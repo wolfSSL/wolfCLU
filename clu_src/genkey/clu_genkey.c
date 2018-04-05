@@ -429,6 +429,9 @@ int wolfCLU_genKey_RSA(RNG* rng, char* fName, int directive, int fmt, int
 #endif
 }
 
+#endif /* WOLFSSL_KEY_GEN && !NO_ASN*/
+
+
 /*
  * makes a cyptographically secure key by stretching a user entered pwdKey
  */
@@ -458,4 +461,3 @@ int wolfCLU_genKey_PWDBASED(RNG* rng, byte* pwdKey, int size, byte* salt, int pa
     return 0;
 }
 
-#endif /* WOLFSSL_KEY_GEN && !NO_ASN*/
