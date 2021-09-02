@@ -1,52 +1,30 @@
-# Prerequisites
-*.d
-
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
+clu_src/stamp*
+libtool
+wolfssl_clu-config
+clu_src/config.h
+Makefile
+Makefile.in
+aclocal.m4
+aminclude.am
+autom4te.cache/
+config.log
+config.status
+configure
+clu_src/config.h.in*
 *.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+*.Plo
+*.o
+lt*.m4
+*.libs
+*.cache
+*.la
+*.patch
+*.deps
+*.libs
+*.dirstamp
+build-aux/*
+m4/libtool.m4
+wolfssl
+test-suite.log
+tests/x509/x509-process-test.sh.log
+tests/x509/x509-process-test.sh.trs
