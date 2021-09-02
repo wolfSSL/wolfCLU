@@ -19,7 +19,7 @@ AC_CANONICAL_HOST
 AC_CANONICAL_BUILD
 
 
-AM_INIT_AUTOMAKE([1.11 -Wall -Werror -Wno-portability foreign tar-ustar subdir-objects no-define color-tests])
+AM_INIT_AUTOMAKE([1.14.1 -Wall -Werror -Wno-portability foreign tar-ustar subdir-objects no-define color-tests])
 
 AC_ARG_PROGRAM
 AC_DEFUN([PROTECT_AC_USE_SYSTEM_EXTENSIONS],
@@ -78,11 +78,6 @@ TAO_REQUIRE_LIBWOLFSSL
 # since we have autoconf available, we can use wolfssl options header
 AM_CFLAGS="$AM_CFLAGS -DHAVE_WOLFSSL_OPTIONS"
 
-# capture user C_EXTRA_FLAGS from ./configure line, CFLAGS may hold -g -O2 even
-# if user doesn't override, no way to tell
-USER_C_EXTRA_FLAGS="$C_EXTRA_FLAGS"
-CFLAGS=""
-
 ###############################################
 #                                             #
 #     Need a genKey check                     #
@@ -103,8 +98,12 @@ else
     fi
 fi
 
-# add user C_EXTRA_FLAGS back
-CFLAGS="$CFLAGS $USER_C_EXTRA_FLAGS"
+
+# Add Wall to CFLAGS
+if test "$GCC" = "yes"
+then
+    AM_CFLAGS="$AM_CFLAGS -Wall -Wno-unused"
+fi
 
 CREATE_HEX_VERSION
 AC_SUBST([AM_CPPFLAGS])
