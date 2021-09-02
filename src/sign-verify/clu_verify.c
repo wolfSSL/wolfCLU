@@ -197,7 +197,7 @@ int wolfCLU_verify_signature(char* sig, char* hash,
 
         case ED25519_SIG_VER:
         #ifdef HAVE_ED25519
-            hSz;
+            hSz = 0;
             h = fopen(hash,"rb");
             if (h == NULL) {
                 printf("unable to open file %s\n", hash);
