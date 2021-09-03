@@ -32,7 +32,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType) {
         return BAD_FUNC_ARG;
     }
     fseek(f, 0, SEEK_END);
-    fSz = ftell(f);
+    fSz = (int)ftell(f);
 
     byte data[fSz];
 
@@ -91,7 +91,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey) {
         }
 
         fseek(privKeyFile, 0, SEEK_END);
-        privFileSz = ftell(privKeyFile);
+        privFileSz = (int)ftell(privKeyFile);
         byte keyBuf[privFileSz];
         fseek(privKeyFile, 0, SEEK_SET);
         fread(keyBuf, 1, privFileSz, privKeyFile);
@@ -122,7 +122,8 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey) {
         }
         #endif
 
-        ret = wc_RsaSSL_Sign(data, dataSz, outBuf, sizeof(outBuf), &key, &rng);
+        ret = wc_RsaSSL_Sign(data, dataSz, outBuf, (word32)sizeof(outBuf), &key,
+                &rng);
         if (ret < 0) {
             printf("Failed to sign data with RSA private key.\nRET: %d\n", ret);
             return ret;
@@ -177,7 +178,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey) {
         }
 
         fseek(privKeyFile, 0, SEEK_END);
-        privFileSz = ftell(privKeyFile);
+        privFileSz = (int)ftell(privKeyFile);
         byte keyBuf[privFileSz];
         fseek(privKeyFile, 0, SEEK_SET);
         fread(keyBuf, 1, privFileSz, privKeyFile);
@@ -193,7 +194,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey) {
         /* setting up output buffer based on key size */
         byte outBuf[wc_ecc_sig_size(&key)];
         XMEMSET(&outBuf, 0, sizeof(outBuf));
-        outLen = sizeof(outBuf);
+        outLen = (word32)sizeof(outBuf);
 
         /* signing input with ecc priv key to produce signature */
         ret = wc_ecc_sign_hash(data, fSz, outBuf, &outLen, &rng, &key);
@@ -253,7 +254,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out,
         }
 
         fseek(privKeyFile, 0, SEEK_END);
-        privFileSz = ftell(privKeyFile);
+        privFileSz = (int)ftell(privKeyFile);
         byte keyBuf[privFileSz];
         fseek(privKeyFile, 0, SEEK_SET);
         fread(keyBuf, 1, privFileSz, privKeyFile);

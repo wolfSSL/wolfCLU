@@ -76,7 +76,7 @@ int wolfCLU_ecparam(int argc, char** argv)
                 XSTRNCPY(name, optarg, ECC_MAXNAME);
 
                 /* convert name to upper case */
-                for (i = 0; i < XSTRLEN(name); i++)
+                for (i = 0; i < (int)XSTRLEN(name); i++)
                     (void)toupper(name[i]);
 
                 #if 0

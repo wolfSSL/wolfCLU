@@ -210,7 +210,7 @@ int wolfCLU_certSetup(int argc, char** argv)
                 ret = wolfCLU_inpemOuttext(infile, outfile, silent_flag);
             } else {
                 printf("Outfile not set, using stdout\n");
-                outfile = "stdout";
+                outfile = (char*)"stdout";
                 ret = wolfCLU_inpemOuttext(infile, outfile, silent_flag);
             }
             break;

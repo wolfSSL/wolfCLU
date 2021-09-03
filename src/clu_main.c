@@ -42,10 +42,10 @@ static int getMode(char* arg)
     int ret = -1, i = 0;
 
     if (arg != NULL) {
-        int argSz = XSTRLEN(arg);
+        int argSz = (int)XSTRLEN(arg);
         struct option current = mode_options[i];
         while (current.name != NULL) {
-            if (XSTRLEN(current.name) == argSz &&
+            if ((int)XSTRLEN(current.name) == argSz &&
                     XSTRNCMP(arg, current.name, argSz) == 0) {
                 ret = current.val;
                 break;

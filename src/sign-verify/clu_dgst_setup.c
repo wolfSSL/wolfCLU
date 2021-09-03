@@ -23,6 +23,7 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/sign-verify/clu_sign.h>
 #include <wolfclu/sign-verify/clu_verify.h>
+#include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 
 int wolfCLU_dgst_setup(int argc, char** argv)
 {
@@ -242,6 +243,10 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             case WC_SIGNATURE_TYPE_ECC:
                 wc_ecc_free(&ecc);
                 break;
+
+            case WC_SIGNATURE_TYPE_RSA_W_ENC:
+            case WC_SIGNATURE_TYPE_NONE:
+                FALL_THROUGH;
 
             default:
                 printf("key type not yet supported\n");

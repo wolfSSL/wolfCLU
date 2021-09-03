@@ -96,6 +96,7 @@ fi
 
 
 # Add Wall to CFLAGS
+AX_HARDEN_CC_COMPILER_FLAGS
 if test "$GCC" = "yes"
 then
     AM_CFLAGS="$AM_CFLAGS -Wall -Wno-unused"

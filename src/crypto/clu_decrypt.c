@@ -214,5 +214,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     fclose(inFile);
     fclose(outFile);
 
+    (void)mode;
+    (void)alg;
     return ret;
 }

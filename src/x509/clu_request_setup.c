@@ -203,7 +203,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
     if (ret == 0) {
         if (config != NULL) {
-            ret = wolfCLU_readConfig(x509, config, "req");
+            ret = wolfCLU_readConfig(x509, config, (char*)"req");
         }
         else {
             /* if no configure is passed in then get input from command line */
