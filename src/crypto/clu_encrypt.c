@@ -269,5 +269,8 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     /* Use the wolfssl free for rng */
     wc_FreeRng(&rng);
     wolfCLU_freeBins(input, output, NULL, NULL, NULL);
+
+    (void)mode;
+    (void)alg;
     return 0;
 }

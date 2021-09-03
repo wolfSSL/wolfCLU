@@ -185,7 +185,7 @@ void wolfCLU_verifyHelp(int);
 /*
  * certgen help function
  */
-void wolfCLU_certgenHelp();
+void wolfCLU_certgenHelp(void);
 
 
 /* find algorithm for encryption/decryption
@@ -383,7 +383,7 @@ int wolfCLU_version(void);
  *
  *
  */
-int wolfCLU_checkForArg(char* searchTerm, int length, int argc, char** argv);
+int wolfCLU_checkForArg(const char* searchTerm, int length, int argc, char** argv);
 
 /*
  * Verify valid output format

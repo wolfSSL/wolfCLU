@@ -29,10 +29,7 @@
 #define SALT_SIZE       8
 #define DES3_BLOCK_SIZE 24
 
-/*end type casting */
-
-int     loop       =   1;       /* benchmarking loop */
-int     i          =   0;       /* loop variable */
+static int loop = 0;
 
 /*
  * generic help function
@@ -86,7 +83,7 @@ int     i          =   0;       /* loop variable */
  */
 void wolfCLU_verboseHelp()
 {
-    printf("\nwolfssl Command Line Utility version %3.1f\n\n", VERSION);
+    int i;
 
     /* hash options */
     const char* algsenc[] = {        /* list of acceptable algorithms */
@@ -151,6 +148,7 @@ void wolfCLU_verboseHelp()
         , "blake2b"
 #endif
     };
+    printf("\nwolfssl Command Line Utility version %3.1f\n\n", VERSION);
 
     wolfCLU_help();
 
@@ -244,7 +242,8 @@ void wolfCLU_decryptHelp()
  */
 void wolfCLU_hashHelp()
 {
-    printf("\n");
+    int i;
+
     /* hash options */
     const char* algsenc[] = {        /* list of acceptable algorithms */
     "Algorithms: "
@@ -290,7 +289,7 @@ void wolfCLU_hashHelp()
  */
 void wolfCLU_benchHelp()
 {
-    printf("\n");
+    int i;
 
     /* benchmark options */
     const char* algsother[] = {      /* list of acceptable algorithms */
@@ -354,9 +353,11 @@ void wolfCLU_certHelp()
            "\n\n");
 }
 
-void wolfCLU_genKeyHelp() {
+void wolfCLU_genKeyHelp()
+{
+    int i;
 
-        const char* keysother[] = { /* list of acceptable key types */
+    const char* keysother[] = { /* list of acceptable key types */
         "KEYS: "
     #ifndef NO_RSA
         ,"rsa"
@@ -386,8 +387,9 @@ void wolfCLU_genKeyHelp() {
            "\nmykey.pub\n\n");
 }
 
-void wolfCLU_signHelp(int keyType) {
-
+void wolfCLU_signHelp(int keyType)
+{
+    int i;
     const char* keysother[] = { /* list of acceptable key types */
         "KEYS: "
         #ifndef NO_RSA
@@ -434,6 +436,7 @@ void wolfCLU_signHelp(int keyType) {
 }
 
 void wolfCLU_verifyHelp(int keyType) {
+    int i;
     const char* keysother[] = { /* list of acceptable key types */
         "KEYS: "
         #ifndef NO_RSA
@@ -511,6 +514,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     int     ret         = 0;        /* return variable */
     int     nameCheck   = 0;        /* check for acceptable name */
     int     modeCheck   = 0;        /* check for acceptable mode */
+    int     i;
     char*   sz          = 0;        /* key size provided */
     char*   end         = 0;
     char*   tmpAlg      = NULL;
@@ -678,7 +682,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
             XFREE(*mode, NULL, DYNAMIC_TYPE_TMP_BUFFER);
 
         if (ret >= 0) {
-            s = XSTRLEN(tmpMode) + 1;
+            s = (int)XSTRLEN(tmpMode) + 1;
             *mode = (char*)XMALLOC(s, NULL, DYNAMIC_TYPE_TMP_BUFFER);
             if (*mode == NULL) {
                 ret = MEMORY_E;
@@ -964,7 +968,8 @@ int wolfCLU_version()
     return 0;
 }
 
-int wolfCLU_checkForArg(char* searchTerm, int length, int argc, char** argv)
+int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
+        char** argv)
 {
     int i;
     int ret = 0;
@@ -979,11 +984,12 @@ int wolfCLU_checkForArg(char* searchTerm, int length, int argc, char** argv)
             break; /* stop checking if no more args*/
         } else if (XSTRNCMP(searchTerm, "-help", length) == 0 &&
                    XSTRNCMP(argv[i], "-help", XSTRLEN(argv[i])) == 0 &&
-                   (int) XSTRLEN(argv[i]) > 0) {
+                   (int)XSTRLEN(argv[i]) > 0) {
            return 1;
 
-        } else if (XMEMCMP(argv[i], searchTerm, length) == 0 &&
-                   XSTRLEN(argv[i]) == length) {
+        }
+        else if (XMEMCMP(argv[i], searchTerm, length) == 0 &&
+                   (int)XSTRLEN(argv[i]) == length) {
 
             ret = i;
             if (argFound == 1) {
@@ -1005,12 +1011,14 @@ int wolfCLU_checkOutform(char* outform)
         return USER_INPUT_ERROR;
     }
 
-    convert_to_lower(outform, XSTRLEN(outform));
+    convert_to_lower(outform, (int)XSTRLEN(outform));
     if (XSTRNCMP(outform, "pem", 3) == 0) {
         return PEM_FORM;
-    } else if (XSTRNCMP(outform, "der", 3) == 0) {
+    }
+    else if (XSTRNCMP(outform, "der", 3) == 0) {
         return DER_FORM;
-    } else {
+    }
+    else {
         printf("Usage: -outform [PEM/DER]\n");
         printf("\"%s\" is not a valid output format\n", outform);
     }
@@ -1025,12 +1033,14 @@ int wolfCLU_checkInform(char* inform)
         return USER_INPUT_ERROR;
     }
 
-    convert_to_lower(inform, XSTRLEN(inform));
+    convert_to_lower(inform, (int)XSTRLEN(inform));
     if (XSTRNCMP(inform, "pem", 3) == 0) {
         return PEM_FORM;
-    } else if (XSTRNCMP(inform, "der", 3) == 0) {
+    }
+    else if (XSTRNCMP(inform, "der", 3) == 0) {
         return DER_FORM;
-    } else {
+    }
+    else {
         printf("Usage: -inform [PEM/DER]\n");
         printf("\"%s\" is not a valid input format\n", inform);
     }
@@ -1046,7 +1056,7 @@ static void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid,
 
     if (str != NULL) {
         /* strip off newline character if found at the end of str */
-        i = XSTRLEN((const char*)str);
+        i = (int)XSTRLEN((const char*)str);
         while (i >= 0) {
             if (str[i] == '\n') {
                 str[i] = '\0';

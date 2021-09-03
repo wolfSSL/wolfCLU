@@ -40,7 +40,7 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut) {
     }
 
     fseek(keyFile, 0, SEEK_END);
-    keyFileSz = ftell(keyFile);
+    keyFileSz = (int)ftell(keyFile);
     byte keyBuf[keyFileSz];
     fseek(keyFile, 0, SEEK_SET);
     fread(keyBuf, 1, keyFileSz, keyFile);

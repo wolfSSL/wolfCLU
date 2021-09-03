@@ -47,7 +47,7 @@ static int wolfCLU_setAttributes(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* str, int crit)
 {
     char* word, *end;
-    char* deli = ":";
+    char* deli = (char*)":";
     WOLFSSL_X509_EXTENSION *ext;
     WOLFSSL_ASN1_OBJECT *obj;
 
@@ -99,7 +99,7 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseSubjectKeyID(char* str, int crit,
     WOLFSSL_X509_EXTENSION *ext = NULL;
     WOLFSSL_EVP_PKEY *pkey = NULL;
     char* word, *end;
-    char* deli = ",";
+    char* deli = (char*)",";
 
     if (x509 == NULL || str == NULL)
         return NULL;
@@ -166,7 +166,7 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseKeyUsage(char* str, int crit,
     WOLFSSL_ASN1_STRING *data;
     WOLFSSL_X509_EXTENSION *ext = NULL;
     char* word, *end;
-    char* deli = ",";
+    char* deli = (char*)",";
     word16 keyUseFlag = 0;
 
     if (x509 == NULL || str == NULL)
@@ -403,7 +403,7 @@ static int wolfCLU_X509addEntry(WOLFSSL_X509_NAME* name, WOLFSSL_CONF* conf,
     current = (const unsigned char*)wolfSSL_NCONF_get_string(conf, sect, str);
     if (current != NULL) {
         entry = wolfSSL_X509_NAME_ENTRY_create_by_NID(NULL, nid,
-                type, current, strlen((const char*)current));
+                type, current, (int)XSTRLEN((const char*)current));
         wolfSSL_X509_NAME_add_entry(name, entry, -1, 0);
     }
     return 0;

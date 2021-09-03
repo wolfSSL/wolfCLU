@@ -24,8 +24,9 @@
 #include <wolfclu/sign-verify/clu_sign.h> /* for RSA_SIG_VER, ECC_SIG_VER,
                                              ED25519_SIG_VER */
 
-byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
-                                      int* outBufSz) {
+static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
+                                      int* outBufSz)
+{
 #ifndef NO_RSA
     int ret;
     int privFileSz;
@@ -59,7 +60,7 @@ byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
         return NULL;
     }
     fseek(privKeyFile, 0, SEEK_END);
-    privFileSz = ftell(privKeyFile);
+    privFileSz = (int)ftell(privKeyFile);
     keyBuf = malloc(privFileSz);
     if (keyBuf != NULL) {
         fseek(privKeyFile, 0, SEEK_SET);
@@ -99,7 +100,8 @@ byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
 #endif
 }
 
-int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf) {
+static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
+{
 #ifdef HAVE_ED25519
     int ret;
     word32 outLen = ED25519_KEY_SIZE;
@@ -149,7 +151,7 @@ int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf) {
 int wolfCLU_verify_signature(char* sig, char* hash,
                              char* out, char* keyPath, int keyType, int pubIn) {
 
-    int hSz;
+    int hSz = 0;
     int fSz;
     int ret;
 
@@ -163,7 +165,7 @@ int wolfCLU_verify_signature(char* sig, char* hash,
     }
 
     fseek(f, 0, SEEK_END);
-    fSz = ftell(f);
+    fSz = (int)ftell(f);
 
     byte data[fSz];
     fseek(f, 0, SEEK_SET);
@@ -184,9 +186,9 @@ int wolfCLU_verify_signature(char* sig, char* hash,
             }
 
             fseek(h, 0, SEEK_END);
-            hSz = ftell(h);
+            hSz = (int)ftell(h);
 
-            h_mssg = malloc(hSz);
+            h_mssg = (byte*)malloc(hSz);
 
             fseek(h, 0, SEEK_SET);
             fread(h_mssg, 1, hSz, h);
@@ -197,7 +199,6 @@ int wolfCLU_verify_signature(char* sig, char* hash,
 
         case ED25519_SIG_VER:
         #ifdef HAVE_ED25519
-            hSz;
             h = fopen(hash,"rb");
             if (h == NULL) {
                 printf("unable to open file %s\n", hash);
@@ -206,9 +207,9 @@ int wolfCLU_verify_signature(char* sig, char* hash,
             }
 
             fseek(h, 0, SEEK_END);
-            hSz = ftell(h);
+            hSz = (int)ftell(h);
 
-            h_mssg = malloc(hSz);
+            h_mssg = (byte*)malloc(hSz);
 
             fseek(h, 0, SEEK_SET);
             fread(h_mssg, 1, hSz, h);
@@ -255,7 +256,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         }
 
         fseek(keyPathFile, 0, SEEK_END);
-        keyFileSz = ftell(keyPathFile);
+        keyFileSz = (int)ftell(keyPathFile);
         keyBuf = (byte*)malloc(keyFileSz*sizeof(keyBuf));
         if (keyBuf != NULL) {
             fseek(keyPathFile, 0, SEEK_SET);
@@ -281,7 +282,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     byte outBuf[wc_RsaEncryptSize(&key)];
     XMEMSET(&outBuf, 0, sizeof(outBuf));
 
-    ret = wc_RsaSSL_Verify(sig, sigSz, outBuf, sizeof(outBuf), &key);
+    ret = wc_RsaSSL_Verify(sig, sigSz, outBuf, (word32)sizeof(outBuf), &key);
     if (ret < 0) {
         printf("Failed to verify data with RSA public key.\nRET: %d\n", ret);
         return ret;
@@ -335,8 +336,8 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     }
 
     fseek(keyPathFile, 0, SEEK_END);
-    keyFileSz = ftell(keyPathFile);
-    keyBuf = malloc(keyFileSz);
+    keyFileSz = (int)ftell(keyPathFile);
+    keyBuf = (byte*)malloc(keyFileSz);
     if (keyBuf != NULL) {
         fseek(keyPathFile, 0, SEEK_SET);
         fread(keyBuf, 1, keyFileSz, keyPathFile);

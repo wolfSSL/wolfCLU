@@ -26,7 +26,7 @@ int wolfCLU_benchSetup(int argc, char** argv)
     int     ret     =   0;          /* return variable */
     int     time    =   3;          /* timer variable */
     int     i, j    =   0;          /* second loop variable */
-    char*   algs[]  =   {           /* list of acceptable algorithms */
+    const char* algs[]  = {         /* list of acceptable algorithms */
 #ifndef NO_AES
         "aes-cbc",
 #endif
@@ -95,7 +95,7 @@ int wolfCLU_benchSetup(int argc, char** argv)
 
     /* pull as many of the algorithms out of the argv as posible */
     for (i = 0; i < (int)algsSz; ++i) {
-        ret = wolfCLU_checkForArg(algs[i], XSTRLEN(algs[i]), argc, argv);
+        ret = wolfCLU_checkForArg(algs[i], (int)XSTRLEN(algs[i]), argc, argv);
         if (ret > 0) {
             option[i] = 1;
             optionCheck = 1;

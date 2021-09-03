@@ -41,7 +41,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid) {
     }
 
     fseek(keyFile, 0, SEEK_END);
-    keyFileSz = ftell(keyFile);
+    keyFileSz = (int)ftell(keyFile);
     byte keyBuf[keyFileSz];
     fseek(keyFile, 0, SEEK_SET);
     fread(keyBuf, 1, keyFileSz, keyFile);

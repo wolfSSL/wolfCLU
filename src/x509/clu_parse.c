@@ -143,7 +143,7 @@ int wolfCLU_printX509PubKey(char* infile, int inform, char* outfile,
     }
 
     /* use stdout if outfile is null */
-    if (ret == 0) {
+    if (ret == 0 && outfile == NULL) {
         bio = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bio == NULL) {
             ret = -1;
@@ -154,6 +154,10 @@ int wolfCLU_printX509PubKey(char* infile, int inform, char* outfile,
                 ret = -1;
             }
         }
+    }
+
+    if (ret == 0 && outfile != NULL) {
+        bio = wolfSSL_BIO_new_file(outfile, "wb");
     }
 
     /* get the size of the pubkey der buffer and alloc it */
@@ -185,6 +189,7 @@ int wolfCLU_printX509PubKey(char* infile, int inform, char* outfile,
     if (der != NULL)
         XFREE(der, NULL, DYNAMIC_TYPE_PUBLIC_KEY);
 
+    (void)silent_flag;
     return ret;
 }
 
@@ -257,7 +262,7 @@ int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
 /*----------------------------------------------------------------------------*/
     else if ( (inform && !outform) ) {
         /* read in the certificate to be processed */
-        inBufSz = fread(inBuf, 1, MAX_CERT_SIZE, instream);
+        inBufSz = (int)fread(inBuf, 1, MAX_CERT_SIZE, instream);
         if (inBufSz <= 0) {
             ret = FREAD_ERROR;
             goto clu_parse_cleanup;
@@ -283,7 +288,7 @@ int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
         }
 
         /* write the result of conversion to the outfile specified */
-        ret = fwrite(outBuf, 1, outBufSz, outstream);
+        ret = (int)fwrite(outBuf, 1, outBufSz, outstream);
         if (ret <= 0) {
             wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
             ret = FWRITE_ERROR;
@@ -303,7 +308,7 @@ int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
 /* read in pem, output der */
 /*----------------------------------------------------------------------------*/
     else if ( (!inform && outform) ) {
-        inBufSz = fread(inBuf, 1, MAX_CERT_SIZE, instream);
+        inBufSz = (int)fread(inBuf, 1, MAX_CERT_SIZE, instream);
         if (inBufSz <= 0) {
             ret = FREAD_ERROR;
             goto clu_parse_cleanup;
@@ -329,7 +334,7 @@ int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
         }
 
         /* write the result of conversion to the outfile specified */
-        ret = fwrite(outBuf, 1, outBufSz, outstream);
+        ret = (int)fwrite(outBuf, 1, outBufSz, outstream);
         if (ret <= 0) {
             wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
             ret = FWRITE_ERROR;

@@ -22,6 +22,7 @@
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/sign-verify/clu_sign.h>
 #include <wolfclu/sign-verify/clu_verify.h>
+#include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 
 int wolfCLU_sign_verify_setup(int argc, char** argv)
 {

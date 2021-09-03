@@ -66,7 +66,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     }
     else {
         /* read hex from string instead */
-        in = wolfSSL_BIO_new_mem_buf(hexIn, strlen(hexIn));
+        in = wolfSSL_BIO_new_mem_buf(hexIn, (int)XSTRLEN(hexIn));
     }
     if (in == NULL) {
         printf("unable to open file %s\n", fileIn);
@@ -106,9 +106,15 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         else {
             char tmp[sizeof(isSalted)];
 
-            wolfSSL_BIO_read(in, tmp, XSTRLEN(isSalted));
+            if (wolfSSL_BIO_read(in, tmp, (int)XSTRLEN(isSalted)) <= 0) {
+                printf("Error reading salted string\n");
+                ret = -1;
+            }
             tmp[XSTRLEN(isSalted)] = '\0';
-            if (XMEMCMP(tmp, isSalted, XSTRLEN(isSalted)) != 0) {
+
+
+            if (ret >= 0 &&
+                    XMEMCMP(tmp, isSalted, (int)XSTRLEN(isSalted)) != 0) {
                 printf("Was expecting salt\n");
                 ret = -1;
             }
@@ -179,8 +185,18 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
 
     /* when encrypting a file write out the salt value generated */
     if (ret >= 0 && enc) {
-        wolfSSL_BIO_write(out, isSalted, XSTRLEN(isSalted));
-        wolfSSL_BIO_write(out, salt, SALT_SIZE);
+        if (wolfSSL_BIO_write(out, isSalted, (int)XSTRLEN(isSalted)) !=
+                (int)XSTRLEN(isSalted)) {
+            printf("issue writing out isSalted\n");
+            ret = -1;
+        }
+    }
+
+    if (ret >= 0 && enc) {
+        if (wolfSSL_BIO_write(out, salt, SALT_SIZE) != SALT_SIZE) {
+            printf("issue writing out salt\n");
+            ret = -1;
+        }
     }
 
     if (printOut) {
@@ -300,6 +316,9 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     wc_FreeRng(&rng);
     wolfCLU_freeBins(input, output, NULL, NULL, NULL);
     wolfSSL_EVP_CIPHER_CTX_free(ctx);
+
+    (void)mode;
+    (void)hexOut;
     return 0;
 }
 

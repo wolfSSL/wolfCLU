@@ -33,7 +33,7 @@
 int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 {
     int ret;                             /* return value */
-    int fOutNmSz = XSTRLEN(fOutNm);      /* file name without append */
+    int fOutNmSz;                        /* file name without append */
     int fOutNmAppendSz = 6;              /* # of bytes to append to file name */
     int flag_outputPub = 0;              /* set if outputting both priv/pub */
     char privAppend[6] = ".priv\0";      /* last part of the priv file name */
@@ -48,6 +48,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
 
     printf("fOutNm = %s\n", fOutNm);
+    fOutNmSz = (int)XSTRLEN(fOutNm);
 
     /*--------------- INIT ---------------------*/
     ret = wc_ed25519_init(&edKeyOut);
@@ -236,7 +237,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                        char* name)
 {
 #ifdef HAVE_ECC
-    int   fNameSz     = XSTRLEN(fName);
+    int   fNameSz;
     int   fExtSz      = 6;
     char  fExtPriv[6] = ".priv\0";
     char  fExtPub[6]  = ".pub\0\0";
@@ -253,6 +254,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
     if (rng == NULL || fName == NULL)
         return BAD_FUNC_ARG;
+    fNameSz = (int)XSTRLEN(fName);
 
     key = wolfSSL_EC_KEY_new();
     if (key == NULL)
@@ -441,7 +443,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     FILE*  file;
     int    ret;
 
-    int   fNameSz     = XSTRLEN(fName);
+    int   fNameSz;
     int   fExtSz      = 6;
     char  fExtPriv[6] = ".priv\0";
     char  fExtPub[6]  = ".pub\0\0";
@@ -458,6 +460,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
     if (rng == NULL || fName == NULL)
         return BAD_FUNC_ARG;
+    fNameSz = (int)XSTRLEN(fName);
 
     if (fmt == PEM_FORM) {
         printf("Der to Pem for rsa key not yet implemented\n");
@@ -498,7 +501,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
             printf("fOutNameBuf = %s\n", fOutNameBuf);
 
-            derBufSz = wc_RsaKeyToDer(&key, derBuf, maxDerBufSz);
+            derBufSz = wc_RsaKeyToDer(&key, derBuf, (word32)maxDerBufSz);
             if (derBufSz < 0) {
                 XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -529,7 +532,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
             printf("fOutNameBuf = %s\n", fOutNameBuf);
 
-            derBufSz = wc_RsaKeyToPublicDer(&key, derBuf, maxDerBufSz);
+            derBufSz = wc_RsaKeyToPublicDer(&key, derBuf, (word32)maxDerBufSz);
             if (derBufSz < 0) {
                 XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
