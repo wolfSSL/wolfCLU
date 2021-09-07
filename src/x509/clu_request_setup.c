@@ -25,6 +25,31 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
+static struct option req_options[] = {
+
+    {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
+    {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
+    {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
+    {"sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
+    {"sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
+    {"rsa",       no_argument,       0, WOLFCLU_RSA       },
+    {"ecc",       no_argument,       0, WOLFCLU_ECC       },
+    {"ed25519",   no_argument,       0, WOLFCLU_ED25519   },
+
+    {"in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"key",       required_argument, 0, WOLFCLU_KEY       },
+    {"new",       no_argument,       0, WOLFCLU_NEW       },
+    {"inkey",     required_argument, 0, WOLFCLU_INKEY     },
+    {"inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
+    {"config",    required_argument, 0, WOLFCLU_CONFIG },
+    {"days",      required_argument, 0, WOLFCLU_DAYS },
+    {"x509",      no_argument,       0, WOLFCLU_X509 },
+
+    {0, 0, 0, 0} /* terminal element */
+};
+
 int wolfCLU_requestSetup(int argc, char** argv)
 {
 #ifndef WOLFSSL_CERT_REQ

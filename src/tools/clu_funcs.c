@@ -31,6 +31,27 @@
 
 static int loop = 0;
 
+static struct option crypt_algo_options[] = {
+    /* AES */
+    {"aes-128-ctr", no_argument, 0, WOLFCLU_AES128CTR},
+    {"aes-192-ctr", no_argument, 0, WOLFCLU_AES192CTR},
+    {"aes-256-ctr", no_argument, 0, WOLFCLU_AES256CTR},
+    {"aes-128-cbc", no_argument, 0, WOLFCLU_AES128CBC},
+    {"aes-192-cbc", no_argument, 0, WOLFCLU_AES192CBC},
+    {"aes-256-cbc", no_argument, 0, WOLFCLU_AES256CBC},
+
+    /* camellia */
+    {"camellia-128-cbc", no_argument, 0, WOLFCLU_CAMELLIA128CBC},
+    {"camellia-192-cbc", no_argument, 0, WOLFCLU_CAMELLIA192CBC},
+    {"camellia-256-cbc", no_argument, 0, WOLFCLU_CAMELLIA256CBC},
+
+    /* 3des */
+    {"des-cbc", no_argument, 0, WOLFCLU_DESCBC},
+    {"d",       no_argument, 0, WOLFCLU_DECRYPT},
+
+    {0, 0, 0, 0} /* terminal element */
+};
+
 /*
  * generic help function
  */
