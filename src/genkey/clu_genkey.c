@@ -92,6 +92,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
         case PRIV_AND_PUB:
             flag_outputPub = 1;
             /* Fall through to PRIV_ONLY */
+            FALL_THROUGH;
         case PRIV_ONLY:
             /* add on the final part of the file name ".priv" */
             XMEMCPY(finalOutFNm+fOutNmSz, privAppend, fOutNmAppendSz);
@@ -114,6 +115,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             if (flag_outputPub == 0) {
                 break;
             } /* else fall through to PUB_ONLY if flag_outputPub == 1*/
+            FALL_THROUGH;
         case PUB_ONLY:
             /* add on the final part of the file name ".pub" */
             XMEMCPY(finalOutFNm+fOutNmSz, pubAppend, fOutNmAppendSz);
@@ -496,6 +498,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     switch(directive) {
         case PRIV_AND_PUB:
             /* Fall through to PRIV_ONLY */
+            FALL_THROUGH;
         case PRIV_ONLY_FILE:
             /* add on the final part of the file name ".priv" */
             XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
@@ -527,6 +530,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             if (directive != PRIV_AND_PUB) {
                 break;
             }
+            FALL_THROUGH;
         case PUB_ONLY_FILE:
             /* add on the final part of the file name ".pub" */
             XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);

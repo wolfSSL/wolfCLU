@@ -66,7 +66,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid) {
     }
     
     wc_InitCert(&newCert);
-    char country[3];
+    char country[CTC_NAME_SIZE];
     char province[CTC_NAME_SIZE];
     char city[CTC_NAME_SIZE];
     char org[CTC_NAME_SIZE];
@@ -77,7 +77,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid) {
     
     printf("Enter your countries 2 digit code (ex: United States -> US): ");
     fgets(country,CTC_NAME_SIZE,stdin);
-    country[sizeof(country)-1] = '\0';
+    country[CTC_NAME_SIZE-1] = '\0';
     printf("Enter the name of the province you are located at: ");
     fgets(province,CTC_NAME_SIZE,stdin);
     printf("Enter the name of the city you are located at: ");
@@ -93,7 +93,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid) {
     printf("Enter the number of days this certificate should be valid: ");
     fgets(daysValid,CTC_NAME_SIZE,stdin);
     
-    strncpy(newCert.subject.country, country, sizeof(country));
+    strncpy(newCert.subject.country, country, CTC_NAME_SIZE);
     strncpy(newCert.subject.state, province, CTC_NAME_SIZE);
     strncpy(newCert.subject.locality, city, CTC_NAME_SIZE);
     strncpy(newCert.subject.org, org, CTC_NAME_SIZE);

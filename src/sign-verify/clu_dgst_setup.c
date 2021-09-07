@@ -25,6 +25,20 @@
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 
+static struct option dgst_options[] = {
+
+    {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
+    {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
+    {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
+    {"sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
+    {"sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
+
+    {"signature", required_argument, 0, WOLFCLU_INFILE    },
+    {"verify",    required_argument, 0, WOLFCLU_VERIFY    },
+
+    {0, 0, 0, 0} /* terminal element */
+};
+
 int wolfCLU_dgst_setup(int argc, char** argv)
 {
     WOLFSSL_BIO *sigBio = NULL;

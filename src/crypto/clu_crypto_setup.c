@@ -22,6 +22,28 @@
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_optargs.h>
 
+static struct option crypt_options[] = {
+    {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
+    {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
+    {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
+    {"sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
+    {"sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
+
+    {"in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"pwd",       required_argument, 0, WOLFCLU_PASSWORD  },
+    {"key",       required_argument, 0, WOLFCLU_KEY       },
+    {"iv",        required_argument, 0, WOLFCLU_IV        },
+    {"inkey",     required_argument, 0, WOLFCLU_INKEY     },
+    {"output",    required_argument, 0, WOLFCLU_OUTPUT    },
+    {"pbkdf2",    no_argument,       0, WOLFCLU_PBKDF2    },
+    {"md",        required_argument, 0, WOLFCLU_MD        },
+    {"d",         no_argument,       0, WOLFCLU_DECRYPT   },
+    {"p",         no_argument,       0, WOLFCLU_DEBUG     },
+    {"k",         required_argument, 0, WOLFCLU_PASSWORD  },
+
+    {0, 0, 0, 0} /* terminal element */
+};
 
 int wolfCLU_setup(int argc, char** argv, char action)
 {
@@ -166,6 +188,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
             /* The cases above have their arguments converted to lower case */
             if (optarg) convert_to_lower(optarg, (int)XSTRLEN(optarg));
             /* The cases below won't have their argument's molested */
+            FALL_THROUGH;
 
         case WOLFCLU_INFILE:
             in = optarg;
