@@ -31,6 +31,7 @@ ACLOCAL_AMFLAGS= -I m4
 EXTRA_DIST+= tests
 EXTRA_DIST+= manpages
 EXTRA_DIST+= README.md
+EXTRA_DIST+= LICENSE
 
 man_MANS+= manpages/wolfCLU_benchmark.1
 man_MANS+= manpages/wolfCLU_decrypt.1
