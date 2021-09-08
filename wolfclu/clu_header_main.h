@@ -51,6 +51,10 @@
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/signature.h>
 
+#ifdef HAVE_FIPS
+    #include <wolfssl/wolfcrypt/fips_test.h>
+#endif
+
 #ifndef NO_MD5
     #include <wolfssl/wolfcrypt/md5.h>
 #endif

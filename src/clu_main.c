@@ -94,6 +94,15 @@ int main(int argc, char** argv)
         wolfCLU_help();
     }
 
+#ifdef HAVE_FIPS
+    if (wolfCrypt_GetStatus_fips() == IN_CORE_FIPS_E) {
+        printf("Linked to a FIPS version of wolfSSL that has failed the in core\n"
+               "integrity check. ALL FIPS crypto will report ERRORS when used.\n"
+               "To resolve please recompile wolfSSL with the correct integrity\n"
+               "hash. If the issue continues, contact fips @ wolfssl.com\n");
+    }
+#endif
+
     /* If the first string does not have a '-' in front of it then try to
      * get the mode to use i.e. x509, req, version ... this is for
      * compatibility with the behavior of the OpenSSL command line utility
