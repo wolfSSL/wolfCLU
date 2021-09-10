@@ -1,86 +1,55 @@
 # wolfCLU
 
-This is the wolfSSL: Command Line Utility (wolfCLU).
+This is the wolfSSL Command Line Utility (wolfCLU).
 
-## wolfSSL Install
+## wolfSSL Installation
 
-To use this feature, please configure and install wolfssl with the following commands:
+Configure and install wolfSSL with the following commands:
 
 ```
-./configure --enable-pwdbased --enable-opensslextra --enable-keygen --enable-ed25519 --enable-certgen
-
+./autogen.sh # only needed if source pulled from GitHub
+./configure --enable-wolfclu
 make
-
 make check
-```
-
-If that succeeds, run:
-
-```
 sudo make install
 ```
 
-`--enable-pwdbased` is for password based encryption allowing the user
-to specify a unique password known only to him/her self and the
-recipient of the encrypted file.
+## wolfCLU Installation
 
-`--enable-opensslextra` provides utility for a hex to binary conversion of
-hexidecimal values.
+After wolfSSL is installed, install wolfCLU from the wolfCLU root directory:
 
-`--enable-base64encode` enables Base64 encoding (not on by default)
+```
+./autogen.sh # only needed if source pulled from GitHub
+./configure
+make
+make check
+sudo make install
+```
 
-`--enable-keygen` enables key generation (not on by default)
+If wolfSSL was recently installed run `sudo ldconfig` to update the linker cache.
 
+Now, you should be able to use wolfCLU:
 
-Additional features that can be included when configuring wolfssl for
-encryption or decryption are:
+```
+wolfssl -h
+```
 
-        --enable-camellia
-        --enable-des3
-        --enable-blake2
-        --enable-sha512
-        --enable-fortress
+If everything worked, you should see the wolfCLU help message.
 
-Additional features that can be included when configuring wolfssl for
-key generation are:
-
-
-
-##wolfCLU Install
-
-After wolfssl is installed, install wolfCLU.  In the directory
-`wolfssl-examples/wolfCLU` enter the following commands:
-
-    ./autogen.sh
-    ./configure
-    make
-    (optionally) make check OR make test
-    sudo make install
-
-Notes:
-* If `wolfssl` was recently installed run `sudo ldconfig` to update the linker cache.
-
-
-Now you should be able to use the wolfssl command line tool.  To verify type:
-
-    wolfssl -h
-
-If everything worked, you should see the wolfssl help page.
-
-## Example Usages
+## Examples
 
 ### Base64
 
 #### Encode
 
 ```
-./wolfssl -hash base64enc -in README.md > README_encoded.md
+wolfssl -hash base64enc -in README.md > README_encrypted.md
 ```
 
 #### Decode
 
 ```
-./wolfssl -hash base64dec -in README_encoded.md
+wolfssl -hash base64dec -in README_encrypted.md
 ```
 
 ### X509
@@ -90,29 +59,32 @@ wolfssl -x509 -inform pem -in testing-certs/ca-cert.pem -outform der -out output
 wolfssl -x509 -inform der -in testing-certs/ca-cert.der -outform pem -out outputfilename.pem
 ```
 
-### SHA256 hash, sign with RSA2048, then verify with public key 
+### RSA Signature Generation and Verification
 
-####Hash
+#### Hash
 
 ```
 wolfssl -hash sha256 -in README.md -out README.md.sha256
 ```
-####Sign
+
+#### Sign
 
 ```
 wolfssl -rsa -sign -inkey ../certs/client-key.der -in README.md.sha256  -out README.md.signed
 ```
-####Verify with Public Key
+
+#### Verify
 
 ```
 wolfssl -rsa -verify -inkey ../certs/client-keyPub.der -sigfile README.md.signed -out README.md.verify -pubin
 ```
+
 At this point, the contents of `README.md.sha256` and `README.md.verify` should be the same.
 
 ## Contacts
 
-Please contact support@wolfssl.com with any questions or comments
+Please contact support@wolfssl.com with any questions or comments.
 
 ## License
 
-Copyright (c) 2006-2020 wolfSSL Inc.
+Copyright (c) 2006-2021 wolfSSL Inc.
