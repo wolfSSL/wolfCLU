@@ -68,12 +68,8 @@ AC_CHECK_FUNCS([gettimeofday memset alarm])
 AC_FUNC_MALLOC
 AC_TYPE_INT64_T
 
-# Requirements
-TAO_REQUIRE_LIBWOLFSSL
-# Have John or Todd assist in writing have_opensslextra.m4
-#TAO_REQUIRE_OPENSSLEXTRA
-# Have John or Todd assist in writing have_pwdbased.m4
-#TAO_REQUIRE_PWDBASED
+# wolfCLU requires libwolfssl.
+AC_CHECK_LIB([wolfssl],[wolfCrypt_Init],,[AC_MSG_ERROR([libwolfssl is required and wasn't found on the system. It can be obtained from https://www.wolfssl.com/download.html/.])])
 
 # since we have autoconf available, we can use wolfssl options header
 AM_CFLAGS="$AM_CFLAGS -DHAVE_WOLFSSL_OPTIONS"
