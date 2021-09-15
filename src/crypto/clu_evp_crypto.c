@@ -143,7 +143,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                 ret = wolfSSL_PKCS5_PBKDF2_HMAC((const char*)pwdKey,
                     (int) strlen((const char*)pwdKey), salt, SALT_SIZE, iter,
                     hashType, keySz + ivSz, pwdKey);
-                if (ret != 0) {
+                if (ret != WOLFSSL_SUCCESS) {
                     printf("failed to create key, ret = %d\n", ret);
                     ret = -1;
                 }
@@ -243,7 +243,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     }
 
     /* loop, encrypt 1kB at a time till length <= 0 */
-    while (length > 0) {
+    while (ret >= 0 && length > 0) {
         /* Read in 1kB to input[] */
         ret = wolfSSL_BIO_read(in, input, WOLFCLU_MAX_BUFFER);
         if (ret < 0) {
