@@ -287,7 +287,8 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
             fread(keyBuf, 1, keyFileSz, keyPathFile);
         }
         fclose(keyPathFile);
-    } else {
+    }
+    else {
         keyBuf = wolfCLU_generate_public_key_rsa(keyPath, keyBuf, &keyFileSz);
         if (keyFileSz < 0) {
                 WOLFCLU_LOG(WOLFCLU_L0, "Failed to derive public key from private key.");
@@ -389,7 +390,8 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
-    } else {
+    }
+    else {
         /* retrieving private key and storing in the Ecc Key */
         ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
         if (ret != 0 ) {
@@ -403,9 +405,11 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     if (ret < 0) {
         WOLFCLU_LOG(WOLFCLU_L0, "Failed to verify data with Ecc public key.\nRET: %d", ret);
         return ret;
-    } else if (stat == 1) {
+    }
+    else if (stat == 1) {
         WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
-    } else {
+    }
+    else {
         WOLFCLU_LOG(WOLFCLU_L0, "Invalid Signature.");
     }
 
@@ -449,8 +453,8 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
         fread(keyBuf, 1, ED25519_KEY_SIZE, keyPathFile);
         fclose(keyPathFile);
 
-    } else {
-
+    }
+    else {
         ret = wolfCLU_generate_public_key_ed25519(keyPath, keyBuf);
         if (ret != 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "Failed to derive public key from private key.");
@@ -471,9 +475,11 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     if (ret != 0) {
         WOLFCLU_LOG(WOLFCLU_L0, "Failed to verify data with ED25519 public key.\nRET: %d", ret);
         return ret;
-    } else if (stat == 1) {
+    }
+    else if (stat == 1) {
         WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
-    } else {
+    }
+    else {
         WOLFCLU_LOG(WOLFCLU_L0, "Invalid Signature.");
     }
 

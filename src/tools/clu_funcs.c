@@ -1006,7 +1006,8 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
     for (i = 0; i < argc; i++) {
         if (argv[i] == NULL) {
             break; /* stop checking if no more args*/
-        } else if (XSTRNCMP(searchTerm, "-help", length) == 0 &&
+        }
+        else if (XSTRNCMP(searchTerm, "-help", length) == 0 &&
                    XSTRNCMP(argv[i], "-help", XSTRLEN(argv[i])) == 0 &&
                    (int)XSTRLEN(argv[i]) > 0) {
            return 1;

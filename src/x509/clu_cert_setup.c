@@ -92,9 +92,11 @@ int wolfCLU_certSetup(int argc, char** argv)
         inform = wolfCLU_checkInform(argv[ret+1]);
         if (inform == PEM_FORM) {
             inpem_flag = 1;
-        } else if (inform == DER_FORM) {
+        }
+        else if (inform == DER_FORM) {
             inder_flag = 1;
-        } else {
+        }
+        else {
             return inform;
         }
     }
@@ -115,16 +117,19 @@ int wolfCLU_certSetup(int argc, char** argv)
         ret = wolfCLU_checkOutform(outform);
         if (ret == PEM_FORM) {
             outpem_flag = 1;
-        } else if (ret == DER_FORM) {
+        }
+        else if (ret == DER_FORM) {
             outder_flag = 1;
-        } else {
+        }
+        else {
             return ret;
         }
-    } else if (text_flag == 0 && text_pubkey == 0) {
+    }
+    else if (text_flag == 0 && text_pubkey == 0) {
         return ret;
     }
 
-    
+
 
 /*---------------------------------------------------------------------------*/
 /* in file */
@@ -134,14 +139,16 @@ int wolfCLU_certSetup(int argc, char** argv)
        /* set flag for in file and flag for input file OK if exists
         * check for error case below. If no error then read in file */
        infile = argv[ret+1];
-    } else {
+    }
+    else {
         return ret;
     }
 
     if (access(infile, F_OK) != -1) {
         WOLFCLU_LOG(WOLFCLU_L0, "input file is \"%s\"", infile);
         infile_flag = 1;
-    } else {
+    }
+    else {
         WOLFCLU_LOG(WOLFCLU_L0, "ERROR: input file \"%s\" does not exist", infile);
         return INPUT_FILE_ERROR;
     }
@@ -154,16 +161,18 @@ int wolfCLU_certSetup(int argc, char** argv)
          * then write outfile */
         outfile_flag = 1;
         outfile = argv[ret+1];
-    } else if (text_flag == 0 && text_pubkey == 0) {
+    }
+    else if (text_flag == 0 && text_pubkey == 0) {
         return ret;
     }
 
     if (outfile != NULL) {
         if (access(outfile, F_OK) != -1) {
             WOLFCLU_LOG(WOLFCLU_L0, "output file set: \"%s\"", outfile);
-        } else {
-            WOLFCLU_LOG(WOLFCLU_L0, "output file \"%s\"did not exist, it will be created.",
-                                                                       outfile);
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "output file \"%s\"did not exist, it will"
+                   " be created.", outfile);
         }
     }
 /*---------------------------------------------------------------------------*/
@@ -209,7 +218,8 @@ int wolfCLU_certSetup(int argc, char** argv)
         case INPEM_OUTTEXT:
             if (outfile_flag) {
                 ret = wolfCLU_inpemOuttext(infile, outfile, silent_flag);
-            } else {
+            }
+            else {
                 WOLFCLU_LOG(WOLFCLU_L0, "Outfile not set, using stdout");
                 outfile = (char*)"stdout";
                 ret = wolfCLU_inpemOuttext(infile, outfile, silent_flag);

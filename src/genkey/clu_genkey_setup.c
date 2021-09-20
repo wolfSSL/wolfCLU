@@ -57,12 +57,14 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     if (ret > 0) {
         if (argv[ret+1] != NULL) {
             XSTRNCPY(keyOutFName, argv[ret+1], XSTRLEN(argv[ret+1]));
-        } else {
+        }
+        else {
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: No output file name specified");
             wolfCLU_genKeyHelp();
             return USER_INPUT_ERROR;
         }
-    } else {
+    }
+    else {
         WOLFCLU_LOG(WOLFCLU_L0, "ERROR: Please specify an output file name");
         wolfCLU_genKeyHelp();
         return USER_INPUT_ERROR;
@@ -76,7 +78,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     if (ret == PEM_FORM || ret == DER_FORM) {
         WOLFCLU_LOG(WOLFCLU_L0, "OUTPUT A %s FILE", (ret == PEM_FORM)? "PEM": "DER");
         formatArg = ret;
-    } else {
+    }
+    else {
         WOLFCLU_LOG(WOLFCLU_L0, "ERROR: \"%s\" is not a valid file format", format);
         return ret;
     }
@@ -84,7 +87,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     /* type of key to generate */
     if (0) {
         /* force fail w/ check on condition "false" */
-    } else if (XSTRNCMP(keyType, "ed25519", 7) == 0) {
+    }
+    else if (XSTRNCMP(keyType, "ed25519", 7) == 0) {
 
     #ifdef HAVE_ED25519
 
@@ -101,7 +105,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                     ret = wolfCLU_genKey_ED25519(&rng, keyOutFName,
                                                        PRIV_AND_PUB, formatArg);
             }
-        } else {
+        }
+        else {
             WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
             ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_AND_PUB,
@@ -114,7 +119,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         return NOT_COMPILED_IN;
     #endif /* HAVE_ED25519 */
 
-    } else if (XSTRNCMP(keyType, "ecc", 3) == 0) {
+    }
+    else if (XSTRNCMP(keyType, "ecc", 3) == 0) {
     #if defined(HAVE_ECC) && defined(WOLFSSL_KEY_GEN)
         /* ECC flags */
         int directiveArg = PRIV_AND_PUB;
@@ -153,8 +159,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             }
         }
 
-        if (name == NULL) { /* if we have the name of curve we know */
-            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use a 32 ECC key");
+        if (name == NULL) { /* if we have the name of curve we know the size */
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: ECC key curve name used");
         }
 
         ret = wolfCLU_genKey_ECC(&rng, keyOutFName, directiveArg,
@@ -165,7 +171,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                "try again");
         return NOT_COMPILED_IN;
     #endif /* HAVE_ECC */
-    } else if (XSTRNCMP(keyType, "rsa", 3) == 0) {
+    }
+    else if (XSTRNCMP(keyType, "rsa", 3) == 0) {
     #if !defined(NO_RSA) && defined(WOLFSSL_KEY_GEN)
         /* RSA flags */
         int directiveArg = PRIV_AND_PUB;
@@ -258,7 +265,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                "try again");
         return NOT_COMPILED_IN;
     #endif /* NO_RSA */
-    } else {
+    }
+    else {
         WOLFCLU_LOG(WOLFCLU_L0, "\"%s\" is an invalid key type, or not compiled in", keyType);
         return USER_INPUT_ERROR;
     }

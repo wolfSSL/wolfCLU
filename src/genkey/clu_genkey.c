@@ -261,7 +261,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
     key = wolfSSL_EC_KEY_new();
     if (key == NULL)
-        return ret;
+        return MEMORY_E;
 
     if (name != NULL) {
         WOLFSSL_EC_GROUP *group;
@@ -271,7 +271,6 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
             WOLFCLU_LOG(WOLFCLU_L0, "unable to set curve");
             ret = -1;
         }
-
 
         if (ret == 0) {
             if (wolfSSL_EC_KEY_set_group(key, group) != WOLFSSL_SUCCESS) {
@@ -291,7 +290,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
     if (ret == 0) {
         bioOut = wolfSSL_BIO_new_file(fName, "wb");
         if (bioOut == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to read outfile %s", fName);
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", fName);
             ret = MEMORY_E;
         }
     }
@@ -316,24 +315,8 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                         }
                     }
                     else {
-                        WOLFSSL_EVP_PKEY *pkey;
 
-                        pkey = wolfSSL_EVP_PKEY_new();
-                        if (pkey == NULL) {
-                            ret = MEMORY_E;
-                        }
-
-                        if (ret == 0) {
-                            wolfSSL_EVP_PKEY_set1_EC_KEY(pkey, key);
-                        }
-
-                        if (ret == 0) {
-                            derSz = wolfSSL_i2d_PrivateKey(pkey, &der);
-                            if (derSz <= 0) {
-                                WOLFCLU_LOG(WOLFCLU_L0, "error converting to der");
-                                ret = -1;
-                            }
-                        }
+                        derSz = wolfSSL_i2d_ECPrivateKey(key, &der);
 
                         if (ret == 0 && derSz > 0) {
                             ret = wolfSSL_BIO_write(bioOut, der, derSz);
@@ -343,9 +326,11 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                             }
                         }
 
-                        if (der != NULL)
-                            free(der);
-                        wolfSSL_EVP_PKEY_free(pkey);
+                        if (der != NULL) {
+                            /* der was created by wolfSSL library so we assume
+                             * that XMALLOC was used and call XFREE here */
+                            XFREE(der, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+                        }
                     }
                 }
                 break;

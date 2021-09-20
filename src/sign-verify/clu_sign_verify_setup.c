@@ -41,11 +41,14 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
 
     if (wolfCLU_checkForArg("-rsa", 4, argc, argv) > 0) {
         algCheck = RSA_SIG_VER;
-    } else if (wolfCLU_checkForArg("-ed25519", 8, argc, argv) > 0) {
+    }
+    else if (wolfCLU_checkForArg("-ed25519", 8, argc, argv) > 0) {
         algCheck = ED25519_SIG_VER;
-    } else if (wolfCLU_checkForArg("-ecc", 4, argc, argv) > 0) {
+    }
+    else if (wolfCLU_checkForArg("-ecc", 4, argc, argv) > 0) {
         algCheck = ECC_SIG_VER;
-    } else {
+    }
+    else {
         return FATAL_ERROR;
     }
 
@@ -82,7 +85,8 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         priv = XMALLOC(XSTRLEN(argv[ret+1]) + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (priv == NULL) {
             return MEMORY_E;
-        } else if (access(argv[ret+1], F_OK) == -1) {
+        }
+        else if (access(argv[ret+1], F_OK) == -1) {
             WOLFCLU_LOG(WOLFCLU_L0, "Inkey file %s did not exist. Please check your options.",
                     argv[ret+1]);
             return MEMORY_E;
@@ -112,7 +116,8 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
                      DYNAMIC_TYPE_TMP_BUFFER);
         if (in == NULL) {
             return MEMORY_E;
-        } else if (access(argv[ret+1], F_OK) == -1) {
+        }
+        else if (access(argv[ret+1], F_OK) == -1) {
             WOLFCLU_LOG(WOLFCLU_L0, "In file did not exist. Please check your options.");
             return MEMORY_E;
         }
@@ -128,7 +133,8 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
                       DYNAMIC_TYPE_TMP_BUFFER);
         if (sig == NULL) {
             return MEMORY_E;
-        } else if (access(argv[ret+1], F_OK) == -1) {
+        }
+        else if (access(argv[ret+1], F_OK) == -1) {
             WOLFCLU_LOG(WOLFCLU_L0, "Signature file did not exist. Please check your options.");
             return MEMORY_E;
         }
@@ -146,8 +152,9 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     if (ret > 0) {
         /* output file */
         out = argv[ret+1];
-    } else {
-        if(algCheck == RSA_SIG_VER) {
+    }
+    else {
+        if (algCheck == RSA_SIG_VER) {
             WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
                    "signing or verifing with RSA.");
             wolfCLU_signHelp(algCheck);
@@ -169,7 +176,8 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     if (inCheck == 0) {
         if (algCheck == RSA_SIG_VER && verifyCheck == 1) {
             /* ignore no -in. RSA verify doesn't check original message */
-        } else {
+        }
+        else {
             WOLFCLU_LOG(WOLFCLU_L0, "Must have input as either a file or standard I/O");
             return FATAL_ERROR;
         }
