@@ -144,7 +144,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     /* create buffers and fill them */
     if (ret == 0) {
-        data = (char*)malloc(dataSz);
+        data = (char*)XMALLOC(dataSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (data == NULL) {
             ret = MEMORY_E;
         }
@@ -157,7 +157,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     }
 
     if (ret == 0) {
-        sig = (char*)malloc(sigSz);
+        sig = (char*)XMALLOC(sigSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (sig == NULL) {
             ret = MEMORY_E;
         }
@@ -269,9 +269,9 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     }
 
     if (data != NULL)
-        free(data);
+        XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (sig != NULL)
-        free(sig);
+        XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     wolfSSL_BIO_free(sigBio);
     wolfSSL_BIO_free(pubKeyBio);

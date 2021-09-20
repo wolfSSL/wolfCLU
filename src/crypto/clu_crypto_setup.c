@@ -110,19 +110,19 @@ int wolfCLU_setup(int argc, char** argv, char action)
     }
 
     /* initialize memory buffers */
-    pwdKey = (byte*) XMALLOC(keySize + block, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    pwdKey = (byte*)XMALLOC(keySize + block, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (pwdKey == NULL)
         return MEMORY_E;
     XMEMSET(pwdKey, 0, keySize + block);
 
-    iv = (byte*) XMALLOC(block, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    iv = (byte*)XMALLOC(block, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (iv == NULL) {
         wolfCLU_freeBins(pwdKey, NULL, NULL, NULL, NULL);
         return MEMORY_E;
     }
     XMEMSET(iv, 0, block);
 
-    key = (byte*) XMALLOC(keySize, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    key = (byte*)XMALLOC(keySize, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (key == NULL) {
         wolfCLU_freeBins(pwdKey, iv, NULL, NULL, NULL);
         return MEMORY_E;
@@ -150,12 +150,20 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
         case WOLFCLU_IV:  /* IV if used must be in hex */
             {
-                char ivString[XSTRLEN(optarg)];
+                char* ivString;
+                ivString = (char*)XMALLOC(XSTRLEN(optarg), HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (ivString == NULL) {
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    return MEMORY_E;
+                }
+
                 XSTRNCPY(ivString, optarg, XSTRLEN(optarg));
                 ret = wolfCLU_hexToBin(ivString, &iv, &ivSize,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL);
+                XFREE(ivString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 if (ret != 0) {
                     printf("failed during conversion of IV, ret = %d\n",
                            ret);
@@ -219,12 +227,21 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 return FATAL_ERROR;
             }
             else {
-                char keyString[strlen(optarg)];
+                char* keyString;
+
+                keyString = (char*)XMALLOC(XSTRLEN(optarg), HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (keyString == NULL) {
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    return MEMORY_E;
+                }
+
                 XSTRNCPY(keyString, optarg, XSTRLEN(optarg));
                 ret = wolfCLU_hexToBin(keyString, &key, &numBits,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL);
+                XFREE(keyString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 if (ret != 0) {
                     printf("failed during conversion of Key, ret = %d\n",
                            ret);
@@ -375,7 +392,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
 
     if (mode != NULL)
-        XFREE(mode, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     return ret;
 }

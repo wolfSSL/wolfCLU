@@ -120,7 +120,8 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
                 }
 
                 if (ret == 0) {
-                     der = malloc(derSz);
+                     der = (unsigned char*)XMALLOC(derSz, HEAP_HINT,
+                             DYNAMIC_TYPE_TMP_BUFFER);
                      if (der == NULL) {
                          printf("unable to malloc der buffer\n");
                          ret = MEMORY_E;
@@ -142,7 +143,7 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
                 }
 
                 if (der != NULL)
-                    free(der);
+                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             }
             break;
 

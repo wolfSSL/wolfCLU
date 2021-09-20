@@ -61,7 +61,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     }
     fseek(privKeyFile, 0, SEEK_END);
     privFileSz = (int)ftell(privKeyFile);
-    keyBuf = malloc(privFileSz);
+    keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf != NULL) {
         fseek(privKeyFile, 0, SEEK_SET);
         fread(keyBuf, 1, privFileSz, privKeyFile);
@@ -80,7 +80,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     *outBufSz = 2*wc_RsaEncryptSize(&key);
 
     /* setting up output buffer based on privateKeyFile size */
-    outBuf = malloc(*outBufSz);
+    outBuf = (byte*)XMALLOC(*outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (outBuf == NULL) {
         return NULL;
     }
@@ -148,17 +148,23 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
 #endif
 }
 
-int wolfCLU_verify_signature(char* sig, char* hash,
-                             char* out, char* keyPath, int keyType, int pubIn) {
 
+int wolfCLU_verify_signature(char* sig, char* hash, char* out, char* keyPath,
+        int keyType, int pubIn)
+{
     int hSz = 0;
     int fSz;
     int ret;
 
     FILE* h;
-    byte* h_mssg;
-    FILE* f = fopen(sig,"rb");
+    byte* h_mssg = NULL;
+    FILE* f;
 
+    if (sig == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    f = fopen(sig, "rb");
     if (f == NULL) {
         printf("unable to open file %s\n", sig);
         return BAD_FUNC_ARG;
@@ -188,7 +194,12 @@ int wolfCLU_verify_signature(char* sig, char* hash,
             fseek(h, 0, SEEK_END);
             hSz = (int)ftell(h);
 
-            h_mssg = (byte*)malloc(hSz);
+            h_mssg = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (h_mssg == NULL) {
+                ret = MEMORY_E;
+                fclose(hash);
+                break;
+            }
 
             fseek(h, 0, SEEK_SET);
             fread(h_mssg, 1, hSz, h);
@@ -209,7 +220,12 @@ int wolfCLU_verify_signature(char* sig, char* hash,
             fseek(h, 0, SEEK_END);
             hSz = (int)ftell(h);
 
-            h_mssg = (byte*)malloc(hSz);
+            h_mssg = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (h_mssg == NULL) {
+                ret = MEMORY_E;
+                fclose(hash);
+                break;
+            }
 
             fseek(h, 0, SEEK_SET);
             fread(h_mssg, 1, hSz, h);
@@ -223,6 +239,11 @@ int wolfCLU_verify_signature(char* sig, char* hash,
             printf("No valid verify algorithm selected.\n");
             ret = -1;
     }
+
+    if (h_mssg != NULL) {
+        XFREE(h_mssg, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
     return ret;
 }
 
@@ -237,6 +258,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     RsaKey key;
     WC_RNG rng;
     byte* keyBuf = NULL;
+    byte* outBuf = NULL;
 
     XMEMSET(&rng, 0, sizeof(rng));
     XMEMSET(&key, 0, sizeof(key));
@@ -257,7 +279,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
         fseek(keyPathFile, 0, SEEK_END);
         keyFileSz = (int)ftell(keyPathFile);
-        keyBuf = (byte*)malloc(keyFileSz*sizeof(keyBuf));
+        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf != NULL) {
             fseek(keyPathFile, 0, SEEK_SET);
             fread(keyBuf, 1, keyFileSz, keyPathFile);
@@ -273,18 +295,28 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
     /* retrieving public key and storing in the RsaKey */
     ret = wc_RsaPublicKeyDecode(keyBuf, &index, &key, keyFileSz);
+    if (pubIn == 1 && keyBuf != NULL) {
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
     if (ret < 0 ) {
         printf("Failed to decode public key.\nRET: %d\n", ret);
         return ret;
     }
 
     /* setting up output buffer based on key size */
-    byte outBuf[wc_RsaEncryptSize(&key)];
-    XMEMSET(&outBuf, 0, sizeof(outBuf));
+    outBufSz = wc_RsaEncryptSize(&key);
+    outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (outBuf == NULL) {
+        printf("Failed to malloc output buffer\n");
+        return MEMORY_E;
+    }
+    XMEMSET(&outBuf, 0, outBufSz);
 
-    ret = wc_RsaSSL_Verify(sig, sigSz, outBuf, (word32)sizeof(outBuf), &key);
+    ret = wc_RsaSSL_Verify(sig, sigSz, outBuf, (word32)outBufSz, &key);
     if (ret < 0) {
         printf("Failed to verify data with RSA public key.\nRET: %d\n", ret);
+        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
     else {
@@ -294,11 +326,14 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
             ret = BAD_FUNC_ARG;
         }
         else {
-            fwrite(outBuf, 1, sizeof(outBuf), s);
+            fwrite(outBuf, 1, outBufSz, s);
             fclose(s);
         }
     }
 
+    if (outBuf != NULL) {
+        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
     return ret;
 #else
     return NOT_COMPILED_IN;
@@ -337,7 +372,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
 
     fseek(keyPathFile, 0, SEEK_END);
     keyFileSz = (int)ftell(keyPathFile);
-    keyBuf = (byte*)malloc(keyFileSz);
+    keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf != NULL) {
         fseek(keyPathFile, 0, SEEK_SET);
         fread(keyBuf, 1, keyFileSz, keyPathFile);
@@ -349,6 +384,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         ret = wc_EccPublicKeyDecode(keyBuf, &index, &key, keyFileSz);
         if (ret < 0 ) {
             printf("Failed to decode public key.\nRET: %d\n", ret);
+            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
     } else {
@@ -356,6 +392,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
         if (ret != 0 ) {
             printf("Failed to decode private key.\nRET: %d\n", ret);
+            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
     }
@@ -385,7 +422,8 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 
     FILE* keyPathFile;
     ed25519_key key;
-    byte* keyBuf = (byte*)malloc(ED25519_KEY_SIZE);
+    byte* keyBuf = (byte*)XMALLOC(ED25519_KEY_SIZE, HEAP_HINT,
+            DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf == NULL) {
         printf("malloc failed\n");
         return MEMORY_E;
@@ -397,7 +435,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     ret = wc_ed25519_init(&key);
     if (ret != 0) {
         printf("Failed to initialize ED25519 key.\nRet: %d", ret);
-        free(keyBuf);
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
 
@@ -414,7 +452,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
         ret = wolfCLU_generate_public_key_ed25519(keyPath, keyBuf);
         if (ret != 0) {
             printf("Failed to derive public key from private key.\n");
-            free(keyBuf);
+            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
     }
@@ -422,10 +460,10 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     ret = wc_ed25519_import_public(keyBuf, ED25519_KEY_SIZE, &key);
     if (ret != 0 ) {
         printf("Failed to decode public key.\nRET: %d\n", ret);
-        free(keyBuf);
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
-    free(keyBuf);
+    XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     ret = wc_ed25519_verify_msg(sig, sigSz, hash, hashSz, &stat, &key);
     if (ret != 0) {
