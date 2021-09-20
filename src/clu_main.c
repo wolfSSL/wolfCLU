@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/clu_error_codes.h>
@@ -90,16 +91,16 @@ int main(int argc, char** argv)
     int     longIndex = 0;
 
     if (argc == 1) {
-        printf("Main Help.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Main Help.");
         wolfCLU_help();
     }
 
 #ifdef HAVE_FIPS
     if (wolfCrypt_GetStatus_fips() == IN_CORE_FIPS_E) {
-        printf("Linked to a FIPS version of wolfSSL that has failed the in core\n"
-               "integrity check. ALL FIPS crypto will report ERRORS when used.\n"
-               "To resolve please recompile wolfSSL with the correct integrity\n"
-               "hash. If the issue continues, contact fips @ wolfssl.com\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Linked to a FIPS version of wolfSSL that has failed the in core"
+               "integrity check. ALL FIPS crypto will report ERRORS when used."
+               "To resolve please recompile wolfSSL with the correct integrity"
+               "hash. If the issue continues, contact fips @ wolfssl.com");
     }
 #endif
 
@@ -117,7 +118,7 @@ int main(int argc, char** argv)
 
     switch (flag) {
         case 0:
-            printf("No mode provided.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "No mode provided.");
             ret = 0;
             break;
 
@@ -184,7 +185,7 @@ int main(int argc, char** argv)
 
         case WOLFCLU_HELP:
             /* only print for -help if no mode has been declared */
-            printf("Main help menu:\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Main help menu:");
             wolfCLU_help();
             return 0;
 
@@ -197,13 +198,13 @@ int main(int argc, char** argv)
             return 0;
 
         default:
-            printf("Unknown mode\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Unknown mode");
             wolfCLU_help();
             return -1;
     }
 
     if (ret < 0)
-        printf("Error returned: %d.\n", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "Error returned: %d.", ret);
 
     return ret;
 }

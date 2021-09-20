@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/version.h>
 #include <wolfclu/x509/clu_cert.h>        /* for PEM_FORM and DER_FORM */
@@ -56,47 +57,47 @@ static struct option crypt_algo_options[] = {
  * generic help function
  */
  void wolfCLU_help()
- {  printf("\n");
-    printf("-help           Help, print out this help menu\n");
-    printf("\n");
-    printf("Only set one of the following.\n\n");
-    printf("-encrypt        Encrypt a file or some user input\n");
-    printf("-decrypt        Decrypt an encrypted file\n");
-    printf("-hash           Hash a file or input\n");
-    printf("-bench          Benchmark one of the algorithms\n");
-    printf("-x509           X509 certificate processing\n");
-    printf("-req            Request for certificate generation\n");
-    printf("-rsa            Rsa signing and signature verification\n");
-    printf("-ecc            Ecc signing and signature verification\n");
-    printf("-ed25519        Ed25519 signing and signature verification\n");
-    printf("\n");
+ {  WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, "-help           Help, print out this help menu");
+    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, "Only set one of the following.\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "-encrypt        Encrypt a file or some user input");
+    WOLFCLU_LOG(WOLFCLU_L0, "-decrypt        Decrypt an encrypted file");
+    WOLFCLU_LOG(WOLFCLU_L0, "-hash           Hash a file or input");
+    WOLFCLU_LOG(WOLFCLU_L0, "-bench          Benchmark one of the algorithms");
+    WOLFCLU_LOG(WOLFCLU_L0, "-x509           X509 certificate processing");
+    WOLFCLU_LOG(WOLFCLU_L0, "-req            Request for certificate generation");
+    WOLFCLU_LOG(WOLFCLU_L0, "-rsa            Rsa signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "-ecc            Ecc signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "-ed25519        Ed25519 signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "");
     /*optional flags*/
-    printf("Optional Flags.\n\n");
-    printf("-in             input file to manage\n");
-    printf("-out            file to output as a result of option\n");
-    printf("-pwd            user custom password\n");
-    printf("-iv             user custom IV (hex input only)\n");
-    printf("-key            user custom key(hex input only)\n");
-    printf("-verify         when using -iv and -key this will print result of\n"
-           "                encryption for user verification.\n"
-           "                This flag takes no arguments.\n");
-    printf("-time           used by Benchmark, set time in seconds to run.\n");
-    printf("-verbose        display a more verbose help menu\n");
-    printf("-inform         input format of the certificate file [PEM/DER]\n");
-    printf("-outform        format to output [PEM/DER]\n");
-    printf("-output         used with -genkey option to specify which keys to\n"
-           "                output [PUB/PRIV/KEYPAIR]\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "Optional Flags.\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "-in             input file to manage");
+    WOLFCLU_LOG(WOLFCLU_L0, "-out            file to output as a result of option");
+    WOLFCLU_LOG(WOLFCLU_L0, "-pwd            user custom password");
+    WOLFCLU_LOG(WOLFCLU_L0, "-iv             user custom IV (hex input only)");
+    WOLFCLU_LOG(WOLFCLU_L0, "-key            user custom key(hex input only)");
+    WOLFCLU_LOG(WOLFCLU_L0, "-verify         when using -iv and -key this will print result of"
+           "                encryption for user verification."
+           "                This flag takes no arguments.");
+    WOLFCLU_LOG(WOLFCLU_L0, "-time           used by Benchmark, set time in seconds to run.");
+    WOLFCLU_LOG(WOLFCLU_L0, "-verbose        display a more verbose help menu");
+    WOLFCLU_LOG(WOLFCLU_L0, "-inform         input format of the certificate file [PEM/DER]");
+    WOLFCLU_LOG(WOLFCLU_L0, "-outform        format to output [PEM/DER]");
+    WOLFCLU_LOG(WOLFCLU_L0, "-output         used with -genkey option to specify which keys to"
+           "                output [PUB/PRIV/KEYPAIR]");
 
-    printf("\nFor encryption: wolfssl -encrypt -help\n");
-    printf("For decryption:   wolfssl -decrypt -help\n");
-    printf("For hashing:      wolfssl -hash -help\n");
-    printf("For benchmarking: wolfssl -bench -help\n");
-    printf("For x509:         wolfssl -x509 -help\n");
-    printf("For key creation: wolfssl -genkey -help\n");
-    printf("For certificate creation: wolfssl -req -help\n");
-    printf("For RSA sign/ver: wolfssl -rsa -help\n");
-    printf("For ECC sign/ver: wolfssl -ecc -help\n");
-    printf("For ED25519 sign/ver: wolfssl -ed25519 -help\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nFor encryption: wolfssl -encrypt -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For decryption:   wolfssl -decrypt -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For hashing:      wolfssl -hash -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For benchmarking: wolfssl -bench -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For x509:         wolfssl -x509 -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For key creation: wolfssl -genkey -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For certificate creation: wolfssl -req -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For RSA sign/ver: wolfssl -rsa -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For ECC sign/ver: wolfssl -ecc -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For ED25519 sign/ver: wolfssl -ed25519 -help");
  }
 
 /*
@@ -169,36 +170,36 @@ void wolfCLU_verboseHelp()
         , "blake2b"
 #endif
     };
-    printf("\nwolfssl Command Line Utility version %3.1f\n\n", VERSION);
+    WOLFCLU_LOG(WOLFCLU_L0, "\nwolfssl Command Line Utility version %3.1f\n", VERSION);
 
     wolfCLU_help();
 
-    printf("Available En/De crypt Algorithms with current configure "
-        "settings.\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "Available En/De crypt Algorithms with current configure "
+        "settings.\n");
 #ifndef NO_AES
-    printf("aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
 #endif
 #ifdef WOLFSSL_AES_COUNTER
-    printf("aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
 #endif
 #ifndef NO_DES3
-    printf("3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168");
 #endif
 #ifdef HAVE_CAMELLIA
-    printf("camellia-cbc-128\tcamellia-cbc-192\t"
-            "camellia-cbc-256\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
+            "camellia-cbc-256");
 #endif
-    printf("\n");
-    printf("Available hashing algorithms with current configure settings:\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, "Available hashing algorithms with current configure settings:\n");
 
     for (i = 0; i < (int) sizeof(algsenc)/(int) sizeof(algsenc[0]); i++) {
-            printf("%s\n", algsenc[i]);
+            WOLFCLU_LOG(WOLFCLU_L0, "%s", algsenc[i]);
     }
-    printf("Available benchmark tests with current configure settings:\n");
-    printf("(-a to test all)\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "Available benchmark tests with current configure settings:");
+    WOLFCLU_LOG(WOLFCLU_L0, "(-a to test all)\n");
 
     for(i = 0; i < (int) sizeof(algsother)/(int) sizeof(algsother[0]); i++) {
-        printf("%s\n", algsother[i]);
+        WOLFCLU_LOG(WOLFCLU_L0, "%s", algsother[i]);
     }
 }
 
@@ -207,27 +208,27 @@ void wolfCLU_verboseHelp()
  */
 void wolfCLU_encryptHelp()
 {
-    printf("\nAvailable En/De crypt Algorithms with current configure "
-            "settings.\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable En/De crypt Algorithms with current configure "
+            "settings.\n");
 #ifndef NO_AES
-    printf("aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
 #endif
 #ifdef WOLFSSL_AES_COUNTER
-    printf("aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
 #endif
 #ifndef NO_DES3
-    printf("3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168");
 #endif
 #ifdef HAVE_CAMELLIA
-    printf("camellia-cbc-128\tcamellia-cbc-192\t"
-            "camellia-cbc-256\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
+            "camellia-cbc-256\n");
 #endif
-    printf("***************************************************************\n");
-    printf("\nENCRYPT USAGE: wolfssl -encrypt <-algorithm> -in <filename> "
-           "-pwd <password> -out <output file name>\n\n");
-    printf("***************************************************************\n");
-    printf("\nEXAMPLE: \n\nwolfssl -encrypt aes-cbc-128 -pwd Thi$i$myPa$$w0rd"
-           " -in somefile.txt -out encryptedfile.txt\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nENCRYPT USAGE: wolfssl -encrypt <-algorithm> -in <filename> "
+           "-pwd <password> -out <output file name>\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -encrypt aes-cbc-128 -pwd Thi$i$myPa$$w0rd"
+           " -in somefile.txt -out encryptedfile.txt\n");
 }
 
 /*
@@ -235,27 +236,27 @@ void wolfCLU_encryptHelp()
  */
 void wolfCLU_decryptHelp()
 {
-    printf("\nAvailable En/De crypt Algorithms with current configure "
-            "settings.\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable En/De crypt Algorithms with current configure "
+            "settings.\n");
 #ifndef NO_AES
-    printf("aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
 #endif
 #ifdef WOLFSSL_AES_COUNTER
-    printf("aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
 #endif
 #ifndef NO_DES3
-    printf("3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168");
 #endif
 #ifdef HAVE_CAMELLIA
-    printf("camellia-cbc-128\tcamellia-cbc-192\t"
-            "camellia-cbc-256\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
+            "camellia-cbc-256\n");
 #endif
-    printf("***************************************************************\n");
-    printf("\nDECRYPT USAGE: wolfssl -decrypt <algorithm> -in <encrypted file> "
-           "-pwd <password> -out <output file name>\n\n");
-    printf("***************************************************************\n");
-    printf("\nEXAMPLE: \n\nwolfssl -decrypt aes-cbc-128 -pwd Thi$i$myPa$$w0rd"
-           " -in encryptedfile.txt -out decryptedfile.txt\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nDECRYPT USAGE: wolfssl -decrypt <algorithm> -in <encrypted file> "
+           "-pwd <password> -out <output file name>\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -decrypt aes-cbc-128 -pwd Thi$i$myPa$$w0rd"
+           " -in encryptedfile.txt -out decryptedfile.txt\n");
 }
 
 /*
@@ -294,15 +295,15 @@ void wolfCLU_hashHelp()
 #endif
         };
 
-    printf("\nAvailable algorithms with current configure settings:\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable algorithms with current configure settings:");
     for (i = 0; i < (int) sizeof(algsenc)/(int) sizeof(algsenc[0]); i++) {
-        printf("%s\n", algsenc[i]);
+        WOLFCLU_LOG(WOLFCLU_L0, "%s", algsenc[i]);
     }
             /* encryption/decryption help lists options */
-    printf("***************************************************************\n");
-    printf("\nUSAGE: wolfssl -hash <-algorithm> -in <file to hash>\n");
-    printf("***************************************************************\n");
-    printf("\nEXAMPLE: \n\nwolfssl -hash sha -in <some file>\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nUSAGE: wolfssl -hash <-algorithm> -in <file to hash>");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -hash sha -in <some file>\n");
 }
 
 /*
@@ -347,31 +348,31 @@ void wolfCLU_benchHelp()
 #endif
     };
 
-    printf("\nAvailable tests: (-a to test all)\n");
-    printf("Available tests with current configure settings:\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable tests: (-a to test all)");
+    WOLFCLU_LOG(WOLFCLU_L0, "Available tests with current configure settings:");
     for(i = 0; i < (int) sizeof(algsother)/(int) sizeof(algsother[0]); i++) {
-        printf("%s\n", algsother[i]);
+        WOLFCLU_LOG(WOLFCLU_L0, "%s", algsother[i]);
     }
-    printf("\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "");
             /* encryption/decryption help lists options */
-    printf("***************************************************************\n");
-    printf("USAGE: wolfssl -bench [alg] -time [time in seconds [1-10]]\n"
-           "       or\n       wolfssl -bench -time 10 -all (to test all)\n");
-    printf("***************************************************************\n");
-    printf("\nEXAMPLE: \n\nwolfssl -bench aes-cbc -time 10"
-           " -in encryptedfile.txt -out decryptedfile.txt\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "USAGE: wolfssl -bench [alg] -time [time in seconds [1-10]]"
+           "       or\n       wolfssl -bench -time 10 -all (to test all)");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -bench aes-cbc -time 10"
+           " -in encryptedfile.txt -out decryptedfile.txt\n");
 }
 
 void wolfCLU_certHelp()
 {
-    printf("\n\n");
-    printf("***************************************************************\n");
-    printf("\nX509 USAGE: wolfssl -x509 -inform <PEM or DER> -in <filename> "
-           "-outform <PEM or DER> -out <output file name> \n\n");
-    printf("***************************************************************\n");
-    printf("\nEXAMPLE: \n\nwolfssl -x509 -inform pem -in testing-certs/"
+    WOLFCLU_LOG(WOLFCLU_L0, "\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nX509 USAGE: wolfssl -x509 -inform <PEM or DER> -in <filename> "
+           "-outform <PEM or DER> -out <output file name> \n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -x509 -inform pem -in testing-certs/"
            "ca-cert.pem -outform der -out testing-certs/ca-cert-converted.der"
-           "\n\n");
+           "\n");
 }
 
 void wolfCLU_genKeyHelp()
@@ -391,21 +392,21 @@ void wolfCLU_genKeyHelp()
     #endif
         };
 
-        printf("Available keys with current configure settings:\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Available keys with current configure settings:");
         for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
-            printf("%s\n", keysother[i]);
+            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
         }
-    printf("\n\n");
-    printf("***************************************************************\n");
-    printf("\ngenkey USAGE:\nwolfssl -genkey <keytype> -size(optional) <bits> "
-           "-out <filename> -outform <PEM or DER> -output <PUB/PRIV/KEYPAIR> \n\n");
-    printf("***************************************************************\n");
-    printf("\nEXAMPLE: \n\nwolfssl -genkey rsa -size 2048 -out mykey -outform der "
+    WOLFCLU_LOG(WOLFCLU_L0, "\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\ngenkey USAGE:\nwolfssl -genkey <keytype> -size(optional) <bits> "
+           "-out <filename> -outform <PEM or DER> -output <PUB/PRIV/KEYPAIR> \n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -genkey rsa -size 2048 -out mykey -outform der "
            " -output KEYPAIR"
            "\n\nThe above command would output the files: mykey.priv "
            " and mykey.pub\nChanging the -output option to just PRIV would only"
            "\noutput the mykey.priv and using just PUB would only output"
-           "\nmykey.pub\n\n");
+           "\nmykey.pub\n");
 }
 
 void wolfCLU_signHelp(int keyType)
@@ -424,35 +425,35 @@ void wolfCLU_signHelp(int keyType)
         #endif
         };
 
-        printf("\nAvailable keys with current configure settings:\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable keys with current configure settings:");
         for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
-            printf("%s\n", keysother[i]);
+            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
         }
         
-        printf("\n***************************************************************\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "\n***************************************************************");
         switch(keyType) {
             #ifndef NO_RSA
             case RSA_SIG_VER:
-                printf("RSA Sign Usage: \nwolfssl -rsa -sign -inkey <priv_key>"
-                       " -in <filename> -out <filename>\n\n");
-                printf("***************************************************************\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "RSA Sign Usage: \nwolfssl -rsa -sign -inkey <priv_key>"
+                       " -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
             #endif
             #ifdef HAVE_ED25519
             case ED25519_SIG_VER:
-                printf("ED25519 Sign Usage: \nwolfssl -ed25519 -sign -inkey "
-                       "<priv_key> -in <filename> -out <filename>\n\n");
-                printf("***************************************************************\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Sign Usage: \nwolfssl -ed25519 -sign -inkey "
+                       "<priv_key> -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
             #endif
             #ifdef HAVE_ECC
             case ECC_SIG_VER:
-                printf("ECC Sign Usage: \nwolfssl -ecc -sign -inkey <priv_key>"
-                       " -in <filename> -out <filename>\n\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "ECC Sign Usage: \nwolfssl -ecc -sign -inkey <priv_key>"
+                       " -in <filename> -out <filename>\n");
                 break;
             #endif
             default:
-                printf("No valid key type defined.\n\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
         }
 }
 
@@ -471,59 +472,59 @@ void wolfCLU_verifyHelp(int keyType) {
         #endif
         };
 
-        printf("\nAvailable keys with current configure settings:\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable keys with current configure settings:");
         for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
-            printf("%s\n", keysother[i]);
+            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
         }
         
-        printf("\n***************************************************************\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "\n***************************************************************");
         switch(keyType) {
             #ifndef NO_RSA
             case RSA_SIG_VER:
-                printf("RSA Verify with Private Key:\n"
+                WOLFCLU_LOG(WOLFCLU_L0, "RSA Verify with Private Key:"
                         "wolfssl -rsa -verify -inkey <priv_key>"
-                        " -sigfile <filename> -out <filename>\n\n");
-                printf("***************************************************************\n");
-                printf("RSA Verify with Public Key\n"
+                        " -sigfile <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                WOLFCLU_LOG(WOLFCLU_L0, "RSA Verify with Public Key"
                        "wolfssl -rsa -verify -inkey <pub_key>"
-                       " -sigfile <filename> -out <filename> -pubin\n\n");
-                printf("***************************************************************\n");
+                       " -sigfile <filename> -out <filename> -pubin\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
             #endif
             #ifdef HAVE_ED25519
             case ED25519_SIG_VER:
-                printf("ED25519 Verifiy with Private Key\n"
+                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verifiy with Private Key"
                        "wolfssl -ed25519 -verify -inkey "
                        "<priv_key> -sigfile <filename> -in <original>"
-                       "\n\n");
-                printf("***************************************************************\n");
-                printf("ED25519 Verifiy with Public Key\n"
+                       "\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verifiy with Public Key"
                        "wolfssl -ed25519 -verify -inkey "
                        "<pub_key> -sigfile <filename> -in <original> -pubin"
-                       "\n\n");
-                printf("***************************************************************\n");
+                       "\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
             #endif
             #ifdef HAVE_ECC
             case ECC_SIG_VER:
-                printf("ECC Verify with Public Key\n"
+                WOLFCLU_LOG(WOLFCLU_L0, "ECC Verify with Public Key"
                        "wolfssl -ecc -verify -inkey <pub_key>"
-                       " -sigfile <signature> -in <original>\n\n");
+                       " -sigfile <signature> -in <original>\n");
                 break;
             #endif
             default:
-                printf("No valid key type defined.\n\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
         }
 }
 
 void wolfCLU_certgenHelp() {
-    printf("\n\n");
-    printf("***************************************************************\n");
-    printf("\ncertgen USAGE:\nwolfssl -req -ecc/-rsa/-ed25519 -in <filename> -out"
-           " <filename> -sha/sha224/sha256/sha384/sha512\n\n");
-    printf("***************************************************************\n");
-    printf("\nEXAMPLE: \n\nwolfssl -req ecc -in mykey -out cert.pem -sha256 "
-           "\n\nThe above command would output the file: cert.pem\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\ncertgen USAGE:\nwolfssl -req -ecc/-rsa/-ed25519 -in <filename> -out"
+           " <filename> -sha/sha224/sha256/sha384/sha512\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -req ecc -in mykey -out cert.pem -sha256 "
+           "\n\nThe above command would output the file: cert.pem");
 }
 
 
@@ -565,7 +566,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     }
 
     if (alg == NULL || mode == NULL || size == NULL) {
-        printf("null input to get algo function\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "null input to get algo function");
         return FATAL_ERROR;
     }
 
@@ -603,19 +604,19 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     /* if name or mode doesn't match acceptable options */
     if (nameCheck == 0 || modeCheck == 0) {
-        printf("Invalid entry\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Invalid entry");
         return FATAL_ERROR;
     }
 
     /* checks key sizes for acceptability */
     if (XSTRNCMP(tmpAlg, "aes", 3) == 0) {
     #ifdef NO_AES
-        printf("AES not compiled in.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "AES not compiled in.");
         return NOT_COMPILED_IN;
     #else
         ret = AES_BLOCK_SIZE;
         if (*size != 128 && *size != 192 && *size != 256) {
-            printf("Invalid AES pwdKey size. Should be: %d\n", ret);
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid AES pwdKey size. Should be: %d", ret);
             ret = FATAL_ERROR;
         }
 
@@ -651,12 +652,12 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     else if (XSTRNCMP(tmpAlg, "3des", 4) == 0) {
     #ifdef NO_DES3
-        printf("3DES not compiled in.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "3DES not compiled in.");
         return NOT_COMPILED_IN;
     #else
         ret = DES3_BLOCK_SIZE;
         if (*size != 56 && *size != 112 && *size != 168) {
-            printf("Invalid 3DES pwdKey size\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid 3DES pwdKey size");
             ret = FATAL_ERROR;
         }
         *alg = WOLFCLU_DESCBC;
@@ -665,12 +666,12 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     else if (XSTRNCMP(tmpAlg, "camellia", 8) == 0) {
     #ifndef HAVE_CAMELLIA
-        printf("CAMELIA not compiled in.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "CAMELIA not compiled in.");
         return NOT_COMPILED_IN;
     #else
         ret = CAMELLIA_BLOCK_SIZE;
         if (*size != 128 && *size != 192 && *size != 256) {
-            printf("Invalid Camellia pwdKey size\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid Camellia pwdKey size");
             ret = FATAL_ERROR;
         }
 
@@ -691,7 +692,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     }
 
     else {
-        printf("Invalid algorithm: %s\n", tmpAlg);
+        WOLFCLU_LOG(WOLFCLU_L0, "Invalid algorithm: %s", tmpAlg);
         ret = FATAL_ERROR;
     }
 
@@ -905,11 +906,11 @@ int wolfCLU_noEcho(char* pwdKey, int size)
     nflags.c_lflag |= ECHONL;
 
     if (tcsetattr(fileno(stdin), TCSANOW, &nflags) != 0) {
-        printf("Error\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Error");
         return FATAL_ERROR;
     }
 
-    printf("pwdKey: ");
+    WOLFCLU_LOG(WOLFCLU_L0, "pwdKey: ");
     success = fgets(pwdKey, size, stdin);
     if (success == NULL) {
         /* User wants manual input to be encrypted
@@ -922,7 +923,7 @@ int wolfCLU_noEcho(char* pwdKey, int size)
     /* restore terminal */
     ret = tcsetattr(fileno(stdin), TCSANOW, &oflags);
     if (ret != 0) {
-        printf("Error\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Error");
         return FATAL_ERROR;
     }
     return 0;
@@ -968,24 +969,26 @@ void wolfCLU_stats(double start, int blockSize, int64_t blocks)
     double mbs;
     double time_total = wolfCLU_getTime() - start;
 
-    printf("took %6.3f seconds, blocks = %llu\n", time_total,
+    WOLFCLU_LOG(WOLFCLU_L0, "took %6.3f seconds, blocks = %llu", time_total,
             (unsigned long long)blocks);
 
     mbs = ((blocks * blockSize) / MEGABYTE) / time_total;
-    printf("Average MB/s = %8.1f\n", mbs);
-    if (blockSize != MEGABYTE)
-        printf("Block size of this algorithm is: %d.\n\n", blockSize);
-    else
-        printf("Benchmarked using 1 Megabyte at a time\n\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "Average MB/s = %8.1f", mbs);
+    if (blockSize != MEGABYTE) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Block size of this algorithm is: %d.\n", blockSize);
+    }
+    else {
+        WOLFCLU_LOG(WOLFCLU_L0, "Benchmarked using 1 Megabyte at a time\n");
+    }
 }
 
 
 /* returns 0 on success */
 int wolfCLU_version()
 {
-    printf("You are using version %s of the wolfssl Command Line Utility.\n"
+    WOLFCLU_LOG(WOLFCLU_L0, "You are using version %s of the wolfssl Command Line Utility."
         , CLUWOLFSSL_VERSION_STRING);
-    printf("Linked to wolfSSL version %s\n", LIBWOLFSSL_VERSION_STRING);
+    WOLFCLU_LOG(WOLFCLU_L0, "Linked to wolfSSL version %s", LIBWOLFSSL_VERSION_STRING);
     return 0;
 }
 
@@ -1014,7 +1017,7 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
 
             ret = i;
             if (argFound == 1) {
-                printf("ERROR: argument found twice: \"%s\"\n", searchTerm);
+                WOLFCLU_LOG(WOLFCLU_L0, "ERROR: argument found twice: \"%s\"", searchTerm);
                 return USER_INPUT_ERROR;
             }
             argFound = 1;
@@ -1027,8 +1030,8 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
 int wolfCLU_checkOutform(char* outform)
 {
     if (outform == NULL) {
-        printf("Usage: -outform [PEM/DER]\n");
-        printf("missing outform required argument\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -outform [PEM/DER]");
+        WOLFCLU_LOG(WOLFCLU_L0, "missing outform required argument");
         return USER_INPUT_ERROR;
     }
 
@@ -1040,8 +1043,8 @@ int wolfCLU_checkOutform(char* outform)
         return DER_FORM;
     }
     else {
-        printf("Usage: -outform [PEM/DER]\n");
-        printf("\"%s\" is not a valid output format\n", outform);
+        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -outform [PEM/DER]");
+        WOLFCLU_LOG(WOLFCLU_L0, "\"%s\" is not a valid output format", outform);
     }
     return USER_INPUT_ERROR;
 }
@@ -1049,8 +1052,8 @@ int wolfCLU_checkOutform(char* outform)
 int wolfCLU_checkInform(char* inform)
 {
     if (inform == NULL) {
-        printf("Usage: -inform [PEM/DER]\n");
-        printf("missing inform required argument\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -inform [PEM/DER]");
+        WOLFCLU_LOG(WOLFCLU_L0, "missing inform required argument");
         return USER_INPUT_ERROR;
     }
 
@@ -1062,8 +1065,8 @@ int wolfCLU_checkInform(char* inform)
         return DER_FORM;
     }
     else {
-        printf("Usage: -inform [PEM/DER]\n");
-        printf("\"%s\" is not a valid input format\n", inform);
+        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -inform [PEM/DER]");
+        WOLFCLU_LOG(WOLFCLU_L0, "\"%s\" is not a valid input format", inform);
     }
     return USER_INPUT_ERROR;
 }
@@ -1106,50 +1109,50 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
     FILE *fin = stdin; /* defaulting to stdin but using a fd variable to make it
                         * easy for expanding to other inputs */
 
-    printf("Enter without data will result in the feild being skipped\n");
-    printf("Country [US] : ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Enter without data will result in the feild being skipped");
+    WOLFCLU_LOG(WOLFCLU_L0, "Country [US] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_PRINTABLE, NID_countryName, in);
         free(in); in = NULL;
     }
 
-    printf("State or Province [Montana] : ");
+    WOLFCLU_LOG(WOLFCLU_L0, "State or Province [Montana] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_stateOrProvinceName, in);
         free(in); in = NULL;
     }
 
-    printf("Locality [Bozeman] : ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Locality [Bozeman] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_localityName, in);
         free(in); in = NULL;
     }
 
-    printf("Organization Name [wolfSSL] : ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Organization Name [wolfSSL] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationName, in);
         free(in); in = NULL;
     }
 
-    printf("Organization Unit [engineering] : ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Organization Unit [engineering] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationalUnitName, in);
         free(in); in = NULL;
     }
 
-    printf("Common Name : ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Common Name : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_commonName, in);
         free(in); in = NULL;
     }
 
-    printf("Email Address : ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Email Address : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_emailAddress, in);

@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/x509/clu_cert.h>
@@ -38,9 +39,9 @@ static struct option pkey_options[] = {
 
 static void wolfCLU_pKeyHelp(void)
 {
-    printf("./wolfssl pkey\n");
-    printf("\t-in file input for key to read\n");
-    printf("\t-pubout output the public key\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl pkey");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pubout output the public key");
 }
 
 
@@ -65,7 +66,7 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
                     wolfSSL_EVP_PKEY_get0_EC_KEY(pkey));
             break;
         default:
-            printf("unknown / unsupported key type\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "unknown / unsupported key type");
     }
 
     if (ret == WOLFSSL_SUCCESS) {
@@ -95,7 +96,7 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
             break;
 
         case EVP_PKEY_DSA:
-            printf("DSA key not yet supported\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "DSA key not yet supported");
             ret = USER_INPUT_ERROR;
             break;
 
@@ -107,14 +108,14 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
 
                 ec = wolfSSL_EVP_PKEY_get0_EC_KEY(pkey);
                 if (ec == NULL) {
-                    printf("no ecc key found in pkey\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "no ecc key found in pkey");
                     ret = BAD_FUNC_ARG;
                 }
 
                 if (ret == 0) {
                     derSz = wc_EccPublicKeyDerSize((ecc_key*)ec->internal, 1);
                     if (derSz < 0) {
-                        printf("unable to get ecc der size\n");
+                        WOLFCLU_LOG(WOLFCLU_L0, "unable to get ecc der size");
                         ret = BAD_FUNC_ARG;
                     }
                 }
@@ -123,7 +124,7 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
                      der = (unsigned char*)XMALLOC(derSz, HEAP_HINT,
                              DYNAMIC_TYPE_TMP_BUFFER);
                      if (der == NULL) {
-                         printf("unable to malloc der buffer\n");
+                         WOLFCLU_LOG(WOLFCLU_L0, "unable to malloc der buffer");
                          ret = MEMORY_E;
                      }
                 }
@@ -138,7 +139,7 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
                      }
                      else {
                         ret = BAD_FUNC_ARG;
-                        printf("decoding der from internal structure failed\n");
+                        WOLFCLU_LOG(WOLFCLU_L0, "decoding der from internal structure failed");
                      }
                 }
 
@@ -148,7 +149,7 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
             break;
 
         default:
-            printf("unknown / unsupported key type\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "unknown / unsupported key type");
             ret = USER_INPUT_ERROR;
     }
 
@@ -181,7 +182,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    printf("unable to open public key file %s\n", optarg);
+                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open public key file %s", optarg);
                     ret = -1;
                 }
                 break;
@@ -213,7 +214,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
             pkey = wolfSSL_d2i_PrivateKey_bio(bioIn, NULL);
         }
         if (pkey == NULL) {
-            printf("error reading key from file\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "error reading key from file");
             ret = USER_INPUT_ERROR;
         }
     }
@@ -236,7 +237,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
             if (inForm == PEM_FORM) {
                 ret = wolfCLU_pKeyPEMtoPubKey(bioOut, pkey);
                 if (ret != 0) {
-                    printf("error getting pubkey from pem key\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "error getting pubkey from pem key");
                 }
             }
             else {
@@ -244,12 +245,12 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 int derSz = 0;
 
                 if (wolfCLU_pKeytoPubKey(pkey, &der, &derSz) <= 0) {
-                    printf("error converting der found to public key\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "error converting der found to public key");
                     ret = -1;
                 }
                 else {
                     if (wolfCLU_printDerPubKey(bioOut, der, derSz) != 0) {
-                        printf("error printing out pubkey\n");
+                        WOLFCLU_LOG(WOLFCLU_L0, "error printing out pubkey");
                         ret = -1;
                     }
                     free(der);

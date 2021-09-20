@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/x509/clu_request.h>
 #include <wolfclu/x509/clu_cert.h>
@@ -53,7 +54,7 @@ static struct option req_options[] = {
 int wolfCLU_requestSetup(int argc, char** argv)
 {
 #ifndef WOLFSSL_CERT_REQ
-    printf("wolfSSL not compiled with --enable-certreq\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfSSL not compiled with --enable-certreq");
     return -1;
 #else
     WOLFSSL_BIO *bioOut = NULL;
@@ -88,7 +89,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 in = optarg;
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    printf("unable to open public key file %s\n", optarg);
+                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open public key file %s", optarg);
                     ret = -1;
                 }
                 break;
@@ -97,7 +98,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 out = optarg;
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
                 if (bioOut == NULL) {
-                    printf("unable to open output file %s\n", optarg);
+                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", optarg);
                     ret = -1;
                 }
                 break;
@@ -182,7 +183,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
     x509 = wolfSSL_X509_new();
     if (x509 == NULL) {
-        printf("issue creating structure to use\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "issue creating structure to use");
         ret = MEMORY_E;
     }
 
@@ -194,7 +195,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         notBefore = wolfSSL_ASN1_TIME_adj(NULL, t, 0, 0);
         notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, XATOI(argv[ret+1]), 0);
         if (notBefore == NULL || notAfter == NULL) {
-            printf("error creating not before/after dates\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "error creating not before/after dates");
             ret = -1;
         }
         else {
@@ -210,7 +211,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     if (ret == 0 && bioIn != NULL) {
         pkey = wolfSSL_PEM_read_bio_PrivateKey(bioIn, NULL, NULL, NULL);
         if (pkey == NULL) {
-            printf("error reading key from file\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "error reading key from file");
             ret = USER_INPUT_ERROR;
         }
 
@@ -220,8 +221,8 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
     else {
-        printf("Please specify a -key <key> option when "
-               "generating a certificate.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please specify a -key <key> option when "
+               "generating a certificate.");
         wolfCLU_certgenHelp();
         ret = USER_INPUT_ERROR;
     }
@@ -271,7 +272,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 ret = wolfSSL_X509_REQ_sign(x509, pkey, md);
             }
             if (ret != WOLFSSL_SUCCESS) {
-                printf("error %d signing\n", ret);
+                WOLFCLU_LOG(WOLFCLU_L0, "error %d signing", ret);
             }
 
             if (ret == WOLFSSL_SUCCESS) {
@@ -293,7 +294,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 }
 
                 if (ret != WOLFSSL_SUCCESS) {
-                    printf("error %d writing out cert req\n", ret);
+                    WOLFCLU_LOG(WOLFCLU_L0, "error %d writing out cert req", ret);
                     ret = -1;
                 }
                 else {

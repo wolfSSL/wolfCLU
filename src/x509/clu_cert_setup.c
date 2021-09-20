@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
@@ -138,10 +139,10 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (access(infile, F_OK) != -1) {
-        printf("input file is \"%s\"\n", infile);
+        WOLFCLU_LOG(WOLFCLU_L0, "input file is \"%s\"", infile);
         infile_flag = 1;
     } else {
-        printf("ERROR: input file \"%s\" does not exist\n", infile);
+        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: input file \"%s\" does not exist", infile);
         return INPUT_FILE_ERROR;
     }
 /*---------------------------------------------------------------------------*/
@@ -159,9 +160,9 @@ int wolfCLU_certSetup(int argc, char** argv)
 
     if (outfile != NULL) {
         if (access(outfile, F_OK) != -1) {
-            printf("output file set: \"%s\"\n", outfile);
+            WOLFCLU_LOG(WOLFCLU_L0, "output file set: \"%s\"", outfile);
         } else {
-            printf("output file \"%s\"did not exist, it will be created.\n",
+            WOLFCLU_LOG(WOLFCLU_L0, "output file \"%s\"did not exist, it will be created.",
                                                                        outfile);
         }
     }
@@ -209,7 +210,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             if (outfile_flag) {
                 ret = wolfCLU_inpemOuttext(infile, outfile, silent_flag);
             } else {
-                printf("Outfile not set, using stdout\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Outfile not set, using stdout");
                 outfile = (char*)"stdout";
                 ret = wolfCLU_inpemOuttext(infile, outfile, silent_flag);
             }
@@ -220,7 +221,7 @@ int wolfCLU_certSetup(int argc, char** argv)
         case NOOUT_SET:
             break;
         default:
-            printf("Error case\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Error case");
             ret = -1;
             break;
     }
@@ -242,7 +243,7 @@ int error_check(int inpem_flag, int inder_flag,
     int tmp;
     ret = ( inpem_flag & inder_flag);
     if (ret) {
-        printf("ERROR: inform set to both PEM and DER format\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: inform set to both PEM and DER format");
         return USER_INPUT_ERROR;
     }
     ret = ( inpem_flag & outpem_flag);
@@ -250,7 +251,7 @@ int error_check(int inpem_flag, int inder_flag,
         tmp = ret;
         ret = (tmp & noout_flag);
         if (ret) {
-            printf("ERROR: noout set when output format is specified");
+            WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
         return INPEM_OUTPEM;
@@ -260,7 +261,7 @@ int error_check(int inpem_flag, int inder_flag,
         tmp = ret;
         ret = (tmp & noout_flag);
         if (ret) {
-            printf("ERROR: noout set when output format is specified");
+            WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
         return INPEM_OUTDER;
@@ -270,7 +271,7 @@ int error_check(int inpem_flag, int inder_flag,
         tmp = ret;
         ret = (tmp & noout_flag);
         if (ret) {
-            printf("ERROR: noout set when output format is specified");
+            WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
         return INDER_OUTPEM;
@@ -280,7 +281,7 @@ int error_check(int inpem_flag, int inder_flag,
         tmp = ret;
         ret = (tmp & noout_flag);
         if (ret) {
-            printf("ERROR: noout set when output format is specified");
+            WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
         return INDER_OUTDER;
@@ -294,20 +295,22 @@ int error_check(int inpem_flag, int inder_flag,
     }
     ret = (outder_flag & outpem_flag);
     if (ret) {
-        printf("ERROR: outform set to both DER and PEM format\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: outform set to both DER and PEM format");
         return USER_INPUT_ERROR;
     }
     if (!ret) {
         ret = USER_INPUT_ERROR;
-        if ( !inpem_flag && !inder_flag)
-            printf("ERROR: Failed to specify input format: -inform not set\n");
+        if ( !inpem_flag && !inder_flag) {
+            WOLFCLU_LOG(WOLFCLU_L0, "ERROR: Failed to specify input format: -inform not set");
+        }
         else {
             ret = (inder_flag & noout_flag) | (inpem_flag & noout_flag);
             if (ret) {
                 return NOOUT_SET;
             }
-            else
-                printf("ERROR: Failed to specify -outform or -noout\n");
+            else {
+                WOLFCLU_LOG(WOLFCLU_L0, "ERROR: Failed to specify -outform or -noout");
+            }
         }
     }
     return ret;

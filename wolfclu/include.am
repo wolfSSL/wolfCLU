@@ -6,6 +6,7 @@
 nobase_include_HEADERS+=wolfclu/version.h \
                         wolfclu/clu_header_main.h \
                         wolfclu/clu_optargs.h \
+                        wolfclu/clu_log.h \
                         wolfclu/clu_error_codes.h \
                         wolfclu/x509/clu_cert.h \
                         wolfclu/x509/clu_parse.h \

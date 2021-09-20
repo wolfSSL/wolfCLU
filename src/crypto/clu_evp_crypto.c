@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/genkey/clu_genkey.h>
 
@@ -69,7 +70,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         in = wolfSSL_BIO_new_mem_buf(hexIn, (int)XSTRLEN(hexIn));
     }
     if (in == NULL) {
-        printf("unable to open file %s\n", fileIn);
+        WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", fileIn);
         return -1;
     }
 
@@ -80,14 +81,14 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     if (ret >= 0) {
         ret = (int) wc_InitRng(&rng);
         if (ret != 0) {
-            printf("Random Number Generator failed to start.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Random Number Generator failed to start.");
         }
     }
 
     if (ret >= 0) {
         ctx = wolfSSL_EVP_CIPHER_CTX_new();
         if (ctx == NULL) {
-            printf("Unable to create new ctx\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Unable to create new ctx");
             ret = MEMORY_E;
         }
     }
@@ -99,7 +100,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             /* randomly generates salt */
             ret = wc_RNG_GenerateBlock(&rng, salt, SALT_SIZE);
             if (ret != 0) {
-                printf("Error creating salt\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Error creating salt");
                 ret = -1;
             }
         }
@@ -107,7 +108,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             char tmp[sizeof(isSalted)];
 
             if (wolfSSL_BIO_read(in, tmp, (int)XSTRLEN(isSalted)) <= 0) {
-                printf("Error reading salted string\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Error reading salted string");
                 ret = -1;
             }
             tmp[XSTRLEN(isSalted)] = '\0';
@@ -115,14 +116,14 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
 
             if (ret >= 0 &&
                     XMEMCMP(tmp, isSalted, (int)XSTRLEN(isSalted)) != 0) {
-                printf("Was expecting salt\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Was expecting salt");
                 ret = -1;
             }
 
             if (ret >= 0) {
                 ret = wolfSSL_BIO_read(in, salt, SALT_SIZE);
                 if (ret != SALT_SIZE) {
-                    printf("error reading salt\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "error reading salt");
                     ret = -1;
                 }
             }
@@ -134,8 +135,8 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         if (pbkVersion == WOLFCLU_PBKDF2) {
         #ifdef HAVE_FIPS
             if (strlen((const char*)pwdKey) < HMAC_FIPS_MIN_KEY) {
-                printf("For use with FIPS mode key needs to be at least %d "
-                        "characters long\n", HMAC_FIPS_MIN_KEY);
+                WOLFCLU_LOG(WOLFCLU_L0, "For use with FIPS mode key needs to be at least %d "
+                        "characters long", HMAC_FIPS_MIN_KEY);
                 ret = -1;
             }
         #endif
@@ -144,7 +145,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                     (int) strlen((const char*)pwdKey), salt, SALT_SIZE, iter,
                     hashType, keySz + ivSz, pwdKey);
                 if (ret != WOLFSSL_SUCCESS) {
-                    printf("failed to create key, ret = %d\n", ret);
+                    WOLFCLU_LOG(WOLFCLU_L0, "failed to create key, ret = %d", ret);
                     ret = -1;
                 }
             }
@@ -156,12 +157,12 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             }
         }
         else {
-            printf("WARNING: Using old version of PBKDF!!!!\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "WARNING: Using old version of PBKDF!!!!");
             iter = 1; /* default value for interop */
             ret = wolfSSL_EVP_BytesToKey(cphr, hashType, salt,
                     pwdKey, (int)strlen((const char*)pwdKey), iter, key, iv);
             if (ret == 0) {
-                printf("failed to create key, ret = %d\n", ret);
+                WOLFCLU_LOG(WOLFCLU_L0, "failed to create key, ret = %d", ret);
                 ret = -1;
             }
         }
@@ -178,7 +179,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             wolfSSL_BIO_set_fp(out, stdout, BIO_NOCLOSE);
         }
         if (out == NULL) {
-            printf("unable to open output file %s\n", fileOut);
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", fileOut);
             ret = -1;
         }
     }
@@ -187,41 +188,41 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     if (ret >= 0 && enc) {
         if (wolfSSL_BIO_write(out, isSalted, (int)XSTRLEN(isSalted)) !=
                 (int)XSTRLEN(isSalted)) {
-            printf("issue writing out isSalted\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "issue writing out isSalted");
             ret = -1;
         }
     }
 
     if (ret >= 0 && enc) {
         if (wolfSSL_BIO_write(out, salt, SALT_SIZE) != SALT_SIZE) {
-            printf("issue writing out salt\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "issue writing out salt");
             ret = -1;
         }
     }
 
     if (printOut) {
         int z;
-        printf("salt [%d] :", SALT_SIZE);
+        WOLFCLU_LOG(WOLFCLU_L0, "salt [%d] :", SALT_SIZE);
         for (z = 0; z < SALT_SIZE; z++)
-            printf("%02X", salt[z]);
-        printf("\n");
-        printf("key  [%d] :", keySz);
+            WOLFCLU_LOG(WOLFCLU_L0, "%02X", salt[z]);
+        WOLFCLU_LOG(WOLFCLU_L0, "");
+        WOLFCLU_LOG(WOLFCLU_L0, "key  [%d] :", keySz);
         for (z = 0; z < keySz; z++)
-            printf("%02X", key[z]);
-        printf("\n");
-        printf("iv   [%d] :", ivSz);
+            WOLFCLU_LOG(WOLFCLU_L0, "%02X", key[z]);
+        WOLFCLU_LOG(WOLFCLU_L0, "");
+        WOLFCLU_LOG(WOLFCLU_L0, "iv   [%d] :", ivSz);
         for (z = 0; z < ivSz; z++)
-            printf("%02X", iv[z]);
-        printf("\n");
-        printf("itterations = %d\n", iter);
-        printf("PBKDF version = %d\n", pbkVersion);
+            WOLFCLU_LOG(WOLFCLU_L0, "%02X", iv[z]);
+        WOLFCLU_LOG(WOLFCLU_L0, "");
+        WOLFCLU_LOG(WOLFCLU_L0, "itterations = %d", iter);
+        WOLFCLU_LOG(WOLFCLU_L0, "PBKDF version = %d", pbkVersion);
     }
 
 
     if (ret >= 0) {
         wolfSSL_EVP_CIPHER_CTX_init(ctx);
         if (wolfSSL_EVP_CipherInit(ctx, cphr, key, iv, enc) != WOLFSSL_SUCCESS){
-            printf("failed to init evp ctx\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "failed to init evp ctx");
             ret = MEMORY_E;
         }
     }
@@ -247,7 +248,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         /* Read in 1kB to input[] */
         ret = wolfSSL_BIO_read(in, input, WOLFCLU_MAX_BUFFER);
         if (ret < 0) {
-            printf("error reading in data\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "error reading in data");
             ret = -1;
         }
         if (ret <= 0) {
@@ -260,7 +261,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                                                 NULL, NULL, NULL,
                                                 NULL, NULL, NULL);
             if (hexRet != 0) {
-                printf("failed during conversion of input, ret = %d\n", hexRet);
+                WOLFCLU_LOG(WOLFCLU_L0, "failed during conversion of input, ret = %d", hexRet);
                 ret = -1;
             }
         }
@@ -270,7 +271,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             outputSz = WOLFCLU_MAX_BUFFER;
             if (wolfSSL_EVP_CipherUpdate(ctx, output, &outputSz, input, tempMax)
                     != WOLFSSL_SUCCESS) {
-                printf("Error with cipher update\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Error with cipher update");
                 ret = -1;
             }
         }
@@ -278,7 +279,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         if (ret >= 0) {
             ret = wolfSSL_BIO_write(out, output, outputSz);
             if (ret < 0) {
-                printf("error writing out encrypted data\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "error writing out encrypted data");
                 ret = -1;
             }
         }
@@ -297,7 +298,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         outputSz = tempMax;
         if (wolfSSL_EVP_CipherFinal(ctx, output, &outputSz)
                 != WOLFSSL_SUCCESS) {
-            printf("Error decrypting message\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Error decrypting message");
             ret = -1;
         }
     }

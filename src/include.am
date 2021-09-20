@@ -5,6 +5,7 @@
 #/ kaleb /#
 bin_PROGRAMS = wolfssl
 wolfssl_SOURCES = src/clu_main.c \
+                    src/clu_log.c \
 					src/tools/clu_funcs.c \
 					src/tools/clu_hex_to_bin.c \
 					src/crypto/clu_crypto_setup.c \

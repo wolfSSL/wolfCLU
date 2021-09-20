@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/genkey/clu_genkey.h>
 
@@ -54,13 +55,13 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     /* opens input file */
     inFile = fopen(in, "rb");
     if (inFile == NULL) {
-        printf("Input file does not exist.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Input file does not exist.");
         return DECRYPT_ERROR;
     }
     /* opens output file */
 
     if ((outFile = fopen(out, "wb")) == NULL) {
-        printf("Error creating output file.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Error creating output file.");
         fclose(inFile);
         return DECRYPT_ERROR;
     }
@@ -105,12 +106,12 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         if (currLoopFlag == 1) {
             if (ret == 0 &&
                     (int)fread (salt, 1, SALT_SIZE, inFile) != SALT_SIZE) {
-                printf("Error reading salt.\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Error reading salt.");
                 ret = FREAD_ERROR;
             }
 
             if (ret == 0 && (int) fread (iv, 1, block, inFile) != block) {
-                printf("Error reading salt.\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Error reading salt.");
                 ret = FREAD_ERROR;
             }
             /* replicates old pwdKey if pwdKeys match */
@@ -118,7 +119,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 if (wc_PBKDF2(key, pwdKey, (int) strlen((const char*)pwdKey),
                               salt, SALT_SIZE, CLU_4K_TYPE, size,
                               CLU_SHA256) != 0) {
-                    printf("pwdKey set error.\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "pwdKey set error.");
                     ret = ENCRYPT_ERROR;
                 }
             }
@@ -134,7 +135,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                     }
                 }
                 if (keyVerify == 0) {
-                    printf("the key is all zero's or not set.\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "the key is all zero's or not set.");
                     ret = ENCRYPT_ERROR;
                 }
             }
@@ -148,7 +149,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 ret = 0; /* success */
             }
             else {
-                printf("Input file does not exist.\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Input file does not exist.");
                 ret = FREAD_ERROR;
             }
         }
@@ -172,7 +173,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 /* adjust length for padded bytes and salt size */
                 length -= pad + sbSize;
                 if (length < 0) {
-                    printf("bad length %d found\n", length);
+                    WOLFCLU_LOG(WOLFCLU_L0, "bad length %d found", length);
                     ret = -1;
                     break;
                 }

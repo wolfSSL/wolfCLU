@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/sign-verify/clu_sign.h>
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
@@ -82,7 +83,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         if (priv == NULL) {
             return MEMORY_E;
         } else if (access(argv[ret+1], F_OK) == -1) {
-            printf("Inkey file %s did not exist. Please check your options.\n",
+            WOLFCLU_LOG(WOLFCLU_L0, "Inkey file %s did not exist. Please check your options.",
                     argv[ret+1]);
             return MEMORY_E;
         }
@@ -91,8 +92,8 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         priv[XSTRLEN(argv[ret+1])] = '\0';
     }
     else {
-        printf("Please specify an -inkey <key> option when "
-               "signing or verifying.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please specify an -inkey <key> option when "
+               "signing or verifying.");
         wolfCLU_signHelp(algCheck);
         wolfCLU_verifyHelp(algCheck);
         return ret;
@@ -112,7 +113,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         if (in == NULL) {
             return MEMORY_E;
         } else if (access(argv[ret+1], F_OK) == -1) {
-            printf("In file did not exist. Please check your options.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "In file did not exist. Please check your options.");
             return MEMORY_E;
         }
 
@@ -128,7 +129,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         if (sig == NULL) {
             return MEMORY_E;
         } else if (access(argv[ret+1], F_OK) == -1) {
-            printf("Signature file did not exist. Please check your options.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Signature file did not exist. Please check your options.");
             return MEMORY_E;
         }
 
@@ -136,7 +137,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         sig[XSTRLEN(argv[ret+1])] = '\0';
     }
     else if (verifyCheck == 1) {
-        printf("Please specify -sigfile <sig> when verifying.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please specify -sigfile <sig> when verifying.");
         wolfCLU_verifyHelp(algCheck);
         return ret;
     }
@@ -147,15 +148,15 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         out = argv[ret+1];
     } else {
         if(algCheck == RSA_SIG_VER) {
-            printf("Please specify an output file when "
-                   "signing or verifing with RSA.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
+                   "signing or verifing with RSA.");
             wolfCLU_signHelp(algCheck);
             wolfCLU_verifyHelp(algCheck);
             return ret;
         }
         else if (algCheck == ECC_SIG_VER && verifyCheck == 0) {
-            printf("Please specify an output file when "
-                   "signing with ECC.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
+                   "signing with ECC.");
             wolfCLU_signHelp(algCheck);
             return ret;
         }
@@ -169,7 +170,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         if (algCheck == RSA_SIG_VER && verifyCheck == 1) {
             /* ignore no -in. RSA verify doesn't check original message */
         } else {
-            printf("Must have input as either a file or standard I/O\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Must have input as either a file or standard I/O");
             return FATAL_ERROR;
         }
     }

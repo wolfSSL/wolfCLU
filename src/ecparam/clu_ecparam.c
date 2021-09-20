@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
 #include <wolfclu/clu_optargs.h>
@@ -37,10 +38,10 @@ static struct option ecparam_options[] = {
 
 static void wolfCLU_ecparamHelp(void)
 {
-    printf("./wolfssl ecparam\n");
-    printf("\t-genkey create new key\n");
-    printf("\t-out output file\n");
-    printf("\t-name curve name i.e. secp384r1\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl ecparam");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-genkey create new key");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out output file");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-name curve name i.e. secp384r1");
 }
 
 
@@ -74,7 +75,7 @@ int wolfCLU_ecparam(int argc, char** argv)
             case WOLFCLU_OUTFORM:
                 outForm = wolfCLU_checkOutform(optarg);
                 if (outForm < 0) {
-                    printf("bad outform\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "bad outform");
                     return USER_INPUT_ERROR;
                 }
                 break;
@@ -108,7 +109,7 @@ int wolfCLU_ecparam(int argc, char** argv)
     }
 
     if (genKey == 0) {
-        printf("only supporting genkey so far\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "only supporting genkey so far");
         return 0;
     }
 

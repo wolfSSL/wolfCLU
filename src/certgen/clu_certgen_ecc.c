@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
 void free_things_ecc(byte** a, byte** b, byte** c, ecc_key* d, ecc_key* e,
@@ -46,7 +47,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid) {
     int keyFileSz;
     FILE* keyFile = fopen(keyPath,"rb");
     if (keyFile == NULL) {
-        printf("unable to open key file %s\n", keyPath);
+        WOLFCLU_LOG(WOLFCLU_L0, "unable to open key file %s", keyPath);
         return BAD_FUNC_ARG;
     }
 
@@ -59,44 +60,49 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid) {
 
     ret = wc_ecc_init(&key);
     if (ret != 0) {
-        printf("Failed to initialize ecc key\nRET: %d\n", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize ecc key\nRET: %d", ret);
         return ret;
     }
 
     ret = wc_InitRng(&rng);
     if (ret != 0) {
-        printf("Failed to initialize rng.\nRET: %d\n", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize rng.\nRET: %d", ret);
         return ret;
     }
 
     ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
     if (ret != 0 ) {
-        printf("Failed to decode private key.\nRET: %d\n", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to decode private key.\nRET: %d",
+                ret);
         return ret;
     }
 
     ret = wc_InitCert(&newCert);
     if (ret != 0 ) {
-        printf("Failed to init Cert \nRET: %d\n", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to init Cert \nRET: %d", ret);
         return ret;
     }
 
-    printf("Enter your countries 2 digit code (ex: United States -> US): ");
+    WOLFCLU_LOG(WOLFCLU_L0,
+            "Enter your countries 2 digit code (ex: United States -> US): ");
     fgets(country,CTC_NAME_SIZE,stdin);
     country[CTC_NAME_SIZE-1] = '\0';
-    printf("Enter the name of the province you are located at: ");
+    WOLFCLU_LOG(WOLFCLU_L0,
+            "Enter the name of the province you are located at: ");
     fgets(province,CTC_NAME_SIZE,stdin);
-    printf("Enter the name of the city you are located at: ");
+    WOLFCLU_LOG(WOLFCLU_L0,
+            "Enter the name of the city you are located at: ");
     fgets(city,CTC_NAME_SIZE,stdin);
-    printf("Enter the name of your orginization: ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of your orginization: ");
     fgets(org,CTC_NAME_SIZE,stdin);
-    printf("Enter the name of your unit: ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of your unit: ");
     fgets(unit,CTC_NAME_SIZE,stdin);
-    printf("Enter the common name of your domain: ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Enter the common name of your domain: ");
     fgets(commonName,CTC_NAME_SIZE,stdin);
-    printf("Enter your email address: ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Enter your email address: ");
     fgets(email,CTC_NAME_SIZE,stdin);
-    printf("Enter the number of days this certificate should be valid: ");
+    WOLFCLU_LOG(WOLFCLU_L0,
+            "Enter the number of days this certificate should be valid: ");
     fgets(daysValid,CTC_NAME_SIZE,stdin);
 
     strncpy(newCert.subject.country, country, CTC_NAME_SIZE);
@@ -128,7 +134,8 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid) {
 
     byte* certBuf = (byte*) XMALLOC(FOURK_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (certBuf == NULL) {
-        printf("Failed to initialize buffer to store certificate.\n");
+        WOLFCLU_LOG(WOLFCLU_L0,
+                "Failed to initialize buffer to store certificate.");
         return -1;
     }
 
@@ -136,45 +143,43 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid) {
 
     ret = wc_MakeCert(&newCert, certBuf, FOURK_SZ, NULL, &key, &rng); //ecc certificate
     if (ret < 0) {
-        printf("Failed to make certificate.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to make certificate.");
         return ret;
     }
-    printf("MakeCert returned %d\n", ret);
+    WOLFCLU_LOG(WOLFCLU_L0, "MakeCert returned %d", ret);
 
     ret = wc_SignCert(newCert.bodySz, newCert.sigType, certBuf, FOURK_SZ, NULL,
                                                               &key, &rng);
     if (ret < 0) {
-        printf("Failed to sign certificate.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to sign certificate.");
         return ret;
     }
-    printf("SignCert returned %d\n", ret);
+    WOLFCLU_LOG(WOLFCLU_L0, "SignCert returned %d", ret);
 
     certBufSz = ret;
 
-    printf("Successfully created new certificate\n");
-
-    printf("Writing newly generated certificate to file \"%s\"\n",
-                                                                 certOut);
+    WOLFCLU_LOG(WOLFCLU_L0, "Successfully created new certificate");
+    WOLFCLU_LOG(WOLFCLU_L0,
+            "Writing newly generated certificate to file \"%s\"", certOut);
     FILE* file = fopen(certOut, "wb");
     if (!file) {
-        printf("failed to open file: %s\n", certOut);
+        WOLFCLU_LOG(WOLFCLU_L0, "failed to open file: %s", certOut);
         return -1;
     }
 
     ret = (int) fwrite(certBuf, 1, certBufSz, file);
     fclose(file);
-    printf("Successfully output %d bytes\n", ret);
+    WOLFCLU_LOG(WOLFCLU_L0, "Successfully output %d bytes", ret);
 
 /*---------------------------------------------------------------------------*/
 /* convert the der to a pem and write it to a file */
 /*---------------------------------------------------------------------------*/
     int pemBufSz;
 
-    printf("Convert the der cert to pem formatted cert\n");
-
+    WOLFCLU_LOG(WOLFCLU_L0, "Convert the der cert to pem formatted cert");
     byte* pemBuf = (byte*) XMALLOC(FOURK_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (pemBuf == NULL) {
-        printf("Failed to initialize pem buffer.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize pem buffer.");
         return -1;
     }
 
@@ -182,20 +187,20 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid) {
 
     pemBufSz = wc_DerToPem(certBuf, certBufSz, pemBuf, FOURK_SZ, CERT_TYPE);
     if (pemBufSz < 0) {
-        printf("Failed to convert from der to pem.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to convert from der to pem.");
         return -1;
     }
 
-    printf("Resulting pem buffer is %d bytes\n", pemBufSz);
+    WOLFCLU_LOG(WOLFCLU_L0, "Resulting pem buffer is %d bytes", pemBufSz);
 
     FILE* pemFile = fopen(certOut, "wb");
     if (!pemFile) {
-        printf("failed to open file: %s\n", certOut);
+        WOLFCLU_LOG(WOLFCLU_L0, "failed to open file: %s", certOut);
         return -1;
     }
     fwrite(pemBuf, 1, pemBufSz, pemFile);
     fclose(pemFile);
-    printf("Successfully converted the der to pem. Result is in:  %s\n\n",
+    WOLFCLU_LOG(WOLFCLU_L0, "Successfully converted the der to pem. Result is in:  %s\n",
                                                                  certOut);
 
     free_things_ecc(&pemBuf, &certBuf, NULL, &key, NULL, &rng);

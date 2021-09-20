@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/x509/clu_cert.h>  /* argument checking */
 
@@ -48,7 +49,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
     ret = wc_InitRng(&rng);
     if (ret != 0) {
-        printf("rng init failed\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "rng init failed");
         return ret;
     }
 
@@ -57,12 +58,12 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         if (argv[ret+1] != NULL) {
             XSTRNCPY(keyOutFName, argv[ret+1], XSTRLEN(argv[ret+1]));
         } else {
-            printf("ERROR: No output file name specified\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "ERROR: No output file name specified");
             wolfCLU_genKeyHelp();
             return USER_INPUT_ERROR;
         }
     } else {
-        printf("ERROR: Please specify an output file name\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: Please specify an output file name");
         wolfCLU_genKeyHelp();
         return USER_INPUT_ERROR;
     }
@@ -73,10 +74,10 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     }
     ret = wolfCLU_checkOutform(format);
     if (ret == PEM_FORM || ret == DER_FORM) {
-        printf("OUTPUT A %s FILE\n", (ret == PEM_FORM)? "PEM": "DER");
+        WOLFCLU_LOG(WOLFCLU_L0, "OUTPUT A %s FILE", (ret == PEM_FORM)? "PEM": "DER");
         formatArg = ret;
     } else {
-        printf("ERROR: \"%s\" is not a valid file format\n", format);
+        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: \"%s\" is not a valid file format", format);
         return ret;
     }
 
@@ -101,15 +102,15 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                                                        PRIV_AND_PUB, formatArg);
             }
         } else {
-            printf("No -output <PUB/PRIV/KEYPAIR>\n");
-            printf("DEFAULT: output public and private key pair\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
             ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_AND_PUB,
                                                                      formatArg);
         }
     #else
-        printf("Invalid option, ED25519 not enabled.\n");
-        printf("Please re-configure wolfSSL with --enable-ed25519 and "
-               "try again\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Invalid option, ED25519 not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-ed25519 and "
+               "try again");
         return NOT_COMPILED_IN;
     #endif /* HAVE_ED25519 */
 
@@ -118,7 +119,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         /* ECC flags */
         int directiveArg = PRIV_AND_PUB;
 
-        printf("generate ECC key\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "generate ECC key");
 
         /* get the directive argument */
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
@@ -133,8 +134,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             }
         }
         else {
-            printf("No -output <PUB/PRIV/KEYPAIR>\n");
-            printf("DEFAULT: output public and private key pair\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
             directiveArg = PRIV_AND_PUB;
         }
 
@@ -153,15 +154,15 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         if (name == NULL) { /* if we have the name of curve we know */
-            printf("DEFAULT: use a 32 ECC key\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use a 32 ECC key");
         }
 
         ret = wolfCLU_genKey_ECC(&rng, keyOutFName, directiveArg,
                                  formatArg, NULL);
     #else
-        printf("Invalid option, ECC not enabled.\n");
-        printf("Please re-configure wolfSSL with --enable-ecc and "
-               "try again\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Invalid option, ECC not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-ecc and "
+               "try again");
         return NOT_COMPILED_IN;
     #endif /* HAVE_ECC */
     } else if (XSTRNCMP(keyType, "rsa", 3) == 0) {
@@ -171,7 +172,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         int sizeArg = 0;
         int expArg  = 0;
 
-        printf("generate RSA key\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "generate RSA key");
 
         /* get the directive argument */
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
@@ -186,8 +187,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             }
         }
         else {
-            printf("No -output <PUB/PRIV/KEYPAIR>\n");
-            printf("DEFAULT: output public and private key pair\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
             directiveArg = PRIV_AND_PUB;
         }
 
@@ -198,7 +199,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                 char* cur;
                 /* make sure it's an integer */
                 if (*argv[ret+1] == '\0') {
-                    printf("Empty -size argument, using 2048\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "Empty -size argument, using 2048");
                     sizeArg = 2048;
                 }
                 else {
@@ -207,7 +208,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                         sizeArg = XATOI(argv[ret+1]);
                     }
                     else {
-                        printf("Invalid -size (%s), using 2048\n",
+                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -size (%s), using 2048",
                                argv[ret+1]);
                         sizeArg = 2048;
                     }
@@ -215,8 +216,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             }
         }
         else {
-            printf("No -size <SIZE>\n");
-            printf("DEFAULT: use a 2048 RSA key\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "No -size <SIZE>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use a 2048 RSA key");
             sizeArg = 2048;
         }
 
@@ -227,7 +228,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                 char* cur;
                 /* make sure it's an integer */
                 if (*argv[ret+1] == '\0') {
-                    printf("Empty -exponent argument, using 65537\n");
+                    WOLFCLU_LOG(WOLFCLU_L0, "Empty -exponent argument, using 65537");
                     expArg = 65537;
                 }
                 else {
@@ -236,7 +237,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                         sizeArg = XATOI(argv[ret+1]);
                     }
                     else {
-                        printf("Invalid -exponent (%s), using 65537\n",
+                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -exponent (%s), using 65537",
                                argv[ret+1]);
                         expArg = 65537;
                     }
@@ -244,21 +245,21 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             }
         }
         else {
-            printf("No -exponent <SIZE>\n");
-            printf("DEFAULT: use an exponent of 65537\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "No -exponent <SIZE>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use an exponent of 65537");
             expArg = 65537;
         }
 
         ret = wolfCLU_genKey_RSA(&rng, keyOutFName, directiveArg,
                                  formatArg, sizeArg, expArg);
     #else
-        printf("Invalid option, RSA not enabled.\n");
-        printf("Please re-configure wolfSSL with --enable-rsa and "
-               "try again\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Invalid option, RSA not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-rsa and "
+               "try again");
         return NOT_COMPILED_IN;
     #endif /* NO_RSA */
     } else {
-        printf("\"%s\" is an invalid key type, or not compiled in\n", keyType);
+        WOLFCLU_LOG(WOLFCLU_L0, "\"%s\" is an invalid key type, or not compiled in", keyType);
         return USER_INPUT_ERROR;
     }
 

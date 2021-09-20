@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 
 /*
  * hash argument function
@@ -85,7 +86,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
     }
 
     if (algCheck == 0) {
-        printf("Invalid algorithm\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Invalid algorithm");
         return FATAL_ERROR;
     }
 
@@ -94,7 +95,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
     if (ret > 0) {
         bioIn = wolfSSL_BIO_new_file(argv[ret+1], "rb");
         if (bioIn == NULL) {
-            printf("unable to open file %s\n", argv[ret+1]);
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", argv[ret+1]);
             return USER_INPUT_ERROR;
         }
         inCheck = 1;
@@ -104,7 +105,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
     if (ret > 0) {
         bioOut = wolfSSL_BIO_new_file(argv[ret+1], "rb");
         if (bioOut == NULL) {
-            printf("unable to open output file %s\n", argv[ret+1]);
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", argv[ret+1]);
             return USER_INPUT_ERROR;
         }
     }
@@ -113,18 +114,18 @@ int wolfCLU_hashSetup(int argc, char** argv)
     if (ret > 0) {
         /* size of output */
 #ifndef HAVE_BLAKE2
-        printf("%s: -size is only valid when blake2 is enabled.\n", argv[0]);
+        WOLFCLU_LOG(WOLFCLU_L0, "%s: -size is only valid when blake2 is enabled.", argv[0]);
 #else
         size = XATOI(argv[ret+1]);
         if (size <= 0 || size > 64) {
-            printf("Invalid size, Must be between 1-64. Using default.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid size, Must be between 1-64. Using default.");
             size = BLAKE2B_OUTBYTES;
         }
 #endif
     }
 
     if (inCheck == 0) {
-        printf("Must have input as either a file or standard I/O\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Must have input as either a file or standard I/O");
         return FATAL_ERROR;
     }
 

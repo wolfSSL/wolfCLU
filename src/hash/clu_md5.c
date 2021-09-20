@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 
 #define MAX_BUFSIZE 8192
 
@@ -30,14 +31,14 @@ int wolfCLU_md5Setup(int argc, char** argv)
     int     ret         = 0;
 
 #ifdef NO_MD5
-    printf("wolfCrypt compiled without MD5 support\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfCrypt compiled without MD5 support");
 #endif
 
     /* was a file input provided? if so read from file */
     if (argc >= 3) {
         bioIn = wolfSSL_BIO_new_file(argv[2], "rb");
         if (bioIn == NULL) {
-            printf("unable to open file %s\n", argv[2]);
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", argv[2]);
             return USER_INPUT_ERROR;
         }
     }

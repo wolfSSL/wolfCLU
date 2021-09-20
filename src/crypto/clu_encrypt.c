@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/genkey/clu_genkey.h>
 
@@ -57,8 +58,8 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
 
     if (access (in, F_OK) == -1) {
-        printf("file did not exist, encrypting string following \"-i\""
-                "instead.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "file did not exist, encrypting string following \"-i\""
+                "instead.");
 
         /* use user entered data to encrypt */
         inputLength = (int) strlen(in);
@@ -82,7 +83,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     /* open the inFile in read mode */
     inFile = fopen(in, "rb");
     if (inFile == NULL) {
-        printf("unable to open file %s\n", in);
+        WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", in);
         return -1;
     }
 
@@ -96,7 +97,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     /* Start up the random number generator */
     ret = (int) wc_InitRng(&rng);
     if (ret != 0) {
-        printf("Random Number Generator failed to start.\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Random Number Generator failed to start.");
         fclose(inFile);
         return ret;
     }
@@ -123,7 +124,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         /* stretches pwdKey to fit size based on wolfCLU_getAlgo() */
         ret = wolfCLU_genKey_PWDBASED(&rng, pwdKey, size, salt, padCounter);
         if (ret != 0) {
-            printf("failed to set pwdKey.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "failed to set pwdKey.");
             return ret;
         }
         /* move the generated pwdKey to "key" for encrypting */
@@ -135,7 +136,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     /* open the outFile in write mode */
     outFile = fopen(out, "wb");
     if (outFile == NULL) {
-        printf("unable to open output file %s\n", out);
+        WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", out);
         return -1;
     }
     fwrite(salt, 1, SALT_SIZE, outFile);
@@ -172,8 +173,8 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                                                 NULL, NULL, NULL,
                                                 NULL, NULL, NULL);
                      if (hexRet != 0) {
-                        printf("failed during conversion of input,"
-                            " ret = %d\n", hexRet);
+                        WOLFCLU_LOG(WOLFCLU_L0, "failed during conversion of input,"
+                            " ret = %d", hexRet);
                         return hexRet;
                     }
                 }/* end hex or ascii */
@@ -196,7 +197,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 alg == WOLFCLU_CAMELLIA256CBC) {
             ret = wc_CamelliaSetKey(&camellia, key, block, iv);
             if (ret != 0) {
-                printf("CamelliaSetKey failed.\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "CamelliaSetKey failed.");
                 wolfCLU_freeBins(input, output, NULL, NULL, NULL);
                 return ret;
             }
@@ -204,7 +205,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 wc_CamelliaCbcEncrypt(&camellia, output, input, tempMax);
             }
             else {
-                printf("Incompatible mode while using Camellia.\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Incompatible mode while using Camellia.");
                 wolfCLU_freeBins(input, output, NULL, NULL, NULL);
                 return FATAL_ERROR;
             }
@@ -219,12 +220,12 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         if (output != NULL && inputHex == 1) {
             int tempi;
 
-            printf("\nUser specified hex input this is a representation of "
+            WOLFCLU_LOG(WOLFCLU_L0, "\nUser specified hex input this is a representation of "
                 "what\nis being written to file in hex form.\n\n[ ");
             for (tempi = 0; tempi < block; tempi++ ) {
-                printf("%02x", output[tempi]);
+                WOLFCLU_LOG(WOLFCLU_L0, "%02x", output[tempi]);
             }
-            printf(" ]\n\n");
+            WOLFCLU_LOG(WOLFCLU_L0, " ]\n");
         } /* end visual confirmation */
 
         /* Open the outFile in append mode */
@@ -232,7 +233,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         ret = (int) fwrite(output, 1, tempMax, outFile);
 
         if (ferror(outFile)) {
-            printf("failed to write to file.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "failed to write to file.");
             if (input != NULL)
                 XMEMSET(input, 0, tempMax);
             if (output != NULL)
@@ -241,7 +242,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             return FWRITE_ERROR;
         }
         if (ret > MAX_LEN) {
-            printf("Wrote too much to file.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Wrote too much to file.");
             if (input != NULL)
                 XMEMSET(input, 0, tempMax);
             if (output != NULL)
@@ -254,7 +255,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
         length -= tempMax;
         if (length < 0)
-            printf("length went past zero.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "length went past zero.");
         if (input != NULL)
             XMEMSET(input, 0, tempMax);
         if (output != NULL)

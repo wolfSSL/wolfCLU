@@ -22,6 +22,7 @@
 #include <stdio.h>
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_cert.h>
@@ -138,7 +139,7 @@ int wolfCLU_printX509PubKey(char* infile, int inform, char* outfile,
 
     x509 = wolfCLU_parseX509(infile, inform);
     if (x509 == NULL) {
-        printf("unable to parse file %s\n", infile);
+        WOLFCLU_LOG(WOLFCLU_L0, "unable to parse file %s", infile);
         ret = -1;
     }
 
@@ -226,7 +227,7 @@ int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
 /* read in der, output der */
 /*----------------------------------------------------------------------------*/
     if ( (inform & outform) == 1) {
-        printf("in parse: in = der, out = der\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "in parse: in = der, out = der");
     }
 /*----------------------------------------------------------------------------*/
 /* read in pem, output pem formatted human-readable-text */
@@ -242,16 +243,16 @@ int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
         wolfSSL_BIO_set_fp(bio, outstream, BIO_NOCLOSE);
         
         if (x509 == NULL){
-            printf("x509 Failure Still Null\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "x509 Failure Still Null");
         }
 
         if (bio == NULL){
-            printf("BIO Failure Still Null\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "BIO Failure Still Null");
         }
         
         ret = wolfSSL_X509_print(bio, x509);
         if (ret == WOLFSSL_FAILURE) {
-            printf("Failed to write x509 cert.\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Failed to write x509 cert.");
             goto clu_parse_cleanup;
         }
         wolfSSL_BIO_free(bio);
@@ -297,7 +298,7 @@ int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
 
         if (!silent_flag) {
            for (i = 0; i < outBufSz; i++) {
-                printf("%c", outBuf[i]);
+                WOLFCLU_LOG(WOLFCLU_L0, "%c", outBuf[i]);
             }
         }
 
@@ -348,7 +349,7 @@ int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
 /* read in pem, output pem */
 /*----------------------------------------------------------------------------*/
     else {
-        printf("in parse: in = pem, out = pem\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "in parse: in = pem, out = pem");
     }
     ret = 0;
 

@@ -25,6 +25,7 @@
 #if defined(WOLFSSL_KEY_GEN) && !defined(NO_ASN)
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 #include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
@@ -47,7 +48,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     FILE* file;                          /* file stream */
 
 
-    printf("fOutNm = %s\n", fOutNm);
+    WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fOutNm);
     fOutNmSz = (int)XSTRLEN(fOutNm);
 
     /*--------------- INIT ---------------------*/
@@ -74,8 +75,8 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
     /*--------------- CONVERT TO PEM IF APPLICABLE  ---------------------*/
     if (format == PEM_FORM) {
-        printf("Der to Pem for ed25519 key not yet implemented\n");
-        printf("FEATURE COMING SOON!\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Der to Pem for ed25519 key not yet implemented");
+        WOLFCLU_LOG(WOLFCLU_L0, "FEATURE COMING SOON!");
         return FEATURE_COMING_SOON;
     }
     /*--------------- OUTPUT KEYS TO FILE(S) ---------------------*/
@@ -96,7 +97,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
         case PRIV_ONLY:
             /* add on the final part of the file name ".priv" */
             XMEMCPY(finalOutFNm+fOutNmSz, privAppend, fOutNmAppendSz);
-            printf("finalOutFNm = %s\n", finalOutFNm);
+            WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
             file = fopen(finalOutFNm, "wb");
             if (!file) {
@@ -119,7 +120,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
         case PUB_ONLY:
             /* add on the final part of the file name ".pub" */
             XMEMCPY(finalOutFNm+fOutNmSz, pubAppend, fOutNmAppendSz);
-            printf("finalOutFNm = %s\n", finalOutFNm);
+            WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
             file = fopen(finalOutFNm, "wb");
             if (!file) {
@@ -136,7 +137,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             fclose(file);
             break;
         default:
-            printf("Invalid directive\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid directive");
             XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return BAD_FUNC_ARG;
     }
@@ -164,7 +165,7 @@ static int wolfCLU_ECC_write_pub_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
 
     derSz = wc_EccPublicKeyDerSize(key->internal, 1);
     if (derSz <= 0) {
-        printf("error getting der size\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "error getting der size");
         ret = derSz;
     }
 
@@ -217,12 +218,12 @@ static int wolfCLU_ECC_write_priv_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
     }
 
     if (ret > 0) {
-        printf("writing out %d bytes for private key\n", derSz);
+        WOLFCLU_LOG(WOLFCLU_L0, "writing out %d bytes for private key", derSz);
         ret = wolfSSL_BIO_write(out, der, derSz);
         if (ret != derSz) {
             ret = -1;
         }
-        printf("ret of write = %d\n", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "ret of write = %d", ret);
     }
 
     if (der != NULL)
@@ -267,14 +268,14 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
         group = wolfSSL_EC_GROUP_new_by_curve_name(wolfSSL_OBJ_txt2nid(name));
         if (group == NULL) {
-            printf("unable to set curve\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to set curve");
             ret = -1;
         }
 
 
         if (ret == 0) {
             if (wolfSSL_EC_KEY_set_group(key, group) != WOLFSSL_SUCCESS) {
-                printf("unable to set ec group\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "unable to set ec group");
                 ret = -1;
             }
         }
@@ -282,7 +283,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
     if (ret == 0) {
         if (wolfSSL_EC_KEY_generate_key(key) != WOLFSSL_SUCCESS) {
-            printf("error generating EC key\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "error generating EC key");
             ret = -1;
         }
     }
@@ -290,7 +291,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
     if (ret == 0) {
         bioOut = wolfSSL_BIO_new_file(fName, "wb");
         if (bioOut == NULL) {
-            printf("unable to read outfile %s\n", fName);
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to read outfile %s", fName);
             ret = MEMORY_E;
         }
     }
@@ -329,7 +330,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                         if (ret == 0) {
                             derSz = wolfSSL_i2d_PrivateKey(pkey, &der);
                             if (derSz <= 0) {
-                                printf("error converting to der\n");
+                                WOLFCLU_LOG(WOLFCLU_L0, "error converting to der");
                                 ret = -1;
                             }
                         }
@@ -337,7 +338,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                         if (ret == 0 && derSz > 0) {
                             ret = wolfSSL_BIO_write(bioOut, der, derSz);
                             if (ret != derSz) {
-                                printf("issue writing out data\n");
+                                WOLFCLU_LOG(WOLFCLU_L0, "issue writing out data");
                                 ret = -1;
                             }
                         }
@@ -366,11 +367,11 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                     XMEMCPY(fOutNameBuf, fName, fNameSz);
                     XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
-                    printf("Private key file = %s\n", fOutNameBuf);
+                    WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
 
                     bioPri = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
                     if (bioPri == NULL) {
-                        printf("unable to read outfile %s\n", fOutNameBuf);
+                        WOLFCLU_LOG(WOLFCLU_L0, "unable to read outfile %s", fOutNameBuf);
                         ret = MEMORY_E;
                     }
                 }
@@ -391,12 +392,12 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                     XMEMCPY(fOutNameBuf, fName, fNameSz);
                     XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
-                    printf("Public key file = %s\n", fOutNameBuf);
+                    WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
 
                     bioPub = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
                     if (bioPub == NULL) {
-                        printf("unable to read outfile %s\n", fOutNameBuf);
+                        WOLFCLU_LOG(WOLFCLU_L0, "unable to read outfile %s", fOutNameBuf);
                         ret = MEMORY_E;
                     }
                 }
@@ -406,7 +407,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                 }
                 break;
             default:
-                printf("Invalid directive\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "Invalid directive");
                 ret = BAD_FUNC_ARG;
         }
     }
@@ -465,8 +466,8 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     fNameSz = (int)XSTRLEN(fName);
 
     if (fmt == PEM_FORM) {
-        printf("Der to Pem for rsa key not yet implemented\n");
-        printf("FEATURE COMING SOON!\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Der to Pem for rsa key not yet implemented");
+        WOLFCLU_LOG(WOLFCLU_L0, "FEATURE COMING SOON!");
         return FEATURE_COMING_SOON;
     }
 
@@ -502,7 +503,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
         case PRIV_ONLY_FILE:
             /* add on the final part of the file name ".priv" */
             XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
-            printf("fOutNameBuf = %s\n", fOutNameBuf);
+            WOLFCLU_LOG(WOLFCLU_L0, "fOutNameBuf = %s", fOutNameBuf);
 
             derBufSz = wc_RsaKeyToDer(&key, derBuf, (word32)maxDerBufSz);
             if (derBufSz < 0) {
@@ -534,7 +535,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
         case PUB_ONLY_FILE:
             /* add on the final part of the file name ".pub" */
             XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
-            printf("fOutNameBuf = %s\n", fOutNameBuf);
+            WOLFCLU_LOG(WOLFCLU_L0, "fOutNameBuf = %s", fOutNameBuf);
 
             derBufSz = wc_RsaKeyToPublicDer(&key, derBuf, (word32)maxDerBufSz);
             if (derBufSz < 0) {
@@ -560,7 +561,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             fclose(file);
             break;
         default:
-            printf("Invalid directive\n");
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid directive");
             XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return BAD_FUNC_ARG;
