@@ -726,22 +726,33 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     return ret;
 }
 
-#define MAX_AES_IDX 6
-static const char* algoName[] = {
-    "aes-128-ctr",
-    "aes-192-ctr",
-    "aes-256-ctr",
-    "aes-128-cbc",
-    "aes-192-cbc",
-    "aes-256-cbc",
-    "camellia-128-cbc",
-    "camellia-192-cbc",
-    "camellia-256-cbc",
-    "des-cbc",
+#define WOLFCLU_AES128CTR_NAME "aes-128-ctr"
+#define WOLFCLU_AES192CTR_NAME "aes-192-ctr"
+#define WOLFCLU_AES256CTR_NAME "aes-256-ctr"
+#define WOLFCLU_AES128CBC_NAME "aes-128-cbc"
+#define WOLFCLU_AES192CBC_NAME "aes-192-cbc"
+#define WOLFCLU_AES256CBC_NAME "aes-256-cbc"
+#define WOLFCLU_CAMELLIA128CBC_NAME "camellia-128-cbc"
+#define WOLFCLU_CAMELLIA192CBC_NAME "camellia-192-cbc"
+#define WOLFCLU_CAMELLIA256CBC_NAME "camellia-256-cbc"
+#define WOLFCLU_DESCBC_NAME "des-cbc"
 
+static const char* algoName[] = {
+    WOLFCLU_AES128CTR_NAME,
+    WOLFCLU_AES192CTR_NAME,
+    WOLFCLU_AES256CTR_NAME,
+    WOLFCLU_AES128CBC_NAME,
+    WOLFCLU_AES192CBC_NAME,
+    WOLFCLU_AES256CBC_NAME,
+    WOLFCLU_CAMELLIA128CBC_NAME,
+    WOLFCLU_CAMELLIA192CBC_NAME,
+    WOLFCLU_CAMELLIA256CBC_NAME,
+    WOLFCLU_DESCBC_NAME,
 };
 
-/* support older name schemes */
+/* support older name schemes MAX_AES_IDX is the maximum index for old AES alogo
+ * names */
+#define MAX_AES_IDX 6
 static const char* oldAlgoName[] = {
     "aes-ctr-128",
     "aes-ctr-192",
@@ -797,7 +808,7 @@ const WOLFSSL_EVP_CIPHER* wolfCLU_CipherTypeFromAlgo(int alg)
 
 /*
  * finds algorithm for encryption/decryption
- * alg and mode are null terminated strings that need free'd by the caller
+ * mode is a null terminated strings that need free'd by the caller
  */
 int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
 {
@@ -811,7 +822,7 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
     /* make a copy of args because getopt_long_only reorders them */
     for (i = 0; i < argc; i++) argvCopy[i] = argv[i];
 
-    /* first just try the 3rd argument */
+    /* first just try the 3rd argument for backwords compatibility */
     if (argc < 3 || argvCopy[2] == NULL) {
         return FATAL_ERROR;
     }
@@ -830,45 +841,55 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
             switch (option) {
                 /* AES */
                 case WOLFCLU_AES128CTR:
-                    XSTRNCPY(name, algoName[0], XSTRLEN(algoName[0]));
+                    XSTRNCPY(name, WOLFCLU_AES128CTR_NAME,
+                            XSTRLEN(WOLFCLU_AES128CTR_NAME));
                     break;
 
                 case WOLFCLU_AES192CTR:
-                    XSTRNCPY(name, algoName[1], XSTRLEN(algoName[1]));
+                    XSTRNCPY(name, WOLFCLU_AES192CTR_NAME,
+                            XSTRLEN(WOLFCLU_AES192CTR_NAME));
                     break;
 
                 case WOLFCLU_AES256CTR:
-                    XSTRNCPY(name, algoName[2], XSTRLEN(algoName[2]));
+                    XSTRNCPY(name, WOLFCLU_AES256CTR_NAME,
+                            XSTRLEN(WOLFCLU_AES256CTR_NAME));
                     break;
 
                 case WOLFCLU_AES128CBC:
-                    XSTRNCPY(name, algoName[3], XSTRLEN(algoName[3]));
+                    XSTRNCPY(name, WOLFCLU_AES128CBC_NAME,
+                            XSTRLEN(WOLFCLU_AES128CBC_NAME));
                     break;
 
                 case WOLFCLU_AES192CBC:
-                    XSTRNCPY(name, algoName[4], XSTRLEN(algoName[4]));
+                    XSTRNCPY(name, WOLFCLU_AES192CBC_NAME,
+                            XSTRLEN(WOLFCLU_AES192CBC_NAME));
                     break;
 
                 case WOLFCLU_AES256CBC:
-                    XSTRNCPY(name, algoName[5], XSTRLEN(algoName[5]));
+                    XSTRNCPY(name, WOLFCLU_AES256CBC_NAME,
+                            XSTRLEN(WOLFCLU_AES256CBC_NAME));
                     break;
 
                 /* camellia */
                 case WOLFCLU_CAMELLIA128CBC:
-                    XSTRNCPY(name, algoName[6], XSTRLEN(algoName[6]));
+                    XSTRNCPY(name, WOLFCLU_CAMELLIA128CBC_NAME,
+                            XSTRLEN(WOLFCLU_CAMELLIA128CBC_NAME));
                     break;
 
                 case WOLFCLU_CAMELLIA192CBC:
-                    XSTRNCPY(name, algoName[7], XSTRLEN(algoName[7]));
+                    XSTRNCPY(name, WOLFCLU_CAMELLIA192CBC_NAME,
+                            XSTRLEN(WOLFCLU_CAMELLIA192CBC_NAME));
                     break;
 
                 case WOLFCLU_CAMELLIA256CBC:
-                    XSTRNCPY(name, algoName[8], XSTRLEN(algoName[8]));
+                    XSTRNCPY(name, WOLFCLU_CAMELLIA256CBC_NAME,
+                            XSTRLEN(WOLFCLU_CAMELLIA256CBC_NAME));
                     break;
 
                 /* 3des */
                 case WOLFCLU_DESCBC:
-                    XSTRNCPY(name, algoName[9], XSTRLEN(algoName[9]));
+                    XSTRNCPY(name, WOLFCLU_DESCBC_NAME,
+                            XSTRLEN(WOLFCLU_DESCBC_NAME));
                     break;
 
                 case '?':
