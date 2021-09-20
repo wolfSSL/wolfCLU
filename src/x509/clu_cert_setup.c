@@ -41,21 +41,21 @@ enum {
 int wolfCLU_certSetup(int argc, char** argv)
 {
     int ret;
-    int text_flag    = 0;   /* does user desire human readable cert info */
-    int text_pubkey  = 0;   /* does user desire human readable pubkey info */
-    int noout_flag   = 0;   /* are we outputting a file */
-    int inder_flag   = 0;   /* is the incoming file in der format */
-    int inpem_flag   = 0;   /* is the incoming file in pem format */
-    int outder_flag  = 0;   /* is the output file in der format */
-    int outpem_flag  = 0;   /* is the output file in pem format */
-    int infile_flag  = 0;   /* set if passing in file argument */
-    int outfile_flag = 0;   /* set if passing out file argument */
-    int silent_flag  = 0;   /* set to disable echo to command line */
+    int textFlag    = 0;   /* does user desire human readable cert info */
+    int textPubkey  = 0;   /* does user desire human readable pubkey info */
+    int nooutFlag   = 0;   /* are we outputting a file */
+    int inderFlag   = 0;   /* is the incoming file in der format */
+    int inpemFlag   = 0;   /* is the incoming file in pem format */
+    int outderFlag  = 0;   /* is the output file in der format */
+    int outpemFlag  = 0;   /* is the output file in pem format */
+    int inFileFlag  = 0;   /* set if passing in file argument */
+    int outFileFlag = 0;   /* set if passing out file argument */
+    int silentFlag  = 0;   /* set to disable echo to command line */
 
-    char* infile  = NULL;   /* pointer to the infile name */
-    char* outfile = NULL;   /* pointer to the outfile name */
-    int   inform  = PEM_FORM; /* the input format */
-    char* outform;          /* the output format */
+    char* inFile  = NULL;   /* pointer to the inFile name */
+    char* outFile = NULL;   /* pointer to the outFile name */
+    int   inForm  = PEM_FORM; /* the input format */
+    char* outForm;          /* the output format */
 
 
 /*---------------------------------------------------------------------------*/
@@ -73,59 +73,59 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (ret > 0) {
         /* set flag for converting to human readable.
          */
-        text_flag = 1;
+        textFlag = 1;
     } /* Optional flag do not return error */
 /*---------------------------------------------------------------------------*/
 /* pubkey */
-/*---------------------------------------------------------------------------*/
+/*--------------------------------------------------------------------------*/
     ret = wolfCLU_checkForArg("-pubkey", 7, argc, argv);
     if (ret > 0) {
         /* set flag for converting to human readable.
          */
-        text_pubkey = 1;
+        textPubkey = 1;
     } /* Optional flag do not return error */
 /*---------------------------------------------------------------------------*/
-/* inform pem/der/??OTHER?? */
+/* inForm pem/der/??OTHER?? */
 /*---------------------------------------------------------------------------*/
     ret = wolfCLU_checkForArg("-inform", 7, argc, argv);
     if (ret > 0) {
-        inform = wolfCLU_checkInform(argv[ret+1]);
-        if (inform == PEM_FORM) {
-            inpem_flag = 1;
+        inForm = wolfCLU_checkInform(argv[ret+1]);
+        if (inForm == PEM_FORM) {
+            inpemFlag = 1;
         }
-        else if (inform == DER_FORM) {
-            inder_flag = 1;
+        else if (inForm == DER_FORM) {
+            inderFlag = 1;
         }
         else {
-            return inform;
+            return inForm;
         }
     }
     else if (ret == 0) {
         /* assume is PEM if not set */
-        inpem_flag = 1;
+        inpemFlag = 1;
     }
     else {
         return ret;
     }
 
 /*---------------------------------------------------------------------------*/
-/* outform pem/der/??OTHER?? */
+/* outForm pem/der/??OTHER?? */
 /*---------------------------------------------------------------------------*/
     ret = wolfCLU_checkForArg("-outform", 8, argc, argv);
     if (ret > 0) {
-        outform = argv[ret+1];
-        ret = wolfCLU_checkOutform(outform);
+        outForm = argv[ret+1];
+        ret = wolfCLU_checkOutform(outForm);
         if (ret == PEM_FORM) {
-            outpem_flag = 1;
+            outpemFlag = 1;
         }
         else if (ret == DER_FORM) {
-            outder_flag = 1;
+            outderFlag = 1;
         }
         else {
             return ret;
         }
     }
-    else if (text_flag == 0 && text_pubkey == 0) {
+    else if (textFlag == 0 && textPubkey == 0) {
         return ret;
     }
 
@@ -138,18 +138,18 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (ret > 0) {
        /* set flag for in file and flag for input file OK if exists
         * check for error case below. If no error then read in file */
-       infile = argv[ret+1];
+       inFile = argv[ret+1];
     }
     else {
         return ret;
     }
 
-    if (access(infile, F_OK) != -1) {
-        WOLFCLU_LOG(WOLFCLU_L0, "input file is \"%s\"", infile);
-        infile_flag = 1;
+    if (access(inFile, F_OK) != -1) {
+        WOLFCLU_LOG(WOLFCLU_L0, "input file is \"%s\"", inFile);
+        inFileFlag = 1;
     }
     else {
-        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: input file \"%s\" does not exist", infile);
+        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: input file \"%s\" does not exist", inFile);
         return INPUT_FILE_ERROR;
     }
 /*---------------------------------------------------------------------------*/
@@ -158,21 +158,21 @@ int wolfCLU_certSetup(int argc, char** argv)
     ret = wolfCLU_checkForArg("-out", 4, argc, argv);
     if (ret > 0) {
         /* set flag for out file, check for error case below. If no error
-         * then write outfile */
-        outfile_flag = 1;
-        outfile = argv[ret+1];
+         * then write outFile */
+        outFileFlag = 1;
+        outFile = argv[ret+1];
     }
-    else if (text_flag == 0 && text_pubkey == 0) {
+    else if (textFlag == 0 && textPubkey == 0) {
         return ret;
     }
 
-    if (outfile != NULL) {
-        if (access(outfile, F_OK) != -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "output file set: \"%s\"", outfile);
+    if (outFile != NULL) {
+        if (access(outFile, F_OK) != -1) {
+            WOLFCLU_LOG(WOLFCLU_L0, "output file set: \"%s\"", outFile);
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "output file \"%s\"did not exist, it will"
-                   " be created.", outfile);
+                   " be created.", outFile);
         }
     }
 /*---------------------------------------------------------------------------*/
@@ -181,7 +181,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     ret = wolfCLU_checkForArg("-noout", 6, argc, argv);
     if (ret > 0) {
         /* set flag for no output file */
-        noout_flag = 1;
+        nooutFlag = 1;
     } /* Optional flag do not return error */
 /*---------------------------------------------------------------------------*/
 /* silent */
@@ -191,42 +191,42 @@ int wolfCLU_certSetup(int argc, char** argv)
         /* set flag for converting to human readable.
          * return NOT_YET_IMPLEMENTED error
          */
-        silent_flag = 1;
+        silentFlag = 1;
     } /* Optional flag do not return error */
 /*---------------------------------------------------------------------------*/
 /* END ARG PROCESSING */
 /*---------------------------------------------------------------------------*/
     ret = 0;
-    switch (error_check(inpem_flag, inder_flag, outpem_flag, outder_flag,
-                      text_flag, text_pubkey, noout_flag)) {
+    switch (error_check(inpemFlag, inderFlag, outpemFlag, outderFlag,
+                      textFlag, textPubkey, nooutFlag)) {
         case INPEM_OUTPEM:
-            if (infile_flag) wolfCLU_inpemOutpem(infile, outfile, silent_flag);
+            if (inFileFlag) wolfCLU_inpemOutpem(inFile, outFile, silentFlag);
             else return INPUT_FILE_ERROR;
             break;
         case INPEM_OUTDER:
-            if (infile_flag) wolfCLU_inpemOutder(infile, outfile, silent_flag);
+            if (inFileFlag) wolfCLU_inpemOutder(inFile, outFile, silentFlag);
             else return INPUT_FILE_ERROR;
             break;
         case INDER_OUTPEM:
-            if (infile_flag) wolfCLU_inderOutpem(infile, outfile, silent_flag);
+            if (inFileFlag) wolfCLU_inderOutpem(inFile, outFile, silentFlag);
             else return INPUT_FILE_ERROR;
             break;
         case INDER_OUTDER:
-            if (infile_flag) wolfCLU_inderOutder(infile, outfile, silent_flag);
+            if (inFileFlag) wolfCLU_inderOutder(inFile, outFile, silentFlag);
             else return INPUT_FILE_ERROR;
             break;
         case INPEM_OUTTEXT:
-            if (outfile_flag) {
-                ret = wolfCLU_inpemOuttext(infile, outfile, silent_flag);
+            if (outFileFlag) {
+                ret = wolfCLU_inpemOuttext(inFile, outFile, silentFlag);
             }
             else {
                 WOLFCLU_LOG(WOLFCLU_L0, "Outfile not set, using stdout");
-                outfile = (char*)"stdout";
-                ret = wolfCLU_inpemOuttext(infile, outfile, silent_flag);
+                outFile = (char*)"stdout";
+                ret = wolfCLU_inpemOuttext(inFile, outFile, silentFlag);
             }
             break;
         case OUTPUBTEXT:
-            ret = wolfCLU_printX509PubKey(infile, inform, outfile, silent_flag);
+            ret = wolfCLU_printX509PubKey(inFile, inForm, outFile, silentFlag);
             break;
         case NOOUT_SET:
             break;
@@ -240,81 +240,82 @@ int wolfCLU_certSetup(int argc, char** argv)
 }
 
 /*
- * @arg inpem_flag: is inform set to pem
- * @arg inder_flag: is inform set to der
- * @arg outpem_flag: is outform set to pem
- * @arg outder_flag: is outform set to der
+ * @arg inpemFlag: is inForm set to pem
+ * @arg inderFlag: is inForm set to der
+ * @arg outpemFlag: is outForm set to pem
+ * @arg outderFlag: is outForm set to der
  */
-int error_check(int inpem_flag, int inder_flag, 
-                int outpem_flag, int outder_flag, 
-                int text_flag, int text_pubkey, int noout_flag)
+int error_check(int inpemFlag, int inderFlag,
+                int outpemFlag, int outderFlag,
+                int textFlag, int textPubkey, int nooutFlag)
 {
     int ret = USER_INPUT_ERROR;
     int tmp;
-    ret = ( inpem_flag & inder_flag);
+
+    ret = ( inpemFlag & inderFlag);
     if (ret) {
-        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: inform set to both PEM and DER format");
+        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: inForm set to both PEM and DER format");
         return USER_INPUT_ERROR;
     }
-    ret = ( inpem_flag & outpem_flag);
+    ret = ( inpemFlag & outpemFlag);
     if (ret) {
         tmp = ret;
-        ret = (tmp & noout_flag);
+        ret = (tmp & nooutFlag);
         if (ret) {
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
         return INPEM_OUTPEM;
    }
-    ret = (inpem_flag & outder_flag);
+    ret = (inpemFlag & outderFlag);
     if (ret) {
         tmp = ret;
-        ret = (tmp & noout_flag);
+        ret = (tmp & nooutFlag);
         if (ret) {
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
         return INPEM_OUTDER;
     }
-    ret = (inder_flag & outpem_flag);
+    ret = (inderFlag & outpemFlag);
     if (ret) {
         tmp = ret;
-        ret = (tmp & noout_flag);
+        ret = (tmp & nooutFlag);
         if (ret) {
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
         return INDER_OUTPEM;
     }
-    ret = (inder_flag & outder_flag);
+    ret = (inderFlag & outderFlag);
     if (ret) {
         tmp = ret;
-        ret = (tmp & noout_flag);
+        ret = (tmp & nooutFlag);
         if (ret) {
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
         return INDER_OUTDER;
     }
-    ret = (inpem_flag & text_flag);
+    ret = (inpemFlag & textFlag);
     if (ret) {
-        return INPEM_OUTTEXT; 
+        return INPEM_OUTTEXT;
     }
-    if (text_pubkey) {
+    if (textPubkey) {
         return OUTPUBTEXT;
     }
-    ret = (outder_flag & outpem_flag);
+    ret = (outderFlag & outpemFlag);
     if (ret) {
-        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: outform set to both DER and PEM format");
+        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: outForm set to both DER and PEM format");
         return USER_INPUT_ERROR;
     }
     if (!ret) {
         ret = USER_INPUT_ERROR;
-        if ( !inpem_flag && !inder_flag) {
+        if ( !inpemFlag && !inderFlag) {
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: Failed to specify input format: -inform not set");
         }
         else {
-            ret = (inder_flag & noout_flag) | (inpem_flag & noout_flag);
+            ret = (inderFlag & nooutFlag) | (inpemFlag & nooutFlag);
             if (ret) {
                 return NOOUT_SET;
             }

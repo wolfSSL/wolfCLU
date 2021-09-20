@@ -23,15 +23,15 @@
 #define WOLFCLU_PARSE_H
 
 /* a helper function for wolfCLU_parse_file */
-int wolfCLU_inpemOutpem(char* infile, char* outfile, int silent_flag);
+int wolfCLU_inpemOutpem(char* inFile, char* outFile, int silentFlag);
 /* a helper function for wolfCLU_parse_file */
-int wolfCLU_inpemOutder(char* infile, char* outfile, int silent_flag);
+int wolfCLU_inpemOutder(char* inFile, char* outFile, int silentFlag);
 /* a helper function for wolfCLU_parse_file */
-int wolfCLU_inderOutpem(char* infile, char* outfile, int silent_flag);
+int wolfCLU_inderOutpem(char* inFile, char* outFile, int silentFlag);
 /* a helper function for wolfCLU_parse_file */
-int wolfCLU_inderOutder(char* infile, char* outfile, int silent_flag);
+int wolfCLU_inderOutder(char* inFile, char* outFile, int silentFlag);
 /* a helper function for wolfCLU_parse_file */
-int wolfCLU_inpemOuttext(char* infile, char* outfile, int silent_flag);
+int wolfCLU_inpemOuttext(char* inFile, char* outFile, int silentFlag);
 
 /**
  * @brief Function to print out DER public key
@@ -49,15 +49,15 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz);
  *
  * @param infile file to read from
  * @param inform PEM_FORM/DER_FORM of input
- * @param outfile name of the file to write to
- * @param silent_flag if should be silent instead of printout
+ * @param outFile name of the file to write to
+ * @param silentFlag if should be silent instead of printout
  *
  * @return returns 0 on success
  */
-int wolfCLU_printX509PubKey(char* infile, int inform, char* outfile,
-        int silent_flag);
+int wolfCLU_printX509PubKey(char* inFile, int inForm, char* outFile,
+        int silentFlag);
 /* function for processing input/output based on format requests from user */
-int wolfCLU_parseFile(char* infile, int inform, char* outfile, int outform,
-                                                               int silent_flag);
+int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
+                                                               int silentFlag);
 
 #endif /* WOLFCLU_PARSE_H */
