@@ -561,11 +561,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 #endif
     };
 
-    if (name == NULL) {
-        return FATAL_ERROR;
-    }
-
-    if (alg == NULL || mode == NULL || size == NULL) {
+    if (name == NULL || alg == NULL || mode == NULL || size == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "null input to get algo function");
         return FATAL_ERROR;
     }
@@ -578,7 +574,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
 
     for (i = 0; i < (int)(sizeof(acceptAlgs)/sizeof(acceptAlgs[0])); i++) {
-        if (strcmp(tmpAlg, acceptAlgs[i]) == 0 )
+        if (XSTRNCMP(tmpAlg, acceptAlgs[i], XSTRLEN(tmpAlg)) == 0 )
             nameCheck = 1;
     }
 
@@ -598,13 +594,13 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     }
 
     for (i = 0; i < (int) (sizeof(acceptMode)/sizeof(acceptMode[0])); i++) {
-        if (strcmp(tmpMode, acceptMode[i]) == 0)
+        if (XSTRNCMP(tmpMode, acceptMode[i], XSTRLEN(tmpMode)) == 0)
             modeCheck = 1;
     }
 
     /* if name or mode doesn't match acceptable options */
     if (nameCheck == 0 || modeCheck == 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Invalid entry");
+        WOLFCLU_LOG(WOLFCLU_L0, "Invalid entry, issue with algo name and mode");
         return FATAL_ERROR;
     }
 

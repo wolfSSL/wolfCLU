@@ -77,32 +77,32 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, char* alg, int size)
 
     /* hashes using accepted algorithm */
 #ifndef NO_MD5
-    if (strcmp(alg, "md5") == 0) {
+    if (ret == -1 && XSTRNCMP(alg, "md5", 3) == 0) {
         ret = wc_Md5Hash(input, inputSz, output);
     }
 #endif
-#ifndef NO_SHA
-    if (strcmp(alg, "sha") == 0) {
-        ret = wc_ShaHash(input, inputSz, output);
-    }
-#endif
 #ifndef NO_SHA256
-    if (strcmp(alg, "sha256") == 0) {
+    if (ret == -1 && XSTRNCMP(alg, "sha256", 6) == 0) {
         ret = wc_Sha256Hash(input, inputSz, output);
     }
 #endif
 #ifdef WOLFSSL_SHA384
-    if (strcmp(alg, "sha384") == 0) {
+    if (ret == -1 && XSTRNCMP(alg, "sha384", 6) == 0) {
         ret = wc_Sha384Hash(input, inputSz, output);
     }
 #endif
 #ifdef WOLFSSL_SHA512
-    if (strcmp(alg, "sha512") == 0) {
+    if (ret == -1 && XSTRNCMP(alg, "sha512", 6) == 0) {
         ret = wc_Sha512Hash(input, inputSz, output);
     }
 #endif
+#ifndef NO_SHA
+    if (ret == - 1 && XSTRNCMP(alg, "sha", 3) == 0) {
+        ret = wc_ShaHash(input, inputSz, output);
+    }
+#endif
 #ifdef HAVE_BLAKE2
-    if (strcmp(alg, "blake2b") == 0) {
+    if (ret == - 1 && XSTRNCMP(alg, "blake2b", 7) == 0) {
         ret = wc_InitBlake2b(&hash, size);
         if (ret != 0) return ret;
         ret = wc_Blake2bUpdate(&hash, input, inputSz);
@@ -114,11 +114,11 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, char* alg, int size)
 
 #ifndef NO_CODING
 #ifdef WOLFSSL_BASE64_ENCODE
-    if (strcmp(alg, "base64enc") == 0) {
+    if (ret == -1 && XSTRNCMP(alg, "base64enc", 9) == 0) {
         ret = Base64_Encode(input, inputSz, output, (word32*)&size);
     }
 #endif /* WOLFSSL_BASE64_ENCODE */
-    if (strcmp(alg, "base64dec") == 0) {
+    if (ret == -1 && XSTRNCMP(alg, "base64dec", 9) == 0) {
         ret = Base64_Decode(input, inputSz, output, (word32*)&size);
     }
 #endif /* !NO_CODING */
