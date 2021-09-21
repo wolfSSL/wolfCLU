@@ -36,7 +36,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     int ret;                             /* return value */
     int fOutNmSz;                        /* file name without append */
     int fOutNmAppendSz = 6;              /* # of bytes to append to file name */
-    int flag_outputPub = 0;              /* set if outputting both priv/pub */
+    int flagOutputPub = 0;              /* set if outputting both priv/pub */
     char privAppend[6] = ".priv\0";      /* last part of the priv file name */
     char pubAppend[6] = ".pub\0\0";      /* last part of the pub file name*/
     byte privKeyBuf[ED25519_KEY_SIZE*2]; /* will hold public & private parts */
@@ -45,7 +45,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     word32 pubKeySz;                     /* size of public key */
     ed25519_key edKeyOut;                /* the ed25519 key structure */
     char* finalOutFNm;                   /* file name + append */
-    FILE* file;                          /* file stream */
+    XFILE file;                          /* file stream */
 
 
     WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fOutNm);
@@ -91,7 +91,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
     switch(directive) {
         case PRIV_AND_PUB:
-            flag_outputPub = 1;
+            flagOutputPub = 1;
             /* Fall through to PRIV_ONLY */
             FALL_THROUGH;
         case PRIV_ONLY:
@@ -99,42 +99,42 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             XMEMCPY(finalOutFNm+fOutNmSz, privAppend, fOutNmAppendSz);
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
-            file = fopen(finalOutFNm, "wb");
+            file = XFOPEN(finalOutFNm, "wb");
             if (!file) {
                 XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return OUTPUT_FILE_ERROR;
             }
 
-            ret = (int) fwrite(privKeyBuf, 1, privKeySz, file);
+            ret = (int)XFWRITE(privKeyBuf, 1, privKeySz, file);
             if (ret <= 0) {
-                fclose(file);
+                XFCLOSE(file);
                 XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return OUTPUT_FILE_ERROR;
             }
             fclose(file);
 
-            if (flag_outputPub == 0) {
+            if (flagOutputPub == 0) {
                 break;
-            } /* else fall through to PUB_ONLY if flag_outputPub == 1*/
+            } /* else fall through to PUB_ONLY if flagOutputPub == 1*/
             FALL_THROUGH;
         case PUB_ONLY:
             /* add on the final part of the file name ".pub" */
             XMEMCPY(finalOutFNm+fOutNmSz, pubAppend, fOutNmAppendSz);
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
-            file = fopen(finalOutFNm, "wb");
+            file = XFOPEN(finalOutFNm, "wb");
             if (!file) {
                 XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return OUTPUT_FILE_ERROR;
             }
 
-            ret = (int) fwrite(pubKeyBuf, 1, pubKeySz, file);
+            ret = (int)XFWRITE(pubKeyBuf, 1, pubKeySz, file);
             if (ret <= 0) {
-                fclose(file);
+                XFCLOSE(file);
                 XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return OUTPUT_FILE_ERROR;
             }
-            fclose(file);
+            XFCLOSE(file);
             break;
         default:
             WOLFCLU_LOG(WOLFCLU_L0, "Invalid directive");
@@ -428,7 +428,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 {
 #ifndef NO_RSA
     RsaKey key;
-    FILE*  file;
+    XFILE  file;
     int    ret;
 
     int   fNameSz;
@@ -497,21 +497,21 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                 return derBufSz;
             }
 
-            file = fopen(fOutNameBuf, "wb");
+            file = XFOPEN(fOutNameBuf, "wb");
             if (file == XBADFILE) {
                 XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return OUTPUT_FILE_ERROR;
             }
 
-            ret = (int)fwrite(derBuf, 1, derBufSz, file);
+            ret = (int)XFWRITE(derBuf, 1, derBufSz, file);
             if (ret <= 0) {
                 XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                fclose(file);
+                XFCLOSE(file);
                 return OUTPUT_FILE_ERROR;
             }
-            fclose(file);
+            XFCLOSE(file);
 
             if (directive != PRIV_AND_PUB) {
                 break;
@@ -529,21 +529,21 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                 return derBufSz;
             }
 
-            file = fopen(fOutNameBuf, "wb");
+            file = XFOPEN(fOutNameBuf, "wb");
             if (file == XBADFILE) {
                 XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return OUTPUT_FILE_ERROR;
             }
 
-            ret = (int) fwrite(derBuf, 1, derBufSz, file);
+            ret = (int)XFWRITE(derBuf, 1, derBufSz, file);
             if (ret <= 0) {
-                fclose(file);
+                XFCLOSE(file);
                 XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return OUTPUT_FILE_ERROR;
             }
-            fclose(file);
+            XFCLOSE(file);
             break;
         default:
             WOLFCLU_LOG(WOLFCLU_L0, "Invalid directive");

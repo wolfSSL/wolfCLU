@@ -34,8 +34,8 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     Camellia camellia;                  /* camellia declaration */
 #endif
 
-    FILE*  inFile;                      /* input file */
-    FILE*  outFile;                     /* output file */
+    XFILE  inFile;                      /* input file */
+    XFILE  outFile;                     /* output file */
 
     WC_RNG     rng;                     /* random number generator */
     byte*   input  = NULL;              /* input buffer */
@@ -53,23 +53,23 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     int     sbSize = SALT_SIZE + block; /* size of salt and iv together */
 
     /* opens input file */
-    inFile = fopen(in, "rb");
+    inFile = XFOPEN(in, "rb");
     if (inFile == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "Input file does not exist.");
         return DECRYPT_ERROR;
     }
     /* opens output file */
 
-    if ((outFile = fopen(out, "wb")) == NULL) {
+    if ((outFile = XFOPEN(out, "wb")) == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "Error creating output file.");
-        fclose(inFile);
+        XFCLOSE(inFile);
         return DECRYPT_ERROR;
     }
 
     /* find end of file for length */
-    fseek(inFile, 0, SEEK_END);
-    length = (int) ftell(inFile);
-    fseek(inFile, 0, SEEK_SET);
+    XFSEEK(inFile, 0, SEEK_END);
+    length = (int)XFTELL(inFile);
+    XFSEEK(inFile, 0, SEEK_SET);
 
     /* if there is a remainder,
      * round up else no round
@@ -105,12 +105,12 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         /* On first loop only read in salt and iv */
         if (currLoopFlag == 1) {
             if (ret == 0 &&
-                    (int)fread (salt, 1, SALT_SIZE, inFile) != SALT_SIZE) {
+                    (int)XFREAD(salt, 1, SALT_SIZE, inFile) != SALT_SIZE) {
                 WOLFCLU_LOG(WOLFCLU_L0, "Error reading salt.");
                 ret = FREAD_ERROR;
             }
 
-            if (ret == 0 && (int) fread (iv, 1, block, inFile) != block) {
+            if (ret == 0 && (int)XFREAD(iv, 1, block, inFile) != block) {
                 WOLFCLU_LOG(WOLFCLU_L0, "Error reading salt.");
                 ret = FREAD_ERROR;
             }
@@ -143,7 +143,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
         /* Read in 1kB */
         if (ret == 0 &&
-                (ret = (int) fread(input, 1, MAX_LEN, inFile)) != MAX_LEN) {
+                (ret = (int)XFREAD(input, 1, MAX_LEN, inFile)) != MAX_LEN) {
             if (feof(inFile)) {
                 tempMax = ret;
                 ret = 0; /* success */
@@ -178,12 +178,12 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                     break;
                 }
                 /* reset tempMax for smaller decryption */
-                fwrite(output, 1, length, outFile);
+                XFWRITE(output, 1, length, outFile);
                 break;
             }
             else {
                 if (output != NULL)
-                    fwrite(output, 1, tempMax, outFile);
+                    XFWRITE(output, 1, tempMax, outFile);
 
                 XMEMSET(input, 0, tempMax);
                 if (output != NULL)
@@ -193,7 +193,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         }
         /* writes output to the outFile */
         if (ret == 0 && output != NULL)
-            fwrite(output, 1, tempMax, outFile);
+            XFWRITE(output, 1, tempMax, outFile);
 
         if (ret == 0) {
             XMEMSET(input, 0, tempMax);
@@ -212,8 +212,8 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     XMEMSET(key, 0, size);
     /* Use the wolfssl wc_FreeRng to free rng */
     wc_FreeRng(&rng);
-    fclose(inFile);
-    fclose(outFile);
+    XFCLOSE(inFile);
+    XFCLOSE(outFile);
 
     (void)mode;
     (void)alg;

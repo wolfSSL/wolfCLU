@@ -23,23 +23,30 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/sign-verify/clu_sign.h>
 
-int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType) {
+int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
+{
     int ret;
     int fSz;
-    FILE* f = fopen(in,"rb");
+    XFILE f;
+    byte *data = NULL;
 
+    f = XFOPEN(in, "rb");
     if (f == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", in);
         return BAD_FUNC_ARG;
     }
-    fseek(f, 0, SEEK_END);
-    fSz = (int)ftell(f);
+    XFSEEK(f, 0, SEEK_END);
+    fSz = (int)XFTELL(f);
 
-    byte data[fSz];
+    data = (byte*)XMALLOC(fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (data == NULL) {
+        XFCLOSE(f);
+        return MEMORY_E;
+    }
 
-    fseek(f, 0, SEEK_SET);
-    fread(data, 1, fSz, f);
-    fclose(f);
+    XFSEEK(f, 0, SEEK_SET);
+    XFREAD(data, 1, fSz, f);
+    XFCLOSE(f);
 
     switch(keyType) {
 
@@ -60,19 +67,25 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType) {
         ret = -1;
     }
 
+    XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     return ret;
 }
 
-int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey) {
+int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
+{
 #ifndef NO_RSA
         int ret;
         int privFileSz;
         word32 index = 0;
 
-        FILE* privKeyFile;
+        XFILE privKeyFile;
+        byte* keyBuf = NULL;
 
         RsaKey key;
         WC_RNG rng;
+
+        byte* outBuf = NULL;
+        int   outBufSz = 0;
 
         XMEMSET(&rng, 0, sizeof(rng));
         XMEMSET(&key, 0, sizeof(key));
@@ -85,29 +98,38 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey) {
         }
 
         /* read in and store private key */
-        privKeyFile = fopen(privKey, "rb");
+        privKeyFile = XFOPEN(privKey, "rb");
         if (privKeyFile == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", privKey);
             return BAD_FUNC_ARG;
         }
 
-        fseek(privKeyFile, 0, SEEK_END);
-        privFileSz = (int)ftell(privKeyFile);
-        byte keyBuf[privFileSz];
-        fseek(privKeyFile, 0, SEEK_SET);
-        fread(keyBuf, 1, privFileSz, privKeyFile);
-        fclose(privKeyFile);
+        XFSEEK(privKeyFile, 0, SEEK_END);
+        privFileSz = (int)XFTELL(privKeyFile);
+        keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (keyBuf == NULL) {
+            XFCLOSE(privKeyFile);
+            return MEMORY_E;
+        }
+        XFSEEK(privKeyFile, 0, SEEK_SET);
+        XFREAD(keyBuf, 1, privFileSz, privKeyFile);
+        XFCLOSE(privKeyFile);
 
         /* retrieving private key and storing in the RsaKey */
         ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (ret != 0 ) {
             WOLFCLU_LOG(WOLFCLU_L0, "Failed to decode private key.\nRET: %d", ret);
             return ret;
         }
 
         /* setting up output buffer based on key size */
-        byte outBuf[wc_RsaEncryptSize(&key)];
-        XMEMSET(&outBuf, 0, sizeof(outBuf));
+        outBufSz = wc_RsaEncryptSize(&key);
+        outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (outBuf == NULL) {
+            return MEMORY_E;
+        }
+        XMEMSET(outBuf, 0, outBufSz);
 
         ret = wc_InitRng(&rng);
         if (ret != 0) {
@@ -123,17 +145,17 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey) {
         }
         #endif
 
-        ret = wc_RsaSSL_Sign(data, dataSz, outBuf, (word32)sizeof(outBuf), &key,
+        ret = wc_RsaSSL_Sign(data, dataSz, outBuf, (word32)outBufSz, &key,
                 &rng);
         if (ret < 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "Failed to sign data with RSA private key.\nRET: %d", ret);
             return ret;
         }
         else {
-            FILE* s;
-            s = fopen(out, "wb");
-            fwrite(outBuf, 1, sizeof(outBuf), s);
-            fclose(s);
+            XFILE s;
+            s = XFOPEN(out, "wb");
+            XFWRITE(outBuf, 1, outBufSz, s);
+            XFCLOSE(s);
         }
 
         (void)index;
@@ -143,17 +165,22 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey) {
 #endif
 }
 
-int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey) {
+int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey)
+{
 #ifdef HAVE_ECC
         int ret;
         int privFileSz;
         word32 index = 0;
         word32 outLen;
 
-        FILE* privKeyFile;
+        byte* keyBuf = NULL;
+        XFILE privKeyFile;
 
         ecc_key key;
         WC_RNG rng;
+
+        byte* outBuf = NULL;
+        int   outBufSz = 0;
 
         XMEMSET(&rng, 0, sizeof(rng));
         XMEMSET(&key, 0, sizeof(key));
@@ -172,30 +199,38 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey) {
         }
 
         /* read in and store private key */
-        privKeyFile = fopen(privKey, "rb");
+        privKeyFile = XFOPEN(privKey, "rb");
         if (privKeyFile == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", privKey);
             return BAD_FUNC_ARG;
         }
 
-        fseek(privKeyFile, 0, SEEK_END);
-        privFileSz = (int)ftell(privKeyFile);
-        byte keyBuf[privFileSz];
-        fseek(privKeyFile, 0, SEEK_SET);
-        fread(keyBuf, 1, privFileSz, privKeyFile);
-        fclose(privKeyFile);
+        XFSEEK(privKeyFile, 0, SEEK_END);
+        privFileSz = (int)XFTELL(privKeyFile);
+        keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (keyBuf == NULL) {
+            return MEMORY_E;
+        }
+        XFSEEK(privKeyFile, 0, SEEK_SET);
+        XFREAD(keyBuf, 1, privFileSz, privKeyFile);
+        XFCLOSE(privKeyFile);
 
         /* retrieving private key and storing in the Ecc Key */
         ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (ret != 0 ) {
             WOLFCLU_LOG(WOLFCLU_L0, "Failed to decode private key.\nRET: %d", ret);
             return ret;
         }
 
         /* setting up output buffer based on key size */
-        byte outBuf[wc_ecc_sig_size(&key)];
-        XMEMSET(&outBuf, 0, sizeof(outBuf));
-        outLen = (word32)sizeof(outBuf);
+        outBufSz = wc_ecc_sig_size(&key);
+        outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (outBuf == NULL) {
+            return MEMORY_E;
+        }
+        XMEMSET(outBuf, 0, outBufSz);
+        outLen = (word32)outBufSz;
 
         /* signing input with ecc priv key to produce signature */
         ret = wc_ecc_sign_hash(data, fSz, outBuf, &outLen, &rng, &key);
@@ -204,10 +239,10 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey) {
             return ret;
         }
         else {
-            FILE* s;
-            s = fopen(out, "wb");
-            fwrite(outBuf, 1, outLen, s);
-            fclose(s);
+            XFILE s;
+            s = XFOPEN(out, "wb");
+            XFWRITE(outBuf, 1, outLen, s);
+            XFCLOSE(s);
         }
 
         (void)index;
@@ -217,80 +252,91 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey) {
 #endif
 }
 
-int wolfCLU_sign_data_ed25519 (byte* data, char* out,
-                               word32 fSz, char* privKey) {
+int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey)
+{
+#ifdef HAVE_ED25519
+    int ret;
+    int privFileSz;
+    word32 index = 0;
+    word32 outLen;
 
-    #ifdef HAVE_ED25519
-        int ret;
-        int privFileSz;
-        word32 index = 0;
-        word32 outLen;
+    XFILE privKeyFile;
+    byte* keyBuf = NULL;
+    byte* outBuf = NULL;
+    int   outBufSz = 0;
 
-        FILE* privKeyFile;
+    ed25519_key key;
+    WC_RNG rng;
 
-        ed25519_key key;
-        WC_RNG rng;
+    XMEMSET(&rng, 0, sizeof(rng));
+    XMEMSET(&key, 0, sizeof(key));
 
-        XMEMSET(&rng, 0, sizeof(rng));
-        XMEMSET(&key, 0, sizeof(key));
-
-        /* init the ED25519 key */
-        ret = wc_ed25519_init(&key);
-        if (ret != 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize ed25519 key\nRET: %d", ret);
-            return ret;
-        }
-
-        ret = wc_InitRng(&rng);
-        if (ret != 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize rng.\nRET: %d", ret);
-            return ret;
-        }
-
-        /* read in and store private key */
-        privKeyFile = fopen(privKey, "rb");
-        if (privKeyFile == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", privKey);
-            return BAD_FUNC_ARG;
-        }
-
-        fseek(privKeyFile, 0, SEEK_END);
-        privFileSz = (int)ftell(privKeyFile);
-        byte keyBuf[privFileSz];
-        fseek(privKeyFile, 0, SEEK_SET);
-        fread(keyBuf, 1, privFileSz, privKeyFile);
-        fclose(privKeyFile);
-
-        /* retrieving private key and storing in the ED25519 Key */
-        ret = wc_ed25519_import_private_key(keyBuf,
-                                        ED25519_KEY_SIZE,
-                                        keyBuf + ED25519_KEY_SIZE,
-                                        ED25519_KEY_SIZE, &key);
-        if (ret != 0 ) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Failed to import private key.\nRET: %d", ret);
-            return ret;
-        }
-
-        /* setting up output buffer based on key size */
-        byte outBuf[ED25519_SIG_SIZE];
-        XMEMSET(&outBuf, 0, sizeof(outBuf));
-        outLen = sizeof(outBuf);
-
-        /* signing input with ED25519 priv key to produce signature */
-        ret = wc_ed25519_sign_msg(data, fSz, outBuf, &outLen, &key);
-        if (ret < 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Failed to sign data with ED25519 private key.\nRET: %d", ret);
-            return ret;
-        }
-        else {
-            FILE* s;
-            s = fopen(out, "wb");
-            fwrite(outBuf, 1, sizeof(outBuf), s);
-            fclose(s);
-        }
-
-        (void)index;
+    /* init the ED25519 key */
+    ret = wc_ed25519_init(&key);
+    if (ret != 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize ed25519 key\nRET: %d", ret);
         return ret;
+    }
+
+    ret = wc_InitRng(&rng);
+    if (ret != 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize rng.\nRET: %d", ret);
+        return ret;
+    }
+
+    /* read in and store private key */
+    privKeyFile = XFOPEN(privKey, "rb");
+    if (privKeyFile == NULL) {
+        WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", privKey);
+        return BAD_FUNC_ARG;
+    }
+
+    XFSEEK(privKeyFile, 0, SEEK_END);
+    privFileSz = (int)XFTELL(privKeyFile);
+    keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (keyBuf == NULL) {
+        XFCLOSE(privKeyFile);
+        return MEMORY_E;
+    }
+    XFSEEK(privKeyFile, 0, SEEK_SET);
+    XFREAD(keyBuf, 1, privFileSz, privKeyFile);
+    XFCLOSE(privKeyFile);
+
+    /* retrieving private key and storing in the ED25519 Key */
+    ret = wc_ed25519_import_private_key(keyBuf,
+                                    ED25519_KEY_SIZE,
+                                    keyBuf + ED25519_KEY_SIZE,
+                                    ED25519_KEY_SIZE, &key);
+    XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (ret != 0 ) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to import private key.\nRET: %d", ret);
+        return ret;
+    }
+
+    /* setting up output buffer based on key size */
+    outBufSz = ED25519_SIG_SIZE;
+    outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (outBuf == NULL) {
+        return MEMORY_E;
+    }
+    XMEMSET(outBuf, 0, outBufSz);
+    outLen = outBufSz;
+
+    /* signing input with ED25519 priv key to produce signature */
+    ret = wc_ed25519_sign_msg(data, fSz, outBuf, &outLen, &key);
+    if (ret < 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Failed to sign data with ED25519 private key.\nRET: %d", ret);
+        return ret;
+    }
+    else {
+        XFILE s;
+        s = XFOPEN(out, "wb");
+        XFWRITE(outBuf, 1, outBufSz, s);
+        XFCLOSE(s);
+    }
+
+    (void)index;
+    return ret;
 #else
     return NOT_COMPILED_IN;
 #endif

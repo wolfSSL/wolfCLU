@@ -200,8 +200,8 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
                                                                 int silentFlag)
 {
     int i, ret, inBufSz, outBufSz;
-    FILE* inStream;
-    FILE* outStream;
+    XFILE inStream;
+    XFILE outStream;
     byte* inBuf = NULL;
     byte* outBuf = NULL;
 
@@ -209,18 +209,16 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
         return BAD_FUNC_ARG;
 
     /* MALLOC buffer for the certificate to be processed */
-    inBuf = (byte*) XMALLOC(MAX_CERT_SIZE, HEAP_HINT,
-                                                   DYNAMIC_TYPE_TMP_BUFFER);
-
+    inBuf = (byte*)XMALLOC(MAX_CERT_SIZE, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (inBuf == NULL) return MEMORY_E;
     XMEMSET(inBuf, 0, MAX_CERT_SIZE);
 
-    inStream    = fopen(inFile, "rb");
+    inStream = XFOPEN(inFile, "rb");
     if (XSTRNCMP(outFile, "stdout", 6) == 0) {
         outStream = stdout;
     }
     else {
-        outStream  = fopen(outFile, "wb");
+        outStream = XFOPEN(outFile, "wb");
     }
 
 /*----------------------------------------------------------------------------*/
@@ -270,7 +268,7 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
         }
 
         /* MALLOC buffer for the result of conversion from der to pem */
-        outBuf = (byte*) XMALLOC(MAX_CERT_SIZE, HEAP_HINT,
+        outBuf = (byte*)XMALLOC(MAX_CERT_SIZE, HEAP_HINT,
                                                        DYNAMIC_TYPE_TMP_BUFFER);
         if (outBuf == NULL) {
             XFREE(inBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -289,7 +287,7 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
         }
 
         /* write the result of conversion to the outFile specified */
-        ret = (int)fwrite(outBuf, 1, outBufSz, outStream);
+        ret = (int)XFWRITE(outBuf, 1, outBufSz, outStream);
         if (ret <= 0) {
             wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
             ret = FWRITE_ERROR;
@@ -309,14 +307,14 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
 /* read in pem, output der */
 /*----------------------------------------------------------------------------*/
     else if ( (!inForm && outForm) ) {
-        inBufSz = (int)fread(inBuf, 1, MAX_CERT_SIZE, inStream);
+        inBufSz = (int)XFREAD(inBuf, 1, MAX_CERT_SIZE, inStream);
         if (inBufSz <= 0) {
             ret = FREAD_ERROR;
             goto clu_parse_cleanup;
         }
 
         /* MALLOC buffer for the result of converstion from pem to der */
-        outBuf = (byte*) XMALLOC(MAX_CERT_SIZE, HEAP_HINT,
+        outBuf = (byte*)XMALLOC(MAX_CERT_SIZE, HEAP_HINT,
                                                        DYNAMIC_TYPE_TMP_BUFFER);
         if (outBuf == NULL) {
             XFREE(inBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -335,7 +333,7 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
         }
 
         /* write the result of conversion to the outFile specified */
-        ret = (int)fwrite(outBuf, 1, outBufSz, outStream);
+        ret = (int)XFWRITE(outBuf, 1, outBufSz, outStream);
         if (ret <= 0) {
             wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
             ret = FWRITE_ERROR;
@@ -355,8 +353,8 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
 
 clu_parse_cleanup:
 
-    fclose(outStream);
-    fclose(inStream);
+    XFCLOSE(outStream);
+    XFCLOSE(inStream);
 
     return ret;
 }

@@ -32,7 +32,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     int ret;
     int privFileSz;
     word32 index = 0;
-    FILE* privKeyFile;
+    XFILE privKeyFile;
     RsaKey key;
     WC_RNG rng;
     byte* keyBuf;
@@ -55,19 +55,19 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
 
     /* read in and store private key */
 
-    privKeyFile = fopen(privKey, "rb");
+    privKeyFile = XFOPEN(privKey, "rb");
     if (privKeyFile == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "Unable to open file %s", privKey);
         return NULL;
     }
-    fseek(privKeyFile, 0, SEEK_END);
-    privFileSz = (int)ftell(privKeyFile);
+    XFSEEK(privKeyFile, 0, SEEK_END);
+    privFileSz = (int)XFTELL(privKeyFile);
     keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf != NULL) {
-        fseek(privKeyFile, 0, SEEK_SET);
-        fread(keyBuf, 1, privFileSz, privKeyFile);
+        XFSEEK(privKeyFile, 0, SEEK_SET);
+        XFREAD(keyBuf, 1, privFileSz, privKeyFile);
     }
-    fclose(privKeyFile);
+    XFCLOSE(privKeyFile);
 
     /* retrieving private key and storing in the RsaKey */
     ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
@@ -106,7 +106,7 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
 #ifdef HAVE_ED25519
     int ret;
     word32 outLen = ED25519_KEY_SIZE;
-    FILE* privKeyFile;
+    XFILE privKeyFile;
     ed25519_key key;
     byte privBuf[ED25519_SIG_SIZE];
 
@@ -119,12 +119,10 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
         return ret;
     }
 
-
     /* read in and store private key */
-
-    privKeyFile = fopen(privKey, "rb");
-    fread(privBuf, 1, ED25519_SIG_SIZE, privKeyFile);
-    fclose(privKeyFile);
+    privKeyFile = XFOPEN(privKey, "rb");
+    XFREAD(privBuf, 1, ED25519_SIG_SIZE, privKeyFile);
+    XFCLOSE(privKeyFile);
 
     /* retrieving private key and storing in the ED25519 */
     ret = wc_ed25519_import_private_key(privBuf,
@@ -150,34 +148,39 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
 }
 
 
-int wolfCLU_verify_signature(char* sig, char* hash, char* out, char* keyPath,
-        int keyType, int pubIn)
+int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
+        char* keyPath, int keyType, int pubIn)
 {
     int hSz = 0;
     int fSz;
     int ret;
 
-    FILE* h;
-    byte* h_mssg = NULL;
-    FILE* f;
+    byte* hash = NULL;
+    byte* data = NULL;
+    XFILE h;
+    XFILE f;
 
     if (sig == NULL) {
         return BAD_FUNC_ARG;
     }
 
-    f = fopen(sig, "rb");
+    f = XFOPEN(sig, "rb");
     if (f == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", sig);
         return BAD_FUNC_ARG;
     }
 
-    fseek(f, 0, SEEK_END);
-    fSz = (int)ftell(f);
+    XFSEEK(f, 0, SEEK_END);
+    fSz = (int)XFTELL(f);
 
-    byte data[fSz];
-    fseek(f, 0, SEEK_SET);
-    fread(data, 1, fSz, f);
-    fclose(f);
+    data = (byte*)XMALLOC(fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (data == NULL) {
+        XFCLOSE(f);
+        return MEMORY_E;
+    }
+    XFSEEK(f, 0, SEEK_SET);
+    XFREAD(data, 1, fSz, f);
+    XFCLOSE(f);
 
     switch(keyType) {
         case RSA_SIG_VER:
@@ -185,53 +188,53 @@ int wolfCLU_verify_signature(char* sig, char* hash, char* out, char* keyPath,
             break;
 
         case ECC_SIG_VER:
-            h = fopen(hash,"rb");
+            h = XFOPEN(hashFile,"rb");
             if (h == NULL) {
-                WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", hash);
+                WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", hashFile);
                 ret = BAD_FUNC_ARG;
                 break;
             }
 
-            fseek(h, 0, SEEK_END);
-            hSz = (int)ftell(h);
+            XFSEEK(h, 0, SEEK_END);
+            hSz = (int)XFTELL(h);
 
-            h_mssg = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (h_mssg == NULL) {
+            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (hash == NULL) {
                 ret = MEMORY_E;
-                fclose(h);
+                XFCLOSE(h);
                 break;
             }
 
-            fseek(h, 0, SEEK_SET);
-            fread(h_mssg, 1, hSz, h);
-            fclose(h);
-            ret = wolfCLU_verify_signature_ecc(data, fSz, h_mssg, hSz, keyPath,
+            XFSEEK(h, 0, SEEK_SET);
+            XFREAD(hash, 1, hSz, h);
+            XFCLOSE(h);
+            ret = wolfCLU_verify_signature_ecc(data, fSz, hash, hSz, keyPath,
                                                pubIn);
             break;
 
         case ED25519_SIG_VER:
         #ifdef HAVE_ED25519
-            h = fopen(hash,"rb");
+            h = XFOPEN(hashFile, "rb");
             if (h == NULL) {
-                WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", hash);
+                WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", hashFile);
                 ret = BAD_FUNC_ARG;
                 break;
             }
 
-            fseek(h, 0, SEEK_END);
-            hSz = (int)ftell(h);
+            XFSEEK(h, 0, SEEK_END);
+            hSz = (int)XFTELL(h);
 
-            h_mssg = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (h_mssg == NULL) {
+            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (hash == NULL) {
                 ret = MEMORY_E;
-                fclose(h);
+                XFCLOSE(h);
                 break;
             }
 
-            fseek(h, 0, SEEK_SET);
-            fread(h_mssg, 1, hSz, h);
-            fclose(h);
-            ret = wolfCLU_verify_signature_ed25519(data, fSz, h_mssg, hSz,
+            XFSEEK(h, 0, SEEK_SET);
+            XFREAD(hash, 1, hSz, h);
+            XFCLOSE(h);
+            ret = wolfCLU_verify_signature_ed25519(data, fSz, hash, hSz,
                                                    keyPath, pubIn);
         #endif
             break;
@@ -241,21 +244,21 @@ int wolfCLU_verify_signature(char* sig, char* hash, char* out, char* keyPath,
             ret = -1;
     }
 
-    if (h_mssg != NULL) {
-        XFREE(h_mssg, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (hash != NULL) {
+        XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     return ret;
 }
 
 int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
-                                 int pubIn) {
-
+                                 int pubIn)
+{
 #ifndef NO_RSA
     int ret;
     int keyFileSz = 0;
     word32 index = 0;
-    FILE* keyPathFile;
+    XFILE keyPathFile;
     RsaKey key;
     WC_RNG rng;
     byte* keyBuf = NULL;
@@ -273,20 +276,20 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
     if (pubIn == 1) {
         /* read in and store rsa key */
-        keyPathFile = fopen(keyPath, "rb");
+        keyPathFile = XFOPEN(keyPath, "rb");
         if (keyPathFile == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", keyPath);
             return BAD_FUNC_ARG;
         }
 
-        fseek(keyPathFile, 0, SEEK_END);
-        keyFileSz = (int)ftell(keyPathFile);
+        XFSEEK(keyPathFile, 0, SEEK_END);
+        keyFileSz = (int)XFTELL(keyPathFile);
         keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf != NULL) {
-            fseek(keyPathFile, 0, SEEK_SET);
-            fread(keyBuf, 1, keyFileSz, keyPathFile);
+            XFSEEK(keyPathFile, 0, SEEK_SET);
+            XFREAD(keyBuf, 1, keyFileSz, keyPathFile);
         }
-        fclose(keyPathFile);
+        XFCLOSE(keyPathFile);
     }
     else {
         keyBuf = wolfCLU_generate_public_key_rsa(keyPath, keyBuf, &keyFileSz);
@@ -323,14 +326,14 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         return ret;
     }
     else {
-        FILE* s = fopen(out, "wb");
+        XFILE s = XFOPEN(out, "wb");
         if (s == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", out);
             ret = BAD_FUNC_ARG;
         }
         else {
-            fwrite(outBuf, 1, outBufSz, s);
-            fclose(s);
+            XFWRITE(outBuf, 1, outBufSz, s);
+            XFCLOSE(s);
         }
     }
 
@@ -352,10 +355,10 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     int stat = 0;
     word32 index = 0;
 
-    FILE* keyPathFile;
+    XFILE   keyPathFile;
     ecc_key key;
-    WC_RNG rng;
-    byte* keyBuf;
+    WC_RNG  rng;
+    byte*   keyBuf;
 
     XMEMSET(&rng, 0, sizeof(rng));
     XMEMSET(&key, 0, sizeof(key));
@@ -367,20 +370,20 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     }
 
     /* read in and store ecc key */
-    keyPathFile = fopen(keyPath, "rb");
+    keyPathFile = XFOPEN(keyPath, "rb");
     if (keyPathFile == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", keyPath);
         return BAD_FUNC_ARG;
     }
 
-    fseek(keyPathFile, 0, SEEK_END);
-    keyFileSz = (int)ftell(keyPathFile);
+    XFSEEK(keyPathFile, 0, SEEK_END);
+    keyFileSz = (int)XFTELL(keyPathFile);
     keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf != NULL) {
-        fseek(keyPathFile, 0, SEEK_SET);
-        fread(keyBuf, 1, keyFileSz, keyPathFile);
+        XFSEEK(keyPathFile, 0, SEEK_SET);
+        XFREAD(keyBuf, 1, keyFileSz, keyPathFile);
     }
-    fclose(keyPathFile);
+    XFCLOSE(keyPathFile);
 
     if (pubIn == 1) {
         /* retrieving public key and storing in the ecc key */
@@ -426,7 +429,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     int ret;
     int stat = 0;
 
-    FILE* keyPathFile;
+    XFILE keyPathFile;
     ed25519_key key;
     byte* keyBuf = (byte*)XMALLOC(ED25519_KEY_SIZE, HEAP_HINT,
             DYNAMIC_TYPE_TMP_BUFFER);
@@ -447,11 +450,14 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 
     /* retrieving public key and storing in the ED25519 key */
     if (pubIn == 1) {
-
-    /* read in and store ED25519 key */
-        keyPathFile = fopen(keyPath, "rb");
-        fread(keyBuf, 1, ED25519_KEY_SIZE, keyPathFile);
-        fclose(keyPathFile);
+        /* read in and store ED25519 key */
+        keyPathFile = XFOPEN(keyPath, "rb");
+        if (keyPathFile == NULL) {
+            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            return BAD_FUNC_ARG;
+        }
+        XFREAD(keyBuf, 1, ED25519_KEY_SIZE, keyPathFile);
+        XFCLOSE(keyPathFile);
 
     }
     else {
