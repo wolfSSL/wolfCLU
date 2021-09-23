@@ -159,7 +159,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             }
         }
 
-        if (name == NULL) { /* if we have the name of curve we know the size */
+        if (name == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: ECC key curve name used");
         }
 

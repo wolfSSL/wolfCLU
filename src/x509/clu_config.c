@@ -458,6 +458,8 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             "commonName_default");
     wolfCLU_X509addEntry(name, conf, NID_commonName, CTC_UTF8, sect,
             "commonName");
+    wolfCLU_X509addEntry(name, conf, NID_commonName, CTC_UTF8, sect,
+            "CN");
     wolfCLU_X509addEntry(name, conf, NID_emailAddress, CTC_UTF8, sect,
             "emailAddress_default");
     wolfCLU_X509addEntry(name, conf, NID_emailAddress, CTC_UTF8, sect,

@@ -352,7 +352,8 @@ int wolfCLU_benchmark(int timer, int* option);
  * @param alg
  * @param size
  */
-int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, char* alg, int size);
+int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
+        int size);
 
 
 /**

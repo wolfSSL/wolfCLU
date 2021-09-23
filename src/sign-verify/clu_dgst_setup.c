@@ -123,14 +123,14 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         dataBio = wolfSSL_BIO_new_file(argv[argc-1], "rb");
         if (dataBio == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "unable to open data file %s", argv[argc-1]);
-            ret = -1;
+            ret = FATAL_ERROR;
         }
     }
 
     if (ret == 0) {
         if (dataBio == NULL || sigBio == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "error with reading signature or data");
-            ret = -1;
+            ret = FATAL_ERROR;
         }
     }
 

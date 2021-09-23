@@ -29,7 +29,8 @@
  * If bioOut is null then print to stdout
  *
  */
-int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, char* alg, int size)
+int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
+        int size)
 {
 #ifdef HAVE_BLAKE2
     Blake2b hash;               /* blake2b declaration */
@@ -63,9 +64,16 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, char* alg, int size)
     if (bioIn == NULL)
         wolfSSL_BIO_free(tmp);
 
-    /* if size not provided then use input length */
+    /* if size not provided then use input length to find max possible size */
     if (size == 0) {
-        size = inputSz * 4;
+    #ifndef NO_CODING
+        if (Base64_Encode(input, inputSz, NULL, (word32*)&size) !=
+                LENGTH_ONLY_E) {
+            wolfCLU_freeBins(input, NULL, NULL, NULL, NULL);
+            return BAD_FUNC_ARG;
+        }
+    #endif
+        size = (size < WC_MAX_DIGEST_SIZE) ? WC_MAX_DIGEST_SIZE : size;
     }
 
     output = XMALLOC(size, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

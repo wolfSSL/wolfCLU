@@ -32,7 +32,10 @@ int wolfCLU_md5Setup(int argc, char** argv)
 
 #ifdef NO_MD5
     WOLFCLU_LOG(WOLFCLU_L0, "wolfCrypt compiled without MD5 support");
-#endif
+    ret = NOT_COMPILED_IN;
+    (void)bioIn;
+    (void)bioOut;
+#else
 
     /* was a file input provided? if so read from file */
     if (argc >= 3) {
@@ -46,6 +49,7 @@ int wolfCLU_md5Setup(int argc, char** argv)
     /* hashing function */
     ret = wolfCLU_hash(bioIn, bioOut, (char*)"md5", WC_MD5_DIGEST_SIZE);
     wolfSSL_BIO_free(bioIn);
+#endif
     return ret;
 }
 

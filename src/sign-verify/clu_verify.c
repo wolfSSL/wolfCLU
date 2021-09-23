@@ -38,7 +38,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     byte* keyBuf;
 
     if (outBufSz == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Unexpected null argument");
+        WOLFCLU_LOG(WOLFCLU_L0, "Unexpected null output size variable");
         return NULL;
     }
 

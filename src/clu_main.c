@@ -194,13 +194,15 @@ int main(int argc, char** argv)
             return 0;
 
         case 'v':
-            (void)wolfCLU_version();
-            return 0;
+            if (wolfCLU_version() != 0) {
+                WOLFCLU_LOG(WOLFCLU_L0, "Error getting version");
+            }
+            return FATAL_ERROR;
 
         default:
             WOLFCLU_LOG(WOLFCLU_L0, "Unknown mode");
             wolfCLU_help();
-            return -1;
+            return FATAL_ERROR;
     }
 
     if (ret < 0)

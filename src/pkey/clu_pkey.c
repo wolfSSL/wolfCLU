@@ -46,7 +46,7 @@ static void wolfCLU_pKeyHelp(void)
 
 
 /* print out PEM public key
- * returns 0 on success
+ * returns 0 on success other return values are considered 'not success'
  */
 static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
 {
@@ -59,12 +59,12 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
             ret = wolfSSL_PEM_write_bio_RSA_PUBKEY(bio,
                     wolfSSL_EVP_PKEY_get0_RSA(pkey));
             break;
-        case EVP_PKEY_DSA:
-            break;
         case EVP_PKEY_EC:
             ret = wolfSSL_PEM_write_bio_EC_PUBKEY(bio,
                     wolfSSL_EVP_PKEY_get0_EC_KEY(pkey));
             break;
+        case EVP_PKEY_DSA:
+            FALL_THROUGH;
         default:
             WOLFCLU_LOG(WOLFCLU_L0, "unknown / unsupported key type");
     }
@@ -73,7 +73,7 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
         return 0;
     }
     else {
-        return -1;
+        return FATAL_ERROR;
     }
 }
 
@@ -81,18 +81,16 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
 /* creates an out buffer containing only the public key from the pkey
  * returns size of buffer on success
  */
-static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
-        int* outSz)
+static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
 {
     int type;
     int ret = 0;
 
-    *outSz = 0;
     type   = wolfSSL_EVP_PKEY_id(pkey);
     switch (type) {
         case EVP_PKEY_RSA:
-            *outSz = wolfSSL_i2d_RSAPublicKey(
-                   wolfSSL_EVP_PKEY_get0_RSA(pkey), out);
+            ret = wolfSSL_i2d_RSAPublicKey(
+                    wolfSSL_EVP_PKEY_get0_RSA(pkey), out);
             break;
 
         case EVP_PKEY_DSA:
@@ -133,9 +131,8 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
                      ret = wc_EccPublicKeyToDer((ecc_key*)ec->internal, der,
                              derSz, 1);
                      if (ret > 0) {
-                         ret    = 0;
+                         ret    = derSz;
                          *out   = der;
-                         *outSz = derSz;
                      }
                      else {
                         ret = BAD_FUNC_ARG;
@@ -153,8 +150,6 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
             ret = USER_INPUT_ERROR;
     }
 
-    if (ret == 0)
-        ret = *outSz;
     return ret;
 }
 
@@ -183,7 +178,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
                     WOLFCLU_LOG(WOLFCLU_L0, "unable to open public key file %s", optarg);
-                    ret = -1;
+                    ret = FATAL_ERROR;
                 }
                 break;
 
@@ -222,12 +217,12 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     if (ret == 0) {
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bioOut == NULL) {
-            ret = -1;
+            ret = FATAL_ERROR;
         }
         else {
             if (wolfSSL_BIO_set_fp(bioOut, stdout, BIO_NOCLOSE)
                     != WOLFSSL_SUCCESS) {
-                ret = -1;
+                ret = FATAL_ERROR;
             }
         }
     }
@@ -244,14 +239,14 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 unsigned char *der = NULL;
                 int derSz = 0;
 
-                if (wolfCLU_pKeytoPubKey(pkey, &der, &derSz) <= 0) {
+                if ((derSz = wolfCLU_pKeytoPubKey(pkey, &der)) <= 0) {
                     WOLFCLU_LOG(WOLFCLU_L0, "error converting der found to public key");
-                    ret = -1;
+                    ret = FATAL_ERROR;
                 }
                 else {
                     if (wolfCLU_printDerPubKey(bioOut, der, derSz) != 0) {
                         WOLFCLU_LOG(WOLFCLU_L0, "error printing out pubkey");
-                        ret = -1;
+                        ret = FATAL_ERROR;
                     }
                     free(der);
                 }

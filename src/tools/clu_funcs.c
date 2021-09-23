@@ -1107,7 +1107,7 @@ static void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid,
             i--;
         }
 
-        /* treats an empty space as 'do not add' */
+        /* treats an empty string as 'do not add' */
         sz = (int)XSTRLEN((const char*)str);
         if (sz > 0) {
             entry = wolfSSL_X509_NAME_ENTRY_create_by_NID(NULL, nid,
@@ -1127,7 +1127,8 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
     FILE *fin = stdin; /* defaulting to stdin but using a fd variable to make it
                         * easy for expanding to other inputs */
 
-    WOLFCLU_LOG(WOLFCLU_L0, "Enter without data will result in the feild being skipped");
+    WOLFCLU_LOG(WOLFCLU_L0, "Enter without data will result in the field being "
+            "skipped.\nExamples of inputs are provided as [*]");
     WOLFCLU_LOG(WOLFCLU_L0, "Country [US] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
