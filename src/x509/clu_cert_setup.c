@@ -29,13 +29,13 @@
 #include <wolfclu/x509/clu_parse.h>
 
 enum {
-    INPEM_OUTPEM  = 1,
-    INPEM_OUTDER  = 2,
-    INDER_OUTPEM  = 3,
-    INDER_OUTDER  = 4,
-    INPEM_OUTTEXT = 5,
-    NOOUT_SET     = 6,
-    OUTPUBTEXT    = 7,
+    IN_PEM_OUT_PEM  = 1,
+    IN_PEM_OUT_DER  = 2,
+    IN_DER_OUT_PEM  = 3,
+    IN_DER_OUT_DER  = 4,
+    IN_PEM_OUT_TEXT = 5,
+    NOOUT_SET       = 6,
+    OUT_PUB_TEXT    = 7,
 };
 
 int wolfCLU_certSetup(int argc, char** argv)
@@ -199,23 +199,23 @@ int wolfCLU_certSetup(int argc, char** argv)
     ret = 0;
     switch (error_check(inpemFlag, inderFlag, outpemFlag, outderFlag,
                       textFlag, textPubkey, nooutFlag)) {
-        case INPEM_OUTPEM:
+        case IN_PEM_OUT_PEM:
             if (inFileFlag) wolfCLU_inpemOutpem(inFile, outFile, silentFlag);
             else return INPUT_FILE_ERROR;
             break;
-        case INPEM_OUTDER:
+        case IN_PEM_OUT_DER:
             if (inFileFlag) wolfCLU_inpemOutder(inFile, outFile, silentFlag);
             else return INPUT_FILE_ERROR;
             break;
-        case INDER_OUTPEM:
+        case IN_DER_OUT_PEM:
             if (inFileFlag) wolfCLU_inderOutpem(inFile, outFile, silentFlag);
             else return INPUT_FILE_ERROR;
             break;
-        case INDER_OUTDER:
+        case IN_DER_OUT_DER:
             if (inFileFlag) wolfCLU_inderOutder(inFile, outFile, silentFlag);
             else return INPUT_FILE_ERROR;
             break;
-        case INPEM_OUTTEXT:
+        case IN_PEM_OUT_TEXT:
             if (outFileFlag) {
                 ret = wolfCLU_inpemOuttext(inFile, outFile, silentFlag);
             }
@@ -225,7 +225,7 @@ int wolfCLU_certSetup(int argc, char** argv)
                 ret = wolfCLU_inpemOuttext(inFile, outFile, silentFlag);
             }
             break;
-        case OUTPUBTEXT:
+        case OUT_PUB_TEXT:
             ret = wolfCLU_printX509PubKey(inFile, inForm, outFile, silentFlag);
             break;
         case NOOUT_SET:
@@ -265,7 +265,7 @@ int error_check(int inpemFlag, int inderFlag,
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
-        return INPEM_OUTPEM;
+        return IN_PEM_OUT_PEM;
    }
     ret = (inpemFlag & outderFlag);
     if (ret) {
@@ -275,7 +275,7 @@ int error_check(int inpemFlag, int inderFlag,
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
-        return INPEM_OUTDER;
+        return IN_PEM_OUT_DER;
     }
     ret = (inderFlag & outpemFlag);
     if (ret) {
@@ -285,7 +285,7 @@ int error_check(int inpemFlag, int inderFlag,
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
-        return INDER_OUTPEM;
+        return IN_DER_OUT_PEM;
     }
     ret = (inderFlag & outderFlag);
     if (ret) {
@@ -295,14 +295,14 @@ int error_check(int inpemFlag, int inderFlag,
             WOLFCLU_LOG(WOLFCLU_L0, "ERROR: noout set when output format is specified");
             return USER_INPUT_ERROR;
         }
-        return INDER_OUTDER;
+        return IN_DER_OUT_DER;
     }
     ret = (inpemFlag & textFlag);
     if (ret) {
-        return INPEM_OUTTEXT;
+        return IN_PEM_OUT_TEXT;
     }
     if (textPubkey) {
-        return OUTPUBTEXT;
+        return OUT_PUB_TEXT;
     }
     ret = (outderFlag & outpemFlag);
     if (ret) {
