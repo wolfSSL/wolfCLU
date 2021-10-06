@@ -362,7 +362,15 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                 }
 
                 if (ret == 0) {
-                    ret = wolfCLU_ECC_write_priv_der(bioPri, key);
+                    if (fmt == PEM_FORM) {
+                        if (wolfSSL_PEM_write_bio_ECPrivateKey(bioPri, key,
+                                NULL, NULL, 0, NULL, NULL) != WOLFSSL_SUCCESS) {
+                            ret = -1;
+                        }
+                    }
+                    else {
+                        ret = wolfCLU_ECC_write_priv_der(bioPri, key);
+                    }
                 }
 
                 if (ret < 0) {
@@ -388,7 +396,15 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                 }
 
                 if (ret == 0) {
-                    ret = wolfCLU_ECC_write_pub_der(bioPub, key);
+                    if (fmt == PEM_FORM) {
+                        if (wolfSSL_PEM_write_bio_EC_PUBKEY(bioPub, key)
+                            != WOLFSSL_SUCCESS) {
+                            ret = -1;
+                        }
+                    }
+                    else {
+                        ret = wolfCLU_ECC_write_pub_der(bioPub, key);
+                    }
                 }
                 break;
             default:
