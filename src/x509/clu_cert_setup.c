@@ -38,6 +38,7 @@ enum {
     OUT_PUB_TEXT    = 7,
 };
 
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_certSetup(int argc, char** argv)
 {
     int ret;
@@ -64,7 +65,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     ret = wolfCLU_checkForArg("-h", 2, argc, argv);
     if (ret > 0) {
         wolfCLU_certHelp();
-        return 0;
+        return WOLFCLU_SUCCESS;
     }
 /*---------------------------------------------------------------------------*/
 /* text */

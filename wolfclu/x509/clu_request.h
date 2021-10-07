@@ -19,7 +19,11 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#ifndef WOLFCLU_REQUEST_H
+#define WOLFCLU_REQUEST_H
+
 /* handles incoming arguments for certificate requests */
 int wolfCLU_requestSetup(int argc, char** argv);
 
 
+#endif /* WOLFCLU_REQUEST_H */

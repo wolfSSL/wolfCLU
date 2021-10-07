@@ -81,41 +81,40 @@ static WOLFSSL_X509* wolfCLU_parseX509(char* inFile, int inForm)
 }
 
 
-/* return 0 on success */
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
 {
-    int ret = 0;
-
+    int ret = WOLFCLU_SUCCESS;
     unsigned char *pem = NULL;
     int pemSz = 0;
 
     if (bio == NULL) {
-        ret = -1;
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
     /* get pem size alloc buffer and convert to pem format */
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         pemSz = wc_DerToPemEx(der, derSz, NULL, 0, NULL, PUBLICKEY_TYPE);
         if (pemSz > 0) {
             pem = (unsigned char*)XMALLOC(pemSz, NULL, DYNAMIC_TYPE_PUBLIC_KEY);
             if (pem == NULL) {
-                ret = -1;
+                ret = WOLFCLU_FATAL_ERROR;
             }
             else {
                 if (wc_DerToPemEx(der, derSz, pem, pemSz, NULL, PUBLICKEY_TYPE)
                         <= 0) {
-                    ret = -1;
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
             }
         }
         else {
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_BIO_write(bio, pem, pemSz) != pemSz) {
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -126,11 +125,11 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
 }
 
 
-/* returns 0 on success */
+/* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_printX509PubKey(char* inFile, int inForm, char* outFile,
         int silentFlag)
 {
-    int ret = 0;
+    int ret = WOLFCLU_SUCCESS;
     WOLFSSL_X509 *x509 = NULL;
     WOLFSSL_BIO  *bio  = NULL;
 
@@ -140,48 +139,48 @@ int wolfCLU_printX509PubKey(char* inFile, int inForm, char* outFile,
     x509 = wolfCLU_parseX509(inFile, inForm);
     if (x509 == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "unable to parse file %s", inFile);
-        ret = -1;
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
     /* use stdout if outFile is null */
-    if (ret == 0 && outFile == NULL) {
+    if (ret == WOLFCLU_SUCCESS && outFile == NULL) {
         bio = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bio == NULL) {
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
         else {
             if (wolfSSL_BIO_set_fp(bio, stdout, BIO_NOCLOSE)
                     != WOLFSSL_SUCCESS) {
-                ret = -1;
+                ret = WOLFCLU_FATAL_ERROR;
             }
         }
     }
 
-    if (ret == 0 && outFile != NULL) {
+    if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
         bio = wolfSSL_BIO_new_file(outFile, "wb");
     }
 
     /* get the size of the pubkey der buffer and alloc it */
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_X509_get_pubkey_buffer(x509, NULL, &derSz)
                 == WOLFSSL_SUCCESS) {
             der = (unsigned char*)XMALLOC(derSz, NULL, DYNAMIC_TYPE_PUBLIC_KEY);
             if (der == NULL) {
-                ret = -1;
+                ret = WOLFCLU_FATAL_ERROR;
             }
             else {
                 if (wolfSSL_X509_get_pubkey_buffer(x509, der, &derSz)
                         != WOLFSSL_SUCCESS) {
-                    ret = -1;
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
             }
         }
         else {
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    if (ret == 0)
+    if (ret == WOLFCLU_SUCCESS)
         ret = wolfCLU_printDerPubKey(bio, der, derSz);
 
     wolfSSL_X509_free(x509);
@@ -195,7 +194,7 @@ int wolfCLU_printX509PubKey(char* inFile, int inForm, char* outFile,
 }
 
 
-/* returns 0 on success */
+/* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
                                                                 int silentFlag)
 {
@@ -349,7 +348,7 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
     else {
         WOLFCLU_LOG(WOLFCLU_L0, "in parse: in = pem, out = pem");
     }
-    ret = 0;
+    ret = WOLFCLU_SUCCESS;
 
 clu_parse_cleanup:
 

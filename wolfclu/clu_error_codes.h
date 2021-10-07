@@ -22,6 +22,10 @@
 #ifndef _WOLFSSL_CLU_ERROR_H_
 #define _WOLFSSL_CLU_ERROR_H_
 
+#define WOLFCLU_FATAL_ERROR -1
+#define WOLFCLU_FAILURE 0
+#define WOLFCLU_SUCCESS 1
+
 enum {
 
     USER_INPUT_ERROR = -1001,

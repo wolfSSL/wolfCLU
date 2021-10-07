@@ -30,7 +30,7 @@ int wolfCLU_sign_verify_setup(int, char**);
  * @param argc number of arguments
  * @param argv array of string args
  *
- * @return 0 on success
+ * @return WOLFCLU_SUCCESS on success
  */
 int wolfCLU_dgst_setup(int argc, char** argv);
 

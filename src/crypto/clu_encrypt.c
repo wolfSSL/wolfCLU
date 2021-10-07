@@ -26,6 +26,7 @@
 
 #define MAX_LEN             1024
 
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         char* in, char* out, byte* iv, int block, int ivCheck, int inputHex)
 {
@@ -84,7 +85,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     inFile = XFOPEN(in, "rb");
     if (inFile == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", in);
-        return -1;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     /* find length */
@@ -123,7 +124,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
         /* stretches pwdKey to fit size based on wolfCLU_getAlgo() */
         ret = wolfCLU_genKey_PWDBASED(&rng, pwdKey, size, salt, padCounter);
-        if (ret != 0) {
+        if (ret != WOLFCLU_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_L0, "failed to set pwdKey.");
             return ret;
         }
@@ -137,7 +138,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     outFile = XFOPEN(out, "wb");
     if (outFile == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", out);
-        return -1;
+        return WOLFCLU_FATAL_ERROR;
     }
     XFWRITE(salt, 1, SALT_SIZE, outFile);
     XFWRITE(iv, 1, block, outFile);
@@ -273,5 +274,5 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
     (void)mode;
     (void)alg;
-    return 0;
+    return WOLFCLU_SUCCESS;
 }

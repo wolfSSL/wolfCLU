@@ -31,6 +31,7 @@
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
 
 #ifdef HAVE_ED25519
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 {
     int ret;                             /* return value */
@@ -146,7 +147,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
     if (ret > 0) {
         /* ret > 0 indicates a successful file write, set to zero for return */
-        ret = 0;
+        ret = WOLFCLU_SUCCESS;
     }
 
     return ret;
@@ -154,10 +155,10 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 #endif /* HAVE_ED25519 */
 
 #ifdef HAVE_ECC
-/* returns 0 on successfully writing out public DER key */
+/* returns WOLFCLU_SUCCESS on successfully writing out public DER key */
 static int wolfCLU_ECC_write_pub_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
 {
-    int derSz, ret = 0;
+    int derSz, ret = WOLFCLU_SUCCESS;
     unsigned char *der = NULL;
 
     if (out == NULL || key == NULL)
@@ -169,7 +170,7 @@ static int wolfCLU_ECC_write_pub_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
         ret = derSz;
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (der == NULL) {
             ret = MEMORY_E;
@@ -182,10 +183,10 @@ static int wolfCLU_ECC_write_pub_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
         }
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         ret = wolfSSL_BIO_write(out, der, derSz);
         if (ret != derSz) {
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -196,10 +197,10 @@ static int wolfCLU_ECC_write_pub_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
 }
 
 
-/* returns 0 on successfully writing out private DER key */
+/* returns WOLFCLU_SUCCESS on successfully writing out private DER key */
 static int wolfCLU_ECC_write_priv_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
 {
-    int derSz = 0, ret = 0;
+    int derSz = 0, ret;
     unsigned char *der = NULL;
 
     if (out == NULL || key == NULL)
@@ -221,7 +222,7 @@ static int wolfCLU_ECC_write_priv_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
         WOLFCLU_LOG(WOLFCLU_L0, "writing out %d bytes for private key", derSz);
         ret = wolfSSL_BIO_write(out, der, derSz);
         if (ret != derSz) {
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
         WOLFCLU_LOG(WOLFCLU_L0, "ret of write = %d", ret);
     }
@@ -230,12 +231,13 @@ static int wolfCLU_ECC_write_priv_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
         XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     if (ret > 0)
-        ret = 0; /* successfully wrote out key */
+        ret = WOLFCLU_SUCCESS; /* successfully wrote out key */
 
     return ret;
 }
 #endif /* HAVE_ECC */
 
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                        char* name)
 {
@@ -250,7 +252,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
     WOLFSSL_BIO *bioPub = NULL;
     WOLFSSL_BIO *bioPri = NULL;
     WOLFSSL_EC_KEY   *key;
-    int ret = 0;
+    int ret = WOLFCLU_SUCCESS;
 
     byte*  der   = NULL;
     int    derSz = -1;
@@ -269,25 +271,25 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
         group = wolfSSL_EC_GROUP_new_by_curve_name(wolfSSL_OBJ_txt2nid(name));
         if (group == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "unable to set curve");
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
 
-        if (ret == 0) {
+        if (ret == WOLFCLU_SUCCESS) {
             if (wolfSSL_EC_KEY_set_group(key, group) != WOLFSSL_SUCCESS) {
                 WOLFCLU_LOG(WOLFCLU_L0, "unable to set ec group");
-                ret = -1;
+                ret = WOLFCLU_FATAL_ERROR;
             }
         }
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_EC_KEY_generate_key(key) != WOLFSSL_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_L0, "error generating EC key");
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         bioOut = wolfSSL_BIO_new_file(fName, "wb");
         if (bioOut == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", fName);
@@ -296,7 +298,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
     }
 
     /* create buffer for alternate file name use */
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         fOutNameBuf = (char*)XMALLOC(fNameSz + fExtSz + 1, NULL,
                 DYNAMIC_TYPE_TMP_BUFFER);
         if (fOutNameBuf == NULL) {
@@ -304,14 +306,14 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
         }
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         switch(directive) {
             case ECPARAM:
                 {
                     if (fmt == PEM_FORM) {
                         if (wolfSSL_PEM_write_bio_ECPrivateKey(bioOut, key,
                                 NULL, NULL, 0, NULL, NULL) != WOLFSSL_SUCCESS) {
-                            ret = -1;
+                            ret = WOLFCLU_FATAL_ERROR;
                         }
                     }
                     else {
@@ -322,7 +324,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                             ret = wolfSSL_BIO_write(bioOut, der, derSz);
                             if (ret != derSz) {
                                 WOLFCLU_LOG(WOLFCLU_L0, "issue writing out data");
-                                ret = -1;
+                                ret = WOLFCLU_FATAL_ERROR;
                             }
                         }
 
@@ -338,7 +340,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                 if (fmt == PEM_FORM) {
                     if (wolfSSL_PEM_write_bio_EC_PUBKEY(bioOut, key)
                             != WOLFSSL_SUCCESS) {
-                        ret = -1;
+                        ret = WOLFCLU_FATAL_ERROR;
                     }
                 }
                 else {
@@ -348,7 +350,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
             case PRIV_AND_PUB:
                 /* Fall through to PRIV_ONLY */
             case PRIV_ONLY_FILE: /* adding .priv to file name */
-                if (ret == 0) {
+                if (ret == WOLFCLU_SUCCESS) {
                     XMEMCPY(fOutNameBuf, fName, fNameSz);
                     XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
@@ -361,11 +363,11 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                     }
                 }
 
-                if (ret == 0) {
+                if (ret == WOLFCLU_SUCCESS) {
                     if (fmt == PEM_FORM) {
                         if (wolfSSL_PEM_write_bio_ECPrivateKey(bioPri, key,
                                 NULL, NULL, 0, NULL, NULL) != WOLFSSL_SUCCESS) {
-                            ret = -1;
+                            ret = WOLFCLU_FATAL_ERROR;
                         }
                     }
                     else {
@@ -381,12 +383,11 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                 }
                 FALL_THROUGH;
             case PUB_ONLY_FILE: /* appending .pub to file name */
-                if (ret == 0) {
+                if (ret == WOLFCLU_SUCCESS) {
                     XMEMCPY(fOutNameBuf, fName, fNameSz);
                     XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
                     WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
-
 
                     bioPub = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
                     if (bioPub == NULL) {
@@ -395,11 +396,11 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                     }
                 }
 
-                if (ret == 0) {
+                if (ret == WOLFCLU_SUCCESS) {
                     if (fmt == PEM_FORM) {
                         if (wolfSSL_PEM_write_bio_EC_PUBKEY(bioPub, key)
                             != WOLFSSL_SUCCESS) {
-                            ret = -1;
+                            ret = WOLFCLU_FATAL_ERROR;
                         }
                     }
                     else {
@@ -424,7 +425,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
     if (ret > 0) {
         /* ret > 0 indicates a successful file write, set to zero for return */
-        ret = 0;
+        ret = WOLFCLU_SUCCESS;
     }
 
     return ret;
@@ -439,6 +440,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 }
 
 
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                        keySz, long exp)
 {
@@ -574,7 +576,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
     if (ret > 0) {
         /* ret > 0 indicates a successful file write, set to zero for return */
-        ret = 0;
+        ret = WOLFCLU_SUCCESS;
     }
 
     return ret;
@@ -595,6 +597,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
 /*
  * makes a cyptographically secure key by stretching a user entered pwdKey
+ * return WOLFCLU_SUCCESS on success
  */
 int wolfCLU_genKey_PWDBASED(WC_RNG* rng, byte* pwdKey, int size, byte* salt,
                             int pad)
@@ -604,7 +607,6 @@ int wolfCLU_genKey_PWDBASED(WC_RNG* rng, byte* pwdKey, int size, byte* salt,
     /* randomly generates salt */
 
     ret = wc_RNG_GenerateBlock(rng, salt, SALT_SIZE-1);
-
     if (ret != 0)
         return ret;
 
@@ -620,6 +622,6 @@ int wolfCLU_genKey_PWDBASED(WC_RNG* rng, byte* pwdKey, int size, byte* salt,
     if (ret != 0)
         return ret;
 
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
 

@@ -63,7 +63,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive,
  * @param fmt       output format (PEM/DER)
  * @param name      curve name for the ECC key
  *
- * return   0 on success, non-zero on error
+ * return   WOLFCLU_SUCCESS on success
  */
 int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
         char* name);
@@ -78,13 +78,13 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
  * @param keySz     size of the RSA key
  * @param exp       RSA public exponent
  *
- * return   0 on success, non-zero on error
+ * return   WOLFCLU_SUCCESS on success
  */
 int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt,
                        int keySz, long exp);
 
-/* generates key based on password provided 
- * 
+/* generates key based on password provided
+ *
  * @param rng the random number generator
  * @param pwdKey the password based key as provided by the user
  * @param size size as determined by wolfCLU_GetAlgo

@@ -46,12 +46,13 @@ static void wolfCLU_pKeyHelp(void)
 
 
 /* print out PEM public key
- * returns 0 on success other return values are considered 'not success'
+ * returns WOLFCLU_SUCCESS on success other return values are considered
+ * 'not success'
  */
 static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
 {
     int type;
-    int ret = WOLFSSL_FAILURE;
+    int ret = WOLFCLU_FAILURE;
 
     type = wolfSSL_EVP_PKEY_id(pkey);
     switch (type) {
@@ -70,10 +71,10 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
     }
 
     if (ret == WOLFSSL_SUCCESS) {
-        return 0;
+        return WOLFCLU_SUCCESS;
     }
     else {
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 }
 
@@ -156,7 +157,7 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
 
 int wolfCLU_pKeySetup(int argc, char** argv)
 {
-    int ret    = 0;
+    int ret    = WOLFCLU_SUCCESS;
     int inForm = PEM_FORM;
     int pubOut = 0;
     int option;
@@ -178,7 +179,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
                     WOLFCLU_LOG(WOLFCLU_L0, "unable to open public key file %s", optarg);
-                    ret = FATAL_ERROR;
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
@@ -188,7 +189,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
 
             case WOLFCLU_HELP:
                 wolfCLU_pKeyHelp();
-                return 0;
+                return WOLFCLU_SUCCESS;
 
             case ':':
             case '?':
@@ -201,7 +202,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     }
 
 
-    if (ret == 0 && bioIn != NULL) {
+    if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
         if (inForm == PEM_FORM) {
             pkey = wolfSSL_PEM_read_bio_PrivateKey(bioIn, NULL, NULL, NULL);
         }
@@ -214,24 +215,24 @@ int wolfCLU_pKeySetup(int argc, char** argv)
         }
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bioOut == NULL) {
-            ret = FATAL_ERROR;
+            ret = WOLFCLU_FATAL_ERROR;
         }
         else {
             if (wolfSSL_BIO_set_fp(bioOut, stdout, BIO_NOCLOSE)
                     != WOLFSSL_SUCCESS) {
-                ret = FATAL_ERROR;
+                ret = WOLFCLU_FATAL_ERROR;
             }
         }
     }
 
-    if (ret == 0 && pubOut == 1) {
+    if (ret == WOLFCLU_SUCCESS && pubOut == 1) {
         if (pkey != NULL) {
             if (inForm == PEM_FORM) {
                 ret = wolfCLU_pKeyPEMtoPubKey(bioOut, pkey);
-                if (ret != 0) {
+                if (ret != WOLFCLU_SUCCESS) {
                     WOLFCLU_LOG(WOLFCLU_L0, "error getting pubkey from pem key");
                 }
             }
@@ -241,12 +242,13 @@ int wolfCLU_pKeySetup(int argc, char** argv)
 
                 if ((derSz = wolfCLU_pKeytoPubKey(pkey, &der)) <= 0) {
                     WOLFCLU_LOG(WOLFCLU_L0, "error converting der found to public key");
-                    ret = FATAL_ERROR;
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
-                    if (wolfCLU_printDerPubKey(bioOut, der, derSz) != 0) {
+                    if (wolfCLU_printDerPubKey(bioOut, der, derSz) !=
+                            WOLFCLU_SUCCESS) {
                         WOLFCLU_LOG(WOLFCLU_L0, "error printing out pubkey");
-                        ret = FATAL_ERROR;
+                        ret = WOLFCLU_FATAL_ERROR;
                     }
                     free(der);
                 }

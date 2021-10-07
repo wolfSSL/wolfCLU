@@ -25,6 +25,7 @@
 #include <wolfclu/x509/clu_parse.h>
 
 
+/* return WOLFCLU_SUCCESS on success */
 static int wolfCLU_setAttributes(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             char* sect)
 {
@@ -33,14 +34,16 @@ static int wolfCLU_setAttributes(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     (void)conf;
     (void)sect;
 #if 0
-// @TODO
-//[ req_attributes ]
-//challengePassword               = A challenge password
-//challengePassword_min           = 4
-//challengePassword_max           = 20
-//unstructuredName                = An optional company name
+    /*
+     * @TODO
+     * [ req_attributes ]
+     * challengePassword               = A challenge password
+     * challengePassword_min           = 4
+     * challengePassword_max           = 20
+     * unstructuredName                = An optional company name
+     */
 #endif
-    return 0;
+    return WOLFCLU_FAILURE;
 }
 
 
@@ -236,6 +239,7 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseKeyUsage(char* str, int crit,
 }
 
 
+/* return WOLFCLU_SUCCESS on success */
 static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
         int* idx)
 {
@@ -271,11 +275,11 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
         }
         *idx = *idx + 1;
     }
-    return WOLFSSL_SUCCESS;
+    return WOLFCLU_SUCCESS;
 }
 
 
-/* return 0 on success, searches for IP's and DNS's */
+/* return WOLFCLU_SUCCESS on success, searches for IP's and DNS's */
 static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             char* sect)
 {
@@ -283,7 +287,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     int  i;
 
     if (sect == NULL) {
-        return 0; /* none set */
+        return WOLFCLU_SUCCESS; /* none set */
     }
 
 #ifndef WOLFSSL_ALT_NAMES
@@ -330,18 +334,18 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             }
             else {
                 WOLFCLU_LOG(WOLFCLU_L0, "bad IP found %s", current);
-                return FATAL_ERROR;
+                return WOLFCLU_FATAL_ERROR;
             }
         }
         i++;
     } while(current != NULL);
 #endif
 
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
 
 
-/* return 0 on success */
+/* return WOLFCLU_SUCCESS on success */
 static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             char* sect)
 {
@@ -349,7 +353,7 @@ static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     int  idx = 1;
 
     if (sect == NULL) {
-        return 0; /* none set */
+        return WOLFCLU_SUCCESS; /* none set */
     }
 
     current = wolfSSL_NCONF_get_string(conf, sect, "basicConstraints");
@@ -378,7 +382,7 @@ static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         current = current+1;
         wolfCLU_setAltNames(x509, conf, current);
     }
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
 #else
 static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
@@ -389,12 +393,12 @@ static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     (void)sect;
 
     WOLFCLU_LOG(WOLFCLU_L0, "wolfSSL not compiled with cert extensions");
-    return -1;
+    return NOT_COMPILED_IN;
 }
 #endif /* WOLFSSL_CERT_EXT */
 
 
-/* return 0 on success */
+/* return WOLFCLU_SUCCESS on success */
 static int wolfCLU_X509addEntry(WOLFSSL_X509_NAME* name, WOLFSSL_CONF* conf,
         int nid, int type, const char* sect, const char* str)
 {
@@ -407,13 +411,13 @@ static int wolfCLU_X509addEntry(WOLFSSL_X509_NAME* name, WOLFSSL_CONF* conf,
                 type, current, (int)XSTRLEN((const char*)current));
         wolfSSL_X509_NAME_add_entry(name, entry, -1, 0);
     }
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
 
 
 /* extracts the distinguished names from the conf file and puts them into
  * the x509
- * returns 0 on success */
+ * returns WOLFCLU_SUCCESS on success */
 static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         char* sect)
 {
@@ -422,12 +426,12 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     long countryName_max = 0;
 
     if (sect == NULL) {
-        return 0; /* none set */
+        return WOLFCLU_SUCCESS; /* none set */
     }
 
     name = wolfSSL_X509_NAME_new();
     if (name == NULL) {
-        return -1;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     wolfCLU_X509addEntry(name, conf, NID_countryName, CTC_PRINTABLE, sect,
@@ -466,7 +470,7 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             "emailAddress");
 
     wolfSSL_X509_REQ_set_subject_name(x509, name);
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
 
 /* Make a new WOLFSSL_X509 based off of the config file read */
@@ -492,6 +496,6 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect)
 
     (void)defaultKey;
     wolfSSL_NCONF_free(conf);
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
 

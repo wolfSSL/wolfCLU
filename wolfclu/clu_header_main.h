@@ -123,7 +123,7 @@ int wolfCLU_setup(int argc, char** argv, char action);
  *
  * @param argc holds all command line input
  * @param argv each holds one value from the command line input
- * @return returns 0 on success
+ * @return returns WOLFLCU_SUCCESS on success
  */
 int wolfCLU_ecparam(int argc, char** argv);
 
@@ -361,7 +361,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
  *
  * @param argc total number of args
  * @param argv array of arg strings
- * @return 0 on success
+ * @return WOLFCLU_SUCCESS on success
  */
 int wolfCLU_md5Setup(int argc, char** argv);
 
@@ -407,7 +407,7 @@ int wolfCLU_checkInform(char* inform);
  *  WOLFSSL_X509_NAME structure.
  *
  *  @param x509 the name structure to be filled in
- *  @return 0 On successfully setting the name
+ *  @return WOLFCLU_SUCCESS On successfully setting the name
  */
 int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* x509);
 
@@ -424,4 +424,9 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* x509);
 */
 int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect);
 
+
+/**
+ * @brief Converts a string to be all lower case
+ */
+void wolfCLU_convertToLower(char* s, int sSz);
 #endif /* _WOLFSSL_CLU_HEADER_ */

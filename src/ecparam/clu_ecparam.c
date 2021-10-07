@@ -45,21 +45,22 @@ static void wolfCLU_ecparamHelp(void)
 }
 
 
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_ecparam(int argc, char** argv)
 {
-    char  name[ECC_MAXNAME]; /* name of curve to use */
+    char* name = NULL;
     char* out  = NULL;    /* default output file name */
-    int   ret        = 0; /* return variable */
-    int   longIndex = 0;
+    int   ret        = WOLFCLU_SUCCESS;
+    int   longIndex  = 0;
     int   genKey     = 0;
     int   outForm    = PEM_FORM;
     int   i, option;
     WC_RNG rng;
 
-    XMEMSET(name, 0, ECC_MAXNAME);
     ret = wolfCLU_checkForArg("-h", 2, argc, argv);
     if (ret > 0) {
         wolfCLU_ecparamHelp();
+        return WOLFCLU_SUCCESS;
     }
 
     opterr = 0; /* do not display unrecognized options */
@@ -85,6 +86,15 @@ int wolfCLU_ecparam(int argc, char** argv)
                 break;
 
             case WOLFCLU_CURVE_NAME:
+                if (name != NULL) {
+                    XFREE(name, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                }
+                name = (char*)XMALLOC(ECC_MAXNAME, HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (name == NULL) {
+                    ret = MEMORY_E;
+                    break;
+                }
                 XSTRNCPY(name, optarg, ECC_MAXNAME);
 
                 /* convert name to upper case */
@@ -110,13 +120,23 @@ int wolfCLU_ecparam(int argc, char** argv)
 
     if (genKey == 0) {
         WOLFCLU_LOG(WOLFCLU_L0, "only supporting genkey so far");
-        return 0;
+        if (name != NULL) {
+            XFREE(name, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        }
+        return WOLFCLU_FAILURE;
     }
 
-    ret = wc_InitRng(&rng);
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_InitRng(&rng);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
         ret = wolfCLU_genKey_ECC(&rng, out, ECPARAM, outForm, name);
         wc_FreeRng(&rng);
+    }
+
+    if (name != NULL) {
+        XFREE(name, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     return ret;
 }

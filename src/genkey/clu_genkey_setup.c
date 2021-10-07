@@ -24,6 +24,7 @@
 #include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/x509/clu_cert.h>  /* argument checking */
 
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKeySetup(int argc, char** argv)
 {
     char     keyOutFName[MAX_FILENAME_SZ];  /* default outFile for genKey */
@@ -35,12 +36,12 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     char*    name    = NULL;
 
     int      formatArg;
-    int      ret        =   0;  /* return variable */
+    int      ret;
 
     ret = wolfCLU_checkForArg("-h", 2, argc, argv);
     if (ret > 0) {
         wolfCLU_genKeyHelp();
-        return 0;
+        return WOLFCLU_SUCCESS;
     }
 
     XMEMSET(keyOutFName, 0, MAX_FILENAME_SZ);

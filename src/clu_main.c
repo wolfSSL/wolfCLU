@@ -64,7 +64,7 @@ static struct option mode_options[] = {
  */
 static int getMode(char* arg)
 {
-    int ret = -1, i = 0;
+    int ret = WOLFCLU_FATAL_ERROR, i = 0;
 
     if (arg != NULL) {
         int argSz = (int)XSTRLEN(arg);
@@ -87,7 +87,7 @@ static int getMode(char* arg)
 int main(int argc, char** argv)
 {
     int     flag = 0;
-    int     ret = 0;
+    int     ret = WOLFCLU_SUCCESS;
     int     longIndex = 0;
 
     if (argc == 1) {
@@ -187,35 +187,29 @@ int main(int argc, char** argv)
             /* only print for -help if no mode has been declared */
             WOLFCLU_LOG(WOLFCLU_L0, "Main help menu:");
             wolfCLU_help();
-            return 0;
+            return WOLFCLU_SUCCESS;
 
         case WOLFCLU_VERBOSE:
             wolfCLU_verboseHelp();
-            return 0;
+            return WOLFCLU_SUCCESS;
 
         case 'v':
             if (wolfCLU_version() != 0) {
                 WOLFCLU_LOG(WOLFCLU_L0, "Error getting version");
             }
-            return FATAL_ERROR;
+            return WOLFCLU_FATAL_ERROR;
 
         default:
             WOLFCLU_LOG(WOLFCLU_L0, "Unknown mode");
             wolfCLU_help();
-            return FATAL_ERROR;
+            return WOLFCLU_FATAL_ERROR;
     }
 
-    if (ret < 0)
+    if (ret <= 0)
         WOLFCLU_LOG(WOLFCLU_L0, "Error returned: %d.", ret);
 
-    return ret;
-}
-
-void convert_to_lower(char* s, int sSz)
-{
-    int i;
-    for (i = 0; i < sSz; i++) {
-        s[i] = tolower(s[i]);
-    }
+    /* main function we want to return 0 on success so that the executable
+     * returns the expected 0 on success */
+    return (ret == WOLFCLU_SUCCESS)? 0 : ret;
 }
 

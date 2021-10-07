@@ -39,7 +39,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
     byte*   output;             /* output buffer */
 
     int     i  =   0;           /* loop variable */
-    int     ret = -1;           /* return variable */
+    int     ret = WOLFCLU_FATAL_ERROR;
     int     inputSz;
     WOLFSSL_BIO* tmp;
 
@@ -85,32 +85,32 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
 
     /* hashes using accepted algorithm */
 #ifndef NO_MD5
-    if (ret == -1 && XSTRNCMP(alg, "md5", 3) == 0) {
+    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "md5", 3) == 0) {
         ret = wc_Md5Hash(input, inputSz, output);
     }
 #endif
 #ifndef NO_SHA256
-    if (ret == -1 && XSTRNCMP(alg, "sha256", 6) == 0) {
+    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "sha256", 6) == 0) {
         ret = wc_Sha256Hash(input, inputSz, output);
     }
 #endif
 #ifdef WOLFSSL_SHA384
-    if (ret == -1 && XSTRNCMP(alg, "sha384", 6) == 0) {
+    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "sha384", 6) == 0) {
         ret = wc_Sha384Hash(input, inputSz, output);
     }
 #endif
 #ifdef WOLFSSL_SHA512
-    if (ret == -1 && XSTRNCMP(alg, "sha512", 6) == 0) {
+    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "sha512", 6) == 0) {
         ret = wc_Sha512Hash(input, inputSz, output);
     }
 #endif
 #ifndef NO_SHA
-    if (ret == - 1 && XSTRNCMP(alg, "sha", 3) == 0) {
+    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "sha", 3) == 0) {
         ret = wc_ShaHash(input, inputSz, output);
     }
 #endif
 #ifdef HAVE_BLAKE2
-    if (ret == - 1 && XSTRNCMP(alg, "blake2b", 7) == 0) {
+    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "blake2b", 7) == 0) {
         ret = wc_InitBlake2b(&hash, size);
         if (ret != 0) return ret;
         ret = wc_Blake2bUpdate(&hash, input, inputSz);
@@ -122,18 +122,24 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
 
 #ifndef NO_CODING
 #ifdef WOLFSSL_BASE64_ENCODE
-    if (ret == -1 && XSTRNCMP(alg, "base64enc", 9) == 0) {
+    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "base64enc", 9) == 0) {
         ret = Base64_Encode(input, inputSz, output, (word32*)&size);
     }
 #endif /* WOLFSSL_BASE64_ENCODE */
-    if (ret == -1 && XSTRNCMP(alg, "base64dec", 9) == 0) {
+    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "base64dec", 9) == 0) {
         ret = Base64_Decode(input, inputSz, output, (word32*)&size);
     }
 #endif /* !NO_CODING */
 
     if (ret == 0) {
-        if (bioOut != NULL)
-            wolfSSL_BIO_write(bioOut, output, size);
+        if (bioOut != NULL) {
+            if (wolfSSL_BIO_write(bioOut, output, size) == size) {
+                ret = WOLFCLU_SUCCESS;
+            }
+            else {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
         else {
             /* write hashed output to terminal */
             tmp = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
@@ -144,6 +150,10 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
                     wolfSSL_BIO_printf(tmp, "%02x", output[i]);
                 wolfSSL_BIO_printf(tmp, "\n");
                 wolfSSL_BIO_free(tmp);
+                ret = WOLFCLU_SUCCESS;
+            }
+            else {
+                ret = MEMORY_E;
             }
         }
     }

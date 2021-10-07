@@ -64,7 +64,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
 
     default:
         WOLFCLU_LOG(WOLFCLU_L0, "No valid sign algorithm selected.");
-        ret = -1;
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
     XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -159,7 +159,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
     }
 
     (void)index;
-    return 0;
+    return WOLFCLU_SUCCESS;
 #else
     return NOT_COMPILED_IN;
 #endif
@@ -246,7 +246,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey)
     }
 
     (void)index;
-    return ret;
+    return WOLFCLU_SUCCESS;
 #else
     return NOT_COMPILED_IN;
 #endif
@@ -336,7 +336,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey)
     }
 
     (void)index;
-    return ret;
+    return WOLFCLU_SUCCESS;
 #else
     return NOT_COMPILED_IN;
 #endif

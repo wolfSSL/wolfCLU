@@ -141,7 +141,7 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
         WOLFCLU_LOG(WOLFCLU_L0, "Failed to create ED25519 public key.\nRET: %d", ret);
         return ret;
     }
-    return ret;
+    return WOLFCLU_SUCCESS;
 #else
     return NOT_COMPILED_IN;
 #endif
@@ -340,7 +340,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
-    return ret;
+    return (ret < 0)? ret : WOLFCLU_SUCCESS;
 #else
     return NOT_COMPILED_IN;
 #endif
@@ -416,7 +416,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         WOLFCLU_LOG(WOLFCLU_L0, "Invalid Signature.");
     }
 
-    return ret;
+    return WOLFCLU_SUCCESS;
 #else
     return NOT_COMPILED_IN;
 #endif
@@ -489,7 +489,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
         WOLFCLU_LOG(WOLFCLU_L0, "Invalid Signature.");
     }
 
-    return ret;
+    return WOLFCLU_SUCCESS;
 #else
     return NOT_COMPILED_IN;
 #endif

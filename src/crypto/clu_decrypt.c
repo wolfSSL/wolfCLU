@@ -26,7 +26,9 @@
 
 #define MAX_LEN             1024
 
-/* Used for algorithms that do not have an EVP type */
+/* Used for algorithms that do not have an EVP type
+ * return WOLFCLU_SUCCESS on success
+ */
 int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         char* in, char* out, byte* iv, int block, int keyType)
 {
@@ -217,5 +219,5 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
     (void)mode;
     (void)alg;
-    return ret;
+    return (ret == 0)? WOLFCLU_SUCCESS : ret;
 }

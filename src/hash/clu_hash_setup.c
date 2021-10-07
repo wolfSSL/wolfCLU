@@ -24,13 +24,14 @@
 
 /*
  * hash argument function
+ * return WOLFCLU_SUCCESS on success
  */
 int wolfCLU_hashSetup(int argc, char** argv)
 {
     WOLFSSL_BIO *bioIn = NULL;
     WOLFSSL_BIO *bioOut = NULL;
 
-    int     ret        =   0;   /* return variable, counter */
+    int     ret        =   WOLFCLU_SUCCESS;
     int     i          =   0;   /* loop variable */
     const char* algs[]  =   {   /* list of acceptable algorithms */
 #ifndef NO_MD5
@@ -74,7 +75,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
     ret = wolfCLU_checkForArg("-help", 5, argc, argv);
     if (ret > 0) {
         wolfCLU_hashHelp();
-        return 0;
+        return WOLFCLU_SUCCESS;
     }
 
     for (i = 0; i < (int)algsSz; ++i) {
@@ -87,7 +88,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
     if (algCheck == 0) {
         WOLFCLU_LOG(WOLFCLU_L0, "Invalid algorithm");
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     /* returns location of the arg in question if present */
@@ -126,7 +127,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
     if (inCheck == 0) {
         WOLFCLU_LOG(WOLFCLU_L0, "Must have input as either a file or standard I/O");
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     /* sets default size of algorithm */

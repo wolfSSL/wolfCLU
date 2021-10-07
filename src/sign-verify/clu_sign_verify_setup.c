@@ -27,7 +27,7 @@
 
 int wolfCLU_sign_verify_setup(int argc, char** argv)
 {
-    int     ret         = 0;    /* return variable, counter */
+    int     ret         = WOLFCLU_SUCCESS;
     char*   in          = NULL; /* input variable */
     char*   out;                /* output variable */
     char*   priv;               /* private key variable */
@@ -49,7 +49,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         algCheck = ECC_SIG_VER;
     }
     else {
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     ret = wolfCLU_checkForArg("-sign", 5, argc, argv);
@@ -179,7 +179,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "Must have input as either a file or standard I/O");
-            return FATAL_ERROR;
+            return WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -187,12 +187,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         ret = wolfCLU_sign_data(in, out, priv, algCheck);
     }
     else if (verifyCheck == 1) {
-
         ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck);
-
-        if(ret >= 0) {
-            return 0;
-        }
     }
 
     XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

@@ -40,7 +40,7 @@ int wolfCLU_inpemOuttext(char* inFile, char* outFile, int silentFlag);
  * @param der der buffer to print out
  * @param derSz size of 'der' buffer
  *
- * @return returns 0 on success
+ * @return returns WOLFCLU_SUCCESS on success
  */
 int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz);
 
@@ -52,7 +52,7 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz);
  * @param outFile name of the file to write to
  * @param silentFlag if should be silent instead of printout
  *
- * @return returns 0 on success
+ * @return returns WOLFCLU_SUCCESS on success
  */
 int wolfCLU_printX509PubKey(char* inFile, int inForm, char* outFile,
         int silentFlag);

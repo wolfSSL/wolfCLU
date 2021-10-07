@@ -106,8 +106,5 @@ enum {
 #define WOLFCLU_PBKDF2 2
 #define WOLFCLU_PBKDF1 1
 
-/* method for converting arguments to lower case */
-void convert_to_lower(char* s, int sSz);
-
 #endif /* WOLFCLU_OPTARGS_H */
 

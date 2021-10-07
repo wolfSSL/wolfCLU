@@ -61,15 +61,19 @@ static struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "-help           Help, print out this help menu");
     WOLFCLU_LOG(WOLFCLU_L0, "");
     WOLFCLU_LOG(WOLFCLU_L0, "Only set one of the following.\n");
-    WOLFCLU_LOG(WOLFCLU_L0, "-encrypt        Encrypt a file or some user input");
-    WOLFCLU_LOG(WOLFCLU_L0, "-decrypt        Decrypt an encrypted file");
-    WOLFCLU_LOG(WOLFCLU_L0, "-hash           Hash a file or input");
-    WOLFCLU_LOG(WOLFCLU_L0, "-bench          Benchmark one of the algorithms");
-    WOLFCLU_LOG(WOLFCLU_L0, "-x509           X509 certificate processing");
-    WOLFCLU_LOG(WOLFCLU_L0, "-req            Request for certificate generation");
-    WOLFCLU_LOG(WOLFCLU_L0, "-rsa            Rsa signing and signature verification");
-    WOLFCLU_LOG(WOLFCLU_L0, "-ecc            Ecc signing and signature verification");
-    WOLFCLU_LOG(WOLFCLU_L0, "-ed25519        Ed25519 signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "bench          Benchmark one of the algorithms");
+    WOLFCLU_LOG(WOLFCLU_L0, "decrypt        Decrypt an encrypted file");
+    WOLFCLU_LOG(WOLFCLU_L0, "dgst           Used for verifying a signature");
+    WOLFCLU_LOG(WOLFCLU_L0, "ecc            Ecc signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "ecparam        Generate an ECC key and parameters");
+    WOLFCLU_LOG(WOLFCLU_L0, "ed25519        Ed25519 signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "encrypt        Encrypt a file or some user input");
+    WOLFCLU_LOG(WOLFCLU_L0, "hash           Hash a file or input");
+    WOLFCLU_LOG(WOLFCLU_L0, "md5            Creates and MD5 hash");
+    WOLFCLU_LOG(WOLFCLU_L0, "pkey           Used for key operations");
+    WOLFCLU_LOG(WOLFCLU_L0, "req            Request for certificate generation");
+    WOLFCLU_LOG(WOLFCLU_L0, "rsa            Rsa signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
     WOLFCLU_LOG(WOLFCLU_L0, "");
     /*optional flags*/
     WOLFCLU_LOG(WOLFCLU_L0, "Optional Flags.\n");
@@ -563,13 +567,13 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     if (name == NULL || alg == NULL || mode == NULL || size == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "null input to get algo function");
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     /* gets name after first '-' and before the second */
     tmpAlg = strtok_r(name, "-", &end);
     if (tmpAlg == NULL) {
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
 
@@ -583,14 +587,14 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
         /* gets size after third "-" */
         sz = strtok_r(NULL, "-", &end);
         if (sz == NULL) {
-            return FATAL_ERROR;
+            return WOLFCLU_FATAL_ERROR;
         }
         *size = XATOI(sz);
     }
 
     tmpMode = strtok_r(NULL, "-", &end);
     if (tmpMode == NULL) {
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     for (i = 0; i < (int) (sizeof(acceptMode)/sizeof(acceptMode[0])); i++) {
@@ -601,7 +605,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     /* if name or mode doesn't match acceptable options */
     if (nameCheck == 0 || modeCheck == 0) {
         WOLFCLU_LOG(WOLFCLU_L0, "Invalid entry, issue with algo name and mode");
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     /* checks key sizes for acceptability */
@@ -613,7 +617,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
         ret = AES_BLOCK_SIZE;
         if (*size != 128 && *size != 192 && *size != 256) {
             WOLFCLU_LOG(WOLFCLU_L0, "Invalid AES pwdKey size. Should be: %d", ret);
-            ret = FATAL_ERROR;
+            ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (XSTRNCMP(tmpMode, "cbc", 3) == 0) {
@@ -654,7 +658,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
         ret = DES3_BLOCK_SIZE;
         if (*size != 56 && *size != 112 && *size != 168) {
             WOLFCLU_LOG(WOLFCLU_L0, "Invalid 3DES pwdKey size");
-            ret = FATAL_ERROR;
+            ret = WOLFCLU_FATAL_ERROR;
         }
         *alg = WOLFCLU_DESCBC;
     #endif
@@ -668,7 +672,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
         ret = CAMELLIA_BLOCK_SIZE;
         if (*size != 128 && *size != 192 && *size != 256) {
             WOLFCLU_LOG(WOLFCLU_L0, "Invalid Camellia pwdKey size");
-            ret = FATAL_ERROR;
+            ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (XSTRNCMP(tmpMode, "cbc", 3) == 0) {
@@ -689,7 +693,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     else {
         WOLFCLU_LOG(WOLFCLU_L0, "Invalid algorithm: %s", tmpAlg);
-        ret = FATAL_ERROR;
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret >= 0) {
@@ -820,7 +824,7 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
 
     /* first just try the 3rd argument for backwords compatibility */
     if (argc < 3 || argvCopy[2] == NULL) {
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     wolfCLU_oldAlgo(argc, argvCopy, 3);
@@ -909,6 +913,7 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
 
 /*
  * secure data entry by turning off key echoing in the terminal
+ * return WOLFCLU_SUCCESS on success
  */
 int wolfCLU_noEcho(char* pwdKey, int size)
 {
@@ -924,7 +929,7 @@ int wolfCLU_noEcho(char* pwdKey, int size)
 
     if (tcsetattr(fileno(stdin), TCSANOW, &nflags) != 0) {
         WOLFCLU_LOG(WOLFCLU_L0, "Error");
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     WOLFCLU_LOG(WOLFCLU_L0, "pwdKey: ");
@@ -941,9 +946,9 @@ int wolfCLU_noEcho(char* pwdKey, int size)
     ret = tcsetattr(fileno(stdin), TCSANOW, &oflags);
     if (ret != 0) {
         WOLFCLU_LOG(WOLFCLU_L0, "Error");
-        return FATAL_ERROR;
+        return WOLFCLU_FATAL_ERROR;
     }
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
 
 /*
@@ -1000,15 +1005,16 @@ void wolfCLU_stats(double start, int blockSize, int64_t blocks)
 }
 
 
-/* returns 0 on success */
+/* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_version()
 {
     WOLFCLU_LOG(WOLFCLU_L0, "You are using version %s of the wolfssl Command Line Utility."
         , CLUWOLFSSL_VERSION_STRING);
     WOLFCLU_LOG(WOLFCLU_L0, "Linked to wolfSSL version %s", LIBWOLFSSL_VERSION_STRING);
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
 
+/* return 0 for not found and index found at otherwise */
 int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
         char** argv)
 {
@@ -1053,7 +1059,7 @@ int wolfCLU_checkOutform(char* outform)
         return USER_INPUT_ERROR;
     }
 
-    convert_to_lower(outform, (int)XSTRLEN(outform));
+    wolfCLU_convertToLower(outform, (int)XSTRLEN(outform));
     if (XSTRNCMP(outform, "pem", 3) == 0) {
         return PEM_FORM;
     }
@@ -1075,7 +1081,7 @@ int wolfCLU_checkInform(char* inform)
         return USER_INPUT_ERROR;
     }
 
-    convert_to_lower(inform, (int)XSTRLEN(inform));
+    wolfCLU_convertToLower(inform, (int)XSTRLEN(inform));
     if (XSTRNCMP(inform, "pem", 3) == 0) {
         return PEM_FORM;
     }
@@ -1118,7 +1124,7 @@ static void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid,
 }
 
 
-/* returns 0 on success */
+/* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 {
     char   *in = NULL;
@@ -1178,5 +1184,16 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
         free(in); in = NULL;
     }
 
-    return 0;
+    return WOLFCLU_SUCCESS;
 }
+
+
+void wolfCLU_convertToLower(char* s, int sSz)
+{
+    int i;
+    for (i = 0; i < sSz; i++) {
+        s[i] = tolower(s[i]);
+    }
+}
+
+

@@ -43,7 +43,8 @@ void wolfCLU_freeBins(byte* b1, byte* b2, byte* b3, byte* b4, byte* b5)
 }
 
 
-/* convert hex string to binary, store size, 0 success (free mem on failure) */
+/* convert hex string to binary, store size, WOLFCLU_SUCCESS success
+ * (free mem on failure) */
 int wolfCLU_hexToBin(const char* h1, byte** b1, word32* b1Sz,
                     const char* h2, byte** b2, word32* b2Sz,
                     const char* h3, byte** b3, word32* b3Sz,
@@ -111,5 +112,5 @@ int wolfCLU_hexToBin(const char* h1, byte** b1, word32* b1Sz,
         }
     }
 
-    return 0;
+    return WOLFCLU_SUCCESS;
 }

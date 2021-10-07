@@ -51,11 +51,13 @@ static struct option req_options[] = {
     {0, 0, 0, 0} /* terminal element */
 };
 
+
+/* return WOLFCLU_SUCCESS on success */
 int wolfCLU_requestSetup(int argc, char** argv)
 {
 #ifndef WOLFSSL_CERT_REQ
     WOLFCLU_LOG(WOLFCLU_L0, "wolfSSL not compiled with --enable-certreq");
-    return -1;
+    return NOT_COMPILED_IN;
 #else
     WOLFSSL_BIO *bioOut = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
@@ -63,7 +65,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     const WOLFSSL_EVP_MD *md  = NULL;
     WOLFSSL_EVP_PKEY *pkey = NULL;
 
-    int     ret = 0;
+    int     ret = WOLFCLU_SUCCESS;
     char*   in  = NULL;
     char*   out = NULL;
     char*   config = NULL;
@@ -90,7 +92,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
                     WOLFCLU_LOG(WOLFCLU_L0, "unable to open public key file %s", optarg);
-                    ret = -1;
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
@@ -99,7 +101,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
                 if (bioOut == NULL) {
                     WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", optarg);
-                    ret = -1;
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
@@ -114,7 +116,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_HELP:
                 wolfCLU_certgenHelp();
-                return 0;
+                return WOLFCLU_SUCCESS;
 
             case WOLFCLU_RSA:
                 algCheck = 1;
@@ -187,7 +189,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         ret = MEMORY_E;
     }
 
-    if (ret == 0 && days > 0) {
+    if (ret == WOLFCLU_SUCCESS && days > 0) {
         WOLFSSL_ASN1_TIME *notBefore, *notAfter;
         time_t t;
 
@@ -196,7 +198,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, XATOI(argv[ret+1]), 0);
         if (notBefore == NULL || notAfter == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "error creating not before/after dates");
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
         else {
             wolfSSL_X509_set_notBefore(x509, notBefore);
@@ -208,16 +210,16 @@ int wolfCLU_requestSetup(int argc, char** argv)
     }
 
 
-    if (ret == 0 && bioIn != NULL) {
+    if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
         pkey = wolfSSL_PEM_read_bio_PrivateKey(bioIn, NULL, NULL, NULL);
         if (pkey == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "error reading key from file");
             ret = USER_INPUT_ERROR;
         }
 
-        if (ret == 0 &&
+        if (ret == WOLFCLU_SUCCESS &&
                 wolfSSL_X509_set_pubkey(x509, pkey) != WOLFSSL_SUCCESS) {
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
     else {
@@ -227,7 +229,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         ret = USER_INPUT_ERROR;
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         if (config != NULL) {
             ret = wolfCLU_readConfig(x509, config, (char*)"req");
         }
@@ -246,18 +248,18 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
 
-    if (ret == 0 && bioOut == NULL) {
+    if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         /* output to stdout if no output is provided */
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bioOut != NULL) {
             if (wolfSSL_BIO_set_fp(bioOut, stdout, BIO_NOCLOSE)
                     != WOLFSSL_SUCCESS) {
-                ret = -1;
+                ret = WOLFCLU_FATAL_ERROR;
             }
         }
     }
 
-    if (ret == 0) {
+    if (ret == WOLFCLU_SUCCESS) {
         if (algCheck == 3) {
             ret = make_self_signed_ecc_certificate(in, out, oid);
         }
@@ -295,11 +297,11 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
                 if (ret != WOLFSSL_SUCCESS) {
                     WOLFCLU_LOG(WOLFCLU_L0, "error %d writing out cert req", ret);
-                    ret = -1;
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
                     /* set WOLFSSL_SUCCESS case to success value */
-                    ret = 0;
+                    ret = WOLFCLU_SUCCESS;
                 }
             }
         }
