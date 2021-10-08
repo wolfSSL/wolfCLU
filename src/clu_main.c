@@ -187,22 +187,22 @@ int main(int argc, char** argv)
             /* only print for -help if no mode has been declared */
             WOLFCLU_LOG(WOLFCLU_L0, "Main help menu:");
             wolfCLU_help();
-            return WOLFCLU_SUCCESS;
+            ret = WOLFCLU_SUCCESS;
+            break;
 
         case WOLFCLU_VERBOSE:
             wolfCLU_verboseHelp();
-            return WOLFCLU_SUCCESS;
+            ret = WOLFCLU_SUCCESS;
+            break;
 
         case 'v':
-            if (wolfCLU_version() != 0) {
-                WOLFCLU_LOG(WOLFCLU_L0, "Error getting version");
-            }
-            return WOLFCLU_FATAL_ERROR;
+            ret = wolfCLU_version();
+            break;
 
         default:
             WOLFCLU_LOG(WOLFCLU_L0, "Unknown mode");
             wolfCLU_help();
-            return WOLFCLU_FATAL_ERROR;
+            ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret <= 0)
