@@ -1130,54 +1130,55 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
     char   *in = NULL;
     size_t  inSz;
     ssize_t ret;
+    FILE *fout = stdout;
     FILE *fin = stdin; /* defaulting to stdin but using a fd variable to make it
                         * easy for expanding to other inputs */
 
-    WOLFCLU_LOG(WOLFCLU_L0, "Enter without data will result in the field being "
-            "skipped.\nExamples of inputs are provided as [*]");
-    WOLFCLU_LOG(WOLFCLU_L0, "Country [US] : ");
+    fprintf(fout, "Enter without data will result in the field being "
+            "skipped.\nExamples of inputs are provided as [*]\n");
+    fprintf(fout, "Country [US] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_PRINTABLE, NID_countryName, in);
         free(in); in = NULL;
     }
 
-    WOLFCLU_LOG(WOLFCLU_L0, "State or Province [Montana] : ");
+    fprintf(fout, "State or Province [Montana] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_stateOrProvinceName, in);
         free(in); in = NULL;
     }
 
-    WOLFCLU_LOG(WOLFCLU_L0, "Locality [Bozeman] : ");
+    fprintf(fout, "Locality [Bozeman] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_localityName, in);
         free(in); in = NULL;
     }
 
-    WOLFCLU_LOG(WOLFCLU_L0, "Organization Name [wolfSSL] : ");
+    fprintf(fout, "Organization Name [wolfSSL] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationName, in);
         free(in); in = NULL;
     }
 
-    WOLFCLU_LOG(WOLFCLU_L0, "Organization Unit [engineering] : ");
+    fprintf(fout, "Organization Unit [engineering] : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationalUnitName, in);
         free(in); in = NULL;
     }
 
-    WOLFCLU_LOG(WOLFCLU_L0, "Common Name : ");
+    fprintf(fout, "Common Name : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_commonName, in);
         free(in); in = NULL;
     }
 
-    WOLFCLU_LOG(WOLFCLU_L0, "Email Address : ");
+    fprintf(fout, "Email Address : ");
     ret = getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_emailAddress, in);
