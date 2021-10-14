@@ -52,7 +52,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     int     pad          = 0;           /* the length to pad */
     int     length;                     /* length of message */
     int     tempMax = MAX_LEN;              /* equal to MAX_LEN until feof */
-    int     sbSize = SALT_SIZE + block; /* size of salt and iv together */
+    int     saltAndIvSize = SALT_SIZE + block; /* size of salt and iv together */
 
     /* opens input file */
     inFile = XFOPEN(in, "rb");
@@ -99,50 +99,47 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         ret = wc_InitRng(&rng);
     }
 
+    /* read in salt and iv */
+    if (ret == 0 &&
+            (int)XFREAD(salt, 1, SALT_SIZE, inFile) != SALT_SIZE) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Error reading salt.");
+        ret = FREAD_ERROR;
+    }
+
+    if (ret == 0 && (int)XFREAD(iv, 1, block, inFile) != block) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Error reading salt.");
+        ret = FREAD_ERROR;
+    }
+    /* replicates old pwdKey if pwdKeys match */
+    if (ret == 0 && keyType == 1) {
+        if (wc_PBKDF2(key, pwdKey, (int) strlen((const char*)pwdKey),
+                      salt, SALT_SIZE, CLU_4K_TYPE, size,
+                      CLU_SHA256) != 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "pwdKey set error.");
+            ret = ENCRYPT_ERROR;
+        }
+    }
+    else if (ret == 0 && keyType == 2) {
+        for (i = 0; i < size; i++) {
+
+            /* ensure key is set */
+            if (key[i] == 0 || key[i] == '\0') {
+                continue;
+            }
+            else {
+                keyVerify++;
+            }
+        }
+        if (keyVerify == 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "the key is all zero's or not set.");
+            ret = ENCRYPT_ERROR;
+        }
+    }
+
     /* reads from inFile and writes whatever
      * is there to the input buffer
      */
     while (length > 0 && ret == 0) {
-
-        /* On first loop only read in salt and iv */
-        if (currLoopFlag == 1) {
-            if (ret == 0 &&
-                    (int)XFREAD(salt, 1, SALT_SIZE, inFile) != SALT_SIZE) {
-                WOLFCLU_LOG(WOLFCLU_L0, "Error reading salt.");
-                ret = FREAD_ERROR;
-            }
-
-            if (ret == 0 && (int)XFREAD(iv, 1, block, inFile) != block) {
-                WOLFCLU_LOG(WOLFCLU_L0, "Error reading salt.");
-                ret = FREAD_ERROR;
-            }
-            /* replicates old pwdKey if pwdKeys match */
-            if (ret == 0 && keyType == 1) {
-                if (wc_PBKDF2(key, pwdKey, (int) strlen((const char*)pwdKey),
-                              salt, SALT_SIZE, CLU_4K_TYPE, size,
-                              CLU_SHA256) != 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "pwdKey set error.");
-                    ret = ENCRYPT_ERROR;
-                }
-            }
-            else if (ret == 0 && keyType == 2) {
-                for (i = 0; i < size; i++) {
-
-                    /* ensure key is set */
-                    if (key[i] == 0 || key[i] == '\0') {
-                        continue;
-                    }
-                    else {
-                        keyVerify++;
-                    }
-                }
-                if (keyVerify == 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "the key is all zero's or not set.");
-                    ret = ENCRYPT_ERROR;
-                }
-            }
-        }
-
         /* Read in 1kB */
         if (ret == 0 &&
                 (ret = (int)XFREAD(input, 1, MAX_LEN, inFile)) != MAX_LEN) {
@@ -156,7 +153,6 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             }
         }
 
-        /* sets pwdKey decrypts the message to output from input length */
 #ifdef HAVE_CAMELLIA
         if (ret == 0 &&
                 (alg == WOLFCLU_CAMELLIA128CBC ||
@@ -169,47 +165,40 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         }
 #endif
         if (ret == 0 && currLoopFlag == lastLoopFlag) {
-            if (output != NULL && salt[0] != 0) {
-                /* reduces length based on number of padded elements  */
-                pad = output[tempMax-1];
-                /* adjust length for padded bytes and salt size */
-                length -= pad + sbSize;
-                if (length < 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "bad length %d found", length);
-                    ret = -1;
-                    break;
-                }
-                /* reset tempMax for smaller decryption */
-                XFWRITE(output, 1, length, outFile);
-                break;
-            }
-            else {
-                if (output != NULL)
-                    XFWRITE(output, 1, tempMax, outFile);
-
-                XMEMSET(input, 0, tempMax);
-                if (output != NULL)
-                    XMEMSET(output, 0, tempMax);
-                break;
-            }
+            break;
         }
+
         /* writes output to the outFile */
         if (ret == 0 && output != NULL)
             XFWRITE(output, 1, tempMax, outFile);
 
         if (ret == 0) {
-            XMEMSET(input, 0, tempMax);
-            if (output != NULL)
-                XMEMSET(output, 0, tempMax);
-
             currLoopFlag++;
             length -= tempMax;
         }
     }
+
+    /* check padding */
+    if (ret == 0) {
+        if (output != NULL && salt[0] != 0) {
+            /* reduces length based on number of padded elements  */
+            pad = output[tempMax-1];
+            /* adjust length for padded bytes and salt size */
+            length -= pad + saltAndIvSize;
+            if (length < 0) {
+                WOLFCLU_LOG(WOLFCLU_L0, "bad length %d found", length);
+                ret = -1;
+            }
+            /* reset tempMax for smaller decryption */
+            XFWRITE(output, 1, length, outFile);
+        }
+        else {
+            if (output != NULL)
+                XFWRITE(output, 1, tempMax, outFile);
+        }
+    }
+
     /* closes the opened files and frees memory */
-    XMEMSET(input, 0, MAX_LEN);
-    if (output != NULL)
-        XMEMSET (output, 0, MAX_LEN);
     wolfCLU_freeBins(input, output, NULL, NULL, NULL);
     XMEMSET(key, 0, size);
     /* Use the wolfssl wc_FreeRng to free rng */

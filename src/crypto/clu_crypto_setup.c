@@ -318,7 +318,6 @@ int wolfCLU_setup(int argc, char** argv, char action)
             ret = (int) scanf("%s", inName);
         }
         in = inName;
-        /* if no input is provided */
         WOLFCLU_LOG(WOLFCLU_L0, "Encrypting :\"%s\"", inName);
         inCheck = 1;
     }

@@ -235,19 +235,11 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
         if (ferror(outFile)) {
             WOLFCLU_LOG(WOLFCLU_L0, "failed to write to file.");
-            if (input != NULL)
-                XMEMSET(input, 0, tempMax);
-            if (output != NULL)
-                XMEMSET(output, 0, tempMax);
             wolfCLU_freeBins(input, output, NULL, NULL, NULL);
             return FWRITE_ERROR;
         }
         if (ret > MAX_LEN) {
             WOLFCLU_LOG(WOLFCLU_L0, "Wrote too much to file.");
-            if (input != NULL)
-                XMEMSET(input, 0, tempMax);
-            if (output != NULL)
-                XMEMSET(output, 0, tempMax);
             wolfCLU_freeBins(input, output, NULL, NULL, NULL);
             return FWRITE_ERROR;
         }
@@ -257,10 +249,6 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         length -= tempMax;
         if (length < 0)
             WOLFCLU_LOG(WOLFCLU_L0, "length went past zero.");
-        if (input != NULL)
-            XMEMSET(input, 0, tempMax);
-        if (output != NULL)
-            XMEMSET(output, 0, tempMax);
     }
 
     /* closes the opened files and frees the memory */
