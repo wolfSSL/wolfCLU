@@ -291,7 +291,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
     if (pwdKeyChk == 0 && keyCheck == 0) {
         if (decCheck == 1) {
             WOLFCLU_LOG(WOLFCLU_L0, "\nDECRYPT ERROR:");
-            WOLFCLU_LOG(WOLFCLU_L0, "no key set or passphrase");
+            WOLFCLU_LOG(WOLFCLU_L0, "no key or passphrase set");
             WOLFCLU_LOG(WOLFCLU_L0,
                     "Please type \"wolfssl -decrypt -help\" for decryption"
                                                             " usage \n");
