@@ -187,12 +187,10 @@ int main(int argc, char** argv)
             /* only print for -help if no mode has been declared */
             WOLFCLU_LOG(WOLFCLU_L0, "Main help menu:");
             wolfCLU_help();
-            ret = WOLFCLU_SUCCESS;
             break;
 
         case WOLFCLU_VERBOSE:
             wolfCLU_verboseHelp();
-            ret = WOLFCLU_SUCCESS;
             break;
 
         case 'v':
