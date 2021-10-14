@@ -24,7 +24,9 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/genkey/clu_genkey.h>
 
-#define MAX_LEN             1024
+#ifndef MAX_LEN
+    static const int MAX_LEN = 1024;
+#endif
 
 /* Used for algorithms that do not have an EVP type
  * return WOLFCLU_SUCCESS on success
