@@ -10,17 +10,17 @@
 #requires user to have AutoConf version 2.63 or greater.
 AC_PREREQ([2.63])
 
-AC_INIT([wolfssl_clu], [0.5], [http://www.wolfssl.com])
+AC_INIT([wolfclu], [0.0.5], [http://www.wolfssl.com])
 
 #a helpful directory to keep clutter out of root
 AC_CONFIG_AUX_DIR([build-aux])
-AC_CONFIG_HEADER([clu_src/config.h])
+AC_CONFIG_HEADER([src/config.h])
 AC_CANONICAL_HOST
-AC_CANONICAL_BUILD  
-		
+AC_CANONICAL_BUILD
 
-AM_INIT_AUTOMAKE([1.11 -Wall -Werror -Wno-portability foreign tar-ustar subdir-objects no-define color-tests])
- 
+
+AM_INIT_AUTOMAKE([1.14.1 -Wall -Werror -Wno-portability foreign tar-ustar subdir-objects no-define color-tests])
+
 AC_ARG_PROGRAM
 AC_DEFUN([PROTECT_AC_USE_SYSTEM_EXTENSIONS],
          [AX_SAVE_FLAGS
@@ -74,11 +74,6 @@ AC_CHECK_LIB([wolfssl],[wolfCrypt_Init],,[AC_MSG_ERROR([libwolfssl is required a
 # since we have autoconf available, we can use wolfssl options header
 AM_CFLAGS="$AM_CFLAGS -DHAVE_WOLFSSL_OPTIONS"
 
-# capture user C_EXTRA_FLAGS from ./configure line, CFLAGS may hold -g -O2 even
-# if user doesn't override, no way to tell
-USER_C_EXTRA_FLAGS="$C_EXTRA_FLAGS"
-CFLAGS=""
-
 ###############################################
 #                                             #
 #     Need a genKey check                     #
@@ -99,8 +94,13 @@ else
     fi
 fi
 
-# add user C_EXTRA_FLAGS back
-CFLAGS="$CFLAGS $USER_C_EXTRA_FLAGS"
+
+# Add Wall to CFLAGS
+AX_HARDEN_CC_COMPILER_FLAGS
+if test "$GCC" = "yes"
+then
+    AM_CFLAGS="$AM_CFLAGS -Wall -Wno-unused"
+fi
 
 CREATE_HEX_VERSION
 AC_SUBST([AM_CPPFLAGS])

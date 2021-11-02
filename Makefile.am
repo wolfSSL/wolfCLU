@@ -31,6 +31,7 @@ ACLOCAL_AMFLAGS= -I m4
 EXTRA_DIST+= tests
 EXTRA_DIST+= manpages
 EXTRA_DIST+= README.md
+EXTRA_DIST+= LICENSE
 
 man_MANS+= manpages/wolfCLU_benchmark.1
 man_MANS+= manpages/wolfCLU_decrypt.1
@@ -38,8 +39,8 @@ man_MANS+= manpages/wolfCLU_encrypt.1
 man_MANS+= manpages/wolfCLU_hash.1
 man_MANS+= manpages/wolfssl.1
 
-include clu_src/include.am
-include clu_include/include.am
+include src/include.am
+include wolfclu/include.am
 include tests/x509/include.am
 include tests/genkey_sign_ver/include.am
 #####include data/include.am
