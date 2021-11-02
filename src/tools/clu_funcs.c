@@ -57,9 +57,9 @@ static struct option crypt_algo_options[] = {
  * generic help function
  */
  void wolfCLU_help()
- {  WOLFCLU_LOG(WOLFCLU_L0, "");
+ {  WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "-help           Help, print out this help menu");
-    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "Only set one of the following.\n");
     WOLFCLU_LOG(WOLFCLU_L0, "bench          Benchmark one of the algorithms");
     WOLFCLU_LOG(WOLFCLU_L0, "decrypt        Decrypt an encrypted file");
@@ -74,7 +74,7 @@ static struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "req            Request for certificate generation");
     WOLFCLU_LOG(WOLFCLU_L0, "rsa            Rsa signing and signature verification");
     WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
-    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
     /*optional flags*/
     WOLFCLU_LOG(WOLFCLU_L0, "Optional Flags.\n");
     WOLFCLU_LOG(WOLFCLU_L0, "-in             input file to manage");
@@ -193,7 +193,7 @@ void wolfCLU_verboseHelp()
     WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
             "camellia-cbc-256");
 #endif
-    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "Available hashing algorithms with current configure settings:\n");
 
     for (i = 0; i < (int) sizeof(algsenc)/(int) sizeof(algsenc[0]); i++) {
@@ -357,7 +357,7 @@ void wolfCLU_benchHelp()
     for(i = 0; i < (int) sizeof(algsother)/(int) sizeof(algsother[0]); i++) {
         WOLFCLU_LOG(WOLFCLU_L0, "%s", algsother[i]);
     }
-    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
             /* encryption/decryption help lists options */
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "USAGE: wolfssl -bench [alg] -time [time in seconds [1-10]]"
@@ -726,16 +726,16 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     return ret;
 }
 
-#define WOLFCLU_AES128CTR_NAME "aes-128-ctr"
-#define WOLFCLU_AES192CTR_NAME "aes-192-ctr"
-#define WOLFCLU_AES256CTR_NAME "aes-256-ctr"
-#define WOLFCLU_AES128CBC_NAME "aes-128-cbc"
-#define WOLFCLU_AES192CBC_NAME "aes-192-cbc"
-#define WOLFCLU_AES256CBC_NAME "aes-256-cbc"
-#define WOLFCLU_CAMELLIA128CBC_NAME "camellia-128-cbc"
-#define WOLFCLU_CAMELLIA192CBC_NAME "camellia-192-cbc"
-#define WOLFCLU_CAMELLIA256CBC_NAME "camellia-256-cbc"
-#define WOLFCLU_DESCBC_NAME "des-cbc"
+static const char WOLFCLU_AES128CTR_NAME[] = "aes-128-ctr";
+static const char WOLFCLU_AES192CTR_NAME[] = "aes-192-ctr";
+static const char WOLFCLU_AES256CTR_NAME[] = "aes-256-ctr";
+static const char WOLFCLU_AES128CBC_NAME[] = "aes-128-cbc";
+static const char WOLFCLU_AES192CBC_NAME[] = "aes-192-cbc";
+static const char WOLFCLU_AES256CBC_NAME[] = "aes-256-cbc";
+static const char WOLFCLU_CAMELLIA128CBC_NAME[] = "camellia-128-cbc";
+static const char WOLFCLU_CAMELLIA192CBC_NAME[] = "camellia-192-cbc";
+static const char WOLFCLU_CAMELLIA256CBC_NAME[] = "camellia-256-cbc";
+static const char WOLFCLU_DESCBC_NAME[] = "des-cbc";
 
 static const char* algoName[] = {
     WOLFCLU_AES128CTR_NAME,
@@ -750,7 +750,7 @@ static const char* algoName[] = {
     WOLFCLU_DESCBC_NAME,
 };
 
-/* support older name schemes MAX_AES_IDX is the maximum index for old AES alogo
+/* support older name schemes MAX_AES_IDX is the maximum index for old AES algo
  * names */
 #define MAX_AES_IDX 6
 static const char* oldAlgoName[] = {
@@ -835,61 +835,60 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
     /* next check for -cipher option passed through args */
     if (ret < 0) {
         opterr = 0; /* do not print out unknown options */
-        XMEMSET(name, 0, sizeof(name));
         while ((option = getopt_long_only(argc, argvCopy, "",
                        crypt_algo_options, &longIndex )) != -1) {
             switch (option) {
                 /* AES */
                 case WOLFCLU_AES128CTR:
                     XSTRNCPY(name, WOLFCLU_AES128CTR_NAME,
-                            XSTRLEN(WOLFCLU_AES128CTR_NAME));
+                            sizeof(name));
                     break;
 
                 case WOLFCLU_AES192CTR:
                     XSTRNCPY(name, WOLFCLU_AES192CTR_NAME,
-                            XSTRLEN(WOLFCLU_AES192CTR_NAME));
+                            sizeof(name));
                     break;
 
                 case WOLFCLU_AES256CTR:
                     XSTRNCPY(name, WOLFCLU_AES256CTR_NAME,
-                            XSTRLEN(WOLFCLU_AES256CTR_NAME));
+                            sizeof(name));
                     break;
 
                 case WOLFCLU_AES128CBC:
                     XSTRNCPY(name, WOLFCLU_AES128CBC_NAME,
-                            XSTRLEN(WOLFCLU_AES128CBC_NAME));
+                            sizeof(name));
                     break;
 
                 case WOLFCLU_AES192CBC:
                     XSTRNCPY(name, WOLFCLU_AES192CBC_NAME,
-                            XSTRLEN(WOLFCLU_AES192CBC_NAME));
+                            sizeof(name));
                     break;
 
                 case WOLFCLU_AES256CBC:
                     XSTRNCPY(name, WOLFCLU_AES256CBC_NAME,
-                            XSTRLEN(WOLFCLU_AES256CBC_NAME));
+                            sizeof(name));
                     break;
 
                 /* camellia */
                 case WOLFCLU_CAMELLIA128CBC:
                     XSTRNCPY(name, WOLFCLU_CAMELLIA128CBC_NAME,
-                            XSTRLEN(WOLFCLU_CAMELLIA128CBC_NAME));
+                            sizeof(name));
                     break;
 
                 case WOLFCLU_CAMELLIA192CBC:
                     XSTRNCPY(name, WOLFCLU_CAMELLIA192CBC_NAME,
-                            XSTRLEN(WOLFCLU_CAMELLIA192CBC_NAME));
+                            sizeof(name));
                     break;
 
                 case WOLFCLU_CAMELLIA256CBC:
                     XSTRNCPY(name, WOLFCLU_CAMELLIA256CBC_NAME,
-                            XSTRLEN(WOLFCLU_CAMELLIA256CBC_NAME));
+                            sizeof(name));
                     break;
 
                 /* 3des */
                 case WOLFCLU_DESCBC:
                     XSTRNCPY(name, WOLFCLU_DESCBC_NAME,
-                            XSTRLEN(WOLFCLU_DESCBC_NAME));
+                            sizeof(name));
                     break;
 
                 case '?':

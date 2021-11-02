@@ -206,15 +206,15 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         WOLFCLU_LOG(WOLFCLU_L0, "salt [%d] :", SALT_SIZE);
         for (z = 0; z < SALT_SIZE; z++)
             WOLFCLU_LOG(WOLFCLU_L0, "%02X", salt[z]);
-        WOLFCLU_LOG(WOLFCLU_L0, "");
+        WOLFCLU_LOG(WOLFCLU_L0, " ");
         WOLFCLU_LOG(WOLFCLU_L0, "key  [%d] :", keySz);
         for (z = 0; z < keySz; z++)
             WOLFCLU_LOG(WOLFCLU_L0, "%02X", key[z]);
-        WOLFCLU_LOG(WOLFCLU_L0, "");
+        WOLFCLU_LOG(WOLFCLU_L0, " ");
         WOLFCLU_LOG(WOLFCLU_L0, "iv   [%d] :", ivSz);
         for (z = 0; z < ivSz; z++)
             WOLFCLU_LOG(WOLFCLU_L0, "%02X", iv[z]);
-        WOLFCLU_LOG(WOLFCLU_L0, "");
+        WOLFCLU_LOG(WOLFCLU_L0, " ");
         WOLFCLU_LOG(WOLFCLU_L0, "itterations = %d", iter);
         WOLFCLU_LOG(WOLFCLU_L0, "PBKDF version = %d", pbkVersion);
     }
