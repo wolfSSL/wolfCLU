@@ -319,10 +319,9 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                     else {
 
                         derSz = wolfSSL_i2d_ECPrivateKey(key, &der);
-
-                        if (ret == 0 && derSz > 0) {
-                            ret = wolfSSL_BIO_write(bioOut, der, derSz);
-                            if (ret != derSz) {
+                        if (derSz > 0) {
+                            if (wolfSSL_BIO_write(bioOut, der, derSz)
+                                    != derSz) {
                                 WOLFCLU_LOG(WOLFCLU_L0, "issue writing out data");
                                 ret = WOLFCLU_FATAL_ERROR;
                             }
