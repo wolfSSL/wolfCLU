@@ -57,8 +57,7 @@ int wolfCLU_ecparam(int argc, char** argv)
     int   i, option;
     WC_RNG rng;
 
-    ret = wolfCLU_checkForArg("-h", 2, argc, argv);
-    if (ret > 0) {
+    if (wolfCLU_checkForArg("-h", 2, argc, argv) > 0) {
         wolfCLU_ecparamHelp();
         return WOLFCLU_SUCCESS;
     }
@@ -127,7 +126,9 @@ int wolfCLU_ecparam(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wc_InitRng(&rng);
+        if (wc_InitRng(&rng) != 0) {
+            ret = WOLFCLU_FAILURE;
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
