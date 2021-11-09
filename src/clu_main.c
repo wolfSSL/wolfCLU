@@ -104,6 +104,14 @@ int main(int argc, char** argv)
     }
 #endif
 
+    if (wolfCrypt_Init() != 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "wolfCyprt initialization failed!");
+        return -1;
+    }
+#ifdef DEBUG_WOLFSSL
+    wolfSSL_Debugging_ON();
+#endif
+
     /* If the first string does not have a '-' in front of it then try to
      * get the mode to use i.e. x509, req, version ... this is for
      * compatibility with the behavior of the OpenSSL command line utility
@@ -205,6 +213,7 @@ int main(int argc, char** argv)
 
     if (ret <= 0)
         WOLFCLU_LOG(WOLFCLU_L0, "Error returned: %d.", ret);
+    wolfCrypt_Cleanup();
 
     /* main function we want to return 0 on success so that the executable
      * returns the expected 0 on success */

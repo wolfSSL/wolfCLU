@@ -295,7 +295,7 @@ int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
 
         if (!silentFlag) {
            for (i = 0; i < outBufSz; i++) {
-                WOLFCLU_LOG(WOLFCLU_L0, "%c", outBuf[i]);
+                printf("%c", outBuf[i]);
             }
         }
 

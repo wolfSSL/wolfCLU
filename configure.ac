@@ -132,7 +132,9 @@ AC_SUBST([AM_CFLAGS])
 AC_SUBST([AM_LDFLAGS])
 
 # FINAL
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile
+        wolfclu/version.h
+        ])
 
 #AX_CREATE_GENERIC_CONFIG
 AX_AM_JOBSERVER([yes])

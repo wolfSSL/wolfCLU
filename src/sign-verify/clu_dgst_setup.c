@@ -185,7 +185,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         switch (wolfSSL_EVP_PKEY_id(pkey)) {
             case EVP_PKEY_RSA:
                 keySz   = sizeof(RsaKey);
-                sigType = WC_SIGNATURE_TYPE_RSA;
+                sigType = WC_SIGNATURE_TYPE_RSA_W_ENC;
 
                 key = (void*)&rsa;
                 if (wc_InitRsaKey(&rsa, NULL) != 0) {
@@ -193,7 +193,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
-                if (ret == 0) {
+                if (ret == WOLFCLU_SUCCESS) {
                     derSz = wolfSSL_i2d_PUBKEY(pkey, &der);
                     if (derSz <= 0) {
                         WOLFCLU_LOG(WOLFCLU_L0, "error converting pkey to der");
@@ -201,7 +201,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                     }
                 }
 
-                if (ret == 0 &&
+                if (ret == WOLFCLU_SUCCESS &&
                     wc_RsaPublicKeyDecode(der, &idx, &rsa, derSz) != 0) {
                     WOLFCLU_LOG(WOLFCLU_L0, "error decoding public rsa key");
                     ret = WOLFCLU_FATAL_ERROR;

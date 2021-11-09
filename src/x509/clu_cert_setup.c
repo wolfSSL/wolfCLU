@@ -197,7 +197,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* END ARG PROCESSING */
 /*---------------------------------------------------------------------------*/
-    ret = 0;
+    ret = WOLFCLU_SUCCESS;
     switch (error_check(inpemFlag, inderFlag, outpemFlag, outderFlag,
                       textFlag, textPubkey, nooutFlag)) {
         case IN_PEM_OUT_PEM:
@@ -233,7 +233,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             break;
         default:
             WOLFCLU_LOG(WOLFCLU_L0, "Error case");
-            ret = -1;
+            ret = WOLFCLU_FATAL_ERROR;
             break;
     }
 
