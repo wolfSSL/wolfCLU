@@ -1,0 +1,26 @@
+# wolfCLU v0.0.6 (Nov 09, 2021)
+
+- Add ecparam for ECC key generation with parameters
+- Refactoring of directory names for source and include
+- Refactor return values to use WOLFCLU_SUCCESS
+- Add a logging function for printing messages
+- Add PEM key generation for ECC
+- Add support for parsing a config file when creating a certificate or CSR
+- Refactor all file calls to use XFILE wrapping
+- Refactor strncmp and other system calls to use the X* wrapping
+- Formating on if else newlines throughout wolfCLU
+- Change the name of bundle created with 'make dist'
+- Add some error print outs and checking with FIPS builds
+- Add check for warnings (Wall) as errors and the resulting fixes
+- Static analysis tools ran to test code quality and resulting fixes
+- Refactoring on ECC key generation
+- Changed padding scheme in encrypt and decrypt to interop
+- Add WOLFCLU to variable names and macros
+- Add pkey command
+- Update to req command and expanding its capabilities
+- Add md5 command for creating legacy md5 hashes
+- Add public key print out
+- Convert parsing of input commands to not require '-' in front of them i.e './wolfssl -x509' now can be './wolfssl x509'
+- Add check for libwolfssl to autotools with configure
+- Add --with-wolfssl option to configure to specify location of wolfSSL library
+- Updates to dgst verify command and testing

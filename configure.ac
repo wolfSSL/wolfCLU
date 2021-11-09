@@ -10,7 +10,7 @@
 #requires user to have AutoConf version 2.63 or greater.
 AC_PREREQ([2.63])
 
-AC_INIT([wolfclu], [0.0.5], [http://www.wolfssl.com])
+AC_INIT([wolfclu], [0.0.6], [http://www.wolfssl.com])
 
 #a helpful directory to keep clutter out of root
 AC_CONFIG_AUX_DIR([build-aux])
@@ -36,7 +36,6 @@ AC_CONFIG_MACRO_DIR([m4])
 #requires user to have LibTool version 2.2 or greater
 LT_PREREQ([2.2])
 LT_INIT([disable-static],[win32-dll])
-LT_LANG([C++])
 LT_LANG([C])
 
 gl_VISIBILITY
@@ -49,10 +48,8 @@ AS_IF([ test -n "$CFLAG_VISIBILITY" ], [
 m4_ifdef([AM_SILENT_RULES],[AM_SILENT_RULES([yes])])
 
 # Checks for programs.
-AC_PROG_CXX
 AC_PROG_AWK
 AC_PROG_CC
-AC_PROG_CPP
 AC_PROG_CC_C_O
 AC_PROG_INSTALL
 AC_PROG_LN_S
