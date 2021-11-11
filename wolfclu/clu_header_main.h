@@ -429,4 +429,10 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect);
  * @brief Converts a string to be all lower case
  */
 void wolfCLU_convertToLower(char* s, int sSz);
+
+
+/**
+ * @brief function to write 0 at each index of 'mem' passed in
+ */
+void wolfCLU_ForceZero(void* mem, unsigned int len);
 #endif /* _WOLFSSL_CLU_HEADER_ */
