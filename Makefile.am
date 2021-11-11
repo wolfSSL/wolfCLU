@@ -32,6 +32,7 @@ EXTRA_DIST+= tests
 EXTRA_DIST+= manpages
 EXTRA_DIST+= README.md
 EXTRA_DIST+= LICENSE
+EXTRA_DIST+= ChangeLog.md
 
 man_MANS+= manpages/wolfCLU_benchmark.1
 man_MANS+= manpages/wolfCLU_decrypt.1
