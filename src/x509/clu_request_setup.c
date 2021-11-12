@@ -195,7 +195,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
         t = time(NULL);
         notBefore = wolfSSL_ASN1_TIME_adj(NULL, t, 0, 0);
-        notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, XATOI(argv[ret+1]), 0);
+        notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, days, 0);
         if (notBefore == NULL || notAfter == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "error creating not before/after dates");
             ret = WOLFCLU_FATAL_ERROR;
