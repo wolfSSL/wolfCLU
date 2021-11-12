@@ -639,6 +639,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     }
 
     if (derBuf != NULL) {
+        wolfCLU_ForceZero(derBuf, (unsigned int)maxDerBufSz);
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (fOutNameBuf != NULL) {
