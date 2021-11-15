@@ -248,6 +248,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
 
+    if (ret == WOLFSSL_SUCCESS) {
+        ret = wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3);
+    }
+
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         /* output to stdout if no output is provided */
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
