@@ -398,7 +398,8 @@ static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 #endif /* WOLFSSL_CERT_EXT */
 
 
-/* return WOLFCLU_SUCCESS on success */
+/* return WOLFCLU_SUCCESS on success, WOLFCLU_FAILURE if unable to find or add
+ * the entry */
 static int wolfCLU_X509addEntry(WOLFSSL_X509_NAME* name, WOLFSSL_CONF* conf,
         int nid, int type, const char* sect, const char* str)
 {
@@ -410,17 +411,20 @@ static int wolfCLU_X509addEntry(WOLFSSL_X509_NAME* name, WOLFSSL_CONF* conf,
         entry = wolfSSL_X509_NAME_ENTRY_create_by_NID(NULL, nid,
                 type, current, (int)XSTRLEN((const char*)current));
         wolfSSL_X509_NAME_add_entry(name, entry, -1, 0);
+        return WOLFCLU_SUCCESS;
     }
-    return WOLFCLU_SUCCESS;
+    return WOLFCLU_FAILURE;
 }
 
-
+#define MAX_DIST_NAME 80
 /* extracts the distinguished names from the conf file and puts them into
  * the x509
  * returns WOLFCLU_SUCCESS on success */
 static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         char* sect)
 {
+    int  i, ret;
+    char buf[MAX_DIST_NAME];
     WOLFSSL_X509_NAME *name;
     long countryName_min = 0;
     long countryName_max = 0;
@@ -450,10 +454,22 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             "localityName_default");
     wolfCLU_X509addEntry(name, conf, NID_localityName, CTC_UTF8, sect,
             "localityName");
+
+
+    /* check for additional organization names, keep going while successfully
+     * finding an entry */
     wolfCLU_X509addEntry(name, conf, NID_organizationName, CTC_UTF8, sect,
-            "0.organizationName_default");
+            "organizationName_default");
     wolfCLU_X509addEntry(name, conf, NID_organizationName, CTC_UTF8, sect,
-            "0.organizationName");
+            "organizationName");
+    i = 0;
+    do {
+        XSNPRINTF(buf, sizeof(buf), "%d.organizationName", i++);
+        ret = wolfCLU_X509addEntry(name, conf, NID_organizationName, CTC_UTF8,
+                sect, buf);
+    } while (ret == WOLFCLU_SUCCESS);
+
+
     wolfCLU_X509addEntry(name, conf, NID_organizationalUnitName, CTC_UTF8, sect,
             "organizationalUnitName_default");
     wolfCLU_X509addEntry(name, conf, NID_organizationalUnitName, CTC_UTF8, sect,
