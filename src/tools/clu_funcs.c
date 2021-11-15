@@ -1197,3 +1197,8 @@ void wolfCLU_convertToLower(char* s, int sSz)
 }
 
 
+void wolfCLU_ForceZero(void* mem, unsigned int len)
+{
+    volatile byte* z = (volatile byte*)mem;
+    while (len--) *z++ = 0;
+}
