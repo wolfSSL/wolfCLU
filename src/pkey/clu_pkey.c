@@ -384,7 +384,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
-                    if (wolfCLU_printDerPubKey(bioOut, der, derSz) !=
+                    if (wolfCLU_printDerPriKey(bioOut, der, derSz) !=
                             WOLFCLU_SUCCESS) {
                         WOLFCLU_LOG(WOLFCLU_L0, "error printing out pubkey");
                         ret = WOLFCLU_FATAL_ERROR;

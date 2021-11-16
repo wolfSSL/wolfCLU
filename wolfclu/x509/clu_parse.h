@@ -45,6 +45,17 @@ int wolfCLU_inpemOuttext(char* inFile, char* outFile, int silentFlag);
 int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz);
 
 /**
+ * @brief Function to print out DER private key
+ *
+ * @param bio the bio to print to
+ * @param der der buffer to print out
+ * @param derSz size of 'der' buffer
+ *
+ * @return returns WOLFCLU_SUCCESS on success
+ */
+int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz);
+
+/**
  * @brief prints out the public key from a certificate
  *
  * @param infile file to read from
