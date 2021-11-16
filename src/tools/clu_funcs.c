@@ -74,6 +74,7 @@ static struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "req            Request for certificate generation");
     WOLFCLU_LOG(WOLFCLU_L0, "rsa            Rsa signing and signature verification");
     WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
+    WOLFCLU_LOG(WOLFCLU_L0, "verify         X509 certificate verify");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
     /*optional flags*/
     WOLFCLU_LOG(WOLFCLU_L0, "Optional Flags.\n");

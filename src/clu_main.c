@@ -28,6 +28,7 @@
 #include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
+#include <wolfclu/sign-verify/clu_verify.h>
 /* enumerate optionals beyond ascii range to dis-allow use of alias IE we
  * do not want "-e" to work for encrypt, user must use "encrypt"
  */
@@ -48,6 +49,7 @@ static struct option mode_options[] = {
     {"ecc",       no_argument,       0, WOLFCLU_ECC       },
     {"ed25519",   no_argument,       0, WOLFCLU_ED25519   },
     {"dgst",      no_argument,       0, WOLFCLU_DGST      },
+    {"verify",    no_argument,       0, WOLFCLU_VERIFY    },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
     {"v",         no_argument,       0, 'v'       },
@@ -183,6 +185,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_DGST:
             ret = wolfCLU_dgst_setup(argc, argv);
+            break;
+
+        case WOLFCLU_VERIFY:
+            ret = wolfCLU_x509Verify(argc, argv);
             break;
 
         case WOLFCLU_RSA:
