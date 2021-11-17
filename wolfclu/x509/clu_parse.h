@@ -50,10 +50,12 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz);
  * @param bio the bio to print to
  * @param der der buffer to print out
  * @param derSz size of 'der' buffer
+ * @param keyType is the type of PEM key to output, i.e RSA_TYPE, ECC_TYPE
  *
  * @return returns WOLFCLU_SUCCESS on success
  */
-int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz);
+int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
+        int keyType);
 
 /**
  * @brief prints out the public key from a certificate

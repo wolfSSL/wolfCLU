@@ -140,9 +140,10 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
 
 
 /* return WOLFCLU_SUCCESS on success */
-int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
+int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
+        int keyType)
 {
-    return wolfCLU_printDerKey(bio, der, derSz, PRIVATEKEY_TYPE,
+    return wolfCLU_printDerKey(bio, der, derSz, keyType,
             DYNAMIC_TYPE_PRIVATE_KEY);
 }
 

@@ -113,6 +113,73 @@ static int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
     }
 }
 
+/* return key size on success */
+static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
+        int isPrivateKey)
+{
+    int ret   = 0;
+    int derSz = 0;
+    unsigned char *der = NULL;
+    WOLFSSL_EC_KEY *ec = NULL;
+
+    ec = wolfSSL_EVP_PKEY_get0_EC_KEY(pkey);
+    if (ec == NULL) {
+        WOLFCLU_LOG(WOLFCLU_L0, "no ecc key found in pkey");
+        ret = BAD_FUNC_ARG;
+    }
+
+    if (ret == 0) {
+        if (isPrivateKey) {
+            derSz = wc_EccKeyDerSize((ecc_key*)ec->internal, 1);
+        }
+        else {
+            derSz = wc_EccPublicKeyDerSize((ecc_key*)ec->internal, 1);
+        }
+
+        if (derSz < 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to get ecc der size");
+            ret = BAD_FUNC_ARG;
+        }
+    }
+
+    if (ret == 0) {
+        der = (unsigned char*)XMALLOC(derSz, HEAP_HINT,
+                DYNAMIC_TYPE_TMP_BUFFER);
+        if (der == NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to malloc der buffer");
+            ret = MEMORY_E;
+        }
+    }
+
+    if (ret == 0) {
+        if (isPrivateKey) {
+            ret = wc_EccPrivateKeyToDer((ecc_key*)ec->internal, der, derSz);
+        }
+        else {
+            ret = wc_EccPublicKeyToDer((ecc_key*)ec->internal, der, derSz, 1);
+
+        }
+
+        if (ret > 0) {
+            ret    = derSz;
+            *out   = der;
+        }
+        else {
+            ret = BAD_FUNC_ARG;
+            WOLFCLU_LOG(WOLFCLU_L0, "decoding der from internal structure failed");
+        }
+    }
+
+    if (ret < 0 && der != NULL) {
+        wolfCLU_ForceZero(der, derSz);
+        XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        *out = NULL;
+    }
+
+    return ret;
+}
+
+
 /* creates an out buffer containing only the public key from the pkey
  * returns size of buffer on success
  */
@@ -134,50 +201,7 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
             break;
 
         case EVP_PKEY_EC:
-            {
-                int derSz = 0;
-                unsigned char *der = NULL;
-                WOLFSSL_EC_KEY *ec = NULL;
-
-                ec = wolfSSL_EVP_PKEY_get0_EC_KEY(pkey);
-                if (ec == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "no ecc key found in pkey");
-                    ret = BAD_FUNC_ARG;
-                }
-
-                if (ret == 0) {
-                    derSz = wc_EccPublicKeyDerSize((ecc_key*)ec->internal, 1);
-                    if (derSz < 0) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "unable to get ecc der size");
-                        ret = BAD_FUNC_ARG;
-                    }
-                }
-
-                if (ret == 0) {
-                     der = (unsigned char*)XMALLOC(derSz, HEAP_HINT,
-                             DYNAMIC_TYPE_TMP_BUFFER);
-                     if (der == NULL) {
-                         WOLFCLU_LOG(WOLFCLU_L0, "unable to malloc der buffer");
-                         ret = MEMORY_E;
-                     }
-                }
-
-                if (ret == 0) {
-                     ret = wc_EccPublicKeyToDer((ecc_key*)ec->internal, der,
-                             derSz, 1);
-                     if (ret > 0) {
-                         ret    = derSz;
-                         *out   = der;
-                     }
-                     else {
-                        ret = BAD_FUNC_ARG;
-                        WOLFCLU_LOG(WOLFCLU_L0, "decoding der from internal structure failed");
-                     }
-                }
-
-                if (der != NULL)
-                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            }
+            ret = wolfCLU_pKeyToKeyECC(pkey, out, 0);
             break;
 
         default:
@@ -187,6 +211,7 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
 
     return ret;
 }
+
 
 /* creates an out buffer containing the private key from the pkey
  * returns size of buffer on success
@@ -209,50 +234,7 @@ static int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
             break;
 
         case EVP_PKEY_EC:
-            {
-                int derSz = 0;
-                unsigned char *der = NULL;
-                WOLFSSL_EC_KEY *ec = NULL;
-
-                ec = wolfSSL_EVP_PKEY_get0_EC_KEY(pkey);
-                if (ec == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "no ecc key found in pkey");
-                    ret = BAD_FUNC_ARG;
-                }
-
-                if (ret == 0) {
-                    derSz = wc_EccKeyDerSize((ecc_key*)ec->internal, 1);
-                    if (derSz < 0) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "unable to get ecc der size");
-                        ret = BAD_FUNC_ARG;
-                    }
-                }
-
-                if (ret == 0) {
-                     der = (unsigned char*)XMALLOC(derSz, HEAP_HINT,
-                             DYNAMIC_TYPE_TMP_BUFFER);
-                     if (der == NULL) {
-                         WOLFCLU_LOG(WOLFCLU_L0, "unable to malloc der buffer");
-                         ret = MEMORY_E;
-                     }
-                }
-
-                if (ret == 0) {
-                     ret = wc_EccPrivateKeyToDer((ecc_key*)ec->internal, der,
-                             derSz);
-                     if (ret > 0) {
-                         ret    = derSz;
-                         *out   = der;
-                     }
-                     else {
-                        ret = BAD_FUNC_ARG;
-                        WOLFCLU_LOG(WOLFCLU_L0, "decoding der from internal structure failed");
-                     }
-                }
-
-                if (der != NULL)
-                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            }
+            ret = wolfCLU_pKeyToKeyECC(pkey, out, 1);
             break;
 
         default:
@@ -378,13 +360,23 @@ int wolfCLU_pKeySetup(int argc, char** argv)
             else {
                 unsigned char *der = NULL;
                 int derSz = 0;
+                int keyType;
+
+                switch (wolfSSL_EVP_PKEY_id(pkey)) {
+                    case EVP_PKEY_RSA: keyType = RSA_TYPE; break;
+                    case EVP_PKEY_DSA: keyType = DSA_TYPE; break;
+                    case EVP_PKEY_EC:  keyType = ECC_TYPE; break;
+                    default:
+                        /* keep generic PRIVATEKEY_TYPE as type */
+                        keyType = PRIVATEKEY_TYPE;
+                }
 
                 if ((derSz = wolfCLU_pKeytoPriKey(pkey, &der)) <= 0) {
                     WOLFCLU_LOG(WOLFCLU_L0, "error converting der found to public key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
-                    if (wolfCLU_printDerPriKey(bioOut, der, derSz) !=
+                    if (wolfCLU_printDerPriKey(bioOut, der, derSz, keyType) !=
                             WOLFCLU_SUCCESS) {
                         WOLFCLU_LOG(WOLFCLU_L0, "error printing out pubkey");
                         ret = WOLFCLU_FATAL_ERROR;
