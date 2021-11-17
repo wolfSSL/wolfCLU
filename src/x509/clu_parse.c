@@ -81,8 +81,12 @@ static WOLFSSL_X509* wolfCLU_parseX509(char* inFile, int inForm)
 }
 
 
-/* return WOLFCLU_SUCCESS on success */
-int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
+
+/* helper function for shared code when printing out key
+ * returns WOLFCLU_SUCCESS on success
+ */
+static int wolfCLU_printDerKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
+        int keyType, int heapType)
 {
     int ret = WOLFCLU_SUCCESS;
     unsigned char *pem = NULL;
@@ -94,14 +98,14 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
 
     /* get pem size alloc buffer and convert to pem format */
     if (ret == WOLFCLU_SUCCESS) {
-        pemSz = wc_DerToPemEx(der, derSz, NULL, 0, NULL, PUBLICKEY_TYPE);
+        pemSz = wc_DerToPemEx(der, derSz, NULL, 0, NULL, keyType);
         if (pemSz > 0) {
-            pem = (unsigned char*)XMALLOC(pemSz, NULL, DYNAMIC_TYPE_PUBLIC_KEY);
+            pem = (unsigned char*)XMALLOC(pemSz, NULL, heapType);
             if (pem == NULL) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                if (wc_DerToPemEx(der, derSz, pem, pemSz, NULL, PUBLICKEY_TYPE)
+                if (wc_DerToPemEx(der, derSz, pem, pemSz, NULL, keyType)
                         <= 0) {
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -118,10 +122,29 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
         }
     }
 
-    if (pem != NULL)
-        XFREE(pem, NULL, DYNAMIC_TYPE_PUBLIC_KEY);
+    if (pem != NULL) {
+        wolfCLU_ForceZero(pem, pemSz);
+        XFREE(pem, NULL, heapType);
+    }
 
     return ret;
+}
+
+
+/* return WOLFCLU_SUCCESS on success */
+int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
+{
+    return wolfCLU_printDerKey(bio, der, derSz, PUBLICKEY_TYPE,
+            DYNAMIC_TYPE_PUBLIC_KEY);
+}
+
+
+/* return WOLFCLU_SUCCESS on success */
+int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
+        int keyType)
+{
+    return wolfCLU_printDerKey(bio, der, derSz, keyType,
+            DYNAMIC_TYPE_PRIVATE_KEY);
 }
 
 
