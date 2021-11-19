@@ -37,7 +37,8 @@ static struct option pkey_options[] = {
 
 static void wolfCLU_x509VerifyHelp(void)
 {
-    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl verify -CAfile <ca file name> [-crl_check] <cert to verify>");
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl verify -CAfile <ca file name> "
+            "[-crl_check] <cert to verify>");
 }
 
 
@@ -45,25 +46,24 @@ int wolfCLU_x509Verify(int argc, char** argv)
 {
     int ret    = WOLFCLU_SUCCESS;
     int inForm = PEM_FORM;
-    int crlCheck = 0;
+    int crlCheck  = 0;
     int longIndex = 1;
     int option;
-    WOLFSSL_EVP_PKEY *CAkey = NULL;
-    WOLFSSL_BIO *bioIn  = NULL;
-    WOLFSSL_BIO *bioCA  = NULL;
-    WOLFSSL_X509 *x509  = NULL;
-    WOLFSSL_X509 *ca    = NULL;
+    char* caCert     = NULL;
+    char* verifyCert = NULL;
+    WOLFSSL_X509_STORE*  store = NULL;
+    WOLFSSL_X509_LOOKUP* lookup = NULL;
 
     /* last parameter is the certificate to verify */
-    bioIn = wolfSSL_BIO_new_file(argv[argc-1], "rb");
-    if (bioIn == NULL) {
+    verifyCert = argv[argc-1];
+    if (verifyCert == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "unable to open certificate file %s",
                 argv[argc-1]);
         ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        WOLFCLU_LOG(WOLFCLU_L0, "verifying certificate file %s", argv[argc-1]);
+        WOLFCLU_LOG(WOLFCLU_L0, "verifying certificate file %s", verifyCert);
 
         opterr = 0; /* do not display unrecognized options */
         optind = 0; /* start at indent 0 */
@@ -71,17 +71,16 @@ int wolfCLU_x509Verify(int argc, char** argv)
                        pkey_options, &longIndex )) != -1) {
             switch (option) {
                 case WOLFCLU_CHECK_CRL:
+                #ifndef HAVE_CRL
+                    WOLFCLU_LOG(WOLFCLU_L0, "recompile wolfSSL with CRL");
+                    ret = WOLFCLU_FATAL_ERROR;
+                #endif
                     crlCheck = 1;
                     break;
 
                 case WOLFCLU_INFILE:
                     WOLFCLU_LOG(WOLFCLU_L0, "using CA file %s", optarg);
-                    bioCA = wolfSSL_BIO_new_file(optarg, "rb");
-                    if (bioCA == NULL) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "unable to open CA file %s",
-                                optarg);
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
+                    caCert = optarg;
                     break;
 
                 case WOLFCLU_INFORM:
@@ -104,56 +103,77 @@ int wolfCLU_x509Verify(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (inForm == PEM_FORM) {
-            ca = wolfSSL_PEM_read_bio_X509(bioCA, NULL, NULL, NULL);
+        store = wolfSSL_X509_STORE_new();
+        if (store == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (inForm != PEM_FORM) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Only handling PEM CA files");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        lookup = wolfSSL_X509_STORE_add_lookup(store,
+                wolfSSL_X509_LOOKUP_file());
+        if (lookup == NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Failed to setup lookup");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfSSL_X509_LOOKUP_load_file(lookup, caCert, X509_FILETYPE_PEM)
+                != WOLFSSL_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Failed to load CA file");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+
+#ifdef HAVE_CRL
+    if (ret == WOLFCLU_SUCCESS) {
+        if (crlCheck) {
+            if (wolfSSL_CertManagerEnableCRL(store->cm, WOLFSSL_CRL_CHECKALL)
+                    != WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_L0, "Failed to enable CRL use");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
         else {
-            ca = wolfSSL_d2i_X509_bio(bioCA, NULL);
-        }
-        if (ca == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to parse CA file");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-
-    if (ret == WOLFCLU_SUCCESS) {
-        if (inForm == PEM_FORM) {
-            x509 = wolfSSL_PEM_read_bio_X509(bioIn, NULL, NULL, NULL);
-        }
-        else {
-            x509 = wolfSSL_d2i_X509_bio(bioIn, NULL);
-        }
-        if (x509 == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to parse certificate file");
-            ret = WOLFCLU_FATAL_ERROR;
+            if (wolfSSL_CertManagerDisableCRL(store->cm) != WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_L0, "Failed to disable CRL use");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
+#endif
 
-    /* get the CAs public key */
     if (ret == WOLFCLU_SUCCESS) {
-        CAkey = wolfSSL_X509_get_pubkey(ca);
-        if (CAkey == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error reading key from CA");
-            ret = WOLFCLU_FATAL_ERROR;
+        int err;
 
+        err = wolfSSL_CertManagerVerify(store->cm, verifyCert,
+                WOLFSSL_FILETYPE_PEM);
+        if (err == ASN_NO_PEM_HEADER) {
+            /* most likely the file was DER if PEM header not found */
+            err = wolfSSL_CertManagerVerify(store->cm, verifyCert,
+                    WOLFSSL_FILETYPE_ASN1);
         }
-    }
-
-    if (ret == WOLFCLU_SUCCESS) {
-        if ((ret = wolfSSL_X509_verify(x509, CAkey)) != WOLFSSL_SUCCESS) {
+        if (err != WOLFSSL_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_L0, "Verification Failed");
+            WOLFCLU_LOG(WOLFCLU_L0, "Err (%d) : %s",
+                    err, wolfSSL_ERR_reason_error_string(err));
+            ret = WOLFCLU_FATAL_ERROR;
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "OK");
         }
     }
 
-    wolfSSL_X509_free(ca);
-    wolfSSL_X509_free(x509);
-    wolfSSL_EVP_PKEY_free(CAkey);
-    wolfSSL_BIO_free(bioIn);
-    wolfSSL_BIO_free(bioCA);
-
+    wolfSSL_X509_STORE_free(store);
     return ret;
 }
 
