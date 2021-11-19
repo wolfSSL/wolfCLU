@@ -25,7 +25,7 @@
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/x509/clu_cert.h>
 
-static struct option pkey_options[] = {
+static struct option verify_options[] = {
     {"CAfile",    required_argument, 0, WOLFCLU_INFILE    },
     {"crl_check", no_argument,       0, WOLFCLU_CHECK_CRL },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
@@ -68,7 +68,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
         opterr = 0; /* do not display unrecognized options */
         optind = 0; /* start at indent 0 */
         while ((option = getopt_long_only(argc - 1, argv, "",
-                       pkey_options, &longIndex )) != -1) {
+                       verify_options, &longIndex )) != -1) {
             switch (option) {
                 case WOLFCLU_CHECK_CRL:
                 #ifndef HAVE_CRL
