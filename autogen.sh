@@ -3,6 +3,18 @@
 # Create configure and makefile stuff...
 #
 
+# Git hooks should come before autoreconf.
+if [ -d .git ]; then
+    if [ ! -d .git/hooks ]; then
+	    mkdir .git/hooks || exit $?
+    fi
+
+    if [ ! -e .git/hooks/pre-commit ]; then
+	    ln -s ../../pre-commit.sh .git/hooks/pre-commit || exit $?
+    fi
+fi
+
+
 set -e
 
 # if get an error about libtool not setup
