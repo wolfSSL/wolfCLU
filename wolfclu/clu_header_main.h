@@ -50,6 +50,7 @@
 #include <wolfssl/wolfcrypt/rsa.h>
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/signature.h>
+#include <wolfssl/wolfcrypt/pkcs12.h>
 
 #ifdef HAVE_FIPS
     #include <wolfssl/wolfcrypt/fips_test.h>
@@ -430,6 +431,11 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect);
  */
 void wolfCLU_convertToLower(char* s, int sSz);
 
+
+/**
+ * @brief handles PKCS12 command
+ */
+int wolfCLU_PKCS12(int argc, char** argv);
 
 /**
  * @brief function to write 0 at each index of 'mem' passed in

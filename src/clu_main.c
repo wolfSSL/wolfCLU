@@ -50,6 +50,7 @@ static struct option mode_options[] = {
     {"ed25519",   no_argument,       0, WOLFCLU_ED25519   },
     {"dgst",      no_argument,       0, WOLFCLU_DGST      },
     {"verify",    no_argument,       0, WOLFCLU_VERIFY    },
+    {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12    },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
     {"v",         no_argument,       0, 'v'       },
@@ -195,6 +196,10 @@ int main(int argc, char** argv)
         case WOLFCLU_ECC:
         case WOLFCLU_ED25519:
             ret = wolfCLU_sign_verify_setup(argc, argv);
+            break;
+
+        case WOLFCLU_PKCS12:
+            ret = wolfCLU_PKCS12(argc, argv);
             break;
 
         case WOLFCLU_HELP:

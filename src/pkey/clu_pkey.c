@@ -83,7 +83,7 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
  * returns WOLFCLU_SUCCESS on success other return values are considered
  * 'not success'
  */
-static int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
+int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
 {
     int type;
     int ret = WOLFCLU_FAILURE;
@@ -355,6 +355,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
                 if (ret != WOLFCLU_SUCCESS) {
                     WOLFCLU_LOG(WOLFCLU_L0, "error getting pubkey from pem key");
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
             }
             else {
