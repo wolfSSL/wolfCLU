@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 test_return() {
     CHECK=$1
@@ -120,6 +120,6 @@ run2
 run3
 run4
 
-rm out.txt
-rm tmp.pem
-rm tmp.der
+rm -f out.txt
+rm -f tmp.pem
+rm -f tmp.der

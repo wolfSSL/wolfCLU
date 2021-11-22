@@ -29,7 +29,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
 {
     int     ret         = WOLFCLU_SUCCESS;
     char*   in          = NULL; /* input variable */
-    char*   out;                /* output variable */
+    char*   out         = NULL; /* output variable */
     char*   priv;               /* private key variable */
     char*   sig;
 

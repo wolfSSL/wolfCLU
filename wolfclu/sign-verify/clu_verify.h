@@ -31,6 +31,8 @@
     #include <wolfssl/wolfcrypt/asn_public.h>
 #endif
 
+int wolfCLU_x509Verify(int argc, char** argv);
+
 int wolfCLU_verify_signature(char* , char*, char*, char*, int, int);
 
 int wolfCLU_verify_signature_rsa(byte* , char*, int, char*, int);
