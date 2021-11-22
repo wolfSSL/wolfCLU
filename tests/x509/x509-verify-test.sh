@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ ! -d ./certs/ ]; then
     #return 77 to indicate to automake that the test was skipped
