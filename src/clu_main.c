@@ -70,7 +70,7 @@ static int getMode(char* arg)
 
     if (arg != NULL) {
         int argSz = (int)XSTRLEN(arg);
-        static const struct option* current;
+        const struct option* current;
 
         current = &mode_options[i];
         while (current->name != NULL) {
