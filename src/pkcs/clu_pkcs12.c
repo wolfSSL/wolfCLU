@@ -29,6 +29,7 @@
 static struct option pkcs12_options[] = {
     {"nodes",     no_argument, 0, WOLFCLU_NODES   },
     {"nocerts",   no_argument, 0, WOLFCLU_NOCERTS },
+    {"nokeys",    no_argument, 0, WOLFCLU_NOKEYS  },
     {"passin",    required_argument, 0, WOLFCLU_PASSWORD     },
     {"passout",   required_argument, 0, WOLFCLU_PASSWORD_OUT },
     {"in",        required_argument, 0, WOLFCLU_INFILE       },
@@ -45,6 +46,7 @@ static void wolfCLU_pKeyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for pkcs12 bundle");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nocerts no certificate output");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-nokeys no key output");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-passin source to get password from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-passout source to output password to");
 }
@@ -60,6 +62,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     int inForm = PEM_FORM;
     int useDES = 1;     /* default to yes */
     int printCerts = 1; /* default to yes*/
+    int printKeys  = 1; /* default to yes*/
     int option;
     int longIndex = 1;
     WOLFSSL_EVP_PKEY *pkey = NULL;
@@ -80,6 +83,10 @@ int wolfCLU_PKCS12(int argc, char** argv)
 
             case WOLFCLU_NOCERTS:
                 printCerts = 0;
+                break;
+
+            case WOLFCLU_NOKEYS:
+                printKeys = 0;
                 break;
 
             case WOLFCLU_PASSWORD:
@@ -191,7 +198,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     }
 
     /* print out the key */
-    if (ret == WOLFCLU_SUCCESS && pkey != NULL) {
+    if (ret == WOLFCLU_SUCCESS && pkey != NULL && printKeys) {
         ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
         if (ret != WOLFCLU_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_L0, "error getting pubkey from pem key");
