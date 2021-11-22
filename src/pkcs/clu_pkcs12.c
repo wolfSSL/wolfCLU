@@ -26,7 +26,7 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
 
-static struct option pkcs12_options[] = {
+static const struct option pkcs12_options[] = {
     {"nodes",     no_argument, 0, WOLFCLU_NODES   },
     {"nocerts",   no_argument, 0, WOLFCLU_NOCERTS },
     {"nokeys",    no_argument, 0, WOLFCLU_NOKEYS  },
@@ -92,11 +92,36 @@ int wolfCLU_PKCS12(int argc, char** argv)
             case WOLFCLU_PASSWORD:
                 XMEMSET(password, 0, MAX_PASSWORD_SIZE);
                 if (XSTRNCMP(optarg, "stdin", 5) == 0) {
-                    if (fgets(password, MAX_PASSWORD_SIZE, stdin) == NULL) {
+                    if (XFGETS(password, MAX_PASSWORD_SIZE, stdin) == NULL) {
                         WOLFCLU_LOG(WOLFCLU_L0, "error getting password");
                         ret = WOLFCLU_FATAL_ERROR;
                     }
                     if (ret == WOLFCLU_SUCCESS) {
+                        size_t idx = 0;
+                        passwordSz = (int)XSTRLEN(password);
+
+                        /* span the string up to the first return line and chop
+                         * it off */
+                        if (XSTRSTR(password, "\r\n")) {
+                            idx = strcspn(password, "\r\n");
+                            if ((int)idx > passwordSz) {
+                                ret = WOLFCLU_FATAL_ERROR;
+                            }
+                            else {
+                                password[idx] = '\0';
+                            }
+                        }
+
+                        if (XSTRSTR(password, "\n")) {
+                            idx = strcspn(password, "\n");
+                            if ((int)idx > passwordSz) {
+                                ret = WOLFCLU_FATAL_ERROR;
+                            }
+                            else {
+                                password[idx] = '\0';
+                            }
+                        }
+
                         passwordSz = (int)XSTRLEN(password);
                     }
                 }
@@ -217,7 +242,4 @@ int wolfCLU_PKCS12(int argc, char** argv)
     return WOLFCLU_FATAL_ERROR;
 #endif
 }
-
-
-
 
