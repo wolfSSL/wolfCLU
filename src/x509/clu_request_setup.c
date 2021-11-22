@@ -26,7 +26,7 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
-static struct option req_options[] = {
+static const struct option req_options[] = {
 
     {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
     {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},

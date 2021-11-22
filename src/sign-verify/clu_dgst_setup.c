@@ -26,7 +26,7 @@
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 
-static struct option dgst_options[] = {
+static const struct option dgst_options[] = {
 
     {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
     {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},

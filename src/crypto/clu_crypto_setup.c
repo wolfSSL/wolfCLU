@@ -23,7 +23,7 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
-static struct option crypt_options[] = {
+static const struct option crypt_options[] = {
     {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
     {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
     {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},

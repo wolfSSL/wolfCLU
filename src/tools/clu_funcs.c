@@ -32,7 +32,7 @@
 
 static int loop = 0;
 
-static struct option crypt_algo_options[] = {
+static const struct option crypt_algo_options[] = {
     /* AES */
     {"aes-128-ctr", no_argument, 0, WOLFCLU_AES128CTR},
     {"aes-192-ctr", no_argument, 0, WOLFCLU_AES192CTR},

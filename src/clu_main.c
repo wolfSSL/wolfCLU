@@ -33,7 +33,7 @@
  * do not want "-e" to work for encrypt, user must use "encrypt"
  */
 
-static struct option mode_options[] = {
+static const struct option mode_options[] = {
     {"encrypt",   required_argument, 0, WOLFCLU_ENCRYPT   },
     {"decrypt",   required_argument, 0, WOLFCLU_DECRYPT   },
     {"enc",       no_argument,       0, WOLFCLU_CRYPT     },

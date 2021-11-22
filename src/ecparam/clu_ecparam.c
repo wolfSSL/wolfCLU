@@ -25,7 +25,7 @@
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
 #include <wolfclu/clu_optargs.h>
 
-static struct option ecparam_options[] = {
+static const struct option ecparam_options[] = {
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
     {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },

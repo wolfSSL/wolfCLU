@@ -26,7 +26,7 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
 
-static struct option pkey_options[] = {
+static const struct option pkey_options[] = {
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
     {"inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"pubout",    no_argument,       0, WOLFCLU_PUBOUT    },

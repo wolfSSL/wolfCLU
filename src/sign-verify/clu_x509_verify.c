@@ -25,7 +25,7 @@
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/x509/clu_cert.h>
 
-static struct option verify_options[] = {
+static const struct option verify_options[] = {
     {"CAfile",    required_argument, 0, WOLFCLU_INFILE    },
     {"crl_check", no_argument,       0, WOLFCLU_CHECK_CRL },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
