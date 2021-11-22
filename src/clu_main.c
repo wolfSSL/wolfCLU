@@ -33,7 +33,7 @@
  * do not want "-e" to work for encrypt, user must use "encrypt"
  */
 
-static struct option mode_options[] = {
+static const struct option mode_options[] = {
     {"encrypt",   required_argument, 0, WOLFCLU_ENCRYPT   },
     {"decrypt",   required_argument, 0, WOLFCLU_DECRYPT   },
     {"enc",       no_argument,       0, WOLFCLU_CRYPT     },
@@ -70,15 +70,17 @@ static int getMode(char* arg)
 
     if (arg != NULL) {
         int argSz = (int)XSTRLEN(arg);
-        struct option current = mode_options[i];
-        while (current.name != NULL) {
-            if ((int)XSTRLEN(current.name) == argSz &&
-                    XSTRNCMP(arg, current.name, argSz) == 0) {
-                ret = current.val;
+        const struct option* current;
+
+        current = &mode_options[i];
+        while (current->name != NULL) {
+            if ((int)XSTRLEN(current->name) == argSz &&
+                    XSTRNCMP(arg, current->name, argSz) == 0) {
+                ret = current->val;
                 break;
             }
-            current = mode_options[i];
-            i = i+1;
+            i = i + 1;
+            current = &mode_options[i];
         }
     }
     return ret;
