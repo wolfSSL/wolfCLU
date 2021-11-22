@@ -70,15 +70,17 @@ static int getMode(char* arg)
 
     if (arg != NULL) {
         int argSz = (int)XSTRLEN(arg);
-        struct option current = mode_options[i];
-        while (current.name != NULL) {
-            if ((int)XSTRLEN(current.name) == argSz &&
-                    XSTRNCMP(arg, current.name, argSz) == 0) {
-                ret = current.val;
+        static const struct option* current;
+
+        current = &mode_options[i];
+        while (current->name != NULL) {
+            if ((int)XSTRLEN(current->name) == argSz &&
+                    XSTRNCMP(arg, current->name, argSz) == 0) {
+                ret = current->val;
                 break;
             }
-            current = mode_options[i];
-            i = i+1;
+            i = i + 1;
+            current = &mode_options[i];
         }
     }
     return ret;
