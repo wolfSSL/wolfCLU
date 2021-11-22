@@ -59,7 +59,6 @@ int wolfCLU_PKCS12(int argc, char** argv)
     char password[MAX_PASSWORD_SIZE];
     int passwordSz = MAX_PASSWORD_SIZE;
     int ret    = WOLFCLU_SUCCESS;
-    int inForm = PEM_FORM;
     int useDES = 1;     /* default to yes */
     int printCerts = 1; /* default to yes*/
     int printKeys  = 1; /* default to yes*/
@@ -142,17 +141,12 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 break;
 
             case WOLFCLU_INFILE:
-                printf("bioin = %s\n", optarg);
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
                     WOLFCLU_LOG(WOLFCLU_L0, "unable to open pkcs12 file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
-                break;
-
-            case WOLFCLU_INFORM:
-                inForm = wolfCLU_checkInform(optarg);
                 break;
 
             case WOLFCLU_HELP:
@@ -236,6 +230,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     wolfSSL_EVP_PKEY_free(pkey);
     wc_PKCS12_free(pkcs12);
 
+    (void)useDES;
     return ret;
 #else
     WOLFCLU_LOG(WOLFCLU_L0, "Recompile wolfSSL with PKCS12 support");
