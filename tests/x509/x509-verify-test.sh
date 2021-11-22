@@ -1,4 +1,4 @@
-
+#!/bin/sh
 
 if [ ! -d ./certs/ ]; then
     #return 77 to indicate to automake that the test was skipped
@@ -23,9 +23,11 @@ if [ $? != 0 ]; then
     exit 99
 fi
 
-RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem -crl_check ./certs/server-cert.pem | grep "CRL"`
+RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem -crl_check ./certs/server-cert.pem | grep "recompile wolfSSL with CRL"`
 HAVE_CRL=$?
-if [ $HAVE_CRL == 0 ]; then
+
+#if the return value of the grep is success (0) then CRL not compiled in
+if [ $HAVE_CRL != 0 ]; then
     RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem -crl_check ./certs/server-cert.pem`
     if [ $? == 0 ]; then
         echo "Failed on test \"./wolfssl verify -CAfile ./certs/ca-cert.pem -crl_check ./certs/server-cert.pem\""

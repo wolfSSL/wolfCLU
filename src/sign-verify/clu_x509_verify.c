@@ -174,6 +174,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     }
 
     wolfSSL_X509_STORE_free(store);
+    (void)crlCheck;
     return ret;
 }
 

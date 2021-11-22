@@ -138,9 +138,14 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
         switch (option) {
         case WOLFCLU_PASSWORD:
-            XSTRNCPY((char*)pwdKey, optarg, keySize);
-            pwdKeyChk = 1;
-            keyType   = 1;
+            if (optarg == NULL) {
+                return WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                XSTRNCPY((char*)pwdKey, optarg, keySize);
+                pwdKeyChk = 1;
+                keyType   = 1;
+            }
             break;
 
         case WOLFCLU_PBKDF2:
@@ -153,26 +158,31 @@ int wolfCLU_setup(int argc, char** argv, char action)
         case WOLFCLU_IV:  /* IV if used must be in hex */
             {
                 char* ivString;
-                ivString = (char*)XMALLOC(XSTRLEN(optarg), HEAP_HINT,
-                        DYNAMIC_TYPE_TMP_BUFFER);
-                if (ivString == NULL) {
-                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                    return MEMORY_E;
+                if (optarg == NULL) {
+                    return WOLFCLU_FATAL_ERROR;
                 }
+                else {
+                    ivString = (char*)XMALLOC(XSTRLEN(optarg), HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                    if (ivString == NULL) {
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        return MEMORY_E;
+                    }
 
-                XSTRNCPY(ivString, optarg, XSTRLEN(optarg));
-                ret = wolfCLU_hexToBin(ivString, &iv, &ivSize,
+                    XSTRNCPY(ivString, optarg, XSTRLEN(optarg));
+                    ret = wolfCLU_hexToBin(ivString, &iv, &ivSize,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL);
-                XFREE(ivString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                if (ret != 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0,
+                    XFREE(ivString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    if (ret != 0) {
+                        WOLFCLU_LOG(WOLFCLU_L0,
                             "failed during conversion of IV, ret = %d", ret);
-                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                    return WOLFCLU_FATAL_ERROR;
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        return WOLFCLU_FATAL_ERROR;
+                    }
+                    ivCheck = 1;
                 }
-                ivCheck = 1;
             }
             break;
 
