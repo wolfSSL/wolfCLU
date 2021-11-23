@@ -18,6 +18,8 @@ cp  $CERTS_DIR/server-ecc.pem .
 cp  $CERTS_DIR/ca-cert.pem .
 cp  $CERTS_DIR/ca-ecc-cert.pem .
 
+echo "Copy over pkcs12 test bundles"
+cp  $CERTS_DIR/test-servercert.p12 .
 
 echo "Done"
 exit 0
