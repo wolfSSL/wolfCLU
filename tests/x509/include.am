@@ -4,4 +4,5 @@
 
 dist_noinst_SCRIPTS+=tests/x509/x509-process-test.sh
 dist_noinst_SCRIPTS+=tests/x509/x509-verify-test.sh
+dist_noinst_SCRIPTS+=tests/x509/CRL-verify-test.sh
 

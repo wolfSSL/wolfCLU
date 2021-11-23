@@ -12,6 +12,11 @@ echo "Creating CRL test certificates and chains"
 cat $CERTS_DIR/crl/crl.pem $CERTS_DIR/ca-cert.pem > crl-chain.pem
 cp  $CERTS_DIR/server-revoked-cert.pem .
 
+echo "Copy over CRLs"
+cp  $CERTS_DIR/crl/crl.pem .
+cp  $CERTS_DIR/crl/crl.der .
+
+
 echo "Copy over test certificates and chains"
 cp  $CERTS_DIR/server-cert.pem .
 cp  $CERTS_DIR/server-ecc.pem .
