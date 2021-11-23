@@ -85,8 +85,8 @@ static WOLFSSL_X509* wolfCLU_parseX509(char* inFile, int inForm)
 /* helper function for shared code when printing out key
  * returns WOLFCLU_SUCCESS on success
  */
-static int wolfCLU_printDerKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
-        int keyType, int heapType)
+int wolfCLU_printDer(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
+        int pemType, int heapType)
 {
     int ret = WOLFCLU_SUCCESS;
     unsigned char *pem = NULL;
@@ -98,14 +98,14 @@ static int wolfCLU_printDerKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
 
     /* get pem size alloc buffer and convert to pem format */
     if (ret == WOLFCLU_SUCCESS) {
-        pemSz = wc_DerToPemEx(der, derSz, NULL, 0, NULL, keyType);
+        pemSz = wc_DerToPemEx(der, derSz, NULL, 0, NULL, pemType);
         if (pemSz > 0) {
             pem = (unsigned char*)XMALLOC(pemSz, NULL, heapType);
             if (pem == NULL) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                if (wc_DerToPemEx(der, derSz, pem, pemSz, NULL, keyType)
+                if (wc_DerToPemEx(der, derSz, pem, pemSz, NULL, pemType)
                         <= 0) {
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -134,7 +134,7 @@ static int wolfCLU_printDerKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
 {
-    return wolfCLU_printDerKey(bio, der, derSz, PUBLICKEY_TYPE,
+    return wolfCLU_printDer(bio, der, derSz, PUBLICKEY_TYPE,
             DYNAMIC_TYPE_PUBLIC_KEY);
 }
 
@@ -143,7 +143,7 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz)
 int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
         int keyType)
 {
-    return wolfCLU_printDerKey(bio, der, derSz, keyType,
+    return wolfCLU_printDer(bio, der, derSz, keyType,
             DYNAMIC_TYPE_PRIVATE_KEY);
 }
 

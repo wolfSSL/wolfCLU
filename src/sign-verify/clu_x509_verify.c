@@ -26,7 +26,7 @@
 #include <wolfclu/x509/clu_cert.h>
 
 static const struct option verify_options[] = {
-    {"CAfile",    required_argument, 0, WOLFCLU_INFILE    },
+    {"CAfile",    required_argument, 0, WOLFCLU_CAFILE    },
     {"crl_check", no_argument,       0, WOLFCLU_CHECK_CRL },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
@@ -78,7 +78,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
                     crlCheck = 1;
                     break;
 
-                case WOLFCLU_INFILE:
+                case WOLFCLU_CAFILE:
                     WOLFCLU_LOG(WOLFCLU_L0, "using CA file %s", optarg);
                     caCert = optarg;
                     break;

@@ -32,6 +32,7 @@
 #endif
 
 int wolfCLU_x509Verify(int argc, char** argv);
+int wolfCLU_CRLVerify(int argc, char** argv);
 
 int wolfCLU_verify_signature(char* , char*, char*, char*, int, int);
 

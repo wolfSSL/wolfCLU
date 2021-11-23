@@ -395,5 +395,3 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     return ret;
 }
 
-
-
