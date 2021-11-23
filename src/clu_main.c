@@ -51,6 +51,7 @@ static const struct option mode_options[] = {
     {"dgst",      no_argument,       0, WOLFCLU_DGST      },
     {"verify",    no_argument,       0, WOLFCLU_VERIFY    },
     {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12    },
+    {"crl",       no_argument,       0, WOLFCLU_CRL       },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
     {"v",         no_argument,       0, 'v'       },
@@ -192,6 +193,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_VERIFY:
             ret = wolfCLU_x509Verify(argc, argv);
+            break;
+
+        case WOLFCLU_CRL:
+            ret = wolfCLU_CRLVerify(argc, argv);
             break;
 
         case WOLFCLU_RSA:

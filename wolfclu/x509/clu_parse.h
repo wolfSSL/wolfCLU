@@ -57,6 +57,21 @@ int wolfCLU_printDerPubKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz);
 int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
         int keyType);
 
+
+/**
+ * @brief Generic function to print out DER from PEM
+ *
+ * @param bio the bio to print to
+ * @param der der buffer to print out
+ * @param derSz size of 'der' buffer
+ * @param pemType is the type of PEM key to output, i.e RSA_TYPE, ECC_TYPE
+ * @param heapType is the type of DYNAMIC heap to use
+ *
+ * @return returns WOLFCLU_SUCCESS on success
+ */
+int wolfCLU_printDer(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
+        int pemType, int heapType);
+
 /**
  * @brief prints out the public key from a certificate
  *
