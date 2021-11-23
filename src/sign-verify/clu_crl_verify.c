@@ -27,7 +27,7 @@
 #include <wolfclu/x509/clu_cert.h>
 
 #ifdef HAVE_CRL
-static const struct option verify_options[] = {
+static const struct option crl_options[] = {
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
     {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"inform",    required_argument, 0, WOLFCLU_INFORM    },
@@ -45,9 +45,11 @@ static void wolfCLU_CRLVerifyHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl crl\n"
             "-CAfile <ca file name>\n"
-            "-inform pem or der in format\n"
+            "-inform pem or der in format");
+    WOLFCLU_LOG(WOLFCLU_L0,
             "-in the file to read from\n"
-            "-outform pem or der out format\n"
+            "-outform pem or der out format");
+    WOLFCLU_LOG(WOLFCLU_L0,
             "-out output file to write to\n"
             "-noout do not print output if set");
 }
@@ -71,8 +73,8 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc - 1, argv, "",
-                   verify_options, &longIndex )) != -1) {
+    while ((option = getopt_long_only(argc, argv, "", crl_options,
+                    &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_OUTFILE:
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
