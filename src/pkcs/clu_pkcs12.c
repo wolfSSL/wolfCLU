@@ -164,10 +164,35 @@ int wolfCLU_PKCS12(int argc, char** argv)
     }
 
 
+    /* read the input bio to a temporary buffer and convert to PKCS12
+     * wolfSSL_d2i_PKCS12_bio does not yet handle file types */
     if (ret == WOLFCLU_SUCCESS) {
-        pkcs12 = wolfSSL_d2i_PKCS12_bio(bioIn, NULL);
-        if (pkcs12 == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error reading pkcs12 file");
+        byte* buf;
+        int   bufSz;
+
+        bufSz = wolfSSL_BIO_get_len(bioIn);
+        if (bufSz > 0) {
+            buf = (byte*)XMALLOC(bufSz, HEAP_HINT, DYNAMIC_TYPE_PKCS);
+            if (buf == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                /* reading the full file into a buffer */
+                if (wolfSSL_BIO_read(bioIn, buf, bufSz) != bufSz) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    pkcs12 = wc_PKCS12_new();
+                    if (wc_d2i_PKCS12(buf, bufSz, pkcs12) < 0) {
+                        WOLFCLU_LOG(WOLFCLU_L0, "error reading pkcs12 file");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                }
+                XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_PKCS);
+            }
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "error getting length of pkcs12 file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
