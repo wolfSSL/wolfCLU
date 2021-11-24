@@ -42,7 +42,8 @@ static const struct option crypt_options[] = {
     {"d",         no_argument,       0, WOLFCLU_DECRYPT   },
     {"p",         no_argument,       0, WOLFCLU_DEBUG     },
     {"k",         required_argument, 0, WOLFCLU_PASSWORD  },
-
+    {"base64",    no_argument,       0, WOLFCLU_BASE64    },
+    {"nosalt",    no_argument,       0, WOLFCLU_NOSALT    },
     {0, 0, 0, 0} /* terminal element */
 };
 
@@ -62,6 +63,8 @@ int wolfCLU_setup(int argc, char** argv, char action)
     byte*    iv = NULL;         /* iv for initial encryption */
 
 
+    int      noSalt     =   0;
+    int      isBase64   =   0;
     int      keySize    =   0;  /* keysize from name */
     int      ret        =   0;  /* return variable */
     int      block      =   0;  /* block size based on algorithm */
@@ -150,6 +153,14 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
         case WOLFCLU_PBKDF2:
             pbkVersion = 2;
+            break;
+
+        case WOLFCLU_BASE64:
+            isBase64 = 1;
+            break;
+
+        case WOLFCLU_NOSALT:
+            noSalt = 1;
             break;
 
         case WOLFCLU_KEY: /* Key if used must be in hex */
@@ -366,7 +377,8 @@ int wolfCLU_setup(int argc, char** argv, char action)
         /* if EVP type found then call generic EVP function */
         if (cphr != NULL) {
             ret = wolfCLU_evp_crypto(cphr, mode, pwdKey, key, (keySize+7)/8, in,
-                    out, NULL, iv, 0, 1, pbkVersion, hashType, verbose);
+                  out, NULL, iv, 0, 1, pbkVersion, hashType, verbose, isBase64,
+                  noSalt);
         }
         else {
             if (outCheck == 0) {
@@ -387,7 +399,8 @@ int wolfCLU_setup(int argc, char** argv, char action)
         /* if EVP type found then call generic EVP function */
         if (cphr != NULL) {
             ret = wolfCLU_evp_crypto(cphr, mode, pwdKey, key, (keySize+7)/8, in,
-                    out, NULL, iv, 0, 0, pbkVersion, hashType, verbose);
+                    out, NULL, iv, 0, 0, pbkVersion, hashType, verbose,
+                    isBase64, noSalt);
         }
         else {
             if (outCheck == 0) {

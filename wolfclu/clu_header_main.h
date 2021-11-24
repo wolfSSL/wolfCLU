@@ -336,7 +336,8 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         byte* key, int keySz, char* fileIn, char* fileOut, char* hexIn,
         byte* iv, int hexOut, int enc, int pbkVersion,
-        const WOLFSSL_EVP_MD* hashType, int printOut);
+        const WOLFSSL_EVP_MD* hashType, int printOut, int isBase64,
+        int noSalt);
 
 /* benchmarking function
  *
