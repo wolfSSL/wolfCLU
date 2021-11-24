@@ -230,6 +230,23 @@ void wolfCLU_encryptHelp()
     WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
             "camellia-cbc-256\n");
 #endif
+
+    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pwd password input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-key hex key input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-iv  hex iv input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey input file for key");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pbkdf2 use kdf version 2");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-md specify hash algo to use i.e md5, sha256");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-d decrypt the input file");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-p display debug information (key / iv ...)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-k another option for password input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-base64 handle decoding a base64 input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-nosalt do not use a salt input to kdf");
+    WOLFCLU_LOG(WOLFCLU_L0, "");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\nENCRYPT USAGE: wolfssl -encrypt <-algorithm> -in <filename> "
            "-pwd <password> -out <output file name>\n");
