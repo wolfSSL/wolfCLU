@@ -123,6 +123,9 @@ int wolfCLU_Client(int argc, char** argv)
         args.argc = clientArgc;
 
         client_test(&args);
+
+        WOLFCLU_LOG(WOLFCLU_L0, "\nWARNING!!! peer was not verified, -CAfile "
+                "is upcoming");
     }
 
     if (host != NULL) {
