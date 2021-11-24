@@ -67,7 +67,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "ecc            Ecc signing and signature verification");
     WOLFCLU_LOG(WOLFCLU_L0, "ecparam        Generate an ECC key and parameters");
     WOLFCLU_LOG(WOLFCLU_L0, "ed25519        Ed25519 signing and signature verification");
-    WOLFCLU_LOG(WOLFCLU_L0, "encrypt        Encrypt a file or some user input");
+    WOLFCLU_LOG(WOLFCLU_L0, "enc / encrypt  Encrypt a file or some user input");
     WOLFCLU_LOG(WOLFCLU_L0, "hash           Hash a file or input");
     WOLFCLU_LOG(WOLFCLU_L0, "md5            Creates and MD5 hash");
     WOLFCLU_LOG(WOLFCLU_L0, "pkey           Used for key operations");
