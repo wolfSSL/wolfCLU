@@ -33,6 +33,7 @@ wolfssl_SOURCES = src/clu_main.c \
 				    src/certgen/clu_certgen_ecc.c \
 				    src/certgen/clu_certgen_ed25519.c \
 				    src/certgen/clu_certgen_rsa.c \
+				    src/pkey/clu_rsa.c \
 				    src/pkey/clu_pkey.c \
 				    src/pkcs/clu_pkcs12.c \
 				    src/client/client.c \
