@@ -38,5 +38,8 @@ int wolfCLU_pKeySetup(int argc, char** argv);
 
 /* print out the private key from pkey into bio */
 int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey);
+
+
+int wolfCLU_RSA(int argc, char** argv);
 #endif /* CLU_PKEY_H */
 

@@ -67,12 +67,13 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "ecc            Ecc signing and signature verification");
     WOLFCLU_LOG(WOLFCLU_L0, "ecparam        Generate an ECC key and parameters");
     WOLFCLU_LOG(WOLFCLU_L0, "ed25519        Ed25519 signing and signature verification");
-    WOLFCLU_LOG(WOLFCLU_L0, "encrypt        Encrypt a file or some user input");
+    WOLFCLU_LOG(WOLFCLU_L0, "enc / encrypt  Encrypt a file or some user input");
     WOLFCLU_LOG(WOLFCLU_L0, "hash           Hash a file or input");
     WOLFCLU_LOG(WOLFCLU_L0, "md5            Creates and MD5 hash");
     WOLFCLU_LOG(WOLFCLU_L0, "pkey           Used for key operations");
     WOLFCLU_LOG(WOLFCLU_L0, "req            Request for certificate generation");
-    WOLFCLU_LOG(WOLFCLU_L0, "rsa            Rsa signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "-rsa           Legacy RSA signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "rsa            RSA key operations");
     WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
     WOLFCLU_LOG(WOLFCLU_L0, "verify         X509 certificate verify");
     WOLFCLU_LOG(WOLFCLU_L0, "s_client       Basic TLS client for testing"
@@ -1222,3 +1223,62 @@ void wolfCLU_ForceZero(void* mem, unsigned int len)
     volatile byte* z = (volatile byte*)mem;
     while (len--) *z++ = 0;
 }
+
+
+int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
+{
+    int ret = WOLFCLU_SUCCESS;
+
+    if (password == NULL || passwordSz == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    XMEMSET(password, 0, *passwordSz);
+    if (XSTRNCMP(arg, "stdin", 5) == 0) {
+        if (XFGETS(password, MAX_PASSWORD_SIZE, stdin) == NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "error getting password");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ret == WOLFCLU_SUCCESS) {
+            size_t idx = 0;
+            *passwordSz = (int)XSTRLEN(password);
+
+            /* span the string up to the first return line and chop
+             * it off */
+            if (XSTRSTR(password, "\r\n")) {
+                idx = strcspn(password, "\r\n");
+                if ((int)idx > *passwordSz) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    password[idx] = '\0';
+                }
+            }
+
+            if (XSTRSTR(password, "\n")) {
+                idx = strcspn(password, "\n");
+                if ((int)idx > *passwordSz) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    password[idx] = '\0';
+                }
+            }
+
+            *passwordSz = (int)XSTRLEN(password);
+        }
+    }
+    else if (XSTRNCMP(arg, "pass:", 5) == 0) {
+        XSTRNCPY(password, arg + 5, MAX_PASSWORD_SIZE);
+        if (ret == WOLFCLU_SUCCESS) {
+            *passwordSz = (int)XSTRLEN(password);
+        }
+    }
+    else {
+        WOLFCLU_LOG(WOLFCLU_L0, "not supported password in type %s",
+                arg);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+    return ret;
+}
+

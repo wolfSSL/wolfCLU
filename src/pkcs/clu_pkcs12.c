@@ -51,7 +51,6 @@ static void wolfCLU_pKeyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-passout source to output password to");
 }
 
-#define MAX_PASSWORD_SIZE 256
 
 int wolfCLU_PKCS12(int argc, char** argv)
 {
@@ -89,52 +88,8 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 break;
 
             case WOLFCLU_PASSWORD:
-                XMEMSET(password, 0, MAX_PASSWORD_SIZE);
-                if (XSTRNCMP(optarg, "stdin", 5) == 0) {
-                    if (XFGETS(password, MAX_PASSWORD_SIZE, stdin) == NULL) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "error getting password");
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-                    if (ret == WOLFCLU_SUCCESS) {
-                        size_t idx = 0;
-                        passwordSz = (int)XSTRLEN(password);
-
-                        /* span the string up to the first return line and chop
-                         * it off */
-                        if (XSTRSTR(password, "\r\n")) {
-                            idx = strcspn(password, "\r\n");
-                            if ((int)idx > passwordSz) {
-                                ret = WOLFCLU_FATAL_ERROR;
-                            }
-                            else {
-                                password[idx] = '\0';
-                            }
-                        }
-
-                        if (XSTRSTR(password, "\n")) {
-                            idx = strcspn(password, "\n");
-                            if ((int)idx > passwordSz) {
-                                ret = WOLFCLU_FATAL_ERROR;
-                            }
-                            else {
-                                password[idx] = '\0';
-                            }
-                        }
-
-                        passwordSz = (int)XSTRLEN(password);
-                    }
-                }
-                else if (XSTRNCMP(optarg, "pass:", 5) == 0) {
-                    XSTRNCPY(password, optarg + 5, MAX_PASSWORD_SIZE);
-                    if (ret == WOLFCLU_SUCCESS) {
-                        passwordSz = (int)XSTRLEN(password);
-                    }
-                }
-                else {
-                    WOLFCLU_LOG(WOLFCLU_L0, "not supported password in type %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                passwordSz = MAX_PASSWORD_SIZE;
+                ret = wolfCLU_GetPassword(password, &passwordSz, optarg);
                 break;
 
             case WOLFCLU_PASSWORD_OUT:

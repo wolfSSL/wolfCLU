@@ -129,6 +129,9 @@ int main(int argc, char** argv)
     else {
         /* retain old version of modes where '-' is used. i.e -x509, -req */
         flag = getopt_long_only(argc, argv,"", mode_options, &longIndex);
+
+        /* if -rsa was used then it is the older sign/verify version of rsa */
+        if (flag == WOLFCLU_RSA) flag = WOLFCLU_RSALEGACY;
     }
 
     switch (flag) {
@@ -201,6 +204,10 @@ int main(int argc, char** argv)
             break;
 
         case WOLFCLU_RSA:
+            ret = wolfCLU_RSA(argc, argv);
+            break;
+
+        case WOLFCLU_RSALEGACY:
         case WOLFCLU_ECC:
         case WOLFCLU_ED25519:
             ret = wolfCLU_sign_verify_setup(argc, argv);
