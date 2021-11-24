@@ -26,5 +26,9 @@ cp  $CERTS_DIR/ca-ecc-cert.pem .
 echo "Copy over pkcs12 test bundles"
 cp  $CERTS_DIR/test-servercert.p12 .
 
+echo "Additional update of client example source code"
+cp $CERTS_DIR/../examples/client/client.c ../src/client/client.c
+sed -i '' "s/examples\/client\//wolfclu\//" ../src/client/client.c
+
 echo "Done"
 exit 0

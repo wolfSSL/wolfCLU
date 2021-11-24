@@ -51,6 +51,7 @@
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/signature.h>
 #include <wolfssl/wolfcrypt/pkcs12.h>
+#include <wolfssl/test.h>
 
 #ifdef HAVE_FIPS
     #include <wolfssl/wolfcrypt/fips_test.h>
@@ -441,4 +442,9 @@ int wolfCLU_PKCS12(int argc, char** argv);
  * @brief function to write 0 at each index of 'mem' passed in
  */
 void wolfCLU_ForceZero(void* mem, unsigned int len);
+
+/**
+ * @brief example client
+ */
+int wolfCLU_Client(int argc, char** argv);
 #endif /* _WOLFSSL_CLU_HEADER_ */
