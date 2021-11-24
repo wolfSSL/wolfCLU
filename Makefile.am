@@ -44,6 +44,7 @@ include src/include.am
 include wolfclu/include.am
 include tests/pkcs/include.am
 include tests/x509/include.am
+include tests/encrypt/include.am
 include tests/genkey_sign_ver/include.am
 #####include data/include.am
 

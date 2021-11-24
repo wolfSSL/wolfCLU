@@ -193,8 +193,14 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "WARNING: Using old version of PBKDF!!!!");
             iter = 1; /* default value for interop */
-            ret = wolfSSL_EVP_BytesToKey(cphr, hashType, salt,
+            if (noSalt) {
+                ret = wolfSSL_EVP_BytesToKey(cphr, hashType, NULL,
                     pwdKey, (int)strlen((const char*)pwdKey), iter, key, iv);
+            }
+            else {
+                ret = wolfSSL_EVP_BytesToKey(cphr, hashType, salt,
+                    pwdKey, (int)strlen((const char*)pwdKey), iter, key, iv);
+            }
             if (ret == 0) {
                 WOLFCLU_LOG(WOLFCLU_L0, "failed to create key, ret = %d", ret);
                 ret = WOLFCLU_FATAL_ERROR;
