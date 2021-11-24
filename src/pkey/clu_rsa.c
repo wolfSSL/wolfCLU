@@ -45,16 +45,14 @@ static const struct option rsa_options[] = {
 static void wolfCLU_RSAHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl rsa");
-    //WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
-    //WOLFCLU_LOG(WOLFCLU_L0, "\t-pubout output the public key");
-//    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-//    {"inform",    required_argument, 0, WOLFCLU_INFORM    },
-//    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-//    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
-//    {"passin",    required_argument, 0, WOLFCLU_PASSWORD  },
-//    {"noout",     no_argument,       0, WOLFCLU_NOOUT     },
-//    {"modulus",   no_argument,       0, WOLFCLU_MODULUS   },
-//    {"RSAPublicKey_in", no_argument, 0, WOLFCLU_RSAPUBIN  },
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inform PEM or DER input format");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write result to (defaults to stdout)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-outform PEM or DER output format");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-passin password for PEM encrypted files");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-noout do not print the key out when set");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-modulus print out the RSA modulus (n value)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-RSAPublicKey_in expecting a public key input");
 }
 
 
@@ -63,7 +61,7 @@ int wolfCLU_RSA(int argc, char** argv)
     char *pass = NULL;
     char password[MAX_PASSWORD_SIZE];
     int passwordSz = MAX_PASSWORD_SIZE;
-    int ret    = WOLFCLU_SUCCESS;
+    int ret     = WOLFCLU_SUCCESS;
     int inForm  = PEM_FORM;
     int outForm = PEM_FORM;
     int printModulus = 0;
@@ -157,11 +155,20 @@ int wolfCLU_RSA(int argc, char** argv)
                 derSz = wolfSSL_BIO_get_len(bioIn);
                 der = (unsigned char*)XMALLOC(derSz, HEAP_HINT,
                         DYNAMIC_TYPE_PUBLIC_KEY);
-                wolfSSL_BIO_read(bioIn, der, (int)derSz);
+                if (der == NULL) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    if (wolfSSL_BIO_read(bioIn, der, (int)derSz) != derSz) {
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
 
-                pp = (const unsigned char**)&der;
-                rsa = wolfSSL_d2i_RSAPublicKey(NULL, pp, derSz);
-                XFREE(der, HEAP_HINT, DYNAMIC_TYPE_PUBLICKEY);
+                    if (ret == WOLFCLU_SUCCESS) {
+                        pp = (const unsigned char**)&der;
+                        rsa = wolfSSL_d2i_RSAPublicKey(NULL, pp, derSz);
+                    }
+                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_PUBLICKEY);
+                }
             }
             else {
                 rsa = wolfSSL_d2i_RSAPrivateKey_bio(bioIn, NULL);
@@ -197,17 +204,43 @@ int wolfCLU_RSA(int argc, char** argv)
 
         if (pubOnly) {
             heapType = DYNAMIC_TYPE_PUBLIC_KEY;
+            pemType  = PUBLICKEY_TYPE;
+
             derSz = wolfSSL_i2d_RSAPublicKey(rsa, NULL);
-            der = (unsigned char*)XMALLOC(derSz, HEAP_HINT, heapType);
-            derSz = wolfSSL_i2d_RSAPublicKey(rsa, &der);
-            pemType = PUBLICKEY_TYPE;
+            if (derSz < 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                der = (unsigned char*)XMALLOC(derSz, HEAP_HINT, heapType);
+                if (der == NULL) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                derSz = wolfSSL_i2d_RSAPublicKey(rsa, &der);
+            }
         }
         else {
             heapType = DYNAMIC_TYPE_PRIVATE_KEY;
+            pemType  = RSA_TYPE;
+
             derSz = wolfSSL_i2d_RSAPrivateKey(rsa, NULL);
-            der = (unsigned char*)XMALLOC(derSz, HEAP_HINT, heapType);
-            derSz = wolfSSL_i2d_RSAPrivateKey(rsa, &der);
-            pemType = RSA_TYPE;
+            if (derSz < 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                der = (unsigned char*)XMALLOC(derSz, HEAP_HINT, heapType);
+                if (der == NULL) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                derSz = wolfSSL_i2d_RSAPrivateKey(rsa, &der);
+            }
         }
 
         if (outForm == PEM_FORM) {
@@ -226,17 +259,27 @@ int wolfCLU_RSA(int argc, char** argv)
     /* print out the modulus */
     if (ret == WOLFCLU_SUCCESS && printModulus == 1) {
         const WOLFSSL_BIGNUM *n = NULL;
-        char * hex;
+        char *hex;
 
         wolfSSL_RSA_get0_key(rsa, &n, NULL, NULL);
         hex = wolfSSL_BN_bn2hex(n);
-        wolfSSL_BIO_write(bioOut, "Modulus=", (int)XSTRLEN("Modulus="));
-        wolfSSL_BIO_write(bioOut, hex, (int)XSTRLEN(hex));
-        XFREE(hex, NULL, DYNAMIC_TYPE_OPENSSL);
+        if (hex != NULL) {
+            if (wolfSSL_BIO_write(bioOut, "Modulus=", (int)XSTRLEN("Modulus="))
+                    <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    wolfSSL_BIO_write(bioOut, hex, (int)XSTRLEN(hex)) <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            XFREE(hex, NULL, DYNAMIC_TYPE_OPENSSL);
+        }
     }
 
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
+    wolfSSL_RSA_free(rsa);
 
     return ret;
 }
