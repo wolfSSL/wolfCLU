@@ -73,7 +73,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "pkey           Used for key operations");
     WOLFCLU_LOG(WOLFCLU_L0, "req            Request for certificate generation");
     WOLFCLU_LOG(WOLFCLU_L0, "-rsa           Legacy RSA signing and signature verification");
-    WOLFCLU_LOG(WOLFCLU_L0, "rsa            RSA key opeartions");
+    WOLFCLU_LOG(WOLFCLU_L0, "rsa            RSA key operations");
     WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
     WOLFCLU_LOG(WOLFCLU_L0, "verify         X509 certificate verify");
     WOLFCLU_LOG(WOLFCLU_L0, "s_client       Basic TLS client for testing"
