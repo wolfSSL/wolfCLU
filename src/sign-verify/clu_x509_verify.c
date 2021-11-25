@@ -55,11 +55,17 @@ int wolfCLU_x509Verify(int argc, char** argv)
     WOLFSSL_X509_LOOKUP* lookup = NULL;
 
     /* last parameter is the certificate to verify */
-    verifyCert = argv[argc-1];
-    if (verifyCert == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "unable to open certificate file %s",
-                argv[argc-1]);
-        ret = WOLFCLU_FATAL_ERROR;
+    if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
+        wolfCLU_x509VerifyHelp();
+        return WOLFCLU_SUCCESS;
+    }
+    else {
+        verifyCert = argv[argc-1];
+        if (verifyCert == NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to open certificate file %s",
+                    argv[argc-1]);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS) {

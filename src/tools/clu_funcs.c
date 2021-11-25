@@ -543,6 +543,15 @@ void wolfCLU_verifyHelp(int keyType) {
 }
 
 void wolfCLU_certgenHelp() {
+    WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-key public key to put into certificate request");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inform der or pem format for '-in'");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-outform der or pem format for '-out'");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to parse for certificate configuration");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-x509 generate self signed certificate");
     WOLFCLU_LOG(WOLFCLU_L0, "\n");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\ncertgen USAGE:\nwolfssl -req -ecc/-rsa/-ed25519 -in <filename> -out"
