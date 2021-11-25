@@ -232,7 +232,7 @@ void wolfCLU_encryptHelp()
             "camellia-cbc-256\n");
 #endif
 
-    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
@@ -247,7 +247,7 @@ void wolfCLU_encryptHelp()
     WOLFCLU_LOG(WOLFCLU_L0, "\t-k another option for password input");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-base64 handle decoding a base64 input");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nosalt do not use a salt input to kdf");
-    WOLFCLU_LOG(WOLFCLU_L0, "");
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\nENCRYPT USAGE: wolfssl -encrypt <-algorithm> -in <filename> "
            "-pwd <password> -out <output file name>\n");
