@@ -246,13 +246,16 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             printf("salt [%d] :", SALT_SIZE);
             for (z = 0; z < SALT_SIZE; z++)
                 printf("%02X", salt[z]);
+            printf("\n");
         }
         printf("key  [%d] :", keySz);
         for (z = 0; z < keySz; z++)
             printf("%02X", key[z]);
+        printf("\n");
         printf("iv   [%d] :", ivSz);
         for (z = 0; z < ivSz; z++)
             printf("%02X", iv[z]);
+        printf("\n");
         WOLFCLU_LOG(WOLFCLU_L0, "itterations = %d", iter);
         WOLFCLU_LOG(WOLFCLU_L0, "PBKDF version = %d", pbkVersion);
     }

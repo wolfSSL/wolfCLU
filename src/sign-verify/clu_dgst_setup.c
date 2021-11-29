@@ -36,9 +36,28 @@ static const struct option dgst_options[] = {
 
     {"signature", required_argument, 0, WOLFCLU_INFILE    },
     {"verify",    required_argument, 0, WOLFCLU_VERIFY    },
+    {"h",        no_argument,       0, WOLFCLU_HELP      },
+    {"help",     no_argument,       0, WOLFCLU_HELP      },
 
     {0, 0, 0, 0} /* terminal element */
 };
+
+
+static void wolfCLU_dgstHelp(void)
+{
+    WOLFCLU_LOG(WOLFCLU_L0, "dgst: (the last argument is the data that was signed)");
+    WOLFCLU_LOG(WOLFCLU_L0, "Hash algos supported:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-sha");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-sha224");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-sha256");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-sha384");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-sha512");
+    WOLFCLU_LOG(WOLFCLU_L0, "Parameters:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-signature file containing the signature");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-verify key used to verify the signature");
+    WOLFCLU_LOG(WOLFCLU_L0, "Example:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\twolfssl dgst -signature test.sig -verify key.pem test");
+}
 
 
 /* return WOLFCLU_SUCCESS on success */
@@ -109,6 +128,10 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
+
+            case WOLFCLU_HELP:
+                wolfCLU_dgstHelp();
+                return WOLFCLU_SUCCESS;
 
             case ':':
             case '?':
