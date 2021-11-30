@@ -78,6 +78,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "verify         X509 certificate verify");
     WOLFCLU_LOG(WOLFCLU_L0, "s_client       Basic TLS client for testing"
                                            " connection");
+    WOLFCLU_LOG(WOLFCLU_L0, "rand           Generates random data");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
     /*optional flags*/
     WOLFCLU_LOG(WOLFCLU_L0, "Optional Flags.\n");

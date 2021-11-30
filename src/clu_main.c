@@ -53,6 +53,7 @@ static const struct option mode_options[] = {
     {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12    },
     {"crl",       no_argument,       0, WOLFCLU_CRL       },
     {"s_client",  no_argument,       0, WOLFCLU_CLIENT    },
+    {"rand",      no_argument,       0, WOLFCLU_RAND      },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
     {"v",         no_argument,       0, 'v'       },
@@ -219,6 +220,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_CLIENT:
             ret = wolfCLU_Client(argc, argv);
+            break;
+
+        case WOLFCLU_RAND:
+            ret = wolfCLU_Rand(argc, argv);
             break;
 
         case WOLFCLU_HELP:

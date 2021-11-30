@@ -8,6 +8,7 @@ wolfssl_SOURCES = src/clu_main.c \
                     src/clu_log.c \
 					src/tools/clu_funcs.c \
 					src/tools/clu_hex_to_bin.c \
+					src/tools/clu_rand.c \
 					src/crypto/clu_crypto_setup.c \
 					src/crypto/clu_encrypt.c \
 					src/crypto/clu_decrypt.c \

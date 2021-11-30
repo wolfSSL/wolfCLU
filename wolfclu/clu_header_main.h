@@ -454,4 +454,10 @@ int wolfCLU_Client(int argc, char** argv);
  */
 int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg);
 #define MAX_PASSWORD_SIZE 256
+
+
+/**
+ * @brief function to generate random data
+ */
+int wolfCLU_Rand(int argc, char** argv);
 #endif /* _WOLFSSL_CLU_HEADER_ */
