@@ -28,6 +28,7 @@
 
 static const struct option dgst_options[] = {
 
+    {"md5",       no_argument,       0, WOLFCLU_MD5        },
     {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
     {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
     {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
@@ -47,6 +48,7 @@ static void wolfCLU_dgstHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "dgst: (the last argument is the data that was signed)");
     WOLFCLU_LOG(WOLFCLU_L0, "Hash algos supported:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-md5");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sha");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sha224");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sha256");
@@ -92,6 +94,10 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                    dgst_options, &longIndex )) != -1) {
 
         switch (option) {
+
+            case WOLFCLU_MD5:
+                hashType = WC_HASH_TYPE_MD5;
+                break;
 
             case WOLFCLU_CERT_SHA:
                 hashType = WC_HASH_TYPE_SHA;
@@ -271,12 +277,15 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "Verification failure");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
+    /* if any key size has been set then try to free the key struct */
+    if (keySz > 0) {
         switch (sigType) {
             case WC_SIGNATURE_TYPE_RSA:
+            case WC_SIGNATURE_TYPE_RSA_W_ENC:
                 wc_FreeRsaKey(&rsa);
                 break;
 
@@ -284,7 +293,6 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                 wc_ecc_free(&ecc);
                 break;
 
-            case WC_SIGNATURE_TYPE_RSA_W_ENC:
             case WC_SIGNATURE_TYPE_NONE:
                 FALL_THROUGH;
 

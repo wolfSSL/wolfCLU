@@ -21,6 +21,8 @@ cp  $CERTS_DIR/server-key.pem .
 cp  $CERTS_DIR/server-key.der .
 cp  $CERTS_DIR/server-keyEnc.pem .
 cp  $CERTS_DIR/server-keyPub.pem .
+cp  $CERTS_DIR/ecc-key.pem .
+cp  $CERTS_DIR/ecc-keyPub.pem .
 
 echo "Copy over test certificates and chains"
 cp  $CERTS_DIR/server-cert.pem .
