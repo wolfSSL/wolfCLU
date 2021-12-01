@@ -45,6 +45,60 @@ static void wolfCLU_pKeyHelp(void)
 }
 
 
+/* helper function for ECC EVP_PKEY
+ * return WOLFSSL_SUCCESS on success */
+static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
+        int isPrivate)
+{
+    int ret;
+    WOLFSSL_EVP_PKEY *tmpPkey = NULL;
+    WOLFSSL_EC_KEY *key;
+
+    key = wolfSSL_EVP_PKEY_get0_EC_KEY(pkey);
+    if (key == NULL) {
+        unsigned char *der = NULL;
+        int derSz;
+
+        if (isPrivate) {
+            derSz = wolfSSL_i2d_PrivateKey(pkey, &der);
+        }
+        else {
+            derSz = wolfSSL_i2d_PublicKey(pkey, &der);
+        }
+
+        if (derSz >= 0) {
+            if (isPrivate) {
+                tmpPkey = wolfSSL_d2i_PrivateKey_EVP(NULL, &der, derSz);
+            }
+            else {
+                const unsigned char *p = der;
+                tmpPkey = wolfSSL_d2i_PUBKEY(NULL, &p, derSz);
+            }
+
+            key = wolfSSL_EVP_PKEY_get0_EC_KEY(tmpPkey);
+        }
+
+        if (der != NULL) {
+            XFREE(der, NULL, DYNAMIC_TYPE_OPENSSL);
+        }
+    }
+
+    if (isPrivate) {
+        ret = wolfSSL_PEM_write_bio_ECPrivateKey(bio, key, NULL, NULL, 0, NULL,
+                NULL);
+    }
+    else {
+        ret = wolfSSL_PEM_write_bio_EC_PUBKEY(bio, key);
+    }
+
+    if (tmpPkey != NULL) {
+        wolfSSL_EVP_PKEY_free(tmpPkey);
+    }
+
+    return ret;
+}
+
+
 /* print out PEM public key
  * returns WOLFCLU_SUCCESS on success other return values are considered
  * 'not success'
@@ -61,9 +115,9 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
                     wolfSSL_EVP_PKEY_get0_RSA(pkey));
             break;
         case EVP_PKEY_EC:
-            ret = wolfSSL_PEM_write_bio_EC_PUBKEY(bio,
-                    wolfSSL_EVP_PKEY_get0_EC_KEY(pkey));
+            ret = _ECCpKeyPEMtoKey(bio, pkey, 0);
             break;
+
         case EVP_PKEY_DSA:
             FALL_THROUGH;
         default:
@@ -95,10 +149,9 @@ int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
                     wolfSSL_EVP_PKEY_get0_RSA(pkey), NULL, NULL, 0, NULL, NULL);
             break;
         case EVP_PKEY_EC:
-            ret = wolfSSL_PEM_write_bio_ECPrivateKey(bio,
-                    wolfSSL_EVP_PKEY_get0_EC_KEY(pkey), NULL, NULL, 0, NULL,
-                    NULL);
+            ret = _ECCpKeyPEMtoKey(bio, pkey, 1);
             break;
+
         case EVP_PKEY_DSA:
             FALL_THROUGH;
         default:
