@@ -79,6 +79,7 @@ static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
         }
 
         if (der != NULL) {
+            wolfCLU_ForceZero(der, derSz);
             XFREE(der, NULL, DYNAMIC_TYPE_OPENSSL);
         }
     }
