@@ -28,6 +28,7 @@
 
 static const struct option pkey_options[] = {
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"pubout",    no_argument,       0, WOLFCLU_PUBOUT    },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
@@ -41,6 +42,7 @@ static void wolfCLU_pKeyHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl pkey");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to output to (default stdout)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-pubout output the public key");
 }
 
@@ -274,6 +276,15 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 }
                 break;
 
+            case WOLFCLU_OUTFILE:
+                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
+                if (bioOut == NULL) {
+                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s",
+                            optarg);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
+
             case WOLFCLU_INFORM:
                 inForm = wolfCLU_checkInform(optarg);
                 break;
@@ -306,7 +317,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bioOut == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
