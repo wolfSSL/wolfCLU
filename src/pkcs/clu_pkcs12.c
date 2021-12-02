@@ -33,6 +33,7 @@ static const struct option pkcs12_options[] = {
     {"passin",    required_argument, 0, WOLFCLU_PASSWORD     },
     {"passout",   required_argument, 0, WOLFCLU_PASSWORD_OUT },
     {"in",        required_argument, 0, WOLFCLU_INFILE       },
+    {"out",       required_argument, 0, WOLFCLU_OUTFILE      },
     {"help",      no_argument, 0, WOLFCLU_HELP},
     {"h",         no_argument, 0, WOLFCLU_HELP},
 
@@ -44,6 +45,7 @@ static void wolfCLU_pKeyHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl pkcs12");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for pkcs12 bundle");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write results to (default stdout)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nocerts no certificate output");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nokeys no key output");
@@ -99,6 +101,15 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
                     WOLFCLU_LOG(WOLFCLU_L0, "unable to open pkcs12 file %s",
+                            optarg);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
+
+            case WOLFCLU_OUTFILE:
+                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
+                if (bioOut == NULL) {
+                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -160,8 +171,8 @@ int wolfCLU_PKCS12(int argc, char** argv)
         }
     }
 
-    /* setup output bio to stdout for now */
-    if (ret == WOLFCLU_SUCCESS) {
+    /* setup output bio to stdout if not already set */
+    if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bioOut == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
