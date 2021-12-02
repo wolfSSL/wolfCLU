@@ -97,7 +97,7 @@ int wolfCLU_Rand(int argc, char** argv)
 
 
     if (ret == WOLFCLU_SUCCESS) {
-        buf = (byte*)XMALLOC(size, HEAP_HINT, DYNAMIC_TYPE_RNG);
+        buf = (byte*)XMALLOC(size, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (buf == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -142,7 +142,7 @@ int wolfCLU_Rand(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
 
-        base64 = (byte*)XMALLOC(base64Sz, HEAP_HINT, DYNAMIC_TYPE_RNG);
+        base64 = (byte*)XMALLOC(base64Sz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (base64 == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "error malloc'ing for base64");
             ret = WOLFCLU_FATAL_ERROR;
@@ -154,11 +154,13 @@ int wolfCLU_Rand(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_RNG);
-            buf = base64;
+            wolfCLU_ForceZero(buf, size);
+            XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            buf  = base64;
+            size = base64Sz;
         }
         else {
-            XFREE(base64, HEAP_HINT, DYNAMIC_TYPE_RNG);
+            XFREE(base64, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         }
     }
 
@@ -170,18 +172,9 @@ int wolfCLU_Rand(int argc, char** argv)
         }
     }
 
-    /* write out special ending characters for base64 */
-    if (ret == WOLFCLU_SUCCESS && useBase64) {
-        if (wolfSSL_BIO_write(bioOut, "=\n", XSTRLEN("=\n")) !=
-                XSTRLEN("=\n")) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error writing out base64 ending");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-
     if (buf != NULL) {
         wolfCLU_ForceZero(buf, size);
-        XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_RNG);
+        XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     wolfSSL_BIO_free(bioOut);
 
