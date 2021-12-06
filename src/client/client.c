@@ -698,7 +698,7 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
     int onlyKeyShare)
 {
     double start, conn_time = 0, tx_time = 0, rx_time = 0;
-    SOCKET_T sockfd;
+    SOCKET_T sockfd = WOLFSSL_SOCKET_INVALID;
     WOLFSSL* ssl;
     int ret = 0, err = 0;
 
@@ -1530,6 +1530,34 @@ static const char* client_usage_msg[][70] = {
 #endif
 
 };
+
+static void showPeerPEM(WOLFSSL* ssl)
+{
+    WOLFSSL_X509* peer = wolfSSL_get_peer_certificate(ssl);
+    if (peer) {
+        WOLFSSL_BIO* bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
+        if (bioOut == NULL) {
+            printf("failed to get bio on stdout\n");
+        }
+        else {
+            if (wolfSSL_BIO_set_fp(bioOut, stdout, BIO_NOCLOSE)
+                != WOLFSSL_SUCCESS) {
+                printf("failed to set stdout to bio output\n");
+                wolfSSL_BIO_free(bioOut);
+                bioOut = NULL;
+            }
+        }
+
+        if (bioOut) {
+            wolfSSL_BIO_write(bioOut, "---\nServer certificate\n",
+                    XSTRLEN("---\nServer certificate\n"));
+            wolfSSL_PEM_write_bio_X509(bioOut, peer);
+        }
+        wolfSSL_BIO_free(bioOut);
+    }
+    wolfSSL_FreeX509(peer);
+}
+
 
 static void Usage(void)
 {
@@ -3535,6 +3563,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     }
 
     showPeerEx(ssl, lng_index);
+    showPeerPEM(ssl);
 
     /* if the caller requested a particular cipher, check here that either
      * a canonical name of the established cipher matches the requested
@@ -4032,6 +4061,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         }
 
         showPeerEx(sslResume, lng_index);
+        showPeerPEM(sslResume);
 
         if (wolfSSL_session_reused(sslResume))
             printf("reused session id\n");
