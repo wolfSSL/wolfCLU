@@ -35,6 +35,8 @@ int wolfCLU_md5Setup(int argc, char** argv)
     ret = NOT_COMPILED_IN;
     (void)bioIn;
     (void)bioOut;
+    (void) argc; /* silence unused variable warning */
+    (void) argv; /* silence unused variable warning */
 #else
 
     /* was a file input provided? if so read from file */

@@ -827,10 +827,10 @@ const WOLFSSL_EVP_CIPHER* wolfCLU_CipherTypeFromAlgo(int alg)
             return wolfSSL_EVP_aes_192_cbc();
         case WOLFCLU_AES256CBC:
             return wolfSSL_EVP_aes_256_cbc();
-
+#ifndef NO_DES3
         case WOLFCLU_DESCBC:
             return wolfSSL_EVP_des_cbc();
-
+#endif
         default:
             return NULL;
     }

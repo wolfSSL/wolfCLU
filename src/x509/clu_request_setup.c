@@ -26,6 +26,7 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
+#ifdef WOLFSSL_CERT_REQ
 static const struct option req_options[] = {
 
     {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
@@ -50,13 +51,16 @@ static const struct option req_options[] = {
 
     {0, 0, 0, 0} /* terminal element */
 };
-
+#endif
 
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_requestSetup(int argc, char** argv)
 {
 #ifndef WOLFSSL_CERT_REQ
     WOLFCLU_LOG(WOLFCLU_L0, "wolfSSL not compiled with --enable-certreq");
+     /* silence unused variable warnings */
+    (void) argc;
+    (void) argv;
     return NOT_COMPILED_IN;
 #else
     WOLFSSL_BIO *bioOut = NULL;

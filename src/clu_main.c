@@ -90,13 +90,43 @@ static int getMode(char* arg)
     return ret;
 }
 
+#ifdef HAVE_FIPS
+static void myFipsCb(int ok, int err, const char* hash)
+{
+    printf("in my Fips callback, ok = %d, err = %d\n", ok, err);
+    printf("message = %s\n", wc_GetErrorString(err));
+    printf("hash = %s\n", hash);
 
+    if (err == IN_CORE_FIPS_E) {
+        printf("In core integrity hash check failure, copy above hash\n");
+        printf("into verifyCore[] in fips_test.c and rebuild\n");
+    }
+}
+#endif
 
 int main(int argc, char** argv)
 {
     int     flag = 0;
     int     ret = WOLFCLU_SUCCESS;
     int     longIndex = 0;
+#ifdef HAVE_FIPS
+    WC_RNG rng;
+
+    wolfCrypt_SetCb_fips(myFipsCb);
+
+    #ifdef WC_RNG_SEED_CB
+        wc_SetSeed_Cb(wc_GenerateSeed);
+    #endif
+
+    ret = wc_InitRng(&rng);
+
+    if (ret != 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Err %d, update the FIPS hash\n", ret);
+        return ret;
+    }
+
+    wc_FreeRng(&rng);
+#endif
 
     if (argc == 1) {
         WOLFCLU_LOG(WOLFCLU_L0, "Main Help.");
