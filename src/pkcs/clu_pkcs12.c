@@ -132,7 +132,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
         }
     }
 
-    /* with only supporting parsing, an input file is expected */
+    /* with currently only supporting PKCS12 parsing, an input file is expected */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
         WOLFCLU_LOG(WOLFCLU_L0, "no input file set");
         ret = WOLFCLU_FATAL_ERROR;
