@@ -36,8 +36,6 @@ cp  $CERTS_DIR/test-servercert.p12 .
 echo "Additional update of client example source code"
 cp $CERTS_DIR/../examples/client/client.c ../src/client/client.c
 sed -i '' "s/examples\/client\//wolfclu\//" ../src/client/client.c
-cd ../
-patch -p1 < ./certs/client-show-peer-PEM.patch
 
 echo "Done"
 exit 0
