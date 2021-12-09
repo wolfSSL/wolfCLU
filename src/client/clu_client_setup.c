@@ -119,6 +119,10 @@ int wolfCLU_Client(int argc, char** argv)
 
         clientArgv[clientArgc++] = noClientCert;
 
+        /* add TLS downgrade support i.e -v d to arguments */
+        clientArgv[clientArgc++] = "-v";
+        clientArgv[clientArgc++] = "d";
+
         args.argv = (char**)clientArgv;
         args.argc = clientArgc;
 
