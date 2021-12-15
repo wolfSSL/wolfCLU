@@ -45,7 +45,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     byte*   output = NULL;          /* output buffer */
     byte    salt[SALT_SIZE] = {0};  /* salt variable */
 
-    int     ret             = 0;    /* return variable */
+    int     ret             = WOLFCLU_SUCCESS;
     int     hexRet          = 0;    /* hex -> bin return*/
     int     ivSz            = 0;
     int     outputSz        = 0;
@@ -285,7 +285,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     }
 
     /* loop, encrypt 1kB at a time till length <= 0 */
-    while (ret >= 0) {
+    while (ret >= 0 && wolfSSL_BIO_get_len(in) > 0) {
         /* Read in 1kB to input[] */
         ret = wolfSSL_BIO_read(in, input, WOLFCLU_MAX_BUFFER);
         if (ret < 0) {

@@ -32,5 +32,13 @@ if [ $? != 0 ]; then
 fi
 rm -f test-dec.der
 
+run "./wolfssl enc -base64 -d -aes-256-cbc -nosalt -k '' -in certs/crl.der.enc.base64 -out test-dec.der"
+diff "./certs/crl.der" "./test-dec.der" &> /dev/null
+if [ $? != 0 ]; then
+    echo "issue with decryption"
+    exit 99
+fi
+rm -f test-dec.der
+
 echo "Done"
 exit 0
