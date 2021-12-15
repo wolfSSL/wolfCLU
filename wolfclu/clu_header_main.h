@@ -408,10 +408,10 @@ int wolfCLU_checkInform(char* inform);
  *  @ingroup X509
  *  @brief This function is used internally to parse a name string
  *
- *  @param n a string in the form of /C=company/CN=common name
+ *  @param n a null-terminated string in the form of /C=company/CN=common name
  *  @return newly create WOLFSSL_X509_NAME structure on success
  */
-WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(char* n, int nSz);
+WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz);
 
 
 /**

@@ -1154,17 +1154,22 @@ static void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid,
 }
 
 
-/* Input 'n' is a terminated string in the form of '/CN=name/C=company'
+/* Input 'n' is a null-terminated string in the form of '/CN=name/C=company'
  * returns a newly created WOLFSSL_X509_NAME on success */
-WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(char* n, int nSz)
+WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
 {
-    WOLFSSL_X509_NAME* ret = NULL;
+    int encoding = CTC_UTF8;
+    int tagSz = 0;
+    int nid;
     char* word, *end;
     char* deli = (char*)"/";
     char* entry = NULL;
-    char  tag[5] = {0};
+    WOLFSSL_X509_NAME* ret = NULL;
+    char  tag[5];
 
     if (n == NULL || nSz <= 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "unexpected null argument or size with parsing "
+                "name");
         return NULL;
     }
 
@@ -1175,11 +1180,8 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(char* n, int nSz)
     }
 
     tag[0] = '/';
-    for (word = strtok_r(n, deli, &end); word != NULL;
+    for (word = strtok_r((char*)n, deli, &end); word != NULL;
             word = strtok_r(NULL, deli, &end)) {
-        int tagSz = 0;
-        int nid;
-
         tagSz = (int)strcspn(word, "=");
         if (tagSz <= 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "error finding '=' char in name");
@@ -1207,16 +1209,8 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(char* n, int nSz)
         }
 
         if (ret != NULL) {
-            int encoding = CTC_UTF8;
-
             entry = &word[tagSz];
             nid = wolfSSL_OBJ_sn2nid(tag);
-        #if 0
-            printf("found word %s\n", word);
-            printf("\tfound tag %s\n", tag);
-            printf("\tfound entry %s\n", entry);
-            printf("\tNID = %d\n", nid);
-        #endif
             if (nid == NID_countryName) {
                 encoding = CTC_PRINTABLE;
             }
