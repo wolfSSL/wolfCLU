@@ -3,6 +3,7 @@
 # ALl path should be given relative to root directory
 
 dist_noinst_SCRIPTS+=tests/x509/x509-process-test.sh
+dist_noinst_SCRIPTS+=tests/x509/x509-req-test.sh
 dist_noinst_SCRIPTS+=tests/x509/x509-verify-test.sh
 dist_noinst_SCRIPTS+=tests/x509/CRL-verify-test.sh
 
