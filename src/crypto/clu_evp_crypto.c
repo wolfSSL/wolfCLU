@@ -285,12 +285,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     }
 
     /* loop, encrypt 1kB at a time till length <= 0 */
-    while (ret >= 0) {
-        /* check if there is nothing else left to be read */
-        if (wolfSSL_BIO_get_len(in) == 0) {
-            break;
-        }
-
+    while (ret >= 0 && wolfSSL_BIO_get_len(in) > 0) {
         /* Read in 1kB to input[] */
         ret = wolfSSL_BIO_read(in, input, WOLFCLU_MAX_BUFFER);
         if (ret < 0) {
