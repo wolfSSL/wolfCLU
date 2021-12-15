@@ -48,6 +48,7 @@ static const struct option req_options[] = {
     {"config",    required_argument, 0, WOLFCLU_CONFIG },
     {"days",      required_argument, 0, WOLFCLU_DAYS },
     {"x509",      no_argument,       0, WOLFCLU_X509 },
+    {"subj",      required_argument, 0, WOLFCLU_SUBJECT },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -73,6 +74,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     char*   in  = NULL;
     char*   out = NULL;
     char*   config = NULL;
+    char*   subj = NULL;
 
     int     algCheck =   0;     /* algorithm type */
     int     oid      =   0;
@@ -116,6 +118,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_OUTFORM:
                 outForm = wolfCLU_checkOutform(optarg);
+                break;
+
+            case WOLFCLU_SUBJECT:
+                subj = optarg;
                 break;
 
             case WOLFCLU_HELP:
@@ -173,6 +179,9 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case ':':
             case '?':
+                WOLFCLU_LOG(WOLFCLU_L0, "unexpected argument %s", optarg);
+                ret = WOLFCLU_FATAL_ERROR;
+                wolfCLU_certgenHelp();
                 break;
 
             default:
@@ -233,22 +242,29 @@ int wolfCLU_requestSetup(int argc, char** argv)
         ret = USER_INPUT_ERROR;
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        if (config != NULL) {
-            ret = wolfCLU_readConfig(x509, config, (char*)"req");
+    if (ret == WOLFCLU_SUCCESS && config != NULL) {
+        ret = wolfCLU_readConfig(x509, config, (char*)"req");
+    }
+
+    if (ret == WOLFCLU_SUCCESS && subj != NULL) {
+        WOLFSSL_X509_NAME *name;
+        name = wolfCLU_ParseX509NameString(subj, (int)XSTRLEN(subj));
+        if (name != NULL) {
+            wolfSSL_X509_REQ_set_subject_name(x509, name);
+        }
+    }
+
+    /* if no configure is passed in then get input from command line */
+    if (ret == WOLFCLU_SUCCESS && subj == NULL && config == NULL) {
+        WOLFSSL_X509_NAME *name;
+
+        name = wolfSSL_X509_NAME_new();
+        if (name == NULL) {
+            ret = MEMORY_E;
         }
         else {
-            /* if no configure is passed in then get input from command line */
-            WOLFSSL_X509_NAME *name;
-
-            name = wolfSSL_X509_NAME_new();
-            if (name == NULL) {
-                ret = MEMORY_E;
-            }
-            else {
-                wolfCLU_CreateX509Name(name);
-                wolfSSL_X509_REQ_set_subject_name(x509, name);
-            }
+            wolfCLU_CreateX509Name(name);
+            wolfSSL_X509_REQ_set_subject_name(x509, name);
         }
     }
 
