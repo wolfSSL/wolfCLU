@@ -1154,6 +1154,74 @@ static void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid,
 }
 
 
+/* Input 'n' is a null-terminated string in the form of '/CN=name/C=company'
+ * returns a newly created WOLFSSL_X509_NAME on success */
+WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
+{
+    int encoding = CTC_UTF8;
+    int tagSz = 0;
+    int nid;
+    char* word, *end;
+    char* deli = (char*)"/";
+    char* entry = NULL;
+    WOLFSSL_X509_NAME* ret = NULL;
+    char  tag[5];
+
+    if (n == NULL || nSz <= 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "unexpected null argument or size with parsing "
+                "name");
+        return NULL;
+    }
+
+    ret = wolfSSL_X509_NAME_new();
+    if (ret == NULL) {
+        WOLFCLU_LOG(WOLFCLU_L0, "error allocating name structure");
+        return NULL;
+    }
+
+    tag[0] = '/';
+    for (word = strtok_r((char*)n, deli, &end); word != NULL;
+            word = strtok_r(NULL, deli, &end)) {
+        tagSz = (int)strcspn(word, "=");
+        if (tagSz <= 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "error finding '=' char in name");
+            wolfSSL_X509_NAME_free(ret);
+            ret = NULL;
+            break;
+        }
+
+        tagSz = tagSz + 1; /* include the '=' char */
+        if (tagSz + 2 > (int)sizeof(tag)) { /* +2 for '/' and '\0' chars */
+            WOLFCLU_LOG(WOLFCLU_L0, "found a tag that was too large!");
+            wolfSSL_X509_NAME_free(ret);
+            ret = NULL;
+            break;
+        }
+        else if (tagSz + 1 > nSz) {
+            WOLFCLU_LOG(WOLFCLU_L0, "error, entry would be past buffer end");
+            wolfSSL_X509_NAME_free(ret);
+            ret = NULL;
+            break;
+        }
+        else {
+            XMEMCPY(tag + 1, word, tagSz);
+            tag[tagSz + 1] = '\0'; /* append terminating character */
+        }
+
+        if (ret != NULL) {
+            entry = &word[tagSz];
+            nid = wolfSSL_OBJ_sn2nid(tag);
+            if (nid == NID_countryName) {
+                encoding = CTC_PRINTABLE;
+            }
+            wolfCLU_AddNameEntry(ret, encoding, nid, entry);
+        }
+    }
+
+    return ret;
+}
+
+
 /* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 {
