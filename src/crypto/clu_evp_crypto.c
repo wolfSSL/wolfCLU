@@ -354,6 +354,6 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
 
     (void)mode;
     (void)hexOut;
-    return WOLFCLU_SUCCESS;
+    return ret;
 }
 

@@ -6,18 +6,16 @@ if [ ! -d ./certs/ ]; then
 fi
 
 run() {
-    RESULT=`./wolfssl $1`
+    RESULT=`eval $1`
     if [ $? != 0 ]; then
-        echo "Failed on test \"./wolfssl $1\""
+        echo "Failed on test \"$1\""
         exit 99
     fi
 }
 
-
-run() {
+run_fail() {
     RESULT=`eval $1`
-    echo $RESULT
-    if [ $? != 0 ]; then
+    if [ $? == 0 ]; then
         echo "Failed on test \"$1\""
         exit 99
     fi
@@ -39,6 +37,10 @@ if [ $? != 0 ]; then
     exit 99
 fi
 rm -f test-dec.der
+
+
+# check fail cases
+run_fail "./wolfssl enc -base64 -d -aes-256-cbc -nosalt -k '' -in certs/file-does-not-exist -out test-dec.der"
 
 echo "Done"
 exit 0
