@@ -37,6 +37,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
 {
     WOLFSSL_BIO *out = NULL;
     WOLFSSL_BIO *in  = NULL;
+    WOLFSSL_BIO *tmp = NULL;
     WOLFSSL_EVP_CIPHER_CTX* ctx    = NULL;
 
     WC_RNG     rng;                 /* random number generator declaration */
@@ -61,10 +62,16 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         return BAD_FUNC_ARG;
     }
 
+    /* Start up the random number generator */
+    if (wc_InitRng(&rng) != 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Random Number Generator failed to start.");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
     /* open the inFile in read mode */
     if (fileIn != NULL) {
         in = wolfSSL_BIO_new_file(fileIn, "rb");
-        if (in != NULL && isBase64) {
+        if (in != NULL && !enc && isBase64) {
             byte *decodedBase64 = NULL;
             word32 decodeSz;
 
@@ -103,14 +110,6 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         return WOLFCLU_FATAL_ERROR;
     }
 
-    /* Start up the random number generator */
-    if (ret >= 0) {
-        ret = (int) wc_InitRng(&rng);
-        if (ret != 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Random Number Generator failed to start.");
-        }
-    }
-
     if (ret >= 0) {
         ctx = wolfSSL_EVP_CIPHER_CTX_new();
         if (ctx == NULL) {
@@ -132,18 +131,18 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         }
         else {
             if (!noSalt) {
-                char tmp[sizeof(isSalted)];
+                char s[sizeof(isSalted)];
 
-                if (wolfSSL_BIO_read(in, tmp, (int)XSTRLEN(isSalted)) <= 0) {
+                if (wolfSSL_BIO_read(in, s, (int)XSTRLEN(isSalted)) <= 0) {
                     WOLFCLU_LOG(WOLFCLU_L0, "Error reading salted string");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
-                tmp[XSTRLEN(isSalted)] = '\0';
+                s[XSTRLEN(isSalted)] = '\0';
 
                 if (ret >= 0 &&
-                        XMEMCMP(tmp, isSalted, (int)XSTRLEN(isSalted)) != 0) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "Was expecting salt");
-                        ret = WOLFCLU_FATAL_ERROR;
+                    XMEMCMP(s, isSalted, (int)XSTRLEN(isSalted)) != 0) {
+                    WOLFCLU_LOG(WOLFCLU_L0, "Was expecting salt");
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
 
                 if (ret >= 0) {
@@ -220,6 +219,16 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         }
         if (out == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", fileOut);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    /* store up output and pass output through a base64 encoding BIO */
+    if (ret >= 0 && enc && isBase64) {
+        tmp = out;
+        out = wolfSSL_BIO_new(wolfSSL_BIO_s_mem());
+        if (out == NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "unable to create temporary memory");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -341,9 +350,34 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         wolfSSL_BIO_write(out, output, outputSz);
     }
 
+    /* write out stored up output in base64 encrypt case */
+    if (ret >= 0 && enc && isBase64) {
+        WOLFSSL_BUF_MEM *mem = NULL;
+        WOLFSSL_BIO *base64Bio = NULL;
+
+        if (wolfSSL_BIO_get_mem_ptr(out, &mem) != WOLFSSL_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Error getting internal memory of input");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret >= 0) {
+            base64Bio = wolfSSL_BIO_push(wolfSSL_BIO_new(
+                        wolfSSL_BIO_f_base64()), tmp);
+            if (base64Bio == NULL) {
+                WOLFCLU_LOG(WOLFCLU_L0, "Error setting up base64 encoding");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                wolfSSL_BIO_write(base64Bio, mem->data, (int)mem->length);
+                wolfSSL_BIO_free(base64Bio);
+            }
+        }
+    }
+
     /* closes the opened files and frees the memory */
     wolfSSL_BIO_free(out);
     wolfSSL_BIO_free(in);
+    wolfSSL_BIO_free(tmp);
 
     XMEMSET(key, 0, keySz);
     XMEMSET(iv, 0 , ivSz);
@@ -354,6 +388,6 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
 
     (void)mode;
     (void)hexOut;
-    return WOLFCLU_SUCCESS;
+    return ret;
 }
 
