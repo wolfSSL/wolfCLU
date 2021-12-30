@@ -55,8 +55,8 @@ wolfssl -hash base64dec -in README_encrypted.md
 ### X509
 
 ```
-wolfssl -x509 -inform pem -in testing-certs/ca-cert.pem -outform der -out outputfilename.der
-wolfssl -x509 -inform der -in testing-certs/ca-cert.der -outform pem -out outputfilename.pem
+wolfssl -x509 -inform pem -in certs/ca-cert.pem -outform der -out outputfilename.der
+wolfssl -x509 -inform der -in certs/ca-cert.der -outform pem -out outputfilename.pem
 ```
 
 ### RSA Signature Generation and Verification
