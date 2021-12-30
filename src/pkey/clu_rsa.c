@@ -81,7 +81,7 @@ int wolfCLU_RSA(int argc, char** argv)
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open key file %s",
+                    WOLFCLU_LOG(WOLFCLU_E0, "unable to open key file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -90,7 +90,7 @@ int wolfCLU_RSA(int argc, char** argv)
             case WOLFCLU_OUTFILE:
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
                 if (bioOut == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open out file %s",
+                    WOLFCLU_LOG(WOLFCLU_E0, "unable to open out file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -176,7 +176,7 @@ int wolfCLU_RSA(int argc, char** argv)
         }
 
         if (rsa == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error reading key from file");
+            WOLFCLU_LOG(WOLFCLU_E0, "error reading key from file");
             ret = USER_INPUT_ERROR;
         }
     }

@@ -121,7 +121,7 @@ int main(int argc, char** argv)
     ret = wc_InitRng(&rng);
 
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Err %d, update the FIPS hash\n", ret);
+        WOLFCLU_LOG(WOLFCLU_E0, "Err %d, update the FIPS hash\n", ret);
         return ret;
     }
 
@@ -167,7 +167,7 @@ int main(int argc, char** argv)
 
     switch (flag) {
         case 0:
-            WOLFCLU_LOG(WOLFCLU_L0, "No mode provided.");
+            WOLFCLU_LOG(WOLFCLU_E0, "No mode provided.");
             ret = 0;
             break;
 
@@ -271,13 +271,13 @@ int main(int argc, char** argv)
             break;
 
         default:
-            WOLFCLU_LOG(WOLFCLU_L0, "Unknown mode");
+            WOLFCLU_LOG(WOLFCLU_E0, "Unknown mode");
             wolfCLU_help();
             ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret <= 0)
-        WOLFCLU_LOG(WOLFCLU_L0, "Error returned: %d.", ret);
+        WOLFCLU_LOG(WOLFCLU_E0, "Error returned: %d.", ret);
     wolfCrypt_Cleanup();
 
     /* main function we want to return 0 on success so that the executable

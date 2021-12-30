@@ -79,7 +79,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
             case WOLFCLU_OUTFILE:
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
                 if (bioOut == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s",
+                    WOLFCLU_LOG(WOLFCLU_E0, "unable to open output file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -88,7 +88,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open input file %s",
+                    WOLFCLU_LOG(WOLFCLU_E0, "unable to open input file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -212,14 +212,14 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
         cm = wolfSSL_CertManagerNew();
         if (wolfSSL_CertManagerLoadCA(cm, caCert, NULL) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Unable to open CA file");
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open CA file");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             if (wolfSSL_CertManagerEnableCRL(cm, WOLFSSL_CRL_CHECKALL)
                     != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "Failed to enable CRL use");
+                WOLFCLU_LOG(WOLFCLU_E0, "Failed to enable CRL use");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -250,7 +250,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 #else
     (void)argc;
     (void)argv;
-    WOLFCLU_LOG(WOLFCLU_L0, "recompile wolfSSL with CRL support");
+    WOLFCLU_LOG(WOLFCLU_E0, "recompile wolfSSL with CRL support");
     return WOLFCLU_FATAL_ERROR;
 #endif
 }
