@@ -31,6 +31,7 @@ extern "C" {
 #define WOLFCLU_L0 0
 #define WOLFCLU_L1 1
 #define WOLFCLU_L2 2
+#define WOLFCLU_E0 -1
 
 typedef void (*wolfCLU_LoggingCb)(int logLevel, const char *const logMsg);
 void wolfCLU_OutputON(void);

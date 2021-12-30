@@ -53,6 +53,10 @@ void DefaultLoggingCb(int logLevel, const char *const msgStr)
     if (loggingEnabled && loggingLevel <= logLevel) {
         printf("%s\r\n", msgStr);
     }
+
+    if (logLevel == WOLFCLU_E0) {
+        fprintf(stderr, "%s\r\n", msgStr);
+    }
 }
 
 
