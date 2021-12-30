@@ -23,7 +23,7 @@ run_fail() {
 
 
 # Test if CRL compiled in
-RESULT=`./wolfssl crl -CAfile ./certs/ca-cert.pem -in ./certs/crl.pem`
+RESULT=`./wolfssl crl -CAfile ./certs/ca-cert.pem -in ./certs/crl.pem 2>&1`
 echo $RESULT | grep "recompile wolfSSL with CRL support"
 if [ $? == 0 ]; then
     #return 77 to indicate to automake that the test was skipped
