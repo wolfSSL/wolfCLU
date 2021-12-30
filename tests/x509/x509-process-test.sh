@@ -34,7 +34,22 @@ cert_test_case() {
 run1() {
     echo "TEST 1: VALID"
     echo "TEST 1.a"
-    test_case "-inform pem -outform pem"
+    test_case "-inform pem -outform pem -in certs/ca-cert.pem -out test.pem"
+    if [ ! -f test.pem ]; then
+        echo "issue creating output file"
+        exit 99
+    fi
+
+    ./wolfssl x509 -in test.pem -text -noout -out test.pem
+    ./wolfssl x509 -in certs/ca-cert.pem -text -noout -out ca-cert.pem
+    diff "./ca-cert.pem" "./test.pem" &> /dev/null
+    if [ $? != 0 ]; then
+        echo "issue with in pem out pem matching"
+        exit 99
+    fi
+    rm -f ca-cert.pem
+    rm -f test.pem
+
     echo "TEST 1.b"
     test_case "-inform pem -outform der"
     echo "TEST 1.c"
@@ -89,11 +104,15 @@ run3() {
     echo "TEST3: VALID INPUT FILES"
     echo "TEST 3.a"
     #convert ca-cert.der to tmp.pem and compare to ca-cert.pem for valid transform
-    cert_test_case "-inform der -in testing-certs/ca-cert.der -outform pem -out tmp.pem" \
-                   testing-certs/ca-cert.pem tmp.pem
+    ./wolfssl x509 -inform pem -in certs/ca-cert.pem -outform pem -out test.pem
+    cert_test_case "-inform der -in certs/ca-cert.der -outform pem -out tmp.pem" \
+                   test.pem tmp.pem
+    rm -f test.pem tmp.pem
     echo "TEST 3.b"
-    cert_test_case "-inform pem -outform der -in testing-certs/ca-cert.pem -out tmp.der" \
-                    testing-certs/ca-cert.der tmp.der
+    ./wolfssl x509 -inform pem -in certs/ca-cert.pem -outform der -out test.der
+    cert_test_case "-inform pem -outform der -in certs/ca-cert.pem -out tmp.der" \
+                    test.der tmp.der
+    rm -f test.pem tmp.pem
     echo "TEST 3.c"
     test_case "-inform der -in ca-cert.pem -outform der -out out.txt"
     echo "TEST 3.d"
@@ -104,15 +123,15 @@ run4() {
     echo "TEST4: INVALID INPUT FILES"
     echo "TEST 4.a"
     #convert ca-cert.der to tmp.pem and compare to ca-cert.pem for valid transform
-    test_case "-inform der -in testing-certs/ca-cert.der
-                    -in testing-certs/ca-cert.der -outform pem -out tmp.pem"
+    test_case "-inform der -in certs/ca-cert.der
+                    -in certs/ca-cert.der -outform pem -out tmp.pem"
     echo "TEST 4.b"
-    test_case "-inform der -in testing-certs/ca-cert.der
+    test_case "-inform der -in certs/ca-cert.der
                     -outform pem -out tmp.pem -out tmp.pem"
 
     echo "TEST 4.c"
-    test_case "-inform pem -outform der -in testing-certs/ca-cert.pem
-                    -out tmp.der -out tmp.der -in testing-certs/ca-cert.pem"
+    test_case "-inform pem -outform der -in certs/ca-cert.pem
+                    -out tmp.der -out tmp.der -in certs/ca-cert.pem"
 }
 
 run1

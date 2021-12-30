@@ -35,52 +35,6 @@ enum {
     TEXT = 2,
 };
 
-int wolfCLU_inpemOutpem(char* inFile, char* outFile, int silentFlag)
-{
-    int ret;
-    ret = wolfCLU_parseFile(inFile, PEM, outFile, PEM, silentFlag);
-    return ret;
-}
-
-int wolfCLU_inpemOutder(char* inFile, char* outFile, int silentFlag)
-{
-    int ret;
-    ret = wolfCLU_parseFile(inFile, PEM, outFile, DER, silentFlag);
-    return ret;
-}
-
-int wolfCLU_inderOutpem(char* inFile, char* outFile, int silentFlag)
-{
-    int ret;
-    ret = wolfCLU_parseFile(inFile, DER, outFile, PEM, silentFlag);
-    return ret;
-}
-
-int wolfCLU_inderOutder(char* inFile, char* outFile, int silentFlag)
-{
-    int ret;
-    ret = wolfCLU_parseFile(inFile, DER, outFile, DER, silentFlag);
-    return ret;
-}
-
-int wolfCLU_inpemOuttext(char* inFile, char* outFile, int silentFlag) {
-    int ret;
-    ret = wolfCLU_parseFile(inFile, PEM, outFile, TEXT, silentFlag);
-    return ret;
-}
-
-
-/* returns alloc'd WOLFSSL_X509 structure on success */
-static WOLFSSL_X509* wolfCLU_parseX509(char* inFile, int inForm)
-{
-    int type;
-
-    type = (inForm == DER_FORM)? WOLFSSL_FILETYPE_ASN1 : WOLFSSL_FILETYPE_PEM;
-
-    return wolfSSL_X509_load_certificate_file(inFile, type);
-}
-
-
 
 /* helper function for shared code when printing out key
  * returns WOLFCLU_SUCCESS on success
@@ -149,38 +103,14 @@ int wolfCLU_printDerPriKey(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
 
 
 /* returns WOLFCLU_SUCCESS on success */
-int wolfCLU_printX509PubKey(char* inFile, int inForm, char* outFile,
-        int silentFlag)
+int wolfCLU_printX509PubKey(WOLFSSL_X509* x509, WOLFSSL_BIO* out)
 {
     int ret = WOLFCLU_SUCCESS;
-    WOLFSSL_X509 *x509 = NULL;
-    WOLFSSL_BIO  *bio  = NULL;
-
     unsigned char *der = NULL;
     int derSz = 0;
 
-    x509 = wolfCLU_parseX509(inFile, inForm);
-    if (x509 == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "unable to parse file %s", inFile);
+    if (x509 == NULL || out == NULL) {
         ret = WOLFCLU_FATAL_ERROR;
-    }
-
-    /* use stdout if outFile is null */
-    if (ret == WOLFCLU_SUCCESS && outFile == NULL) {
-        bio = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
-        if (bio == NULL) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            if (wolfSSL_BIO_set_fp(bio, stdout, BIO_NOCLOSE)
-                    != WOLFSSL_SUCCESS) {
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-    }
-
-    if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
-        bio = wolfSSL_BIO_new_file(outFile, "wb");
     }
 
     /* get the size of the pubkey der buffer and alloc it */
@@ -204,179 +134,11 @@ int wolfCLU_printX509PubKey(char* inFile, int inForm, char* outFile,
     }
 
     if (ret == WOLFCLU_SUCCESS)
-        ret = wolfCLU_printDerPubKey(bio, der, derSz);
-
-    wolfSSL_X509_free(x509);
-    wolfSSL_BIO_free(bio);
+        ret = wolfCLU_printDerPubKey(out, der, derSz);
 
     if (der != NULL)
         XFREE(der, NULL, DYNAMIC_TYPE_PUBLIC_KEY);
 
-    (void)silentFlag;
     return ret;
 }
 
-
-/* returns WOLFCLU_SUCCESS on success */
-int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
-                                                                int silentFlag)
-{
-    int i, ret, inBufSz, outBufSz;
-    XFILE inStream;
-    XFILE outStream;
-    byte* inBuf = NULL;
-    byte* outBuf = NULL;
-
-    if (inFile == NULL || outFile == NULL)
-        return BAD_FUNC_ARG;
-
-    /* MALLOC buffer for the certificate to be processed */
-    inBuf = (byte*)XMALLOC(MAX_CERT_SIZE, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (inBuf == NULL) return MEMORY_E;
-    XMEMSET(inBuf, 0, MAX_CERT_SIZE);
-
-    inStream = XFOPEN(inFile, "rb");
-    if (XSTRNCMP(outFile, "stdout", 6) == 0) {
-        outStream = stdout;
-    }
-    else {
-        outStream = XFOPEN(outFile, "wb");
-    }
-
-/*----------------------------------------------------------------------------*/
-/* read in der, output der */
-/*----------------------------------------------------------------------------*/
-    if ( (inForm & outForm) == 1) {
-        WOLFCLU_LOG(WOLFCLU_L0, "in parse: in = der, out = der");
-    }
-/*----------------------------------------------------------------------------*/
-/* read in pem, output pem formatted human-readable-text */
-/*----------------------------------------------------------------------------*/
-    else if ( inForm == PEM && outForm == TEXT ) {
-        WOLFSSL_X509* x509;
-        WOLFSSL_BIO* bio;
-
-        x509 = wolfSSL_X509_load_certificate_file(inFile, SSL_FILETYPE_PEM);
-        bio = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
-
-        /* checking if output file was given, if not write to stdout */
-        wolfSSL_BIO_set_fp(bio, outStream, BIO_NOCLOSE);
-
-        if (x509 == NULL){
-            WOLFCLU_LOG(WOLFCLU_L0, "x509 Failure Still Null");
-        }
-
-        if (bio == NULL){
-            WOLFCLU_LOG(WOLFCLU_L0, "BIO Failure Still Null");
-        }
-
-        ret = wolfSSL_X509_print(bio, x509);
-        if (ret == WOLFSSL_FAILURE) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Failed to write x509 cert.");
-            goto clu_parse_cleanup;
-        }
-        wolfSSL_BIO_free(bio);
-        wolfSSL_X509_free(x509);
-    }
-/*----------------------------------------------------------------------------*/
-/* read in der, output pem */
-/*----------------------------------------------------------------------------*/
-    else if ( (inForm && !outForm) ) {
-        /* read in the certificate to be processed */
-        inBufSz = (int)fread(inBuf, 1, MAX_CERT_SIZE, inStream);
-        if (inBufSz <= 0) {
-            ret = FREAD_ERROR;
-            goto clu_parse_cleanup;
-        }
-
-        /* MALLOC buffer for the result of conversion from der to pem */
-        outBuf = (byte*)XMALLOC(MAX_CERT_SIZE, HEAP_HINT,
-                                                       DYNAMIC_TYPE_TMP_BUFFER);
-        if (outBuf == NULL) {
-            XFREE(inBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            ret = MEMORY_E;
-            goto clu_parse_cleanup;
-        }
-        XMEMSET(outBuf, 0, MAX_CERT_SIZE);
-
-        /* convert inBuf from der to pem, store result in outBuf  */
-        outBufSz = wc_DerToPem(inBuf, inBufSz, outBuf, MAX_CERT_SIZE,
-                                                                     CERT_TYPE);
-        if (outBufSz < 0) {
-            wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
-            ret = DER_TO_PEM_ERROR;
-            goto clu_parse_cleanup;
-        }
-
-        /* write the result of conversion to the outFile specified */
-        ret = (int)XFWRITE(outBuf, 1, outBufSz, outStream);
-        if (ret <= 0) {
-            wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
-            ret = FWRITE_ERROR;
-            goto clu_parse_cleanup;
-        }
-
-        if (!silentFlag) {
-           for (i = 0; i < outBufSz; i++) {
-                printf("%c", outBuf[i]);
-            }
-        }
-
-        /* success cleanup */
-        wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
-   }
-/*----------------------------------------------------------------------------*/
-/* read in pem, output der */
-/*----------------------------------------------------------------------------*/
-    else if ( (!inForm && outForm) ) {
-        inBufSz = (int)XFREAD(inBuf, 1, MAX_CERT_SIZE, inStream);
-        if (inBufSz <= 0) {
-            ret = FREAD_ERROR;
-            goto clu_parse_cleanup;
-        }
-
-        /* MALLOC buffer for the result of converstion from pem to der */
-        outBuf = (byte*)XMALLOC(MAX_CERT_SIZE, HEAP_HINT,
-                                                       DYNAMIC_TYPE_TMP_BUFFER);
-        if (outBuf == NULL) {
-            XFREE(inBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            ret = MEMORY_E;
-            goto clu_parse_cleanup;
-        }
-        XMEMSET(outBuf, 0, MAX_CERT_SIZE);
-
-        /* convert inBuf from pem to der, store result in outBuf */
-        outBufSz = wolfSSL_CertPemToDer(inBuf, inBufSz, outBuf, MAX_CERT_SIZE,
-                                                                     CERT_TYPE);
-        if (outBufSz < 0) {
-            wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
-            ret = PEM_TO_DER_ERROR;
-            goto clu_parse_cleanup;
-        }
-
-        /* write the result of conversion to the outFile specified */
-        ret = (int)XFWRITE(outBuf, 1, outBufSz, outStream);
-        if (ret <= 0) {
-            wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
-            ret = FWRITE_ERROR;
-            goto clu_parse_cleanup;
-        }
-
-        /* success cleanup */
-        wolfCLU_freeBins(inBuf, outBuf, NULL, NULL, NULL);
-    }
-/*----------------------------------------------------------------------------*/
-/* read in pem, output pem */
-/*----------------------------------------------------------------------------*/
-    else {
-        WOLFCLU_LOG(WOLFCLU_L0, "in parse: in = pem, out = pem");
-    }
-    ret = WOLFCLU_SUCCESS;
-
-clu_parse_cleanup:
-
-    XFCLOSE(outStream);
-    XFCLOSE(inStream);
-
-    return ret;
-}

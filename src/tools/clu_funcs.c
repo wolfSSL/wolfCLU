@@ -396,8 +396,8 @@ void wolfCLU_certHelp()
     WOLFCLU_LOG(WOLFCLU_L0, "\nX509 USAGE: wolfssl -x509 -inform <PEM or DER> -in <filename> "
            "-outform <PEM or DER> -out <output file name> \n");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -x509 -inform pem -in testing-certs/"
-           "ca-cert.pem -outform der -out testing-certs/ca-cert-converted.der"
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -x509 -inform pem -in certs/"
+           "ca-cert.pem -outform der -out certs/ca-cert-converted.der"
            "\n");
 }
 

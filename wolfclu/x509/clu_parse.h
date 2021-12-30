@@ -22,17 +22,6 @@
 #ifndef WOLFCLU_PARSE_H
 #define WOLFCLU_PARSE_H
 
-/* a helper function for wolfCLU_parse_file */
-int wolfCLU_inpemOutpem(char* inFile, char* outFile, int silentFlag);
-/* a helper function for wolfCLU_parse_file */
-int wolfCLU_inpemOutder(char* inFile, char* outFile, int silentFlag);
-/* a helper function for wolfCLU_parse_file */
-int wolfCLU_inderOutpem(char* inFile, char* outFile, int silentFlag);
-/* a helper function for wolfCLU_parse_file */
-int wolfCLU_inderOutder(char* inFile, char* outFile, int silentFlag);
-/* a helper function for wolfCLU_parse_file */
-int wolfCLU_inpemOuttext(char* inFile, char* outFile, int silentFlag);
-
 /**
  * @brief Function to print out DER public key
  *
@@ -75,17 +64,10 @@ int wolfCLU_printDer(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
 /**
  * @brief prints out the public key from a certificate
  *
- * @param infile file to read from
- * @param inform PEM_FORM/DER_FORM of input
- * @param outFile name of the file to write to
- * @param silentFlag if should be silent instead of printout
+ * @param x509 input to get public key from
+ * @param out  PEM_FORM/DER_FORM of input
  *
  * @return returns WOLFCLU_SUCCESS on success
  */
-int wolfCLU_printX509PubKey(char* inFile, int inForm, char* outFile,
-        int silentFlag);
-/* function for processing input/output based on format requests from user */
-int wolfCLU_parseFile(char* inFile, int inForm, char* outFile, int outForm,
-                                                               int silentFlag);
-
+int wolfCLU_printX509PubKey(WOLFSSL_X509* x509, WOLFSSL_BIO* out);
 #endif /* WOLFCLU_PARSE_H */
