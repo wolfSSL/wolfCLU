@@ -34,7 +34,22 @@ cert_test_case() {
 run1() {
     echo "TEST 1: VALID"
     echo "TEST 1.a"
-    test_case "-inform pem -outform pem"
+    test_case "-inform pem -outform pem -in certs/ca-cert.pem -out test.pem"
+    if [ ! -f test.pem ]; then
+        echo "issue creating output file"
+        exit 99
+    fi
+
+    ./wolfssl x509 -in test.pem -text -noout -out test.pem
+    ./wolfssl x509 -in certs/ca-cert.pem -text -noout -out ca-cert.pem
+    diff "./ca-cert.pem" "./test.pem" &> /dev/null
+    if [ $? != 0 ]; then
+        echo "issue with in pem out pem matching"
+        exit 99
+    fi
+    rm -f ca-cert.pem
+    rm -f test.pem
+
     echo "TEST 1.b"
     test_case "-inform pem -outform der"
     echo "TEST 1.c"

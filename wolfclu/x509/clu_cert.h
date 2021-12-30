@@ -31,8 +31,3 @@ int wolfCLU_certSetup(int argc, char** argv);
 /* print help info */
 void wolfCLU_certHelp(void);
 
-/* check for user input errors */
-int error_check(int inpemFlag, int inderFlag,
-                int outpemFlag, int outderFlag,
-                int textFlag, int textPubkey, int nooutFlag);
-
