@@ -534,12 +534,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_OUTFILE:
                 out = optarg;
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
                 break;
 
             case WOLFCLU_INFORM:
@@ -736,6 +730,21 @@ int wolfCLU_requestSetup(int argc, char** argv)
         ret = wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3);
     }
 
+    /* check that we have the key if re-signing */
+    if ((reqIn == NULL || reSign) && pkey == NULL) {
+        WOLFCLU_LOG(WOLFCLU_E0, "No key loaded to sign with");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
+        bioOut = wolfSSL_BIO_new_file(out, "wb");
+        if (bioOut == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
+                    optarg);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         /* output to stdout if no output is provided */
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
@@ -745,12 +754,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
-    }
-
-    /* check that we have the key if re-signing */
-    if ((reqIn == NULL || reSign) && pkey == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "No key loaded to sign with");
-        ret = WOLFCLU_FATAL_ERROR;
     }
 
     /* sign the req/cert */
