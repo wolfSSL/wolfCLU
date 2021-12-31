@@ -74,7 +74,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     char* data = NULL;
     void* key  = NULL;
     int derSz  = 0;
-    int dataSz = 0;
+    word32 dataSz = 0;
     int sigSz  = 0;
     int keySz  = 0;
     int option;
@@ -87,6 +87,20 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     enum wc_HashType      hashType = WC_HASH_TYPE_NONE;
     enum wc_SignatureType sigType  = WC_SIGNATURE_TYPE_NONE;
+
+    /* signed file should be the last arg */
+    if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
+        wolfCLU_dgstHelp();
+        return WOLFCLU_SUCCESS;
+    }
+    else {
+        dataBio = wolfSSL_BIO_new_file(argv[argc-1], "rb");
+        if (dataBio == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open data file %s",
+                    argv[argc-1]);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -122,7 +136,8 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             case WOLFCLU_VERIFY:
                 pubKeyBio = wolfSSL_BIO_new_file(optarg, "rb");
                 if (pubKeyBio == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open public key file %s", optarg);
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open public key file %s",
+                            optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
@@ -130,7 +145,8 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             case WOLFCLU_INFILE:
                 sigBio = wolfSSL_BIO_new_file(optarg, "rb");
                 if (sigBio == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to signature file %s", optarg);
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to signature file %s",
+                            optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
@@ -149,27 +165,35 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         }
     }
 
-    /* signed file should be the last arg */
-    if (ret == WOLFCLU_SUCCESS) {
-        dataBio = wolfSSL_BIO_new_file(argv[argc-1], "rb");
-        if (dataBio == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to open data file %s", argv[argc-1]);
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-
     if (ret == WOLFCLU_SUCCESS) {
         if (dataBio == NULL || sigBio == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error with reading signature or data");
+            WOLFCLU_LOG(WOLFCLU_E0, "error with reading signature or data");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        dataSz = wolfSSL_BIO_get_len(dataBio);
+        XFILE f;
+
+        /* get data size using raw FILE pointer and seek */
+        if (wolfSSL_BIO_get_fp(dataBio, &f) != WOLFSSL_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get raw file pointer");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS && XFSEEK(f, 0, XSEEK_END) != 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to seek end of file");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            dataSz = (word32)XFTELL(f);
+            wolfSSL_BIO_reset(dataBio);
+        }
         sigSz  = wolfSSL_BIO_get_len(sigBio);
+
         if (dataSz <= 0 || sigSz <= 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "no signature or data");
+            WOLFCLU_LOG(WOLFCLU_E0, "No signature or data");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -181,9 +205,18 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             ret = MEMORY_E;
         }
         else {
-            if (wolfSSL_BIO_read(dataBio, data, dataSz) <= 0) {
-                WOLFCLU_LOG(WOLFCLU_L0, "error reading data");
-                ret = WOLFCLU_FATAL_ERROR;
+            word32 totalRead = 0;
+
+            /* read in 4k at a time because file could be larger than int type
+             * restriction on size input for wolfSSL_BIO_read */
+            while (totalRead < dataSz) {
+                int sz = min(dataSz - totalRead, 4096);
+                if (wolfSSL_BIO_read(dataBio, data + totalRead, sz) != sz) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "Error reading data");
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+                }
+                totalRead += sz;
             }
         }
     }
@@ -195,7 +228,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         }
         else {
             if (wolfSSL_BIO_read(sigBio, sig, sigSz) <= 0) {
-                WOLFCLU_LOG(WOLFCLU_L0, "error reading sig");
+                WOLFCLU_LOG(WOLFCLU_E0, "Error reading sig");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -205,7 +238,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS) {
         pkey = wolfSSL_PEM_read_bio_PUBKEY(pubKeyBio, NULL, NULL, NULL);
         if (pkey == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to decode public key");
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to decode public key");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -218,21 +251,21 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
                 key = (void*)&rsa;
                 if (wc_InitRsaKey(&rsa, NULL) != 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to initialize rsa key");
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to initialize rsa key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
                     derSz = wolfSSL_i2d_PUBKEY(pkey, &der);
                     if (derSz <= 0) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "error converting pkey to der");
+                        WOLFCLU_LOG(WOLFCLU_E0, "Error converting pkey to der");
                         ret = WOLFCLU_FATAL_ERROR;
                     }
                 }
 
                 if (ret == WOLFCLU_SUCCESS &&
                     wc_RsaPublicKeyDecode(der, &idx, &rsa, derSz) != 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "error decoding public rsa key");
+                    WOLFCLU_LOG(WOLFCLU_E0, "Error decoding public rsa key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
@@ -244,28 +277,28 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
                 key = (void*)&ecc;
                 if (wc_ecc_init(&ecc) != 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "error initializing ecc key");
+                    WOLFCLU_LOG(WOLFCLU_E0, "Error initializing ecc key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
                     derSz = wolfSSL_i2d_PUBKEY(pkey, &der);
                     if (derSz <= 0) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "error converting pkey to der");
+                        WOLFCLU_LOG(WOLFCLU_E0, "Error converting pkey to der");
                         ret = WOLFCLU_FATAL_ERROR;
                     }
                 }
 
                 if (ret == WOLFCLU_SUCCESS &&
                         wc_EccPublicKeyDecode(der, &idx, &ecc, derSz) != 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "error decoding public ecc key");
+                    WOLFCLU_LOG(WOLFCLU_E0, "Error decoding public ecc key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
                 break;
 
             default:
-                WOLFCLU_LOG(WOLFCLU_L0, "key type not yet supported");
+                WOLFCLU_LOG(WOLFCLU_E0, "Key type not yet supported");
                 ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -276,7 +309,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_L0, "Verify OK");
         }
         else {
-            WOLFCLU_LOG(WOLFCLU_L0, "Verification failure");
+            WOLFCLU_LOG(WOLFCLU_E0, "Verification failure");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -297,7 +330,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                 FALL_THROUGH;
 
             default:
-                WOLFCLU_LOG(WOLFCLU_L0, "key type not yet supported");
+                WOLFCLU_LOG(WOLFCLU_E0, "Key type not yet supported");
                 ret = WOLFCLU_FATAL_ERROR;
         }
     }
