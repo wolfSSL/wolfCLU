@@ -23,7 +23,7 @@ if [ $? != 0 ]; then
     exit 99
 fi
 
-RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem -crl_check ./certs/server-cert.pem | grep "recompile wolfSSL with CRL"`
+RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem -crl_check ./certs/server-cert.pem 2>&1 | grep "recompile wolfSSL with CRL"`
 HAVE_CRL=$?
 
 #if the return value of the grep is success (0) then CRL not compiled in

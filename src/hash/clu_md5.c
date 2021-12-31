@@ -31,7 +31,7 @@ int wolfCLU_md5Setup(int argc, char** argv)
     int     ret         = 0;
 
 #ifdef NO_MD5
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfCrypt compiled without MD5 support");
+    WOLFCLU_LOG(WOLFCLU_E0, "wolfCrypt compiled without MD5 support");
     ret = NOT_COMPILED_IN;
     (void)bioIn;
     (void)bioOut;
@@ -43,7 +43,7 @@ int wolfCLU_md5Setup(int argc, char** argv)
     if (argc >= 3) {
         bioIn = wolfSSL_BIO_new_file(argv[2], "rb");
         if (bioIn == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to open file %s", argv[2]);
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", argv[2]);
             return USER_INPUT_ERROR;
         }
     }

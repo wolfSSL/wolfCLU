@@ -143,7 +143,7 @@ int main(int argc, char** argv)
 #endif
 
     if (wolfCrypt_Init() != 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "wolfCyprt initialization failed!");
+        WOLFCLU_LOG(WOLFCLU_E0, "wolfCyprt initialization failed!");
         return -1;
     }
 #ifdef DEBUG_WOLFSSL

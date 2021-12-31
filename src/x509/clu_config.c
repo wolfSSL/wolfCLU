@@ -121,7 +121,7 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseSubjectKeyID(char* str, int crit,
 
             pkey = wolfSSL_X509_get_pubkey(x509);
             if (pkey == NULL) {
-                WOLFCLU_LOG(WOLFCLU_L0, "no public key set to hash for subject key id");
+                WOLFCLU_LOG(WOLFCLU_E0, "no public key set to hash for subject key id");
                 return NULL;
             }
 
@@ -137,18 +137,18 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseSubjectKeyID(char* str, int crit,
                     break;
 
                 default:
-                    WOLFCLU_LOG(WOLFCLU_L0, "key type not yet supported");
+                    WOLFCLU_LOG(WOLFCLU_E0, "key type not yet supported");
             }
 
             if (wc_SetSubjectKeyIdFromPublicKey_ex(&cert, keyType, key) < 0) {
-                WOLFCLU_LOG(WOLFCLU_L0, "error hashing public key");
+                WOLFCLU_LOG(WOLFCLU_E0, "error hashing public key");
             }
             else {
                 data = wolfSSL_ASN1_STRING_new();
                 if (data != NULL) {
                     if (wolfSSL_ASN1_STRING_set(data, cert.skid, cert.skidSz)
                             != WOLFSSL_SUCCESS) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "error setting the skid");
+                        WOLFCLU_LOG(WOLFCLU_E0, "error setting the skid");
                     }
                     else {
                         ext = wolfSSL_X509V3_EXT_i2d(NID_subject_key_identifier,
@@ -228,7 +228,7 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseKeyUsage(char* str, int crit,
     if (data != NULL) {
         if (wolfSSL_ASN1_STRING_set(data, (byte*)&keyUseFlag, sizeof(word16))
                         != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error setting the key use");
+            WOLFCLU_LOG(WOLFCLU_E0, "error setting the key use");
         }
         else {
             ext = wolfSSL_X509V3_EXT_i2d(NID_key_usage, crit, data);
@@ -271,7 +271,7 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
     if (ext != NULL) {
         ret = wolfSSL_X509_add_ext(x509, ext, -1);
         if (ret != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error %d adding extesion", ret);
+            WOLFCLU_LOG(WOLFCLU_E0, "error %d adding extesion", ret);
         }
         *idx = *idx + 1;
     }
@@ -303,7 +303,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         if (current != NULL) {
             if (wolfSSL_X509_add_altname(x509, current, ASN_DNS_TYPE)
                     != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "error adding alt name %s", current);
+                WOLFCLU_LOG(WOLFCLU_E0, "error adding alt name %s", current);
             }
         }
         i++;
@@ -328,12 +328,12 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
                 if (wolfSSL_X509_add_altname_ex(x509, (const char*)data, dataSz,
                             ASN_IP_TYPE) != WOLFSSL_SUCCESS) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "error adding ip alt name %s", data);
+                    WOLFCLU_LOG(WOLFCLU_E0, "error adding ip alt name %s", data);
                 }
                 wolfSSL_ASN1_STRING_free(str);
             }
             else {
-                WOLFCLU_LOG(WOLFCLU_L0, "bad IP found %s", current);
+                WOLFCLU_LOG(WOLFCLU_E0, "bad IP found %s", current);
                 return WOLFCLU_FATAL_ERROR;
             }
         }
@@ -392,7 +392,7 @@ static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     (void)conf;
     (void)sect;
 
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfSSL not compiled with cert extensions");
+    WOLFCLU_LOG(WOLFCLU_E0, "wolfSSL not compiled with cert extensions");
     return NOT_COMPILED_IN;
 }
 #endif /* WOLFSSL_CERT_EXT */

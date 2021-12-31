@@ -75,7 +75,7 @@ int wolfCLU_ecparam(int argc, char** argv)
             case WOLFCLU_OUTFORM:
                 outForm = wolfCLU_checkOutform(optarg);
                 if (outForm < 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "bad outform");
+                    WOLFCLU_LOG(WOLFCLU_E0, "bad outform");
                     return USER_INPUT_ERROR;
                 }
                 break;
@@ -118,7 +118,7 @@ int wolfCLU_ecparam(int argc, char** argv)
     }
 
     if (genKey == 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "only supporting genkey so far");
+        WOLFCLU_LOG(WOLFCLU_E0, "only supporting genkey so far");
         if (name != NULL) {
             XFREE(name, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         }

@@ -56,7 +56,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
 
     keyFile = XFOPEN(keyPath, "rb");
     if (keyFile == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "unable to open key file %s", keyPath);
+        WOLFCLU_LOG(WOLFCLU_E0, "unable to open key file %s", keyPath);
         return BAD_FUNC_ARG;
     }
 
@@ -73,14 +73,14 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
 
     ret = wc_ecc_init(&key);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize ecc key\nRET: %d", ret);
+        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize ecc key\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
 
     ret = wc_InitRng(&rng);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize rng.\nRET: %d", ret);
+        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize rng.\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
@@ -88,14 +88,14 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
     ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Failed to decode private key.\nRET: %d",
+        WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode private key.\nRET: %d",
                 ret);
         return ret;
     }
 
     ret = wc_InitCert(&newCert);
     if (ret != 0 ) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Failed to init Cert \nRET: %d", ret);
+        WOLFCLU_LOG(WOLFCLU_E0, "Failed to init Cert \nRET: %d", ret);
         return ret;
     }
 
@@ -150,7 +150,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
 
     certBuf = (byte*)XMALLOC(FOURK_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (certBuf == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0,
+        WOLFCLU_LOG(WOLFCLU_E0,
                 "Failed to initialize buffer to store certificate.");
         return -1;
     }
@@ -159,7 +159,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
 
     ret = wc_MakeCert(&newCert, certBuf, FOURK_SZ, NULL, &key, &rng);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Failed to make certificate.");
+        WOLFCLU_LOG(WOLFCLU_E0, "Failed to make certificate.");
         XFREE(certBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
@@ -168,7 +168,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
     ret = wc_SignCert(newCert.bodySz, newCert.sigType, certBuf, FOURK_SZ, NULL,
                                                               &key, &rng);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Failed to sign certificate.");
+        WOLFCLU_LOG(WOLFCLU_E0, "Failed to sign certificate.");
         XFREE(certBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
@@ -181,7 +181,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
             "Writing newly generated certificate to file \"%s\"", certOut);
     file = XFOPEN(certOut, "wb");
     if (!file) {
-        WOLFCLU_LOG(WOLFCLU_L0, "failed to open file: %s", certOut);
+        WOLFCLU_LOG(WOLFCLU_E0, "failed to open file: %s", certOut);
         XFREE(certBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return -1;
     }
@@ -197,7 +197,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
     WOLFCLU_LOG(WOLFCLU_L0, "Convert the der cert to pem formatted cert");
     pemBuf = (byte*)XMALLOC(FOURK_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (pemBuf == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Failed to initialize pem buffer.");
+        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize pem buffer.");
         return -1;
     }
 
@@ -205,7 +205,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
 
     pemBufSz = wc_DerToPem(certBuf, certBufSz, pemBuf, FOURK_SZ, CERT_TYPE);
     if (pemBufSz < 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Failed to convert from der to pem.");
+        WOLFCLU_LOG(WOLFCLU_E0, "Failed to convert from der to pem.");
         XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return -1;
     }
@@ -214,7 +214,7 @@ int make_self_signed_ecc_certificate(char* keyPath, char* certOut, int oid)
 
     pemFile = XFOPEN(certOut, "wb");
     if (!pemFile) {
-        WOLFCLU_LOG(WOLFCLU_L0, "failed to open file: %s", certOut);
+        WOLFCLU_LOG(WOLFCLU_E0, "failed to open file: %s", certOut);
         XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return -1;
     }

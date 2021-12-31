@@ -87,7 +87,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Inkey file %s did not exist. Please check your options.",
+            WOLFCLU_LOG(WOLFCLU_E0, "Inkey file %s did not exist. Please check your options.",
                     argv[ret+1]);
             return MEMORY_E;
         }
@@ -118,7 +118,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "In file did not exist. Please check your options.");
+            WOLFCLU_LOG(WOLFCLU_E0, "In file did not exist. Please check your options.");
             return MEMORY_E;
         }
 
@@ -135,7 +135,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Signature file did not exist. Please check your options.");
+            WOLFCLU_LOG(WOLFCLU_E0, "Signature file did not exist. Please check your options.");
             return MEMORY_E;
         }
 
@@ -143,7 +143,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         sig[XSTRLEN(argv[ret+1])] = '\0';
     }
     else if (verifyCheck == 1) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Please specify -sigfile <sig> when verifying.");
+        WOLFCLU_LOG(WOLFCLU_E0, "Please specify -sigfile <sig> when verifying.");
         wolfCLU_verifyHelp(algCheck);
         return ret;
     }
@@ -178,7 +178,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             /* ignore no -in. RSA verify doesn't check original message */
         }
         else {
-            WOLFCLU_LOG(WOLFCLU_L0, "Must have input as either a file or standard I/O");
+            WOLFCLU_LOG(WOLFCLU_E0, "Must have input as either a file or standard I/O");
             return WOLFCLU_FATAL_ERROR;
         }
     }

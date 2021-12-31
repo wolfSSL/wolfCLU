@@ -186,7 +186,7 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
 
         if (x509 == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to parse input file");
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to parse input file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -223,7 +223,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     /* write out human readable text if set to */
     if (ret == WOLFCLU_SUCCESS && textFlag) {
         if (wolfSSL_X509_print(out, x509) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to print certificate out");
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to print certificate out");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -237,13 +237,13 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && !nooutFlag) {
         if (outForm == PEM_FORM) {
             if (wolfSSL_PEM_write_bio_X509(out, x509) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "unable to write certificate out");
+                WOLFCLU_LOG(WOLFCLU_E0, "unable to write certificate out");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         else {
             if (wolfSSL_i2d_X509_bio(out, x509) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "unable to write certificate out");
+                WOLFCLU_LOG(WOLFCLU_E0, "unable to write certificate out");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }

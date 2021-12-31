@@ -473,7 +473,7 @@ static int wolfSSL_X509_REQ_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509)
 int wolfCLU_requestSetup(int argc, char** argv)
 {
 #ifndef WOLFSSL_CERT_REQ
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfSSL not compiled with --enable-certreq");
+    WOLFCLU_LOG(WOLFCLU_E0, "wolfSSL not compiled with --enable-certreq");
      /* silence unused variable warnings */
     (void) argc;
     (void) argv;
