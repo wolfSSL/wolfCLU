@@ -227,6 +227,8 @@ int wolfCLU_PKCS12(int argc, char** argv)
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_EVP_PKEY_free(pkey);
+    wolfSSL_X509_free(cert);
+    wolfSSL_sk_X509_pop_free(extra, NULL);
     wc_PKCS12_free(pkcs12);
 
     (void)useDES;

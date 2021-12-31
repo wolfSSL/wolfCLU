@@ -40,7 +40,7 @@ echo "Doing large file test"
 # recreate large file and test
 rm -f large-test.txt
 for i in {1..5000}; do
-    cat ../../certs/server-key.der >> large-test.txt
+    cat ./certs/server-key.der >> large-test.txt
 done
 run "dgst -sha256 -verify ./certs/server-keyPub.pem -signature ./tests/dgst/5000-server-key.sig ./large-test.txt"
 rm -f large-test.txt

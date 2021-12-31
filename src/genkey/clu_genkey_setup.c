@@ -62,12 +62,14 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         else {
             WOLFCLU_LOG(WOLFCLU_E0, "ERROR: No output file name specified");
             wolfCLU_genKeyHelp();
+            wc_FreeRng(&rng);
             return USER_INPUT_ERROR;
         }
     }
     else {
         WOLFCLU_LOG(WOLFCLU_E0, "ERROR: Please specify an output file name");
         wolfCLU_genKeyHelp();
+        wc_FreeRng(&rng);
         return USER_INPUT_ERROR;
     }
 
@@ -82,6 +84,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     }
     else {
         WOLFCLU_LOG(WOLFCLU_E0, "ERROR: \"%s\" is not a valid file format", format);
+        wc_FreeRng(&rng);
         return ret;
     }
 
@@ -117,6 +120,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_E0, "Invalid option, ED25519 not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-ed25519 and "
                "try again");
+        wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
     #endif /* HAVE_ED25519 */
 
@@ -170,6 +174,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_E0, "Invalid option, ECC not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-ecc and "
                "try again");
+        wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
     #endif /* HAVE_ECC */
     }
@@ -264,15 +269,17 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_E0, "Invalid option, RSA not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-rsa and "
                "try again");
+        wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
     #endif /* NO_RSA */
     }
     else {
         WOLFCLU_LOG(WOLFCLU_E0, "\"%s\" is an invalid key type, or not compiled in", keyType);
+        wc_FreeRng(&rng);
         return USER_INPUT_ERROR;
     }
 
+    wc_FreeRng(&rng);
     return ret;
 }
-
 

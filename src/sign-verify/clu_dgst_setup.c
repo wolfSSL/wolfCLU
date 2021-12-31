@@ -68,7 +68,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     WOLFSSL_BIO *sigBio = NULL;
     WOLFSSL_BIO *pubKeyBio = NULL;
     WOLFSSL_BIO *dataBio = NULL;
-    WOLFSSL_EVP_PKEY *pkey;
+    WOLFSSL_EVP_PKEY *pkey = NULL;
     int     ret = WOLFCLU_SUCCESS;
     char* sig  = NULL;
     char* data = NULL;
@@ -339,7 +339,10 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (sig != NULL)
         XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (der != NULL)
+        XFREE(der, NULL, DYNAMIC_TYPE_OPENSSL);
 
+    wolfSSL_EVP_PKEY_free(pkey);
     wolfSSL_BIO_free(sigBio);
     wolfSSL_BIO_free(pubKeyBio);
     wolfSSL_BIO_free(dataBio);

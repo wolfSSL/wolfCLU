@@ -58,6 +58,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     privKeyFile = XFOPEN(privKey, "rb");
     if (privKeyFile == NULL) {
         WOLFCLU_LOG(WOLFCLU_E0, "Unable to open file %s", privKey);
+        wc_FreeRsaKey(&key);
         return NULL;
     }
     XFSEEK(privKeyFile, 0, SEEK_END);
@@ -71,9 +72,11 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
 
     /* retrieving private key and storing in the RsaKey */
     ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
+    XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret < 0 ) {
         WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode private key.\nRET: %d", ret);
         *outBufSz = ret;
+        wc_FreeRsaKey(&key);
         return outBuf;
     }
 
@@ -83,6 +86,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     /* setting up output buffer based on privateKeyFile size */
     outBuf = (byte*)XMALLOC(*outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (outBuf == NULL) {
+        wc_FreeRsaKey(&key);
         return NULL;
     }
     XMEMSET(outBuf, 0, *outBufSz);
@@ -92,9 +96,11 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
         WOLFCLU_LOG(WOLFCLU_E0, "Failed to create RSA public key.\nBuf size: %d\nRET: %d",
                *outBufSz, ret);
         *outBufSz = ret;
+        wc_FreeRsaKey(&key);
         return outBuf;
     }
     *outBufSz = ret;
+    wc_FreeRsaKey(&key);
     return outBuf;
 #else
     return NOT_COMPILED_IN;
@@ -244,6 +250,9 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
             ret = -1;
     }
 
+    if (data != NULL) {
+        XFREE(data , HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
     if (hash != NULL) {
         XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
@@ -279,6 +288,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         keyPathFile = XFOPEN(keyPath, "rb");
         if (keyPathFile == NULL) {
             WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", keyPath);
+            wc_FreeRsaKey(&key);
             return BAD_FUNC_ARG;
         }
 
@@ -295,18 +305,20 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         keyBuf = wolfCLU_generate_public_key_rsa(keyPath, keyBuf, &keyFileSz);
         if (keyFileSz < 0) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Failed to derive public key from private key.");
+                wc_FreeRsaKey(&key);
                 return ret;
         }
     }
 
     /* retrieving public key and storing in the RsaKey */
     ret = wc_RsaPublicKeyDecode(keyBuf, &index, &key, keyFileSz);
-    if (pubIn == 1 && keyBuf != NULL) {
+    if (keyBuf != NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     if (ret < 0 ) {
         WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode public key.\nRET: %d", ret);
+        wc_FreeRsaKey(&key);
         return ret;
     }
 
@@ -315,6 +327,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (outBuf == NULL) {
         WOLFCLU_LOG(WOLFCLU_E0, "Failed to malloc output buffer");
+        wc_FreeRsaKey(&key);
         return MEMORY_E;
     }
     XMEMSET(outBuf, 0, outBufSz);
@@ -323,6 +336,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     if (ret < 0) {
         WOLFCLU_LOG(WOLFCLU_E0, "Failed to verify data with RSA public key.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        wc_FreeRsaKey(&key);
         return ret;
     }
     else {
@@ -340,6 +354,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
+    wc_FreeRsaKey(&key);
     return (ret < 0)? ret : WOLFCLU_SUCCESS;
 #else
     return NOT_COMPILED_IN;
@@ -403,6 +418,9 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
             return ret;
         }
     }
+
+    if (keyBuf)
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     ret = wc_ecc_verify_hash(sig, sigSz, hash, hashSz, &stat, &key);
     if (ret < 0) {

@@ -1149,6 +1149,7 @@ static void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid,
             entry = wolfSSL_X509_NAME_ENTRY_create_by_NID(NULL, nid,
                 type, (const unsigned char*)str, sz);
             wolfSSL_X509_NAME_add_entry(name, entry, -1, 0);
+            wolfSSL_X509_NAME_ENTRY_free(entry);
         }
     }
 }

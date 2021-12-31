@@ -60,11 +60,13 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* str, int crit)
         return NULL;
 
     wolfSSL_X509_EXTENSION_set_critical(ext, crit);
-    if (wolfSSL_X509_EXTENSION_set_object(ext,
-               wolfSSL_OBJ_nid2obj(NID_basic_constraints)) != WOLFSSL_SUCCESS) {
+    obj = wolfSSL_OBJ_nid2obj(NID_basic_constraints);
+    if (wolfSSL_X509_EXTENSION_set_object(ext, obj) != WOLFSSL_SUCCESS) {
         wolfSSL_X509_EXTENSION_free(ext);
+        wolfSSL_ASN1_OBJECT_free(obj);
         return NULL;
     }
+    wolfSSL_ASN1_OBJECT_free(obj);
 
     obj = wolfSSL_X509_EXTENSION_get_object(ext);
     if (obj == NULL) {
@@ -274,6 +276,7 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
             WOLFCLU_LOG(WOLFCLU_E0, "error %d adding extesion", ret);
         }
         *idx = *idx + 1;
+        wolfSSL_X509_EXTENSION_free(ext);
     }
     return WOLFCLU_SUCCESS;
 }
@@ -411,6 +414,7 @@ static int wolfCLU_X509addEntry(WOLFSSL_X509_NAME* name, WOLFSSL_CONF* conf,
         entry = wolfSSL_X509_NAME_ENTRY_create_by_NID(NULL, nid,
                 type, current, (int)XSTRLEN((const char*)current));
         wolfSSL_X509_NAME_add_entry(name, entry, -1, 0);
+        wolfSSL_X509_NAME_ENTRY_free(entry);
         return WOLFCLU_SUCCESS;
     }
     return WOLFCLU_FAILURE;
@@ -486,6 +490,7 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             "emailAddress");
 
     wolfSSL_X509_REQ_set_subject_name(x509, name);
+    wolfSSL_X509_NAME_free(name);
     return WOLFCLU_SUCCESS;
 }
 

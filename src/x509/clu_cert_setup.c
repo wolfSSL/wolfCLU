@@ -36,12 +36,6 @@ int wolfCLU_certSetup(int argc, char** argv)
     int textFlag    = 0;   /* does user desire human readable cert info */
     int textPubkey  = 0;   /* does user desire human readable pubkey info */
     int nooutFlag   = 0;   /* are we outputting a file */
-    int inderFlag   = 0;   /* is the incoming file in der format */
-    int inpemFlag   = 1;   /* is the incoming file in pem format */
-    int outderFlag  = 0;   /* is the output file in der format */
-    int outpemFlag  = 1;   /* is the output file in pem format */
-    int inFileFlag  = 0;   /* set if passing in file argument */
-    int outFileFlag = 0;   /* set if passing out file argument */
     int silentFlag  = 0;   /* set to disable echo to command line */
 
     char* inFile  = NULL;   /* pointer to the inFile name */
@@ -84,10 +78,6 @@ int wolfCLU_certSetup(int argc, char** argv)
         idx = wolfCLU_checkForArg("-inform", 7, argc, argv);
         if (idx > 0) {
             inForm = wolfCLU_checkInform(argv[idx+1]);
-            if (inForm == DER_FORM) {
-                inpemFlag = 0;
-                inderFlag = 1;
-            }
         }
     }
 
@@ -98,10 +88,6 @@ int wolfCLU_certSetup(int argc, char** argv)
         idx = wolfCLU_checkForArg("-outform", 8, argc, argv);
         if (idx > 0) {
             outForm = wolfCLU_checkOutform(argv[idx+1]);
-            if (outForm == DER_FORM) {
-                outpemFlag = 0;
-                outderFlag = 1;
-            }
         }
     }
 
@@ -131,7 +117,6 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS) {
         if (access(inFile, F_OK) != -1) {
             WOLFCLU_LOG(WOLFCLU_L0, "input file is \"%s\"", inFile);
-            inFileFlag = 1;
         }
         else {
             WOLFCLU_LOG(WOLFCLU_E0, "ERROR: input file \"%s\" does not exist",
@@ -147,7 +132,6 @@ int wolfCLU_certSetup(int argc, char** argv)
         if (idx > 0) {
             /* set flag for out file, check for error case below. If no error
              * then write outFile */
-            outFileFlag = 1;
             outFile = argv[idx+1];
         }
 
@@ -173,6 +157,7 @@ int wolfCLU_certSetup(int argc, char** argv)
          * return NOT_YET_IMPLEMENTED error
          */
         silentFlag = 1;
+	(void)silentFlag;
     } /* Optional flag do not return error */
 /*---------------------------------------------------------------------------*/
 /* END ARG PROCESSING */

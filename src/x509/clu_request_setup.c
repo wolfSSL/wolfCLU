@@ -207,15 +207,16 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
             WOLFSSL_X509_EXTENSION* ext = wolfSSL_X509_get_ext(x509, i);
             if (ext != NULL) {
                 WOLFSSL_ASN1_OBJECT* obj;
-                char buf[MAX_WIDTH];
+                char buf[MAX_WIDTH-4]; /* -4 to avoid warning when used in
+                                        * in XSNPRINTF */
                 char* altName;
                 int nid;
 
                 obj = wolfSSL_X509_EXTENSION_get_object(ext);
                 wolfSSL_OBJ_obj2txt(buf, MAX_WIDTH, obj, 0);
-                XSNPRINTF(scratch, MAX_WIDTH, "%*s%s: %s\n", indent + 4, "",
+                XSNPRINTF(scratch, MAX_WIDTH, "%*s%s%s\n", indent + 4, "",
                    buf,
-                   (wolfSSL_X509_EXTENSION_get_critical(ext))? "Critical" : "");
+                   (wolfSSL_X509_EXTENSION_get_critical(ext))? ": Critical" : ":");
 
                 wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
                 nid = wolfSSL_OBJ_obj2nid(obj);
@@ -709,6 +710,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         name = wolfCLU_ParseX509NameString(subj, (int)XSTRLEN(subj));
         if (name != NULL) {
             wolfSSL_X509_REQ_set_subject_name(x509, name);
+            wolfSSL_X509_NAME_free(name);
         }
 
         reSign = 1; /* re-sign after subject change */
@@ -726,6 +728,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         else {
             wolfCLU_CreateX509Name(name);
             wolfSSL_X509_REQ_set_subject_name(x509, name);
+            wolfSSL_X509_NAME_free(name);
         }
     }
 
