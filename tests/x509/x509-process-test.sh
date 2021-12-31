@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ ! -d ./certs/ ]; then
+    #return 77 to indicate to automake that the test was skipped
+    exit 77
+fi
+
 test_return() {
     CHECK=$1
     #UNCOMMENT FOR VERBOSE OUTPUT
