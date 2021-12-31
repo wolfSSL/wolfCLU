@@ -5,23 +5,24 @@ if [ ! -d ./certs/ ]; then
     exit 77
 fi
 
-test_return() {
-    CHECK=$1
-    #UNCOMMENT FOR VERBOSE OUTPUT
-    echo "${2}"
-    [ $CHECK != 23 ] && [ $CHECK != 22 ] && [ $CHECK != 0 ] \
-                           && echo "CHECK = $CHECK" && exit 5
-    [ $CHECK == 0 ] && echo "valid input: TEST PASSED"
-    [ $CHECK == 23 ] && echo "successfully caught input error: TEST PASSED"
-    [ $CHECK == 22 ] && echo "valid input, no input file specified: TEST PASSED"
-    echo ""
-}
-
 test_case() {
     echo "testing: ./wolfssl -x509 $1"
     OUTPUT=$(./wolfssl -x509 $1)
     RESULT=$?
-    test_return $RESULT "$OUTPUT"
+    if [ $RESULT != 0 ]; then
+        echo "Failed when expected to pass"
+        exit 99
+    fi
+}
+
+fail_case() {
+    echo "testing: ./wolfssl -x509 $1"
+    OUTPUT=$(./wolfssl -x509 $1)
+    RESULT=$?
+    if [ $RESULT == 0 ]; then
+        echo "Success when expected to fail"
+        exit 99
+    fi
 }
 
 cert_test_case() {
@@ -45,6 +46,7 @@ run1() {
         exit 99
     fi
 
+    echo "TEST 1.b"
     ./wolfssl x509 -in test.pem -text -noout -out test.pem
     ./wolfssl x509 -in certs/ca-cert.pem -text -noout -out ca-cert.pem
     diff "./ca-cert.pem" "./test.pem" &> /dev/null
@@ -55,54 +57,57 @@ run1() {
     rm -f ca-cert.pem
     rm -f test.pem
 
-    echo "TEST 1.b"
-    test_case "-inform pem -outform der"
     echo "TEST 1.c"
-    test_case "-inform der -outform pem"
+    test_case "-inform pem -outform der -in certs/ca-cert.pem -out test.der"
+    rm -f test.der
+
     echo "TEST 1.d"
-    test_case "-inform der -outform der"
-    echo ""
+    test_case "-inform der -outform pem -in certs/ca-cert.der"
     echo "TEST 1.e"
-    test_case "-inform der -text -noout"
+    test_case "-inform der -outform der -in certs/ca-cert.der -out test.der"
+    rm -f test.der
+    echo ""
+    echo "TEST 1.f"
+    test_case "-inform der -text -noout -in certs/ca-cert.der"
     echo ""
 }
 
 run2() {
     echo "TEST 2: INVALID INPUT"
     echo "TEST 2.a"
-    test_case "-inform pem -inform der"
+    fail_case "-inform pem -inform der"
     echo "TEST 2.b"
-    test_case "-outform pem -outform der"
+    fail_case "-outform pem -outform der"
     echo "TEST 2.c"
-    test_case "-inform -inform"
+    fail_case "-inform -inform"
     echo "TEST 2.d"
-    test_case "-outform -outform"
+    fail_case "-outform -outform"
     echo "TEST 2.e"
-    test_case "-inform pem -inform der -inform"
+    fail_case "-inform pem -inform der -inform"
     echo "TEST 2.f"
-    test_case "-outform pem -outform der -outform"
+    fail_case "-outform pem -outform der -outform"
     echo "TEST 2.g"
-    test_case "-inform pem -outform der -inform"
+    fail_case "-inform pem -outform der -inform"
     echo "TEST 2.h"
-    test_case "-outform pem -inform der -outform"
+    fail_case "-outform pem -inform der -outform"
     echo "TEST 2.i"
-    test_case "-inform"
+    fail_case "-inform"
     echo "TEST 2.j"
-    test_case "-outform"
+    fail_case "-outform"
     echo "TEST 2.k"
-    test_case "-outform pem -outform der -noout"
+    fail_case "-outform pem -outform der -noout"
     echo "TEST 2.l"
-    test_case "-outform -outform -noout"
+    fail_case "-outform -outform -noout"
     echo "TEST 2.m"
-    test_case "-outform pem -outform der -outform -noout"
+    fail_case "-outform pem -outform der -outform -noout"
     echo "TEST 2.n"
-    test_case "-inform pem -outform der -inform -noout"
+    fail_case "-inform pem -outform der -inform -noout"
     echo "TEST 2.o"
-    test_case "-outform pem -inform der -outform -noout"
+    fail_case "-outform pem -inform der -outform -noout"
     echo "TEST 2.p"
-    test_case "-outform -noout"
+    fail_case "-outform -noout"
     echo "TEST 2.q"
-    test_case "-inform pem -outform pem -noout"
+    fail_case "-inform pem -outform pem -noout"
 }
 
 run3() {
@@ -118,25 +123,35 @@ run3() {
     cert_test_case "-inform pem -outform der -in certs/ca-cert.pem -out tmp.der" \
                     test.der tmp.der
     rm -f test.pem tmp.pem
-    echo "TEST 3.c"
-    test_case "-inform der -in ca-cert.pem -outform der -out out.txt"
-    echo "TEST 3.d"
-    test_case "-inform pem -in ca-cert.pem -outform pem -out out.txt"
 }
 
 run4() {
     echo "TEST4: INVALID INPUT FILES"
     echo "TEST 4.a"
     #convert ca-cert.der to tmp.pem and compare to ca-cert.pem for valid transform
-    test_case "-inform der -in certs/ca-cert.der
+    fail_case "-inform der -in certs/ca-cert.der
                     -in certs/ca-cert.der -outform pem -out tmp.pem"
     echo "TEST 4.b"
-    test_case "-inform der -in certs/ca-cert.der
+    fail_case "-inform der -in certs/ca-cert.der
                     -outform pem -out tmp.pem -out tmp.pem"
 
     echo "TEST 4.c"
-    test_case "-inform pem -outform der -in certs/ca-cert.pem
+    fail_case "-inform pem -outform der -in certs/ca-cert.pem
                     -out tmp.der -out tmp.der -in certs/ca-cert.pem"
+    echo "TEST 4.d"
+    rm -f test.der
+    fail_case "-inform pem -in certs/ca-cert.der -outform der -out test.der"
+    if [ -f test.der ]; then
+        echo "./wolfssl x509 -inform pem -in certs/ca-cert.der -outform der -out test.der"
+        echo "Should not have created output file in error case!"
+        rm -f test.der
+        exit 99
+    fi
+    rm -f test.der
+    echo "TEST 4.e"
+    fail_case "-inform der -in ca-cert.pem -outform der -out out.txt"
+    echo "TEST 4.f"
+    fail_case "-inform pem -in ca-cert.pem -outform pem -out out.txt"
 }
 
 run1
