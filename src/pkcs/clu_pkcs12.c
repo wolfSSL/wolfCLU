@@ -100,7 +100,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open pkcs12 file %s",
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open pkcs12 file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -109,7 +109,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
             case WOLFCLU_OUTFILE:
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
                 if (bioOut == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s",
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -121,7 +121,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
 
             case ':':
             case '?':
-                WOLFCLU_LOG(WOLFCLU_L0, "Bad argument found");
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument found");
                 wolfCLU_pKeyHelp();
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
@@ -134,7 +134,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
 
     /* with currently only supporting PKCS12 parsing, an input file is expected */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "no input file set");
+        WOLFCLU_LOG(WOLFCLU_E0, "No input file set");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -158,7 +158,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 else {
                     pkcs12 = wc_PKCS12_new();
                     if (wc_d2i_PKCS12(buf, bufSz, pkcs12) < 0) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "error reading pkcs12 file");
+                        WOLFCLU_LOG(WOLFCLU_E0, "Error reading pkcs12 file");
                         ret = WOLFCLU_FATAL_ERROR;
                     }
                 }
@@ -166,7 +166,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
             }
         }
         else {
-            WOLFCLU_LOG(WOLFCLU_L0, "error getting length of pkcs12 file");
+            WOLFCLU_LOG(WOLFCLU_E0, "Error getting length of pkcs12 file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -174,7 +174,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_PKCS12_parse(pkcs12, password, &pkey, &cert, &extra)
                 != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error parsing pkcs12 file");
+            WOLFCLU_LOG(WOLFCLU_E0, "Error parsing pkcs12 file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -196,7 +196,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     /* print out the certificate */
     if (ret == WOLFCLU_SUCCESS && cert != NULL && printCerts) {
         if (wolfSSL_PEM_write_bio_X509(bioOut, cert) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error printing cert file");
+            WOLFCLU_LOG(WOLFCLU_E0, "Error printing cert file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -209,7 +209,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
         for (i = 0; i < wolfSSL_sk_X509_num(extra); i++) {
             x509 = wolfSSL_sk_X509_value(extra, i);
             if (wolfSSL_PEM_write_bio_X509(bioOut, x509) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "error printing cert file");
+                WOLFCLU_LOG(WOLFCLU_E0, "Error printing cert file");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -219,7 +219,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && pkey != NULL && printKeys) {
         ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
         if (ret != WOLFCLU_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error getting pubkey from pem key");
+            WOLFCLU_LOG(WOLFCLU_E0, "Error getting pubkey from pem key");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -227,12 +227,14 @@ int wolfCLU_PKCS12(int argc, char** argv)
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_EVP_PKEY_free(pkey);
+    wolfSSL_X509_free(cert);
+    wolfSSL_sk_X509_pop_free(extra, NULL);
     wc_PKCS12_free(pkcs12);
 
     (void)useDES;
     return ret;
 #else
-    WOLFCLU_LOG(WOLFCLU_L0, "Recompile wolfSSL with PKCS12 support");
+    WOLFCLU_LOG(WOLFCLU_E0, "Recompile wolfSSL with PKCS12 support");
     return WOLFCLU_FATAL_ERROR;
 #endif
 }

@@ -98,6 +98,10 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                     in = wolfSSL_BIO_new_mem_buf(decodedBase64, decodeSz);
                 }
             }
+
+	    if (decodedBase64 != NULL) {
+                XFREE(decodedBase64, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+	    }
         }
     }
     else {
@@ -107,7 +111,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
 
     if (in == NULL) {
         WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", fileIn);
-        return WOLFCLU_FATAL_ERROR;
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret >= 0) {

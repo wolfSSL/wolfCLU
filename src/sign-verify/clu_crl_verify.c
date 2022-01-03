@@ -232,8 +232,8 @@ int wolfCLU_CRLVerify(int argc, char** argv)
                 WOLFCLU_LOG(WOLFCLU_L0, "OK");
             }
             else {
-                WOLFCLU_LOG(WOLFCLU_L0, "Verification failed");
-                WOLFCLU_LOG(WOLFCLU_L0, "Err (%d) : %s",
+                WOLFCLU_LOG(WOLFCLU_E0, "Verification failed");
+                WOLFCLU_LOG(WOLFCLU_E0, "Err (%d) : %s",
                     err, wolfSSL_ERR_reason_error_string(err));
                 ret = WOLFCLU_FATAL_ERROR;
             }

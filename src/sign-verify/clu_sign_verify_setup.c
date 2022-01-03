@@ -27,11 +27,11 @@
 
 int wolfCLU_sign_verify_setup(int argc, char** argv)
 {
-    int     ret         = WOLFCLU_SUCCESS;
-    char*   in          = NULL; /* input variable */
-    char*   out         = NULL; /* output variable */
-    char*   priv;               /* private key variable */
-    char*   sig;
+    int     ret  = WOLFCLU_SUCCESS;
+    char*   in   = NULL; /* input variable */
+    char*   out  = NULL; /* output variable */
+    char*   priv = NULL; /* private key variable */
+    char*   sig  = NULL;
 
     int     algCheck;           /* acceptable algorithm check */
     int     inCheck     = 0;    /* input check */
@@ -87,8 +87,9 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Inkey file %s did not exist. Please check your options.",
+            WOLFCLU_LOG(WOLFCLU_E0, "Inkey file %s did not exist. Please check your options.",
                     argv[ret+1]);
+            XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return MEMORY_E;
         }
 
@@ -115,10 +116,15 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         in = XMALLOC(XSTRLEN(argv[ret+1]) + 1, HEAP_HINT,
                      DYNAMIC_TYPE_TMP_BUFFER);
         if (in == NULL) {
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "In file did not exist. Please check your options.");
+            WOLFCLU_LOG(WOLFCLU_E0, "In file did not exist. Please check your options.");
+            XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return MEMORY_E;
         }
 
@@ -132,10 +138,19 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         sig = XMALLOC(strlen(argv[ret+1]) + 1, HEAP_HINT,
                       DYNAMIC_TYPE_TMP_BUFFER);
         if (sig == NULL) {
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (in)
+                XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Signature file did not exist. Please check your options.");
+            WOLFCLU_LOG(WOLFCLU_E0, "Signature file did not exist. Please check your options.");
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (in)
+                XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return MEMORY_E;
         }
 
@@ -143,8 +158,14 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         sig[XSTRLEN(argv[ret+1])] = '\0';
     }
     else if (verifyCheck == 1) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Please specify -sigfile <sig> when verifying.");
+        WOLFCLU_LOG(WOLFCLU_E0, "Please specify -sigfile <sig> when verifying.");
         wolfCLU_verifyHelp(algCheck);
+        if (priv)
+            XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (in)
+            XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (sig)
+            XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
 
@@ -159,12 +180,24 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
                    "signing or verifing with RSA.");
             wolfCLU_signHelp(algCheck);
             wolfCLU_verifyHelp(algCheck);
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (in)
+                XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (sig)
+                XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
         else if (algCheck == ECC_SIG_VER && verifyCheck == 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
                    "signing with ECC.");
             wolfCLU_signHelp(algCheck);
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (in)
+                XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (sig)
+                XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
         else {
@@ -178,7 +211,13 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             /* ignore no -in. RSA verify doesn't check original message */
         }
         else {
-            WOLFCLU_LOG(WOLFCLU_L0, "Must have input as either a file or standard I/O");
+            WOLFCLU_LOG(WOLFCLU_E0, "Must have input as either a file or standard I/O");
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (in)
+                XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (sig)
+                XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return WOLFCLU_FATAL_ERROR;
         }
     }
@@ -190,7 +229,12 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck);
     }
 
-    XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (priv)
+        XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (in)
+        XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (sig)
+        XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     return ret;
 }

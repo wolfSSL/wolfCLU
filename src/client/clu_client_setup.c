@@ -74,7 +74,7 @@ int wolfCLU_Client(int argc, char** argv)
         switch (option) {
             case WOLFCLU_CONNECT:
                 if (XSTRSTR(optarg, ":") == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_L0, "connect string does not have ':'");
+                    WOLFCLU_LOG(WOLFCLU_E0, "connect string does not have ':'");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
@@ -128,7 +128,7 @@ int wolfCLU_Client(int argc, char** argv)
 
         client_test(&args);
 
-        WOLFCLU_LOG(WOLFCLU_L0, "\nWARNING!!! peer was not verified, -CAfile "
+        WOLFCLU_LOG(WOLFCLU_E0, "\nWARNING!!! peer was not verified, -CAfile "
                 "is upcoming");
     }
 

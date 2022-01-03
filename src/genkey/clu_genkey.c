@@ -76,7 +76,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
     /*--------------- CONVERT TO PEM IF APPLICABLE  ---------------------*/
     if (format == PEM_FORM) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Der to Pem for ed25519 key not yet implemented");
+        WOLFCLU_LOG(WOLFCLU_E0, "Der to Pem for ed25519 key not yet implemented");
         WOLFCLU_LOG(WOLFCLU_L0, "FEATURE COMING SOON!");
         return FEATURE_COMING_SOON;
     }
@@ -138,7 +138,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             XFCLOSE(file);
             break;
         default:
-            WOLFCLU_LOG(WOLFCLU_L0, "Invalid directive");
+            WOLFCLU_LOG(WOLFCLU_E0, "Invalid directive");
             XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return BAD_FUNC_ARG;
     }
@@ -166,7 +166,7 @@ static int wolfCLU_ECC_write_pub_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
 
     derSz = wc_EccPublicKeyDerSize(key->internal, 1);
     if (derSz <= 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "error getting der size");
+        WOLFCLU_LOG(WOLFCLU_E0, "error getting der size");
         ret = derSz;
     }
 
@@ -270,13 +270,13 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
         group = wolfSSL_EC_GROUP_new_by_curve_name(wolfSSL_OBJ_txt2nid(name));
         if (group == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to set curve");
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to set curve");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             if (wolfSSL_EC_KEY_set_group(key, group) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "unable to set ec group");
+                WOLFCLU_LOG(WOLFCLU_E0, "unable to set ec group");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -284,7 +284,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
     if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_EC_KEY_generate_key(key) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "error generating EC key");
+            WOLFCLU_LOG(WOLFCLU_E0, "error generating EC key");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -292,7 +292,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
     if (ret == WOLFCLU_SUCCESS) {
         bioOut = wolfSSL_BIO_new_file(fName, "wb");
         if (bioOut == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to open output file %s", fName);
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to open output file %s", fName);
             ret = MEMORY_E;
         }
     }
@@ -322,7 +322,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                         if (derSz > 0) {
                             if (wolfSSL_BIO_write(bioOut, der, derSz)
                                     != derSz) {
-                                WOLFCLU_LOG(WOLFCLU_L0, "issue writing out data");
+                                WOLFCLU_LOG(WOLFCLU_E0, "issue writing out data");
                                 ret = WOLFCLU_FATAL_ERROR;
                             }
                         }
@@ -357,7 +357,8 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
                     bioPri = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
                     if (bioPri == NULL) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "unable to read outfile %s", fOutNameBuf);
+                        WOLFCLU_LOG(WOLFCLU_E0, "unable to read outfile %s",
+                                fOutNameBuf);
                         ret = MEMORY_E;
                     }
                 }
@@ -390,7 +391,8 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
                     bioPub = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
                     if (bioPub == NULL) {
-                        WOLFCLU_LOG(WOLFCLU_L0, "unable to read outfile %s", fOutNameBuf);
+                        WOLFCLU_LOG(WOLFCLU_E0, "unable to read outfile %s",
+                                fOutNameBuf);
                         ret = MEMORY_E;
                     }
                 }
@@ -408,7 +410,7 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
                 }
                 break;
             default:
-                WOLFCLU_LOG(WOLFCLU_L0, "Invalid directive");
+                WOLFCLU_LOG(WOLFCLU_E0, "Invalid directive");
                 ret = BAD_FUNC_ARG;
         }
     }
@@ -632,7 +634,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
                 break;
             default:
-                WOLFCLU_LOG(WOLFCLU_L0, "Invalid directive");
+                WOLFCLU_LOG(WOLFCLU_E0, "Invalid directive");
                 ret = BAD_FUNC_ARG;
         }
     }

@@ -62,7 +62,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     else {
         verifyCert = argv[argc-1];
         if (verifyCert == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to open certificate file %s",
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open certificate file %s",
                     argv[argc-1]);
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -78,7 +78,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
             switch (option) {
                 case WOLFCLU_CHECK_CRL:
                 #ifndef HAVE_CRL
-                    WOLFCLU_LOG(WOLFCLU_L0, "recompile wolfSSL with CRL");
+                    WOLFCLU_LOG(WOLFCLU_E0, "recompile wolfSSL with CRL");
                     ret = WOLFCLU_FATAL_ERROR;
                 #endif
                     crlCheck = 1;
@@ -117,7 +117,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS) {
         if (inForm != PEM_FORM) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Only handling PEM CA files");
+            WOLFCLU_LOG(WOLFCLU_E0, "Only handling PEM CA files");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -126,7 +126,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
         lookup = wolfSSL_X509_STORE_add_lookup(store,
                 wolfSSL_X509_LOOKUP_file());
         if (lookup == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Failed to setup lookup");
+            WOLFCLU_LOG(WOLFCLU_E0, "Failed to setup lookup");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -134,7 +134,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_X509_LOOKUP_load_file(lookup, caCert, X509_FILETYPE_PEM)
                 != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Failed to load CA file");
+            WOLFCLU_LOG(WOLFCLU_E0, "Failed to load CA file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -145,13 +145,13 @@ int wolfCLU_x509Verify(int argc, char** argv)
         if (crlCheck) {
             if (wolfSSL_CertManagerEnableCRL(store->cm, WOLFSSL_CRL_CHECKALL)
                     != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "Failed to enable CRL use");
+                WOLFCLU_LOG(WOLFCLU_E0, "Failed to enable CRL use");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         else {
             if (wolfSSL_CertManagerDisableCRL(store->cm) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "Failed to disable CRL use");
+                WOLFCLU_LOG(WOLFCLU_E0, "Failed to disable CRL use");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -169,8 +169,8 @@ int wolfCLU_x509Verify(int argc, char** argv)
                     WOLFSSL_FILETYPE_ASN1);
         }
         if (err != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Verification Failed");
-            WOLFCLU_LOG(WOLFCLU_L0, "Err (%d) : %s",
+            WOLFCLU_LOG(WOLFCLU_E0, "Verification Failed");
+            WOLFCLU_LOG(WOLFCLU_E0, "Err (%d) : %s",
                     err, wolfSSL_ERR_reason_error_string(err));
             ret = WOLFCLU_FATAL_ERROR;
         }

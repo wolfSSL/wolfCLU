@@ -31,16 +31,11 @@
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_certSetup(int argc, char** argv)
 {
-    int ret;
+    int idx;
+    int ret = WOLFCLU_SUCCESS;
     int textFlag    = 0;   /* does user desire human readable cert info */
     int textPubkey  = 0;   /* does user desire human readable pubkey info */
     int nooutFlag   = 0;   /* are we outputting a file */
-    int inderFlag   = 0;   /* is the incoming file in der format */
-    int inpemFlag   = 0;   /* is the incoming file in pem format */
-    int outderFlag  = 0;   /* is the output file in der format */
-    int outpemFlag  = 0;   /* is the output file in pem format */
-    int inFileFlag  = 0;   /* set if passing in file argument */
-    int outFileFlag = 0;   /* set if passing out file argument */
     int silentFlag  = 0;   /* set to disable echo to command line */
 
     char* inFile  = NULL;   /* pointer to the inFile name */
@@ -55,16 +50,15 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* help */
 /*---------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-h", 2, argc, argv);
-    if (ret > 0) {
+    if (wolfCLU_checkForArg("-h", 2, argc, argv) > 0) {
         wolfCLU_certHelp();
         return WOLFCLU_SUCCESS;
     }
+
 /*---------------------------------------------------------------------------*/
 /* text */
 /*---------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-text", 5, argc, argv);
-    if (ret > 0) {
+    if (wolfCLU_checkForArg("-text", 5, argc, argv) > 0) {
         /* set flag for converting to human readable.
          */
         textFlag = 1;
@@ -72,8 +66,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* pubkey */
 /*--------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-pubkey", 7, argc, argv);
-    if (ret > 0) {
+    if (wolfCLU_checkForArg("-pubkey", 7, argc, argv) > 0) {
         /* set flag for converting to human readable.
          */
         textPubkey = 1;
@@ -81,45 +74,21 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* inForm pem/der/??OTHER?? */
 /*---------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-inform", 7, argc, argv);
-    if (ret > 0) {
-        inForm = wolfCLU_checkInform(argv[ret+1]);
-        if (inForm == PEM_FORM) {
-            inpemFlag = 1;
+    if (ret == WOLFCLU_SUCCESS) {
+        idx = wolfCLU_checkForArg("-inform", 7, argc, argv);
+        if (idx > 0) {
+            inForm = wolfCLU_checkInform(argv[idx+1]);
         }
-        else if (inForm == DER_FORM) {
-            inderFlag = 1;
-        }
-        else {
-            return inForm;
-        }
-    }
-    else if (ret == 0) {
-        /* assume is PEM if not set */
-        inpemFlag = 1;
-    }
-    else {
-        return ret;
     }
 
 /*---------------------------------------------------------------------------*/
 /* outForm pem/der/??OTHER?? */
 /*---------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-outform", 8, argc, argv);
-    if (ret > 0) {
-        outForm = wolfCLU_checkOutform(argv[ret+1]);
-        if (outForm == PEM_FORM) {
-            outpemFlag = 1;
+    if (ret == WOLFCLU_SUCCESS) {
+        idx = wolfCLU_checkForArg("-outform", 8, argc, argv);
+        if (idx > 0) {
+            outForm = wolfCLU_checkOutform(argv[idx+1]);
         }
-        else if (outForm == DER_FORM) {
-            outderFlag = 1;
-        }
-        else {
-            return outForm;
-        }
-    }
-    else if (textFlag == 0 && textPubkey == 0) {
-        return ret;
     }
 
 
@@ -127,83 +96,91 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* in file */
 /*---------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-in", 3, argc, argv);
-    if (ret > 0) {
-        /* set flag for in file and flag for input file OK if exists
-         * check for error case below. If no error then read in file */
-        inFile = argv[ret+1];
-        in = wolfSSL_BIO_new_file(inFile, "rb");
-        if (in == NULL) {
-            WOLFCLU_LOG(WOLFCLU_L0, "ERROR: input file \"%s\" does not exist",
+    if (ret == WOLFCLU_SUCCESS) {
+        idx = wolfCLU_checkForArg("-in", 3, argc, argv);
+        if (idx > 0) {
+            /* set flag for in file and flag for input file OK if exists
+             * check for error case below. If no error then read in file */
+            inFile = argv[idx+1];
+            in = wolfSSL_BIO_new_file(inFile, "rb");
+            if (in == NULL) {
+                WOLFCLU_LOG(WOLFCLU_E0, "ERROR: in file \"%s\" does not exist",
+                    inFile);
+                ret = INPUT_FILE_ERROR;
+            }
+        }
+        else {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (access(inFile, F_OK) != -1) {
+            WOLFCLU_LOG(WOLFCLU_L0, "input file is \"%s\"", inFile);
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_E0, "ERROR: input file \"%s\" does not exist",
                     inFile);
             ret = INPUT_FILE_ERROR;
         }
     }
-    else {
-        return ret;
-    }
-
-    if (access(inFile, F_OK) != -1) {
-        WOLFCLU_LOG(WOLFCLU_L0, "input file is \"%s\"", inFile);
-        inFileFlag = 1;
-    }
-    else {
-        WOLFCLU_LOG(WOLFCLU_L0, "ERROR: input file \"%s\" does not exist", inFile);
-        return INPUT_FILE_ERROR;
-    }
 /*---------------------------------------------------------------------------*/
 /* out file */
 /*---------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-out", 4, argc, argv);
-    if (ret > 0) {
-        /* set flag for out file, check for error case below. If no error
-         * then write outFile */
-        outFileFlag = 1;
-        outFile = argv[ret+1];
-    }
-    else if (textFlag == 0 && textPubkey == 0) {
-        return ret;
+    if (ret == WOLFCLU_SUCCESS) {
+        idx = wolfCLU_checkForArg("-out", 4, argc, argv);
+        if (idx > 0) {
+            /* set flag for out file, check for error case below. If no error
+             * then write outFile */
+            outFile = argv[idx+1];
+        }
+
+        if (idx < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
 /*---------------------------------------------------------------------------*/
 /* noout */
 /*---------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-noout", 6, argc, argv);
-    if (ret > 0) {
+    if (ret == WOLFCLU_SUCCESS &&
+            wolfCLU_checkForArg("-noout", 6, argc, argv) > 0) {
         /* set flag for no output file */
         nooutFlag = 1;
     } /* Optional flag do not return error */
 /*---------------------------------------------------------------------------*/
 /* silent */
 /*---------------------------------------------------------------------------*/
-    ret = wolfCLU_checkForArg("-silent", 7, argc, argv);
-    if (ret > 0) {
+    if (ret == WOLFCLU_SUCCESS &&
+            wolfCLU_checkForArg("-silent", 7, argc, argv) > 0) {
         /* set flag for converting to human readable.
          * return NOT_YET_IMPLEMENTED error
          */
         silentFlag = 1;
+	(void)silentFlag;
     } /* Optional flag do not return error */
 /*---------------------------------------------------------------------------*/
 /* END ARG PROCESSING */
 /*---------------------------------------------------------------------------*/
-    ret = WOLFCLU_SUCCESS;
-    if (inForm == PEM_FORM) {
-        x509 = wolfSSL_PEM_read_bio_X509(in, NULL, NULL, NULL);
-    }
-    else if (inForm == DER_FORM) {
-        x509 = wolfSSL_d2i_X509_bio(in, NULL);
-    }
+    if (ret == WOLFCLU_SUCCESS) {
+        if (inForm == PEM_FORM) {
+            x509 = wolfSSL_PEM_read_bio_X509(in, NULL, NULL, NULL);
+        }
+        else if (inForm == DER_FORM) {
+            x509 = wolfSSL_d2i_X509_bio(in, NULL);
+        }
 
-    if (x509 == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "unable to parse input file");
-        ret = WOLFCLU_FATAL_ERROR;
+        if (x509 == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to parse input file");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
     /* done with input file */
     wolfSSL_BIO_free(in);
 
     /* try to open output file if set */
-    if (outFile != NULL) {
+    if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
         out = wolfSSL_BIO_new_file(outFile, "wb");
         if (access(outFile, F_OK) != -1) {
             WOLFCLU_LOG(WOLFCLU_L0, "output file set: \"%s\"", outFile);
@@ -231,7 +208,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     /* write out human readable text if set to */
     if (ret == WOLFCLU_SUCCESS && textFlag) {
         if (wolfSSL_X509_print(out, x509) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "unable to print certificate out");
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to print certificate out");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -245,13 +222,13 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && !nooutFlag) {
         if (outForm == PEM_FORM) {
             if (wolfSSL_PEM_write_bio_X509(out, x509) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "unable to write certificate out");
+                WOLFCLU_LOG(WOLFCLU_E0, "unable to write certificate out");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         else {
             if (wolfSSL_i2d_X509_bio(out, x509) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_L0, "unable to write certificate out");
+                WOLFCLU_LOG(WOLFCLU_E0, "unable to write certificate out");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
