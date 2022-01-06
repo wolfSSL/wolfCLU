@@ -67,7 +67,8 @@ int wolfCLU_CRLVerify(int argc, char** argv)
     int option;
     byte* der   = NULL;
     int   derSz = 0;
-    char* caCert     = NULL;
+    char* caCert = NULL;
+    char* out = NULL;
     WOLFSSL_BIO* bioIn  = NULL;
     WOLFSSL_BIO* bioOut = NULL;
 
@@ -77,12 +78,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
                     &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "unable to open output file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                out = optarg;
                 break;
 
             case WOLFCLU_INFILE:
@@ -176,6 +172,30 @@ int wolfCLU_CRLVerify(int argc, char** argv)
                 derSz = len;
                 wolfSSL_BIO_read(bioIn, der, derSz);
             }
+        }
+    }
+
+    /* sanity check that input is indeed a CRL */
+    if (ret == WOLFCLU_SUCCESS) {
+        WOLFSSL_X509_CRL* test;
+
+        test = wolfSSL_d2i_X509_CRL(NULL, der, derSz);
+        if (test == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to parse CRL file");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            wolfSSL_X509_CRL_free(test);
+        }
+    }
+
+
+    if (ret == WOLFCLU_SUCCESS && output != 0 && out != NULL) {
+        bioOut = wolfSSL_BIO_new_file(out, "wb");
+        if (bioOut == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to open output file %s",
+                    optarg);
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
