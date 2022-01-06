@@ -12,6 +12,7 @@ nobase_include_HEADERS+=wolfclu/version.h \
                         wolfclu/x509/clu_cert.h \
                         wolfclu/x509/clu_parse.h \
                         wolfclu/x509/clu_request.h \
+                        wolfclu/x509/clu_x509_sign.h \
                         wolfclu/genkey/clu_genkey.h \
                         wolfclu/pkey/clu_pkey.h \
                         wolfclu/sign-verify/clu_sign.h \

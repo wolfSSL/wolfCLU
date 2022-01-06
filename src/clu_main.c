@@ -34,6 +34,7 @@
  */
 
 static const struct option mode_options[] = {
+    {"ca",        no_argument,       0, WOLFCLU_CA        },
     {"encrypt",   required_argument, 0, WOLFCLU_ENCRYPT   },
     {"decrypt",   required_argument, 0, WOLFCLU_DECRYPT   },
     {"enc",       no_argument,       0, WOLFCLU_CRYPT     },
@@ -188,6 +189,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_DECRYPT:
             ret = wolfCLU_setup(argc, argv, 'd');
+            break;
+
+        case WOLFCLU_CA:
+            ret = wolfCLU_CASetup(argc, argv);
             break;
 
         case WOLFCLU_BENCHMARK:
