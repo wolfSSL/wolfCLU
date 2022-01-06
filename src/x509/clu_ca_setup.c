@@ -34,19 +34,27 @@ static const struct option ca_options[] = {
     {"cert",      required_argument, 0, WOLFCLU_CAFILE    },
     {"extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
     {"md",        required_argument, 0, WOLFCLU_MD        },
-    {"inkey",     required_argument, 0, WOLFCLU_INKEY     },
     {"inform",    required_argument, 0, WOLFCLU_INFORM    },
-    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
     {"config",    required_argument, 0, WOLFCLU_CONFIG },
     {"days",      required_argument, 0, WOLFCLU_DAYS },
-    {"x509",      no_argument,       0, WOLFCLU_X509 },
+    {"h",         no_argument, 0, WOLFCLU_HELP },
+    {"help",      no_argument, 0, WOLFCLU_HELP },
 
     {0, 0, 0, 0} /* terminal element */
 };
 
 static void wolfCLU_CAHelp(void)
 {
-
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl ca");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in CSR file input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to output to");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-keyfile file to read private key from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-cert file to read CA from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions section in config file to parse extensions from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-md type of hash i.e sha256");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inform type PEM/DER of CSR input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to read configuration from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
 }
 
 /* return WOLFCLU_SUCCESS on success */
@@ -65,7 +73,6 @@ int wolfCLU_CASetup(int argc, char** argv)
     char* config = NULL;
     char* ext = NULL;
 
-    int outForm = PEM_FORM; /* default to PEM format */
     int inForm  = PEM_FORM;
     int option;
     int longIndex = 1;
@@ -119,10 +126,6 @@ int wolfCLU_CASetup(int argc, char** argv)
 
             case WOLFCLU_INFORM:
                 inForm = wolfCLU_checkInform(optarg);
-                break;
-
-            case WOLFCLU_OUTFORM:
-                outForm = wolfCLU_checkOutform(optarg);
                 break;
 
             case WOLFCLU_CONFIG:
