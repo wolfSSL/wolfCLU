@@ -59,6 +59,12 @@ run_success "crl -inform DER -outform PEM -in ./certs/crl.der -out ./test-crl.pe
 run_success "crl -noout -CAfile ./certs/ca-cert.pem -in ./test-crl.pem"
 rm -f test-crl.pem
 
+run_fail "crl -inform DER -outform PEM -in ./certs/ca-cert.der -out test.crl.pem"
+if [ -f "test.crl.pem" ]; then
+    echo "file test.crl.pem should not have been created on fail case"
+    exit 99
+fi
+
 echo "Done"
 exit 0
 
