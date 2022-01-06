@@ -61,6 +61,7 @@ fi
 rm -f tmp.cert
 
 run_success "req -new -key ./certs/server-key.pem -conf ./test.conf -out tmp.cert"
+run_success "req -text -in tmp.cert"
 rm -f tmp.cert
 
 run_success "req -new -key ./certs/server-key.pem -conf ./test.conf -x509 -out tmp.cert"
