@@ -736,7 +736,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
+    if (ret == WOLFCLU_SUCCESS && bioOut == NULL && out != NULL) {
         bioOut = wolfSSL_BIO_new_file(out, "wb");
         if (bioOut == NULL) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
