@@ -23,6 +23,7 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_parse.h>
+#include <wolfclu/x509/clu_x509_sign.h>
 
 
 /* return WOLFCLU_SUCCESS on success */
@@ -349,8 +350,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
 
 /* return WOLFCLU_SUCCESS on success */
-static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
-            char* sect)
+int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
 {
     char *current;
     int  idx = 1;
@@ -518,5 +518,30 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect)
     (void)defaultKey;
     wolfSSL_NCONF_free(conf);
     return WOLFCLU_SUCCESS;
+}
+
+
+int wolfCLU_GetTypeFromPKEY(WOLFSSL_EVP_PKEY* key)
+{
+    int keyType = 0;
+
+    switch (wolfSSL_EVP_PKEY_base_id(key)) {
+        case EVP_PKEY_RSA:
+            keyType = RSAk;
+            break;
+
+        case EVP_PKEY_DSA:
+            keyType = DSAk;
+            break;
+
+        case EVP_PKEY_EC:
+            keyType = ECDSAk;
+            break;
+
+        case EVP_PKEY_DH:
+            keyType = DHk;
+            break;
+    }
+    return keyType;
 }
 

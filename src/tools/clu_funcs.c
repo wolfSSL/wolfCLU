@@ -61,6 +61,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "-help           Help, print out this help menu");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "Only set one of the following.\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "ca             Used for signing certificates");
     WOLFCLU_LOG(WOLFCLU_L0, "bench          Benchmark one of the algorithms");
     WOLFCLU_LOG(WOLFCLU_L0, "decrypt        Decrypt an encrypted file");
     WOLFCLU_LOG(WOLFCLU_L0, "dgst           Used for verifying a signature");

@@ -439,6 +439,31 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect);
 
 
 /**
+ * @brief used to read the 'extensions' section from a config file and put the
+ *  extensions found into 'x509'
+ */
+int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect);
+
+
+/**
+ * @brief function to processes 'ca' command
+ */
+int wolfCLU_CASetup(int argc, char** argv);
+
+
+/**
+ * @brief converts a string to a wolfCrypt hash type
+ */
+enum wc_HashType wolfCLU_StringToHashType(char* in);
+
+
+/**
+ * @brief gets the wolfCrypt (i.e RSAk) type from a WOLFSSL_EVP_PKEY
+ */
+int wolfCLU_GetTypeFromPKEY(WOLFSSL_EVP_PKEY* key);
+
+
+/**
  * @brief Converts a string to be all lower case
  */
 void wolfCLU_convertToLower(char* s, int sSz);
