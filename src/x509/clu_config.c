@@ -160,6 +160,7 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseSubjectKeyID(char* str, int crit,
                     wolfSSL_ASN1_STRING_free(data);
                 }
             }
+	    wolfSSL_EVP_PKEY_free(pkey);
         }
     }
 
