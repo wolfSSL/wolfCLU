@@ -207,6 +207,13 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
     }
 
+    /* default to version 3 which supports extensions */
+    if (ret == WOLFCLU_SUCCESS &&
+           wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS) {
+        WOLFCLU_LOG(WOLFCLU_E0, "Unable to set version 3 for cert");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
     if (ret == WOLFCLU_SUCCESS) {
         ret = wolfCLU_CertSign(signer, x509, ext);
     }

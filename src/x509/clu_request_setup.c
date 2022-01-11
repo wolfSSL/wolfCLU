@@ -516,7 +516,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
             case WOLFCLU_INFILE:
                 reqIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (reqIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open public key file %s",
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open input file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -613,6 +613,9 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 noOut = 1;
                 break;
 
+            case WOLFCLU_NEW:
+                break;
+
             case ':':
             case '?':
                 WOLFCLU_LOG(WOLFCLU_E0, "Unexpected argument");
@@ -621,34 +624,37 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 break;
 
             default:
-                /* do nothing. */
-                (void)ret;
+                WOLFCLU_LOG(WOLFCLU_E0, "Unsupported argument");
+                ret = WOLFCLU_FATAL_ERROR;
+                wolfCLU_certgenHelp();
         }
     }
 
     /* default to sha256 if not set */
-    if (md == NULL) {
+    if (ret == WOLFCLU_SUCCESS && md == NULL) {
         md  = wolfSSL_EVP_sha256();
         oid = SHA_HASH256;
     }
 
-    if (reqIn == NULL) {
-        x509 = wolfSSL_X509_new();
-        if (x509 == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Issue creating structure to use");
-            ret = MEMORY_E;
-        }
-    }
-    else {
-        if (inForm == PEM_FORM) {
-            wolfSSL_PEM_read_bio_X509_REQ(reqIn, &x509, NULL, NULL);
+    if (ret == WOLFCLU_SUCCESS) {
+        if (reqIn == NULL) {
+            x509 = wolfSSL_X509_new();
+            if (x509 == NULL) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Issue creating structure to use");
+                ret = MEMORY_E;
+            }
         }
         else {
-            wolfSSL_d2i_X509_REQ_bio(reqIn, &x509);
-        }
-        if (x509 == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Issue creating structure to use");
-            ret = WOLFCLU_FATAL_ERROR;
+            if (inForm == PEM_FORM) {
+                wolfSSL_PEM_read_bio_X509_REQ(reqIn, &x509, NULL, NULL);
+            }
+            else {
+                wolfSSL_d2i_X509_REQ_bio(reqIn, &x509);
+            }
+            if (x509 == NULL) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Issue creating structure to use");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 
@@ -686,7 +692,8 @@ int wolfCLU_requestSetup(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
-    else if (reqIn == NULL) {
+
+    if (ret == WOLFCLU_SUCCESS && keyIn == NULL && reqIn == NULL) {
         WOLFCLU_LOG(WOLFCLU_E0, "Please specify a -key <key> option when "
                "generating a certificate.");
         wolfCLU_certgenHelp();
@@ -726,12 +733,18 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFSSL_SUCCESS && reqIn == NULL) {
-        ret = wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3);
+    /* default to version 1 when generating CSR */
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V1) !=
+                WOLFSSL_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error setting CSR version");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
     /* check that we have the key if re-signing */
-    if ((reqIn == NULL || reSign) && pkey == NULL) {
+    if (ret == WOLFCLU_SUCCESS &&
+            (reqIn == NULL || reSign) && pkey == NULL) {
         WOLFCLU_LOG(WOLFCLU_E0, "No key loaded to sign with");
         ret = WOLFCLU_FATAL_ERROR;
     }
@@ -763,9 +776,18 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
         else {
             if (genX509) {
-                ret = wolfSSL_X509_sign(x509, pkey, md);
-                if (ret > 0)
-                    ret = WOLFSSL_SUCCESS;
+                /* default to version 3 which supports extensions */
+                if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) !=
+                        WOLFSSL_SUCCESS) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to set version 3 for cert");
+                    ret = WOLFSSL_FAILURE;
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = wolfSSL_X509_sign(x509, pkey, md);
+                    if (ret > 0)
+                        ret = WOLFSSL_SUCCESS;
+                }
             }
             else {
                 ret = wolfSSL_X509_REQ_sign(x509, pkey, md);

@@ -60,18 +60,33 @@ then
 fi
 rm -f tmp.cert
 
-run_success "req -new -key ./certs/server-key.pem -conf ./test.conf -out tmp.cert"
-run_success "req -text -in tmp.cert"
-rm -f tmp.cert
+# no parameter -conf
+#run_fail "req -new -key ./certs/server-key.pem -conf ./test.conf -out tmp.csr"
 
-run_success "req -new -key ./certs/server-key.pem -conf ./test.conf -x509 -out tmp.cert"
+run_success "req -new -key ./certs/server-key.pem -config ./test.conf -out tmp.csr"
+run_success "req -text -in tmp.csr"
+
+# test pem to der and back again
+run_success "req -inform pem -outform der -in tmp.csr -out tmp.csr.der"
+run_success "req -inform der -outform pem -in tmp.csr.der -out tmp.csr.pem"
+diff tmp.csr.pem tmp.csr
+if [ $? != 0 ]; then
+    echo "transforming from der and back to pem mismatch"
+    echo "tmp.csr != tmp.csr.pem"
+    exit 99
+fi
+rm -f tmp.csr.pem
+rm -f tmp.csr.der
+rm -f tmp.csr
+
+run_success "req -new -key ./certs/server-key.pem -config ./test.conf -x509 -out tmp.cert"
 SUBJECT=`./wolfssl x509 -in tmp.cert -text | grep Subject:`
 if [ "$SUBJECT" != "        Subject: /C=US/ST=Montana/L=Bozeman/O=wolfSSL/CN=testing" ]
 then
     echo "found unexpected $SUBJECT"
     exit 99
 fi
-#rm -f tmp.cert
+rm -f tmp.cert
 rm -f test.conf
 
 echo "Done"
