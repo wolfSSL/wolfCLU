@@ -393,6 +393,12 @@ void wolfCLU_benchHelp()
 void wolfCLU_certHelp()
 {
     WOLFCLU_LOG(WOLFCLU_L0, "\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "-subject print out the subject name");
+    WOLFCLU_LOG(WOLFCLU_L0, "-issuer  print out the issuer name");
+    WOLFCLU_LOG(WOLFCLU_L0, "-serial  print out the serial number in hex");
+    WOLFCLU_LOG(WOLFCLU_L0, "-dates   print out the valid dates of cert");
+    WOLFCLU_LOG(WOLFCLU_L0, "-email   print out the subject names email address");
+    WOLFCLU_LOG(WOLFCLU_L0, "-fingerprint print out the hash of the certificate in DER form");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\nX509 USAGE: wolfssl -x509 -inform <PEM or DER> -in <filename> "
            "-outform <PEM or DER> -out <output file name> \n");
