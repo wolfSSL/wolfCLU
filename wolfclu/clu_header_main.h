@@ -85,6 +85,7 @@
 
 #define BLOCK_SIZE 16384
 #define MEGABYTE (1024*1024)
+#define MAX_TERM_WIDTH 80
 #define MAX_THREADS 64
 #define MAX_FILENAME_SZ 256
 #define CLU_4K_TYPE 4096

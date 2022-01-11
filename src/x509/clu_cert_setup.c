@@ -43,6 +43,15 @@ int wolfCLU_certSetup(int argc, char** argv)
     int   inForm  = PEM_FORM; /* the input format */
     int   outForm = PEM_FORM; /* the output format */
 
+    /* flags for printing out specific parts of the x509 */
+    byte printSubject = 0;
+    byte printIssuer  = 0;
+    byte printSerial  = 0;
+    byte printDates   = 0;
+    byte printEmail   = 0;
+    byte printFinger  = 0;
+    byte printPurpose = 0;
+
     WOLFSSL_BIO* in  = NULL;
     WOLFSSL_BIO* out = NULL;
     WOLFSSL_X509* x509 = NULL;
@@ -115,10 +124,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (access(inFile, F_OK) != -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "input file is \"%s\"", inFile);
-        }
-        else {
+        if (access(inFile, F_OK) != 0) {
             WOLFCLU_LOG(WOLFCLU_E0, "ERROR: input file \"%s\" does not exist",
                     inFile);
             ret = INPUT_FILE_ERROR;
@@ -182,10 +188,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     /* try to open output file if set */
     if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
         out = wolfSSL_BIO_new_file(outFile, "wb");
-        if (access(outFile, F_OK) != -1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "output file set: \"%s\"", outFile);
-        }
-        else {
+        if (access(outFile, F_OK) != 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "output file \"%s\"did not exist, it will"
                    " be created.", outFile);
         }
@@ -204,6 +207,213 @@ int wolfCLU_certSetup(int argc, char** argv)
             }
         }
     }
+
+    /* Print out specific parts as requested */
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfCLU_checkForArg("-subject", 8, argc, argv) != 0) {
+            printSubject = 1;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && printSubject) {
+        char* subject;
+
+        subject = wolfSSL_X509_NAME_oneline(
+                                     wolfSSL_X509_get_subject_name(x509), 0, 0);
+        if (subject != NULL) {
+            wolfSSL_BIO_write(out, subject, (int)XSTRLEN(subject));
+            wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n"));
+            XFREE(subject, 0, DYNAMIC_TYPE_OPENSSL);
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfCLU_checkForArg("-issuer", 7, argc, argv) != 0) {
+            printIssuer = 1;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && printIssuer) {
+        char* issuer;
+
+        issuer = wolfSSL_X509_NAME_oneline(
+                                     wolfSSL_X509_get_issuer_name(x509), 0, 0);
+        if (issuer != NULL) {
+            wolfSSL_BIO_write(out, issuer, (int)XSTRLEN(issuer));
+            wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n"));
+            XFREE(issuer, 0, DYNAMIC_TYPE_OPENSSL);
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfCLU_checkForArg("-serial", 7, argc, argv) != 0) {
+            printSerial = 1;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && printSerial) {
+        unsigned char serial[32];
+        int  sz = sizeof(serial);
+        int  i;
+
+        if (wolfSSL_X509_get_serial_number(x509, serial, &sz) ==
+                WOLFSSL_SUCCESS) {
+            wolfSSL_BIO_write(out, "serial=", (int)XSTRLEN("serail="));
+            for (i = 0; i < sz; i++) {
+                char scratch[3];
+                XSNPRINTF(scratch, 3, "%02X", serial[i]);
+                wolfSSL_BIO_write(out, scratch, 2);
+            }
+            wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n"));
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfCLU_checkForArg("-dates", 6, argc, argv) != 0) {
+            printDates = 1;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && printDates) {
+        char notBefore[] = "notBefore=";
+        char notAfter[] = "notAfter=";
+
+        if (wolfSSL_BIO_write(out, notBefore, (int)XSTRLEN(notBefore)) < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_ASN1_TIME_print(out, wolfSSL_X509_get_notBefore(x509))
+                    != WOLFSSL_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(out, notAfter, (int)XSTRLEN(notAfter)) < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_ASN1_TIME_print(out, wolfSSL_X509_get_notAfter(x509))
+                != WOLFSSL_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfCLU_checkForArg("-email", 6, argc, argv) != 0) {
+            printEmail = 1;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && printEmail) {
+        int emailSz;
+        char* emailBuf = NULL;
+        WOLFSSL_X509_NAME* name = NULL;
+
+        name = wolfSSL_X509_get_subject_name(x509);
+        if (name == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            emailSz = wolfSSL_X509_NAME_get_text_by_NID(name, NID_emailAddress,
+                NULL, 0);
+            if (emailSz < 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            emailSz += 1;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            emailBuf = (char*)XMALLOC(emailSz, HEAP_HINT,
+                    DYNAMIC_TYPE_TMP_BUFFER);
+            if (emailBuf == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_X509_NAME_get_text_by_NID(name, NID_emailAddress,
+                emailBuf, emailSz) <= 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            emailBuf[emailSz-1] = '\0';
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(out, emailBuf, (int)XSTRLEN(emailBuf)) < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (emailBuf != NULL) {
+            XFREE(emailBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfCLU_checkForArg("-fingerprint", 12, argc, argv) != 0) {
+            printFinger = 1;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && printFinger) {
+        int derSz;
+        const unsigned char* der;
+        byte digest[WC_MAX_DIGEST_SIZE];
+        word32 digestSz = WC_MAX_DIGEST_SIZE;
+        enum wc_HashType digestType = WC_HASH_TYPE_SHA;
+
+        der = wolfSSL_X509_get_der(x509, &derSz);
+        if (der != NULL) {
+            digestSz = wc_HashGetDigestSize(digestType);
+            if (wc_Hash(digestType, der, derSz, digest, digestSz) == 0) {
+                char txt[MAX_TERM_WIDTH];
+                word32 i;
+
+                XSNPRINTF(txt, MAX_TERM_WIDTH, "SHA1 of cert. DER : ");
+                if (wolfSSL_BIO_write(out, txt, (int)XSTRLEN(txt)) <= 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                for (i = 0; i < digestSz; i++) {
+                    XSNPRINTF(txt, MAX_TERM_WIDTH, "%02X", digest[i]);
+                    if (wolfSSL_BIO_write(out, txt, (int)XSTRLEN(txt)) <= 0) {
+                        ret = WOLFCLU_FATAL_ERROR;
+                        break;
+                    }
+                }
+                if (ret == WOLFCLU_SUCCESS &&
+                    wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+        }
+
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfCLU_checkForArg("-purpose", 8, argc, argv) != 0) {
+            printPurpose = 1;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && printPurpose) {
+        /* @TODO not yet implemented */
+    }
+
 
     /* write out human readable text if set to */
     if (ret == WOLFCLU_SUCCESS && textFlag) {
