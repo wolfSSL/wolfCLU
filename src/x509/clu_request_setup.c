@@ -516,7 +516,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
             case WOLFCLU_INFILE:
                 reqIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (reqIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open public key file %s",
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open input file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
