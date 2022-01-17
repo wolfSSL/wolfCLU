@@ -235,37 +235,106 @@ static int wolfCLU_ECC_write_priv_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
 
     return ret;
 }
-#endif /* HAVE_ECC */
 
-/* return WOLFCLU_SUCCESS on success */
-int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
-                       char* name)
+void wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
+        int fmt)
 {
-#ifdef HAVE_ECC
-    int   fNameSz;
-    int   fExtSz      = 6;
-    char  fExtPriv[6] = ".priv\0";
-    char  fExtPub[6]  = ".pub\0\0";
-    char* fOutNameBuf = NULL;
-
-    WOLFSSL_BIO *bioOut = NULL;
-    WOLFSSL_BIO *bioPub = NULL;
-    WOLFSSL_BIO *bioPri = NULL;
-    WOLFSSL_EC_KEY   *key;
     int ret = WOLFCLU_SUCCESS;
+    const WOLFSSL_EC_GROUP* group = NULL;
+    char header[] = "-----BEGIN EC PARAMETERS-----\n";
+    char footer[] = "-----END EC PARAMETERS-----\n";
+    const byte* oid = NULL;
+    byte* objOID = NULL;
+    word32 objOIDSz = 0;
+    word32 oidSz = 0;
 
-    byte*  der   = NULL;
-    int    derSz = -1;
+    group = wolfSSL_EC_KEY_get0_group(key);
+    if (group == NULL) {
+        ret = WOLFCLU_FATAL_ERROR;
+    }
 
-    if (rng == NULL || fName == NULL)
-        return BAD_FUNC_ARG;
-    fNameSz = (int)XSTRLEN(fName);
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wc_ecc_get_oid(group->curve_oid, &oid, &oidSz) == NOT_COMPILED_IN) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        objOIDSz = oidSz + 2;
+        objOID = (byte*)XMALLOC(oidSz + 2, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (objOID == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    /* set object ID tag and internal oid section */
+    if (ret == WOLFCLU_SUCCESS) {
+        objOID[0] = ASN_OBJECT_ID;
+        objOID[1] = oidSz;
+        XMEMCPY(objOID + 2, oid, oidSz);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (fmt == PEM_FORM) {
+            byte*  base64 = NULL;
+            word32 base64Sz;
+    
+            if (wolfSSL_BIO_write(out, header, (int)XSTRLEN(header)) <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                if (Base64_Encode(objOID, objOIDSz, NULL, &base64Sz) !=
+                        LENGTH_ONLY_E) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                base64 = (byte*)XMALLOC(base64Sz, HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (base64 == NULL) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    Base64_Encode(objOID, objOIDSz, base64, &base64Sz) != 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    wolfSSL_BIO_write(out, base64, base64Sz) <= 0) {
+
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            XFREE(base64, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    wolfSSL_BIO_write(out, footer, (int)XSTRLEN(footer)) <= 0) {
+
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else {
+            if (wolfSSL_BIO_write(out, objOID, objOIDSz) <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+    }
+
+    if (objOID != NULL) {
+        XFREE(objOID, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+}
+
+WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name)
+{
+    int ret = WOLFCLU_SUCCESS;
+    WOLFSSL_EC_KEY* key;
 
     key = wolfSSL_EC_KEY_new();
-    if (key == NULL)
-        return MEMORY_E;
-
-    if (name != NULL) {
+    if (key != NULL && name != NULL) {
         WOLFSSL_EC_GROUP *group;
 
         group = wolfSSL_EC_GROUP_new_by_curve_name(wolfSSL_OBJ_txt2nid(name));
@@ -282,11 +351,40 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
+    if (key != NULL && ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_EC_KEY_generate_key(key) != WOLFSSL_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_E0, "error generating EC key");
             ret = WOLFCLU_FATAL_ERROR;
         }
+    }
+    return key;
+}
+#endif /* HAVE_ECC */
+
+/* return WOLFCLU_SUCCESS on success */
+int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
+        int fmt, char* name)
+{
+#ifdef HAVE_ECC
+    int   fNameSz;
+    int   fExtSz      = 6;
+    char  fExtPriv[6] = ".priv\0";
+    char  fExtPub[6]  = ".pub\0\0";
+    char* fOutNameBuf = NULL;
+
+    WOLFSSL_BIO *bioOut = NULL;
+    WOLFSSL_BIO *bioPub = NULL;
+    WOLFSSL_BIO *bioPri = NULL;
+    WOLFSSL_EC_KEY   *key;
+    int ret = WOLFCLU_SUCCESS;
+
+    if (rng == NULL || fName == NULL)
+        return BAD_FUNC_ARG;
+    fNameSz = (int)XSTRLEN(fName);
+
+    key = wolfCLU_GenKeyECC(name);
+    if (key == NULL) {
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -308,33 +406,6 @@ int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
 
     if (ret == WOLFCLU_SUCCESS) {
         switch(directive) {
-            case ECPARAM:
-                {
-                    if (fmt == PEM_FORM) {
-                        if (wolfSSL_PEM_write_bio_ECPrivateKey(bioOut, key,
-                                NULL, NULL, 0, NULL, NULL) != WOLFSSL_SUCCESS) {
-                            ret = WOLFCLU_FATAL_ERROR;
-                        }
-                    }
-                    else {
-
-                        derSz = wolfSSL_i2d_ECPrivateKey(key, &der);
-                        if (derSz > 0) {
-                            if (wolfSSL_BIO_write(bioOut, der, derSz)
-                                    != derSz) {
-                                WOLFCLU_LOG(WOLFCLU_E0, "issue writing out data");
-                                ret = WOLFCLU_FATAL_ERROR;
-                            }
-                        }
-
-                        if (der != NULL) {
-                            /* der was created by wolfSSL library so we assume
-                             * that XMALLOC was used and call XFREE here */
-                            XFREE(der, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-                        }
-                    }
-                }
-                break;
             case PUB_ONLY:
                 if (fmt == PEM_FORM) {
                     if (wolfSSL_PEM_write_bio_EC_PUBKEY(bioOut, key)

@@ -168,7 +168,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: ECC key curve name used");
         }
 
-        ret = wolfCLU_genKey_ECC(&rng, keyOutFName, directiveArg,
+        ret = wolfCLU_GenAndOutput_ECC(&rng, keyOutFName, directiveArg,
                                  formatArg, NULL);
     #else
         WOLFCLU_LOG(WOLFCLU_E0, "Invalid option, ECC not enabled.");
