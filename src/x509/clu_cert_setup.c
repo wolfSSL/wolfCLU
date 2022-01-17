@@ -51,6 +51,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     byte printEmail   = 0;
     byte printFinger  = 0;
     byte printPurpose = 0;
+    byte printSubjHash = 0;
 
     WOLFSSL_BIO* in  = NULL;
     WOLFSSL_BIO* out = NULL;
@@ -411,7 +412,49 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && printPurpose) {
-        /* @TODO not yet implemented */
+        unsigned int keyUsage;
+
+        keyUsage = wolfSSL_X509_get_extended_key_usage(x509);
+        if ((int)keyUsage < 0) {
+            keyUsage = 0;
+        }
+
+        wolfCLU_extKeyUsagePrint(out, keyUsage, 0, 1);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfCLU_checkForArg("-hash", 5, argc, argv) != 0) {
+            printSubjHash = 1;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && printSubjHash) {
+        WOLFSSL_X509_NAME* name;
+        unsigned long h;
+        char txt[MAX_TERM_WIDTH];
+
+        name = wolfSSL_X509_get_subject_name(x509);
+        if (name != NULL) {
+
+            XSNPRINTF(txt, MAX_TERM_WIDTH, "%s\n",
+                    "Not canon version of subject:");
+            if (wolfSSL_BIO_write(out, txt, (int)XSTRLEN(txt)) <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                h = wolfSSL_X509_NAME_hash(name);
+                XSNPRINTF(txt, MAX_TERM_WIDTH, "%lx", h);
+                if (wolfSSL_BIO_write(out, txt, (int)XSTRLEN(txt)) <= 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
     }
 
 

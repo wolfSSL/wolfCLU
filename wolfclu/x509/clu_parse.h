@@ -70,4 +70,17 @@ int wolfCLU_printDer(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
  * @return returns WOLFCLU_SUCCESS on success
  */
 int wolfCLU_printX509PubKey(WOLFSSL_X509* x509, WOLFSSL_BIO* out);
+
+/**
+ * @brief prints out extended key usage
+ *
+ * @param bio output bio
+ * @param keyUsage bit map of key usage
+ * @param indent number of leading spaces
+ * @param flag if printing out NO for not supported items
+ *
+ * @return returns WOLFCLU_SUCCESS on success
+ */
+int wolfCLU_extKeyUsagePrint(WOLFSSL_BIO* bio, unsigned int keyUsage,
+        int indent, int flag);
 #endif /* WOLFCLU_PARSE_H */

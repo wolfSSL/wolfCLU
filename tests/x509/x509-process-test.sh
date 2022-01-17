@@ -180,7 +180,29 @@ notAfter=Sep 15 23:07:25 2024 GMT"
         echo "expected $EXPECTED"
         exit 99
     fi
-
+    echo "TEST 3.j"
+    test_case "-in certs/server-cert.pem -purpose -noout"
+    EXPECTED="Certificate Purpose:
+Any Extended Key Usage : YES
+TLS Web Server Authentication : YES
+TLS Web Client Authentication : NO
+OCSP Signing : YES
+Email Protect : YES
+Time Stamp Signing : YES"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.k"
+    test_case "-in certs/server-cert.pem -hash -noout"
+    EXPECTED="Not canon version of subject:
+f6cf410e"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
 }
 
 run4() {
