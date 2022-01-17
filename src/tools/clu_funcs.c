@@ -399,6 +399,8 @@ void wolfCLU_certHelp()
     WOLFCLU_LOG(WOLFCLU_L0, "-dates   print out the valid dates of cert");
     WOLFCLU_LOG(WOLFCLU_L0, "-email   print out the subject names email address");
     WOLFCLU_LOG(WOLFCLU_L0, "-fingerprint print out the hash of the certificate in DER form");
+    WOLFCLU_LOG(WOLFCLU_L0, "-purpose print out the certificates purpose");
+    WOLFCLU_LOG(WOLFCLU_L0, "-hash print out the hash of the certificate subject name");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\nX509 USAGE: wolfssl -x509 -inform <PEM or DER> -in <filename> "
            "-outform <PEM or DER> -out <output file name> \n");
