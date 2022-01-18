@@ -65,7 +65,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive,
  *
  * return   WOLFCLU_SUCCESS on success
  */
-int wolfCLU_genKey_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
+int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive, int fmt,
         char* name);
 
 /**
@@ -93,5 +93,10 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt,
  */
 int wolfCLU_genKey_PWDBASED(WC_RNG* rng, byte* pwdKey, int size, byte* salt,
                                                                        int pad);
+
+void wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
+        int fmt);
+
+WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name);
 
 #endif /* CLU_GENKEY_H */
