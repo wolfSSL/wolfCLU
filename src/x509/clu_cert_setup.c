@@ -253,19 +253,31 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && printSerial) {
-        unsigned char serial[32];
-        int  sz = sizeof(serial);
+        unsigned char serial[EXTERNAL_SERIAL_SIZE];
+        int  sz;
         int  i;
 
+        sz = (int)sizeof(serial);
         if (wolfSSL_X509_get_serial_number(x509, serial, &sz) ==
                 WOLFSSL_SUCCESS) {
-            wolfSSL_BIO_write(out, "serial=", (int)XSTRLEN("serail="));
+            if (wolfSSL_BIO_write(out, "serial=", (int)XSTRLEN("serial="))
+                    <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
             for (i = 0; i < sz; i++) {
                 char scratch[3];
                 XSNPRINTF(scratch, 3, "%02X", serial[i]);
-                wolfSSL_BIO_write(out, scratch, 2);
+                if (ret == WOLFCLU_SUCCESS &&
+                        wolfSSL_BIO_write(out, scratch, 2) <= 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+                }
             }
-            wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n"));
+            if (ret == WOLFCLU_SUCCESS &&
+                    wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 
