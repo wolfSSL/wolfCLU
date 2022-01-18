@@ -218,9 +218,10 @@ int wolfCLU_CASetup(int argc, char** argv)
         ret = wolfCLU_CertSign(signer, x509, ext);
     }
 
+    wolfSSL_BIO_free(reqIn);
     wolfSSL_BIO_free(keyIn);
     wolfSSL_X509_free(x509);
-    wolfSSL_EVP_PKEY_free(pkey);
+    wolfCLU_CertSignFree(signer);
     return ret;
 }
 

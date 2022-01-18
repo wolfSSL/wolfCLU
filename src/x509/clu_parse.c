@@ -142,3 +142,67 @@ int wolfCLU_printX509PubKey(WOLFSSL_X509* x509, WOLFSSL_BIO* out)
     return ret;
 }
 
+
+int wolfCLU_extKeyUsagePrint(WOLFSSL_BIO* bio, unsigned int keyUsage,
+        int indent, int flag)
+{
+    unsigned int ava;
+    char scratch[MAX_TERM_WIDTH];
+
+    if (flag) {
+        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s\n", indent, "",
+                "Certificate Purpose:");
+        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+    }
+
+    ava = (EKU_ANY_OID & keyUsage);
+    if (ava | flag) {
+        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
+                "Any Extended Key Usage",
+                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
+        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+    }
+
+    ava = (EKU_SERVER_AUTH_OID & keyUsage);
+    if (ava | flag) {
+        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
+                "TLS Web Server Authentication",
+                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
+        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+    }
+
+    ava = (EKU_CLIENT_AUTH_OID & keyUsage);
+    if (ava | flag) {
+        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
+                "TLS Web Client Authentication",
+                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
+        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+    }
+
+    ava = (EKU_OCSP_SIGN_OID & keyUsage);
+    if (ava | flag) {
+        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
+                "OCSP Signing",
+                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
+        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+    }
+
+    ava = (EKU_EMAILPROTECT_OID & keyUsage);
+    if (ava | flag) {
+        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
+                "Email Protect",
+                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
+        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+    }
+
+    ava = (EKU_TIMESTAMP_OID & keyUsage);
+    if (ava | flag) {
+        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
+                "Time Stamp Signing",
+                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
+        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+    }
+
+    return WOLFSSL_SUCCESS;
+}
+

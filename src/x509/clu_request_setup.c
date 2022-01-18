@@ -277,13 +277,16 @@ static int _wolfSSL_X509_signature_print_ex(WOLFSSL_BIO* bio,
         int i;
         char tmp[100];
         int sigNid = wolfSSL_X509_get_signature_nid(x509);
+        WOLFSSL_ASN1_OBJECT* obj;
 
         XSNPRINTF(scratch, MAX_WIDTH, "%*s%s", indent, "",
                 "Signature Algorithm: ");
         if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
             return WOLFSSL_FAILURE;
         }
-        wolfSSL_OBJ_obj2txt(scratch, MAX_WIDTH, wolfSSL_OBJ_nid2obj(sigNid), 0);
+        obj = wolfSSL_OBJ_nid2obj(sigNid);
+        wolfSSL_OBJ_obj2txt(scratch, MAX_WIDTH, obj, 0);
+        wolfSSL_ASN1_OBJECT_free(obj);
         XSNPRINTF(tmp, sizeof(tmp) - 1,"%s\n", scratch);
         tmp[sizeof(tmp) - 1] = '\0';
         if (wolfSSL_BIO_write(bio, tmp, (int)XSTRLEN(tmp)) <= 0) {
@@ -354,6 +357,7 @@ static int _wolfSSL_X509_pubkey_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
 
     pubKey = wolfSSL_X509_get_pubkey(x509);
     wolfSSL_EVP_PKEY_print_public(bio, pubKey, indent + 4, NULL);
+    wolfSSL_EVP_PKEY_free(pubKey);
     return WOLFSSL_SUCCESS;
 }
 
@@ -857,6 +861,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
 
+    wolfSSL_BIO_free(reqIn);
     wolfSSL_BIO_free(keyIn);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_X509_free(x509);

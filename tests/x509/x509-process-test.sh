@@ -123,6 +123,86 @@ run3() {
     cert_test_case "-inform pem -outform der -in certs/ca-cert.pem -out tmp.der" \
                     test.der tmp.der
     rm -f test.pem tmp.pem
+    echo "TEST 3.c"
+    test_case "-in certs/server-cert.pem -subject -noout"
+    EXPECTED="/C=US/ST=Montana/L=Bozeman/O=wolfSSL/OU=Support/CN=www.wolfssl.com/emailAddress=info@wolfssl.com"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.d"
+    test_case "-in certs/server-cert.pem -issuer -noout"
+    EXPECTED="/C=US/ST=Montana/L=Bozeman/O=Sawtooth/OU=Consulting/CN=www.wolfssl.com/emailAddress=info@wolfssl.com"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.e"
+    test_case "-in certs/ca-cert.pem -serial -noout"
+    EXPECTED="serial=7D947088BA07428DAAAF4FBEC21A48F0D140E642"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.f"
+    test_case "-in certs/server-cert.pem -serial -noout"
+    EXPECTED="serial=01"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.g"
+    test_case "-in certs/server-cert.pem -dates -noout"
+    EXPECTED="notBefore=Dec 20 23:07:25 2021 GMT
+notAfter=Sep 15 23:07:25 2024 GMT"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.h"
+    test_case "-in certs/server-cert.pem -email -noout"
+    EXPECTED="info@wolfssl.com"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.i"
+    test_case "-in certs/server-cert.pem -fingerprint -noout"
+    EXPECTED="SHA1 of cert. DER : 52686B24F54652F04B0D87BA9F591B393C86C407"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.j"
+    test_case "-in certs/server-cert.pem -purpose -noout"
+    EXPECTED="Certificate Purpose:
+Any Extended Key Usage : YES
+TLS Web Server Authentication : YES
+TLS Web Client Authentication : NO
+OCSP Signing : YES
+Email Protect : YES
+Time Stamp Signing : YES"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
+    echo "TEST 3.k"
+    test_case "-in certs/server-cert.pem -hash -noout"
+    EXPECTED="Not canon version of subject:
+f6cf410e"
+    if [ "$OUTPUT" != "$EXPECTED" ]; then
+        echo "found unexpected $OUTPUT"
+        echo "expected $EXPECTED"
+        exit 99
+    fi
 }
 
 run4() {
@@ -162,3 +242,6 @@ run4
 rm -f out.txt
 rm -f tmp.pem
 rm -f tmp.der
+
+echo "Done"
+exit 0

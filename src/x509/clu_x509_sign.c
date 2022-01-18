@@ -75,6 +75,7 @@ void wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
         if (csign->keyType == RSAk || csign->keyType == ECDSAk) {
             wolfSSL_EVP_PKEY_free(csign->caKey.pkey);
         }
+        XFREE(csign, HEAP_HINT, DYNAMIC_TYPE_CERT);
     }
 }
 
@@ -102,6 +103,7 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
 {
     if (csign != NULL) {
         if (ca != NULL) {
+            wolfSSL_X509_free(csign->ca);
             csign->ca = ca;
         }
 
@@ -109,6 +111,7 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
             switch (keyType) {
                 case RSAk:
                 case ECDSAk:
+                    wolfSSL_EVP_PKEY_free(csign->caKey.pkey);
                     csign->caKey.pkey = (WOLFSSL_EVP_PKEY*)key;
                     break;
 
@@ -124,6 +127,7 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
 void wolfCLU_CertSignSetSerial(WOLFCLU_CERT_SIGN* csign, WOLFSSL_BIO* s)
 {
     if (csign != NULL) {
+        wolfSSL_BIO_free(csign->serialFile);
         csign->serialFile = s;
     }
 }
@@ -463,6 +467,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509, char* ext)
     if (ret == WOLFCLU_SUCCESS && csign->dataBase != NULL) {
         ret = wolfCLU_CertSignLog(csign, x509);
     }
+    wolfSSL_BIO_free(out);
 
     return ret;
 }
@@ -479,7 +484,6 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     long line = 0;
     long defaultDays;
     char* CAsection;
-    char* dir = NULL;
     char* serial;
     char* defaultMD;
     char* tmp;
@@ -509,7 +513,6 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
             CAsection = sect;
         }
 
-        dir = wolfSSL_NCONF_get_string(conf, CAsection, "dir");
         tmp = wolfSSL_NCONF_get_string(conf, CAsection, "new_certs_dir");
         if (wolfCLU_CertSignAppendOut(ret, tmp) != WOLFCLU_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to set output locate %s", tmp);
