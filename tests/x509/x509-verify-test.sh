@@ -5,6 +5,28 @@ if [ ! -d ./certs/ ]; then
     exit 77
 fi
 
+RESULT=`./wolfssl verify ./certs/server-cert.pem 2>&1`
+if [ $? == 0 ]; then
+    echo "Failed on test \"./wolfssl verify ./certs/server-cert.pem\""
+    exit 99
+fi
+echo "$RESULT" | grep "Err (-188) : ASN no signer error to confirm failure"
+if [ $? != 0 ]; then
+    echo "Unexpected error result on test \"./wolfssl verify ./certs/server-cert.pem\""
+    exit 99
+fi
+
+RESULT=`./wolfssl verify ./certs/ca-cert.pem 2>&1`
+if [ $? == 0 ]; then
+    echo "Failed on test \"./wolfssl verify ./certs/ca-cert.pem\""
+    exit 99
+fi
+echo "$RESULT" | grep "Err (-275) : ASN self-signed certificate error"
+if [ $? != 0 ]; then
+    echo "Unexpected error result on test \"./wolfssl verify ./certs/ca-cert.pem\""
+    exit 99
+fi
+
 RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem ./certs/server-cert.pem`
 if [ $? != 0 ]; then
     echo "Failed on test \"./wolfssl verify -CAfile ./certs/ca-cert.pem ./certs/server-cert.pem\""

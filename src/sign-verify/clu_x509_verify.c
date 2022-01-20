@@ -131,7 +131,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
         if (wolfSSL_X509_LOOKUP_load_file(lookup, caCert, X509_FILETYPE_PEM)
                 != WOLFSSL_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_E0, "Failed to load CA file");
