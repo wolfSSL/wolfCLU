@@ -45,5 +45,12 @@ done
 run "dgst -sha256 -verify ./certs/server-keyPub.pem -signature ./tests/dgst/5000-server-key.sig ./large-test.txt"
 rm -f large-test.txt
 
+run "dgst -sha256 -sign ./certs/ecc-key.pem -out configure.sig configure.ac"
+run_fail "dgst -sha256 -verify ./certs/ecc-key.pem -signature configure.sig configure.ac"
+run_fail "dgst -sha256 -verify bad-key.pem -signature configure.sig configure.ac"
+run_fail "dgst -sha256 -verify ./certs/server-keyPub.pem -signature configure.sig configure.ac"
+run "dgst -sha256 -verify ./certs/ecc-keyPub.pem -signature configure.sig configure.ac"
+rm -f configure.sig
+
 echo "Done"
 exit 0
