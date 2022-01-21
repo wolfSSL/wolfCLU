@@ -30,6 +30,7 @@ static const struct option pkey_options[] = {
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
     {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
     {"pubout",    no_argument,       0, WOLFCLU_PUBOUT    },
     {"pubin",     no_argument,       0, WOLFCLU_PUBIN     },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
@@ -44,6 +45,8 @@ static void wolfCLU_pKeyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl pkey");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to output to (default stdout)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inform pem/der");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-outform pem/der");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-pubout output the public key");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-pubin  expect to read public key in");
 }
@@ -308,7 +311,8 @@ static int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
 int wolfCLU_pKeySetup(int argc, char** argv)
 {
     int ret    = WOLFCLU_SUCCESS;
-    int inForm = PEM_FORM;
+    int inForm  = PEM_FORM;
+    int outForm = PEM_FORM;
     int pubIn  = 0;
     int pubOut = 0;
     int option;
@@ -351,6 +355,10 @@ int wolfCLU_pKeySetup(int argc, char** argv)
 
             case WOLFCLU_INFORM:
                 inForm = wolfCLU_checkInform(optarg);
+                break;
+
+            case WOLFCLU_OUTFORM:
+                outForm = wolfCLU_checkOutform(optarg);
                 break;
 
             case WOLFCLU_HELP:
@@ -407,72 +415,109 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     /* print out the public key only */
     if (ret == WOLFCLU_SUCCESS && pubOut == 1) {
         if (pkey != NULL) {
+            unsigned char *der = NULL;
+            int derSz = 0;
+
             if (inForm == PEM_FORM) {
-                ret = wolfCLU_pKeyPEMtoPubKey(bioOut, pkey);
-                if (ret != WOLFCLU_SUCCESS) {
-                    WOLFCLU_LOG(WOLFCLU_E0,
-                            "Error getting pubkey from pem key");
+                if (outForm == PEM_FORM) {
+                    ret = wolfCLU_pKeyPEMtoPubKey(bioOut, pkey);
+                    if (ret != WOLFCLU_SUCCESS) {
+                        WOLFCLU_LOG(WOLFCLU_E0,
+                                "Error getting pubkey from pem key");
+                    }
+                }
+                else {
+                    if ((derSz = wolfCLU_pKeytoPubKey(pkey, &der)) <= 0) {
+                        WOLFCLU_LOG(WOLFCLU_E0,
+                                "Error converting der found to public key");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    if (ret == WOLFCLU_SUCCESS) {
+                        wolfSSL_BIO_write(bioOut, der, derSz);
+                    }
                 }
             }
             else {
-                unsigned char *der = NULL;
-                int derSz = 0;
-
                 if ((derSz = wolfCLU_pKeytoPubKey(pkey, &der)) <= 0) {
                     WOLFCLU_LOG(WOLFCLU_E0,
                             "Error converting der found to public key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
-                    if (wolfCLU_printDerPubKey(bioOut, der, derSz) !=
+                    if (outForm == PEM_FORM) {
+                        if (wolfCLU_printDerPubKey(bioOut, der, derSz) !=
                             WOLFCLU_SUCCESS) {
-                        WOLFCLU_LOG(WOLFCLU_E0, "Error printing out pubkey");
-                        ret = WOLFCLU_FATAL_ERROR;
+                            WOLFCLU_LOG(WOLFCLU_E0, "Error printing out pubkey");
+                            ret = WOLFCLU_FATAL_ERROR;
+                        }
                     }
-                    free(der);
+                    else {
+                        wolfSSL_BIO_write(bioOut, der, derSz);
+                    }
                 }
             }
+            if (der != NULL)
+                free(der);
         }
     }
 
     /* print out the private key */
     if (ret == WOLFCLU_SUCCESS && pubOut == 0) {
         if (pkey != NULL) {
+            unsigned char *der = NULL;
+            int derSz = 0;
+            int keyType;
+
+            switch (wolfSSL_EVP_PKEY_id(pkey)) {
+                case EVP_PKEY_RSA: keyType = RSA_TYPE; break;
+                case EVP_PKEY_DSA: keyType = DSA_TYPE; break;
+                case EVP_PKEY_EC:  keyType = ECC_TYPE; break;
+                default:
+                    /* keep generic PRIVATEKEY_TYPE as type */
+                    keyType = PRIVATEKEY_TYPE;
+            }
+
             if (inForm == PEM_FORM) {
-                ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
-                if (ret != WOLFCLU_SUCCESS) {
-                    WOLFCLU_LOG(WOLFCLU_E0,
-                            "Error getting private key from pem key");
-                    ret = WOLFCLU_FATAL_ERROR;
+                if (outForm == PEM_FORM) {
+                    ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
+                    if (ret != WOLFCLU_SUCCESS) {
+                        WOLFCLU_LOG(WOLFCLU_E0,
+                                "Error getting private key from pem key");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                }
+                else {
+                    if (wolfCLU_printDerPriKey(bioOut, der, derSz, keyType)
+                            != WOLFCLU_SUCCESS) {
+                        WOLFCLU_LOG(WOLFCLU_E0, "Error printing out pubkey");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    if (ret == WOLFCLU_SUCCESS) {
+                        wolfSSL_BIO_write(bioOut, der, derSz);
+                    }
                 }
             }
             else {
-                unsigned char *der = NULL;
-                int derSz = 0;
-                int keyType;
-
-                switch (wolfSSL_EVP_PKEY_id(pkey)) {
-                    case EVP_PKEY_RSA: keyType = RSA_TYPE; break;
-                    case EVP_PKEY_DSA: keyType = DSA_TYPE; break;
-                    case EVP_PKEY_EC:  keyType = ECC_TYPE; break;
-                    default:
-                        /* keep generic PRIVATEKEY_TYPE as type */
-                        keyType = PRIVATEKEY_TYPE;
-                }
-
                 if ((derSz = wolfCLU_pKeytoPriKey(pkey, &der)) <= 0) {
                     WOLFCLU_LOG(WOLFCLU_E0,
                             "Error converting der found to public key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
-                    if (wolfCLU_printDerPriKey(bioOut, der, derSz, keyType) !=
-                            WOLFCLU_SUCCESS) {
-                        WOLFCLU_LOG(WOLFCLU_E0, "Error printing out pubkey");
-                        ret = WOLFCLU_FATAL_ERROR;
+                    if (outForm == PEM_FORM) {
+                        if (wolfCLU_printDerPriKey(bioOut, der, derSz, keyType)
+                                != WOLFCLU_SUCCESS) {
+                            WOLFCLU_LOG(WOLFCLU_E0, "Error printing out pubkey");
+                            ret = WOLFCLU_FATAL_ERROR;
+                        }
                     }
-                    free(der);
+                    else {
+                        wolfSSL_BIO_write(bioOut, der, derSz);
+                    }
                 }
+            }
+            if (der != NULL) {
+                free(der);
             }
         }
     }
