@@ -31,6 +31,7 @@ static const struct option pkey_options[] = {
     {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"pubout",    no_argument,       0, WOLFCLU_PUBOUT    },
+    {"pubin",     no_argument,       0, WOLFCLU_PUBIN     },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
 
@@ -44,6 +45,7 @@ static void wolfCLU_pKeyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to output to (default stdout)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-pubout output the public key");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pubin  expect to read public key in");
 }
 
 
@@ -307,6 +309,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
 {
     int ret    = WOLFCLU_SUCCESS;
     int inForm = PEM_FORM;
+    int pubIn  = 0;
     int pubOut = 0;
     int option;
     int longIndex = 1;
@@ -320,6 +323,11 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                    pkey_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_PUBOUT:
+                pubOut = 1;
+                break;
+
+            case WOLFCLU_PUBIN:
+                pubIn  = 1;
                 pubOut = 1;
                 break;
 
@@ -362,10 +370,20 @@ int wolfCLU_pKeySetup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
         if (inForm == PEM_FORM) {
-            pkey = wolfSSL_PEM_read_bio_PrivateKey(bioIn, NULL, NULL, NULL);
+            if (pubIn) {
+                pkey = wolfSSL_PEM_read_bio_PUBKEY(bioIn, NULL, NULL, NULL);
+            }
+            else {
+                pkey = wolfSSL_PEM_read_bio_PrivateKey(bioIn, NULL, NULL, NULL);
+            }
         }
         else {
-            pkey = wolfSSL_d2i_PrivateKey_bio(bioIn, NULL);
+            if (pubIn) {
+                pkey = wolfSSL_d2i_PUBKEY_bio(bioIn, NULL);
+            }
+            else {
+                pkey = wolfSSL_d2i_PrivateKey_bio(bioIn, NULL);
+            }
         }
         if (pkey == NULL) {
             WOLFCLU_LOG(WOLFCLU_E0, "Error reading key from file");
@@ -424,7 +442,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
                 if (ret != WOLFCLU_SUCCESS) {
                     WOLFCLU_LOG(WOLFCLU_E0,
-                            "Error getting pubkey from pem key");
+                            "Error getting private key from pem key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
             }
