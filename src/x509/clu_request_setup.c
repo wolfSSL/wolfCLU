@@ -52,6 +52,7 @@ static const struct option req_options[] = {
     {"verify",    no_argument,       0, WOLFCLU_VERIFY },
     {"text",      no_argument,       0, WOLFCLU_TEXT_OUT },
     {"noout",     no_argument,       0, WOLFCLU_NOOUT },
+    {"extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -496,6 +497,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     char*   out = NULL;
     char*   config = NULL;
     char*   subj = NULL;
+    char*   ext = NULL;
 
     int     algCheck =   0;     /* algorithm type */
     int     oid      =   0;
@@ -517,6 +519,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
                     &longIndex )) != -1) {
 
         switch (option) {
+            case WOLFCLU_EXTENSIONS:
+                ext = optarg;
+                break;
+
             case WOLFCLU_INFILE:
                 reqIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (reqIn == NULL) {
@@ -705,7 +711,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && config != NULL) {
-        ret = wolfCLU_readConfig(x509, config, (char*)"req");
+        ret = wolfCLU_readConfig(x509, config, (char*)"req", ext);
 
         reSign = 1; /* re-sign after config changes */
     }

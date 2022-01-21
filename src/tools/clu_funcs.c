@@ -562,6 +562,7 @@ void wolfCLU_certgenHelp() {
     WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to parse for certificate configuration");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-x509 generate self signed certificate");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
     WOLFCLU_LOG(WOLFCLU_L0, "\n");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\ncertgen USAGE:\nwolfssl -req -ecc/-rsa/-ed25519 -in <filename> -out"
