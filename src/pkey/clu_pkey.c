@@ -213,11 +213,9 @@ static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
         }
         else {
             ret = wc_EccPublicKeyToDer((ecc_key*)ec->internal, der, derSz, 1);
-
         }
 
         if (ret > 0) {
-            ret    = derSz;
             *out   = der;
         }
         else {
@@ -240,7 +238,7 @@ static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
 /* creates an out buffer containing only the public key from the pkey
  * returns size of buffer on success
  */
-static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
+int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
 {
     int type;
     int ret = 0;
@@ -273,12 +271,12 @@ static int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
 /* creates an out buffer containing the private key from the pkey
  * returns size of buffer on success
  */
-static int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
+int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
 {
     int type;
     int ret = 0;
 
-    type   = wolfSSL_EVP_PKEY_id(pkey);
+    type = wolfSSL_EVP_PKEY_id(pkey);
     switch (type) {
         case EVP_PKEY_RSA:
             ret = wolfSSL_i2d_RSAPrivateKey(

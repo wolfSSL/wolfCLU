@@ -41,5 +41,8 @@ int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey);
 
 
 int wolfCLU_RSA(int argc, char** argv);
+
+int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out);
+int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out);
 #endif /* CLU_PKEY_H */
 
