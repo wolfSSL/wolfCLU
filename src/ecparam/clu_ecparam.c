@@ -148,10 +148,8 @@ int wolfCLU_ecparam(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wc_InitRng(&rng) != 0) {
-            ret = WOLFCLU_FAILURE;
-        }
+    if (wc_InitRng(&rng) != 0) {
+        ret = WOLFCLU_FAILURE;
     }
 
     if (ret == WOLFCLU_SUCCESS && in != NULL) {
@@ -262,6 +260,7 @@ int wolfCLU_ecparam(int argc, char** argv)
     wolfSSL_EC_KEY_free(key);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_BIO_free(in);
+    wc_FreeRng(&rng);
     return ret;
 }
 
