@@ -433,10 +433,11 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* x509);
  *
  * @param config file name of the config to read
  * @param sect   section in the config file to search for when reading
+ * @param ext    optional section to read extensions from
  * @return a newly created WOLFSSL_X509 structure on success
  * @return null on fail
 */
-int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect);
+int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext);
 
 
 /**

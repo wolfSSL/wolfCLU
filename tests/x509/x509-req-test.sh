@@ -40,6 +40,10 @@ commonName = testing
 basicConstraints = CA:FALSE
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
+[ v3_alt_ca ]
+basicConstraints = CA:TRUE
+keyUsage = digitalSignature
+subjectAltName = @alt_names
 [alt_names]
 DNS.1 = extraName
 DNS.2 = alt-name
@@ -65,6 +69,14 @@ rm -f tmp.cert
 
 run_success "req -new -key ./certs/server-key.pem -config ./test.conf -out tmp.csr"
 run_success "req -text -in tmp.csr"
+
+run_success "req -new -extensions v3_alt_ca -key ./certs/server-key.pem -config ./test.conf -x509 -out alt.crt"
+run_success "x509 -in alt.crt -text -noout"
+echo "$RESULT" | grep "CA:TRUE"
+if [ $? != 0 ]; then
+    echo "was expecting alt extensions to have CA set"
+    exit 99
+fi
 
 # test pem to der and back again
 run_success "req -inform pem -outform der -in tmp.csr -out tmp.csr.der"

@@ -496,7 +496,7 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 }
 
 /* Make a new WOLFSSL_X509 based off of the config file read */
-int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect)
+int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext)
 {
     WOLFSSL_CONF *conf = NULL;
     long line = 0;
@@ -511,8 +511,13 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect)
 
     wolfCLU_setAttributes(x509, conf,
             wolfSSL_NCONF_get_string(conf, sect, "attributes"));
-    wolfCLU_setExtensions(x509, conf,
+    if (ext == NULL) {
+        wolfCLU_setExtensions(x509, conf,
             wolfSSL_NCONF_get_string(conf, sect, "x509_extensions"));
+    }
+    else {
+        wolfCLU_setExtensions(x509, conf, ext);
+    }
     wolfCLU_setDisNames(x509, conf,
             wolfSSL_NCONF_get_string(conf, sect, "distinguished_name"));
 
