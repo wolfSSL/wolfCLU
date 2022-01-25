@@ -349,6 +349,7 @@ WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name)
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
+        wolfSSL_EC_GROUP_free(group);
     }
 
     if (key != NULL && ret == WOLFCLU_SUCCESS) {
