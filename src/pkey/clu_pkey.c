@@ -321,7 +321,6 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
 
-    opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = getopt_long_only(argc, argv, "",
                    pkey_options, &longIndex )) != -1) {
@@ -367,11 +366,13 @@ int wolfCLU_pKeySetup(int argc, char** argv)
 
             case ':':
             case '?':
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
+                ret = USER_INPUT_ERROR;
                 break;
 
             default:
-                /* do nothing. */
-                (void)ret;
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
+                ret = USER_INPUT_ERROR;
         }
     }
 
