@@ -55,7 +55,15 @@ fi
 rm -f test-dec.der
 rm -f test-enc.der
 
-
+run "enc -aes-128-cbc -in ./configure.ac -out ./configure.ac.enc -k 'test'"
+run "enc -d -aes-128-cbc -in ./configure.ac.enc -out ./configure.ac.dec -k 'test'"
+diff ./configure.ac ./configure.ac.dec
+if [ $? != 0 ]; then
+    echo "decrypted file does not match original file"
+    exit 99
+fi
+rm -f configure.ac.dec
+rm -f configure.ac.enc
 
 # interoperability testing
 openssl enc --help &> /dev/null
