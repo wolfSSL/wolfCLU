@@ -135,13 +135,6 @@ static int ExtractKey(void* key, WOLFSSL_EVP_PKEY* pkey, int* keySz,
             /* expecting private key */
             if (ret == WOLFCLU_SUCCESS && signing == 1 &&
                     wc_EccPrivateKeyDecode(der, &idx, ecc, derSz) != 0) {
-                {
-                    int z;
-                    printf("private der : ");
-                    for (z = 0; z < derSz; z++)
-                        printf("%02X", der[z]);
-                    printf("\n");
-                }
                 WOLFCLU_LOG(WOLFCLU_E0, "Error decoding private ecc key");
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -398,17 +391,22 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && signing == 1) {
         WC_RNG rng;
 
-        wc_InitRng(&rng);
-
-        /* get expected signature size */
-        ret = wc_SignatureGetSize(sigType, key, keySz);
-        if (ret <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error getting signature size");
+        if (wc_InitRng(&rng) != 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error initializing RNG");
             ret = WOLFCLU_FATAL_ERROR;
         }
-        else {
-            sigSz = (word32)ret;
-            ret = WOLFCLU_SUCCESS;
+
+        /* get expected signature size */
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = wc_SignatureGetSize(sigType, key, keySz);
+            if (ret <= 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error getting signature size");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                sigSz = (word32)ret;
+                ret = WOLFCLU_SUCCESS;
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
