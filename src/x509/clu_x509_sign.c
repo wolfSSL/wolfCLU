@@ -30,14 +30,20 @@ struct WOLFCLU_CERT_SIGN {
     int keyType;
     enum wc_HashType hashType;
     char* outDir;
+    char* ext; /* location of extensions to use */
     WOLFSSL_BIO* serialFile;
     WOLFSSL_BIO* dataBase;
+    WOLFSSL_BIO* randFile;
     WOLFSSL_X509* ca;
     WOLFSSL_CONF* config;
+    char* crl;
+    char* crlDir;
+    int   crlNumber;
     union caKey {
         WOLFSSL_EVP_PKEY* pkey;
         /* other key options*/
     } caKey;
+    byte unique; /* flag if subject needs to be unique */
 };
 
 
@@ -71,11 +77,39 @@ void wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
 
         wolfSSL_BIO_free(csign->dataBase);
         wolfSSL_BIO_free(csign->serialFile);
+        wolfSSL_BIO_free(csign->randFile);
         wolfSSL_X509_free(csign->ca);
         if (csign->keyType == RSAk || csign->keyType == ECDSAk) {
             wolfSSL_EVP_PKEY_free(csign->caKey.pkey);
         }
         XFREE(csign, HEAP_HINT, DYNAMIC_TYPE_CERT);
+    }
+}
+
+#ifdef HAVE_CRL
+void wolfCLU_CertSignSetCrl(WOLFCLU_CERT_SIGN* csign, char* crl, char* crlDir,
+        int crlNumber)
+{
+    if (csign != NULL) {
+        csign->crl    = crl;
+        csign->crlDir = crlDir;
+        csign->crlNumber = crlNumber;
+    }
+}
+#endif /* HAVE_CRL */
+
+static void wolfCLU_CertSignSetRandFile(WOLFCLU_CERT_SIGN* csign, char* f)
+{
+    if (csign != NULL) {
+        wolfSSL_BIO_free(csign->randFile);
+        csign->randFile = wolfSSL_BIO_new_file(f, "wb+");
+    }
+}
+
+void wolfCLU_CertSignSetExt(WOLFCLU_CERT_SIGN* csign, char* ext)
+{
+    if (csign != NULL) {
+        csign->ext = ext;
     }
 }
 
@@ -116,7 +150,8 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
                     break;
 
                 default:
-                    printf("keytype needs added to wolfCLU_CertSignSetCA\n");
+                    WOLFCLU_LOG(WOLFCLU_E0,
+                            "keytype needs added to wolfCLU_CertSignSetCA");
             }
             csign->keyType = keyType;
         }
@@ -292,8 +327,19 @@ static int wolfCLU_CertSignLog(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
         subject = wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(x509),
                NULL, 0); 
-        wolfSSL_BIO_write(csign->dataBase, subject, (int)XSTRLEN(subject));
-        wolfSSL_BIO_write(csign->dataBase, "\n", (int)XSTRLEN("\n"));
+        if (wolfSSL_BIO_write(csign->dataBase, subject, (int)XSTRLEN(subject))
+                <= 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to write to data base");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(csign->dataBase, "\n", (int)XSTRLEN("\n"))
+                <= 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to write to data base");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
         XFREE(subject, NULL, DYNAMIC_TYPE_OPENSSL);
     }
 
@@ -305,7 +351,7 @@ static int wolfCLU_CertSignLog(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
  * 'ext' is an optional extensions section in the 'csign's config file loaded
  * return WOLFCLU_SUCCESS on success
  */
-int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509, char* ext)
+int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 {
     const WOLFSSL_EVP_MD* md;
     WOLFSSL_BIO* out = NULL;
@@ -405,7 +451,11 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509, char* ext)
 
         if (csign->serialFile != NULL) {
             s = wolfSSL_ASN1_INTEGER_new();
-            wolfSSL_a2i_ASN1_INTEGER(csign->serialFile, s, buf, size);
+            if (wolfSSL_a2i_ASN1_INTEGER(csign->serialFile, s, buf, size)
+                    != WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Issue reading serial number from file");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
         else {
             int defaultSerialSz = 20;
@@ -427,8 +477,8 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509, char* ext)
     }
 
     /* set extensions */
-    if (ext != NULL) {
-        wolfCLU_setExtensions(x509, csign->config, ext);
+    if (csign->ext != NULL) {
+        wolfCLU_setExtensions(x509, csign->config, csign->ext);
     }
 
     /* sign the certificate */
@@ -451,6 +501,44 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509, char* ext)
        * x509 struct and use a different method for signing and creating the
        * certificate */
 
+    /* check if unique subject name is required */
+    if (ret == WOLFCLU_SUCCESS && csign->unique == 1) {
+        char line[MAX_TERM_WIDTH];
+        WOLFSSL_X509_NAME* subject;
+        subject = wolfSSL_X509_get_subject_name(x509);
+
+        /* for now using a dumb brute force approach */
+        wolfSSL_BIO_reset(csign->dataBase);
+        while (wolfSSL_BIO_gets(csign->dataBase, line, MAX_TERM_WIDTH) > 0) {
+            int i = 0;
+            char* word, *end;
+            char* deli = (char*)"\t";
+            char* subj = NULL;
+            WOLFSSL_X509_NAME* current = NULL;
+
+            for (word = strtok_r(line, deli, &end); word != NULL;
+                    word = strtok_r(NULL, deli, &end)) {
+                    if (i == 1) {
+                        subj = word;
+                    }
+                    i++;
+            }
+
+            if (subj == NULL) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error parsing out subject name");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
+
+            current = wolfCLU_ParseX509NameString(subj, (int)XSTRLEN(subj));
+            if (wolfSSL_X509_NAME_cmp(subject, current) == 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Subject name already exists");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
+        }
+    }
+
     /* create WOLFSSL_BIO for output */
     if (ret == WOLFCLU_SUCCESS) {
         out = wolfSSL_BIO_new_file(csign->outDir, "wb");
@@ -467,6 +555,35 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509, char* ext)
             WOLFCLU_LOG(WOLFCLU_E0, "Error writing out certificate");
             ret = WOLFCLU_FATAL_ERROR;
         }
+    }
+
+    /* increment the serial number in the file */
+    if (ret == WOLFCLU_SUCCESS && csign->serialFile != NULL) {
+        WOLFSSL_ASN1_INTEGER* s;
+        char buf[EXTERNAL_SERIAL_SIZE*2];
+        int size = EXTERNAL_SERIAL_SIZE*2;
+
+        s = wolfSSL_ASN1_INTEGER_new();
+        wolfSSL_BIO_reset(csign->serialFile);
+        if (wolfSSL_a2i_ASN1_INTEGER(csign->serialFile, s, buf, size)
+                != WOLFSSL_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Issue reading serial number from file");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (wolfSSL_ASN1_INTEGER_set(s, wolfSSL_ASN1_INTEGER_get(s)+1)
+                != WOLFSSL_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Issue incrementing serial number");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        wolfSSL_BIO_reset(csign->serialFile);
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_i2a_ASN1_INTEGER(csign->serialFile, s) <= 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Issue writing serial number");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        wolfSSL_ASN1_INTEGER_free(s);
     }
 
     /* write results to data base */
@@ -520,8 +637,14 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         }
 
         tmp = wolfSSL_NCONF_get_string(conf, CAsection, "new_certs_dir");
-        if (wolfCLU_CertSignAppendOut(ret, tmp) != WOLFCLU_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to set output locate %s", tmp);
+        if (tmp == NULL) {
+            /* if NULL try searching for 'certs' key word instead */
+            tmp = wolfSSL_NCONF_get_string(conf, CAsection, "certs");
+        }
+        if (tmp == NULL ||
+                wolfCLU_CertSignAppendOut(ret, tmp) != WOLFCLU_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to set output certificate location "
+                   "%s", tmp);
             wolfCLU_CertSignFree(ret);
             ret = NULL;
         }
@@ -530,7 +653,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     if (ret != NULL) {
         tmp = wolfSSL_NCONF_get_string(conf, CAsection, "database");
         if (tmp != NULL) {
-            ret->dataBase = wolfSSL_BIO_new_file(tmp, "wb");
+            ret->dataBase = wolfSSL_BIO_new_file(tmp, "ab+");
             if (ret->dataBase == NULL) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Unable to open data base file %s",
                         tmp);
@@ -553,13 +676,21 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         }
     }
 
+    /* does the subject need to be unique? */
+    if (ret != NULL) {
+        tmp = wolfSSL_NCONF_get_string(conf, CAsection, "unique_subject");
+        if (tmp != NULL && XSTRCMP(tmp, "yes") == 0) {
+            ret->unique = 1;
+        }
+    }
+
     /* check on setting serial */
     if (ret != NULL) {
         serial = wolfSSL_NCONF_get_string(conf, CAsection, "serial");
         if (serial != NULL) {
             WOLFSSL_BIO* s;
 
-            s = wolfSSL_BIO_new_file(serial, "rb");
+            s = wolfSSL_BIO_new_file(serial, "rb+");
             if (s == NULL) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Unable to open serial file %s",
                         serial);
@@ -572,7 +703,21 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         }
     }
 
+    /* look for a private random file (loads on start and writes 256 byte to on
+     * close */
     if (ret != NULL) {
+        tmp = wolfSSL_NCONF_get_string(conf, CAsection, "RANDFILE");
+        if (tmp != NULL) {
+            wolfCLU_CertSignSetRandFile(ret, tmp);
+        }
+    }
+
+    if (ret != NULL) {
+        tmp = wolfSSL_NCONF_get_string(conf, CAsection, "x509_extensions");
+        if (tmp != NULL) {
+            wolfCLU_CertSignSetExt(ret, tmp);
+        }
+
         if (wolfSSL_NCONF_get_number(conf, CAsection, "default_days",
                     &defaultDays) == WOLFSSL_SUCCESS) {
             wolfCLU_CertSignSetDate(ret, (int)defaultDays);
@@ -599,6 +744,24 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
             }
         }
     }
+
+    /* read CRL information */
+#ifdef HAVE_CRL
+    if (ret != NULL) {
+        char* crl       = NULL;
+        char* crlDir    = NULL;
+        int   crlNumber = 0;
+
+        crlDir = wolfSSL_NCONF_get_string(conf, CAsection, "crl_dir");
+        crl    = wolfSSL_NCONF_get_string(conf, CAsection, "crl");
+        if (wolfSSL_NCONF_get_number(conf, CAsection, "crlnumber",
+                    &defaultDays) != WOLFSSL_SUCCESS) {
+            crlNumber = 0;
+        }
+
+        wolfCLU_CertSignSetCrl(ret, crl, crlDir, crlNumber);
+    }
+#endif /* HAVE_CRL */
 
     if (caKey != NULL) {
         keyType = wolfCLU_GetTypeFromPKEY(caKey);

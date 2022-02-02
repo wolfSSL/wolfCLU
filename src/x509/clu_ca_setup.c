@@ -214,8 +214,12 @@ int wolfCLU_CASetup(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
+    if (ret == WOLFCLU_SUCCESS && ext != NULL) {
+        wolfCLU_CertSignSetExt(signer, ext);
+    }
+
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfCLU_CertSign(signer, x509, ext);
+        ret = wolfCLU_CertSign(signer, x509);
     }
 
     wolfSSL_BIO_free(reqIn);
