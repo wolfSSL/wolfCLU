@@ -196,9 +196,9 @@ Time Stamp Signing : YES"
     fi
     echo "TEST 3.k"
     test_case "-in certs/server-cert.pem -hash -noout"
-    EXPECTED="Not canon version of subject:
-f6cf410e"
-    if [ "$OUTPUT" != "$EXPECTED" ]; then
+    EXPECTED="137dc03f"
+    OLD_EXPECTED="f6cf410e" #was fixed to match OpenSSL after release 5.1.1
+    if [ "$OUTPUT" != "$EXPECTED" ] && [ "$OUTPUT" != "$OLD_EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
         exit 99

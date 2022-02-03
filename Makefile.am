@@ -42,6 +42,7 @@ man_MANS+= manpages/wolfssl.1
 
 include src/include.am
 include wolfclu/include.am
+include tests/dsa/include.am
 include tests/pkey/include.am
 include tests/dgst/include.am
 include tests/rand/include.am

@@ -65,6 +65,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "bench          Benchmark one of the algorithms");
     WOLFCLU_LOG(WOLFCLU_L0, "decrypt        Decrypt an encrypted file");
     WOLFCLU_LOG(WOLFCLU_L0, "dgst           Used for verifying a signature");
+    WOLFCLU_LOG(WOLFCLU_L0, "dsaparam       Used for creating dsa params and keys");
     WOLFCLU_LOG(WOLFCLU_L0, "ecc            Ecc signing and signature verification");
     WOLFCLU_LOG(WOLFCLU_L0, "ecparam        Generate an ECC key and parameters");
     WOLFCLU_LOG(WOLFCLU_L0, "ed25519        Ed25519 signing and signature verification");

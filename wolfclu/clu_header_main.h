@@ -39,6 +39,7 @@
 #include <wolfssl/openssl/pem.h>
 #include <wolfssl/openssl/x509v3.h>
 #include <wolfssl/wolfcrypt/types.h>
+#include <wolfssl/wolfcrypt/dsa.h>
 #include <wolfssl/wolfcrypt/random.h>
 #include <wolfssl/wolfcrypt/pwdbased.h>
 #include <wolfssl/wolfcrypt/aes.h>
@@ -497,4 +498,10 @@ int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg);
  * @brief function to generate random data
  */
 int wolfCLU_Rand(int argc, char** argv);
+
+
+/**
+ * @brief function to generate dsa params and keys
+ */
+int wolfCLU_DsaParamSetup(int argc, char** argv);
 #endif /* _WOLFSSL_CLU_HEADER_ */
