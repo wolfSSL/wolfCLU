@@ -21,6 +21,14 @@ run_fail() {
     fi
 }
 
+# Test if DSA compiled in
+RESULT=`./wolfssl dsaparam 1024 2>&1`
+echo $RESULT | grep "DSA support not compiled into wolfSSL"
+if [ $? == 0 ]; then
+    #return 77 to indicate to automake that the test was skipped
+    exit 77
+fi
+
 run "dsaparam 1024"
 echo $RESULT | grep -e "-----BEGIN DSA PARAMETERS-----"
 if [ $? != 0 ]; then
