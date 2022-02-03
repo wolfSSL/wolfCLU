@@ -562,6 +562,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         WOLFSSL_ASN1_INTEGER* s;
         char buf[EXTERNAL_SERIAL_SIZE*2];
         int size = EXTERNAL_SERIAL_SIZE*2;
+        long cur;
 
         s = wolfSSL_ASN1_INTEGER_new();
         wolfSSL_BIO_reset(csign->serialFile);
@@ -571,8 +572,15 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             ret = WOLFCLU_FATAL_ERROR;
         }
 
-        if (wolfSSL_ASN1_INTEGER_set(s, wolfSSL_ASN1_INTEGER_get(s)+1)
-                != WOLFSSL_SUCCESS) {
+        if (ret == WOLFCLU_SUCCESS) {
+            cur = wolfSSL_ASN1_INTEGER_get(s);
+            if (cur < 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_ASN1_INTEGER_set(s, cur + 1) != WOLFSSL_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_E0, "Issue incrementing serial number");
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -681,7 +689,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     /* does the subject need to be unique? */
     if (ret != NULL) {
         tmp = wolfSSL_NCONF_get_string(conf, CAsection, "unique_subject");
-        if (tmp != NULL && XSTRCMP(tmp, "yes") == 0) {
+        if (tmp != NULL && XSTRNCMP(tmp, "yes", 3) == 0) {
             ret->unique = 1;
         }
     }
@@ -706,7 +714,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     }
 
     /* look for a private random file (loads on start and writes 256 byte to on
-     * close */
+     * close) */
     if (ret != NULL) {
         tmp = wolfSSL_NCONF_get_string(conf, CAsection, "RANDFILE");
         if (tmp != NULL) {
