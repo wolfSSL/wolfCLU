@@ -27,7 +27,8 @@
 static const struct option dsa_options[] = {
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
     {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"genkey",    no_argument,       0, WOLFCLU_PUBOUT    },
+    {"genkey",    no_argument,       0, WOLFCLU_GEN_KEY   },
+    {"noout",     no_argument,       0, WOLFCLU_NOOUT     },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
 
@@ -41,6 +42,7 @@ static void wolfCLU_DsaHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to output to (default stdout)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-genkey generate DSA key using param input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-noout  do not print out the params");
 }
 #endif /* !NO_DSA */
 
@@ -55,7 +57,8 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
     int option;
     int longIndex = 1;
     char* out = NULL;
-    byte genKey   = 0;
+    byte genKey = 0;
+    byte noOut  = 0;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
 
@@ -92,6 +95,10 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
                 genKey = 1;
                 break;
 
+            case WOLFCLU_NOOUT:
+                noOut = 1;
+                break;
+
             case WOLFCLU_HELP:
                 wolfCLU_DsaHelp();
                 return WOLFCLU_SUCCESS;
@@ -116,7 +123,50 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 
     /* read in parameters */
     if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
-        //wc_DsaParamsDecode(in, &idx, &dsa, inSz);
+        DerBuffer* pDer = NULL;
+        byte* in = NULL;
+        word32 inSz = 0;
+        word32 idx  = 0;
+
+        inSz = wolfSSL_BIO_get_len(bioIn);
+        if (inSz > 0) {
+            in = (byte*)XMALLOC(inSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+            if (in == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    wolfSSL_BIO_read(bioIn, in, inSz) <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    wc_PemToDer(in, inSz, DSA_PARAM_TYPE, &pDer, NULL, NULL,
+                        NULL) != 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            /* der should always be smaller then pem but check just in case */
+            if (ret == WOLFCLU_SUCCESS && inSz < pDer->length) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                inSz = pDer->length;
+                XMEMCPY(in, pDer->buffer, pDer->length);
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    wc_DsaParamsDecode(in, &idx, &dsa, inSz) != 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Unable to decode input params");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (in != NULL)
+                XFREE(in, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+            if (pDer != NULL)
+                wc_FreeDer(&pDer);
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -152,7 +202,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
     }
 
     /* print out the dsa parameters */
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && !noOut) {
         byte* outBuf = NULL;
         byte* pem    = NULL;
         word32 outBufSz = 0;
@@ -207,8 +257,77 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
     }
 
     /* print out the dsa key */
-    //wc_MakeDsaKey(&rng, &dsa);
-    //wc_DsaKeyToDer(&key, out, outSz);
+    if (ret == WOLFCLU_SUCCESS && genKey) {
+        byte* outBuf = NULL;
+        byte* pem    = NULL;
+        word32 outBufSz = 0;
+        word32 pemSz    = 0;
+
+        if (wc_MakeDsaKey(&rng, &dsa) != 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error making DSA key");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        /* get DER size (param has p,q,g and key has p,q,g,y,x) */
+        if (wc_DsaKeyToParamsDer_ex(&dsa, NULL, &outBufSz) != LENGTH_ONLY_E) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            /* size is p,q,g + x,y
+             * x will be q size plus 64 bits
+             * y will be result of g^x mod p */
+            outBufSz = outBufSz + outBufSz + (64/WOLFSSL_BIT_SIZE);
+            outBuf = (byte*)XMALLOC(outBufSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+            if (outBuf == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = wc_DsaKeyToDer(&dsa, outBuf, outBufSz);
+            if (ret <= 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error converting DSA key to buffer");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                outBufSz = (word32)ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            pemSz = wc_DerToPem(outBuf, outBufSz, NULL, 0, DSA_PRIVATEKEY_TYPE);
+            if (pemSz > 0) {
+                pem = (byte*)XMALLOC(pemSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+                if (pem == NULL) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+            else {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            pemSz = wc_DerToPem(outBuf, outBufSz, pem, pemSz,
+                    DSA_PRIVATEKEY_TYPE);
+            if (pemSz <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(bioOut, pem, pemSz) <= 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (pem != NULL)
+            XFREE(pem, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        if (outBuf != NULL)
+            XFREE(outBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    }
 
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
