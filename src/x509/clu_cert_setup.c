@@ -447,19 +447,10 @@ int wolfCLU_certSetup(int argc, char** argv)
 
         name = wolfSSL_X509_get_subject_name(x509);
         if (name != NULL) {
-
-            XSNPRINTF(txt, MAX_TERM_WIDTH, "%s\n",
-                    "Not canon version of subject:");
+            h = wolfSSL_X509_NAME_hash(name);
+            XSNPRINTF(txt, MAX_TERM_WIDTH, "%08lx", h);
             if (wolfSSL_BIO_write(out, txt, (int)XSTRLEN(txt)) <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
-            }
-
-            if (ret == WOLFCLU_SUCCESS) {
-                h = wolfSSL_X509_NAME_hash(name);
-                XSNPRINTF(txt, MAX_TERM_WIDTH, "%lx", h);
-                if (wolfSSL_BIO_write(out, txt, (int)XSTRLEN(txt)) <= 0) {
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
             }
 
             if (ret == WOLFCLU_SUCCESS &&
