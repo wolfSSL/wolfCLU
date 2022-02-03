@@ -40,6 +40,7 @@ wolfssl_SOURCES = src/clu_main.c \
 				    src/pkey/clu_pkey.c \
 				    src/pkcs/clu_pkcs12.c \
 				    src/client/client.c \
-				    src/client/clu_client_setup.c
+				    src/client/clu_client_setup.c \
+				    src/dsa/clu_dsa.c
 
 
