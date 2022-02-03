@@ -158,7 +158,8 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         word32 outBufSz = 0;
         word32 pemSz    = 0;
 
-        if (wc_DsaKeyToParamsDer_ex(&dsa, NULL, &outBufSz) != 0) {
+        if (wc_DsaKeyToParamsDer_ex(&dsa, NULL, &outBufSz) != LENGTH_ONLY_E) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -170,7 +171,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS &&
-                wc_DsaKeyToParamsDer_ex(&dsa, outBuf, &outBufSz) != 0) {
+                wc_DsaKeyToParamsDer_ex(&dsa, outBuf, &outBufSz) <= 0) {
             ret = WOLFCLU_FATAL_ERROR;
         }
 
