@@ -33,10 +33,15 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
 void wolfCLU_CertSignSetHash(WOLFCLU_CERT_SIGN* csign,
         enum wc_HashType hashType);
 void wolfCLU_CertSignSetDate(WOLFCLU_CERT_SIGN* csign, int d);
-int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509, char* ext);
+int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509);
 WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect);
 int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out);
 int wolfCLU_CertSignSetOut(WOLFCLU_CERT_SIGN* csign, char* out);
+void wolfCLU_CertSignSetExt(WOLFCLU_CERT_SIGN* csign, char* ext);
+#ifdef HAVE_CRL
+void wolfCLU_CertSignSetCrl(WOLFCLU_CERT_SIGN* csign, char* crl, char* crlDir,
+        int crlNumber);
+#endif
 
 #endif /* WOLFCLU_X509_SIGN_H */
 

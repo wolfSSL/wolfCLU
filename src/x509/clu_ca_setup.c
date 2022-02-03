@@ -37,6 +37,7 @@ static const struct option ca_options[] = {
     {"inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"config",    required_argument, 0, WOLFCLU_CONFIG },
     {"days",      required_argument, 0, WOLFCLU_DAYS },
+    {"selfsign",  no_argument, 0, WOLFCLU_SELFSIGN },
     {"h",         no_argument, 0, WOLFCLU_HELP },
     {"help",      no_argument, 0, WOLFCLU_HELP },
 
@@ -55,6 +56,7 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inform type PEM/DER of CSR input");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to read configuration from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-selfsign sign with key associated with cert");
 }
 
 /* return WOLFCLU_SUCCESS on success */
@@ -77,6 +79,7 @@ int wolfCLU_CASetup(int argc, char** argv)
     int option;
     int longIndex = 1;
     int days = 0;
+    int selfSigned = 0;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -91,6 +94,10 @@ int wolfCLU_CASetup(int argc, char** argv)
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
+                break;
+
+            case WOLFCLU_SELFSIGN:
+                selfSigned = 1;
                 break;
 
             case WOLFCLU_KEY:
@@ -168,6 +175,10 @@ int wolfCLU_CASetup(int argc, char** argv)
     else {
         signer = wolfCLU_CertSignNew();
     }
+    if (signer == NULL) {
+        WOLFCLU_LOG(WOLFCLU_E0, "Unable to create a signer struct");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
 
     /* override hash type if -md was passed in */
     if (ret == WOLFCLU_SUCCESS && hashType != WC_HASH_TYPE_NONE) {
@@ -180,10 +191,6 @@ int wolfCLU_CASetup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_E0, "Error reading key from file");
             ret = USER_INPUT_ERROR;
         }
-    }
-
-    if (ret == WOLFCLU_SUCCESS && (pkey != NULL || ca != NULL)) {
-        wolfCLU_CertSignSetCA(signer, ca, pkey, wolfCLU_GetTypeFromPKEY(pkey));
     }
 
     if (ret == WOLFCLU_SUCCESS && out != NULL) {
@@ -207,6 +214,17 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
     }
 
+    if (ret == WOLFCLU_SUCCESS && (pkey != NULL || ca != NULL)) {
+        if (selfSigned) {
+            wolfCLU_CertSignSetCA(signer, x509, pkey,
+                    wolfCLU_GetTypeFromPKEY(pkey));
+        }
+        else {
+            wolfCLU_CertSignSetCA(signer, ca, pkey,
+                    wolfCLU_GetTypeFromPKEY(pkey));
+        }
+    }
+
     /* default to version 3 which supports extensions */
     if (ret == WOLFCLU_SUCCESS &&
            wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS) {
@@ -214,13 +232,19 @@ int wolfCLU_CASetup(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
+    if (ret == WOLFCLU_SUCCESS && ext != NULL) {
+        wolfCLU_CertSignSetExt(signer, ext);
+    }
+
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfCLU_CertSign(signer, x509, ext);
+        ret = wolfCLU_CertSign(signer, x509);
     }
 
     wolfSSL_BIO_free(reqIn);
     wolfSSL_BIO_free(keyIn);
-    wolfSSL_X509_free(x509);
+    if (!selfSigned) {
+        wolfSSL_X509_free(x509);
+    }
     wolfCLU_CertSignFree(signer);
     return ret;
 }
