@@ -627,7 +627,9 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
             wolfCLU_CertSignFree(ret);
             ret = NULL;
         }
-        conf = ret->config;
+
+        if (ret != NULL)
+            conf = ret->config;
     }
 
     if (ret != NULL) {
@@ -768,6 +770,13 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     }
 
     wolfCLU_CertSignSetCA(ret, ca, caKey, keyType);
+
+    /* in fail case free up memory */
+    if (ret == NULL) {
+        wolfSSL_NCONF_free(conf);
+        wolfSSL_X509_free(ca);
+        wolfSSL_EVP_PKEY_free(caKey);
+    }
     return ret;
 }
 

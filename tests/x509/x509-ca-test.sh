@@ -132,9 +132,12 @@ run_success "ca -h"
 run_success "ca -help"
 run_success "req -key ./certs/server-key.pem -subj O=wolfSSL/C=US/ST=MT/L=Bozeman/CN=wolfSSL/OU=org-unit -out tmp-ca.csr"
 
-# testing out selfsign
+# testing reading bad conf file
 run_fail "ca -config ca-example.conf -in tmp-ca.csr -out tmp.pem -md sha256 -selfsign -keyfile ./certs/ca-key.pem"
-run_success "ca -config ca-example.conf -in tmp-ca.csr -out test_ca.pem -md sha256 -selfsign -keyfile ./certs/server-key.pem"
+
+# testing out selfsign
+run_fail "ca -config ca.conf -in tmp-ca.csr -out tmp.pem -md sha256 -selfsign -keyfile ./certs/ca-key.pem"
+run_success "ca -config ca.conf -in tmp-ca.csr -out test_ca.pem -md sha256 -selfsign -keyfile ./certs/server-key.pem"
 SUBJ=`./wolfssl x509 -in test_ca.pem -subject -noout`
 ISSU=`./wolfssl x509 -in test_ca.pem -issuer -noout`
 if [ "$SUBJ" != "$ISSU" ]; then
@@ -142,6 +145,7 @@ if [ "$SUBJ" != "$ISSU" ]; then
     exit 99
 fi
 run_fail "verify -CAfile ./certs/server-cert.pem test_ca.pem"
+run_fail "verify -CAfile ./certs/ca-cert.pem test_ca.pem"
 
 # create a certificate and then verify it
 run_success "ca -config ca.conf -in tmp-ca.csr -out test_ca.pem"

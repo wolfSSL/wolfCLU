@@ -175,6 +175,10 @@ int wolfCLU_CASetup(int argc, char** argv)
     else {
         signer = wolfCLU_CertSignNew();
     }
+    if (signer == NULL) {
+        WOLFCLU_LOG(WOLFCLU_E0, "Unable to create a signer struct");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
 
     /* override hash type if -md was passed in */
     if (ret == WOLFCLU_SUCCESS && hashType != WC_HASH_TYPE_NONE) {
