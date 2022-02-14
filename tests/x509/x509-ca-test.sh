@@ -91,6 +91,43 @@ commonName             = supplied
 emailAddress           = optional
 EOF
 
+cat << EOF >> ca-match.conf
+[ ca ]
+default_ca = CA_default
+
+[ usr_cert ]
+
+basicConstraints=CA:FALSE
+
+[ CA_default ]
+
+dir = ./certs
+database = ./index.txt
+new_certs_dir = ./
+
+certificate = \$dir/ca-cert.pem
+private_key = \$dir/ca-key.pem
+rand_serial = yes
+
+default_days = 365
+default_md = sha256
+
+policy = policy_match
+
+[ policy_match ]
+countryName            = supplied
+stateOrProvinceName    = optional
+organizationName       = match
+organizationalUnitName = optional
+commonName             = match
+emailAddress           = optional
+
+crl_dir    = ./crls-test
+crlnumber  = ./crlnumber-test
+crl        = ./certs/crl.pem
+EOF
+
+touch index.txt
 cat << EOF >> ca-crl.conf
 [ ca ]
 default_ca = CA_default
@@ -182,12 +219,31 @@ if [ "$RESULT" != "serial=02" ]; then
     exit 99
 fi
 
+# testing on policy section in conf file
+echo "Testing policy section"
+
+# no common name when is 'supplied'
+run_success "req -key ./certs/server-key.pem -subj O=wolfSSL/C=US/ST=MT/L=Bozeman/OU=org-unit -out tmp-ca.csr"
+echo "Test fail when common name not supplied"
+run_fail "ca -config ca.conf -in tmp-ca.csr -out tmp.pem -md sha256 -keyfile ./certs/ca-key.pem"
+echo "Test fail when common name not supplied 'ca-match.conf'"
+run_fail "ca -config ca-match.conf -in tmp-ca.csr -out tmp.pem -md sha256 -keyfile ./certs/ca-key.pem"
+echo "Test success when common name supplied"
+run_success "req -key ./certs/server-key.pem -subj O=Sawtooth/CN=www.wolfclu.com/C=US/ST=MT/L=Bozeman/OU=org-unit -out tmp-ca.csr"
+run_success "ca -config ca.conf -in tmp-ca.csr -out tmp.pem -md sha256 -keyfile ./certs/ca-key.pem"
+
+# common name mismatch
+run_success "req -key ./certs/server-key.pem -subj O=Sawtooth/CN=www.wolfclu.com/C=US/ST=MT/L=Bozeman/OU=org-unit -out tmp-ca.csr"
+run_fail "ca -config ca-match.conf -in tmp-ca.csr -out tmp.pem -md sha256 -keyfile ./certs/ca-key.pem"
+
+rm -f tmp.pm
 rm -f rand-file-test
 rm -f serial-file-test
 rm -f tmp-ca.csr
 rm -f ca.conf
 rm -f ca-2.conf
 rm -f ca-crl.conf
+rm -f ca-match.conf
 rm -f index.txt
 
 echo "Done"

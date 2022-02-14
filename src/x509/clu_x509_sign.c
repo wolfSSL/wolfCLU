@@ -622,42 +622,63 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             ret = _checkPolicy(issuer, subject, NID_countryName,
                     (csign->policy & WOLFCLU_CN_SUPPLIED),
                     (csign->policy & WOLFCLU_CN_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad country name in certificate");
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             ret = _checkPolicy(issuer, subject, NID_stateOrProvinceName,
                     (csign->policy & WOLFCLU_SN_SUPPLIED),
                     (csign->policy & WOLFCLU_SN_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad state name in certificate");
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             ret = _checkPolicy(issuer, subject, NID_localityName,
                     (csign->policy & WOLFCLU_LN_SUPPLIED),
                     (csign->policy & WOLFCLU_LN_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad locality name in certificate");
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             ret = _checkPolicy(issuer, subject, NID_organizationName,
                     (csign->policy & WOLFCLU_ON_SUPPLIED),
                     (csign->policy & WOLFCLU_ON_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad org. name in certificate");
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             ret = _checkPolicy(issuer, subject, NID_organizationalUnitName,
                     (csign->policy & WOLFCLU_UN_SUPPLIED),
                     (csign->policy & WOLFCLU_UN_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad org. unit name in certificate");
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             ret = _checkPolicy(issuer, subject, NID_commonName,
                     (csign->policy & WOLFCLU_CM_SUPPLIED),
                     (csign->policy & WOLFCLU_CM_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad common name in certificate");
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             ret = _checkPolicy(issuer, subject, NID_emailAddress,
                     (csign->policy & WOLFCLU_EA_SUPPLIED),
                     (csign->policy & WOLFCLU_EA_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad email address in certificate");
+            }
         }
     }
 
