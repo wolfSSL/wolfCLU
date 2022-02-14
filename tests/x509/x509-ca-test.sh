@@ -210,10 +210,9 @@ if [ "$RESULT" != "serial=01" ]; then
 fi
 
 # test rand file
-RESULT=`wc -c rand-file-test`
-EXPECTED="     256 rand-file-test"
-if [ "$RESULT" != "$EXPECTED" ]; then
-    echo "rand file was empty"
+wc -c rand-file-test | grep 256
+if [ $? != 0 ]; then
+    echo "rand file was not 256 bytes"
     exit 99
 fi
 RAND=`cat rand-file-test`
