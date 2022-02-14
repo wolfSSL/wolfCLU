@@ -286,8 +286,10 @@ int main(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
     }
 
-    if (ret <= 0)
+    if (ret <= 0) {
         WOLFCLU_LOG(WOLFCLU_E0, "Error returned: %d.", ret);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
     wolfCrypt_Cleanup();
 
     /* main function we want to return 0 on success so that the executable

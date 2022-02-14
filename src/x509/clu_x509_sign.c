@@ -25,10 +25,22 @@
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
 
+#define WOLFCLU_CN_MATCH    0x00000001 /* country name must match */
+#define WOLFCLU_CN_SUPPLIED 0x00000002 /* country name must be set */
+#define WOLFCLU_SN_MATCH    0x00000004 /* state name must match */
+#define WOLFCLU_SN_SUPPLIED 0x00000008 /* state name must be set */
+#define WOLFCLU_LN_MATCH    0x00000010 /* locality name must match */
+#define WOLFCLU_LN_SUPPLIED 0x00000020 /* locality name must be set */
+#define WOLFCLU_ON_MATCH    0x00000040 /* org name must match */
+#define WOLFCLU_ON_SUPPLIED 0x00000080 /* org name must be set */
+#define WOLFCLU_UN_MATCH    0x00000100 /* org unit name must match */
+#define WOLFCLU_UN_SUPPLIED 0x00000200 /* org unit name must be set */
+#define WOLFCLU_CM_MATCH    0x00000400 /* common name must match */
+#define WOLFCLU_CM_SUPPLIED 0x00000800 /* common name must be set */
+#define WOLFCLU_EA_MATCH    0x00001000 /* email must match */
+#define WOLFCLU_EA_SUPPLIED 0x00002000 /* email must be set */
+
 struct WOLFCLU_CERT_SIGN {
-    int days;
-    int keyType;
-    enum wc_HashType hashType;
     char* outDir;
     char* ext; /* location of extensions to use */
     WOLFSSL_BIO* serialFile;
@@ -38,11 +50,15 @@ struct WOLFCLU_CERT_SIGN {
     WOLFSSL_CONF* config;
     char* crl;
     char* crlDir;
-    int   crlNumber;
     union caKey {
         WOLFSSL_EVP_PKEY* pkey;
         /* other key options*/
     } caKey;
+    int days;
+    int keyType;
+    int crlNumber;
+    word32 policy; /* bitmap of policy restrictions */
+    enum wc_HashType hashType;
     byte unique; /* flag if subject needs to be unique */
 };
 
@@ -347,6 +363,62 @@ static int wolfCLU_CertSignLog(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 }
 
 
+static int _checkPolicy(WOLFSSL_X509_NAME* issuer, WOLFSSL_X509_NAME* subject,
+        int nid, word32 supplied, word32 match)
+{
+    char* current = NULL;
+    int   currentSz;
+    int   ret = WOLFCLU_SUCCESS;
+
+    currentSz = wolfSSL_X509_NAME_get_text_by_NID(subject, nid, NULL, 0);
+    if (currentSz <= 0 && (supplied != 0 || match != 0)) {
+        return WOLFCLU_FAILURE;
+    }
+
+    /* if required to match then check it here */
+    if (match != 0 && currentSz > 0) {
+        char* expected = NULL;
+        int   expectedSz;
+
+        expectedSz = wolfSSL_X509_NAME_get_text_by_NID(issuer, nid, NULL, 0);
+        if (expectedSz != currentSz) {
+            WOLFSSL_MSG("Size of expected policy does not match");
+            return WOLFCLU_FAILURE;
+        }
+
+        current  = (char*)XMALLOC(currentSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        expected = (char*)XMALLOC(expectedSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        if (current == NULL || expected == NULL) {
+            ret = WOLFCLU_FAILURE;
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_X509_NAME_get_text_by_NID(subject, nid, current,
+                currentSz) <= 0) {
+            ret = WOLFCLU_FAILURE;
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_X509_NAME_get_text_by_NID(issuer, nid, expected,
+                expectedSz) <= 0) {
+            ret = WOLFCLU_FAILURE;
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                XSTRNCMP(expected, current, currentSz) != 0) {
+            WOLFSSL_MSG("Policy mismatch with subject and issuer");
+            ret = WOLFCLU_FAILURE;
+        }
+
+        if (current != NULL)
+            XFREE(current, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        if (expected != NULL)
+            XFREE(expected, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    return ret;
+}
+
+
 /* sign the certificate 'x509' using info from 'csign'
  * 'ext' is an optional extensions section in the 'csign's config file loaded
  * return WOLFCLU_SUCCESS on success
@@ -539,6 +611,77 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         }
     }
 
+    /* check policy constraints */
+    if (ret == WOLFCLU_SUCCESS && csign->policy > 0) {
+        WOLFSSL_X509_NAME *issuer, *subject;
+
+        subject = wolfSSL_X509_get_subject_name(x509);
+        issuer  = wolfSSL_X509_get_issuer_name(x509);
+
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _checkPolicy(issuer, subject, NID_countryName,
+                    (csign->policy & WOLFCLU_CN_SUPPLIED),
+                    (csign->policy & WOLFCLU_CN_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad country name in certificate");
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _checkPolicy(issuer, subject, NID_stateOrProvinceName,
+                    (csign->policy & WOLFCLU_SN_SUPPLIED),
+                    (csign->policy & WOLFCLU_SN_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad state name in certificate");
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _checkPolicy(issuer, subject, NID_localityName,
+                    (csign->policy & WOLFCLU_LN_SUPPLIED),
+                    (csign->policy & WOLFCLU_LN_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad locality name in certificate");
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _checkPolicy(issuer, subject, NID_organizationName,
+                    (csign->policy & WOLFCLU_ON_SUPPLIED),
+                    (csign->policy & WOLFCLU_ON_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad org. name in certificate");
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _checkPolicy(issuer, subject, NID_organizationalUnitName,
+                    (csign->policy & WOLFCLU_UN_SUPPLIED),
+                    (csign->policy & WOLFCLU_UN_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad org. unit name in certificate");
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _checkPolicy(issuer, subject, NID_commonName,
+                    (csign->policy & WOLFCLU_CM_SUPPLIED),
+                    (csign->policy & WOLFCLU_CM_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad common name in certificate");
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _checkPolicy(issuer, subject, NID_emailAddress,
+                    (csign->policy & WOLFCLU_EA_SUPPLIED),
+                    (csign->policy & WOLFCLU_EA_MATCH));
+            if (ret != WOLFCLU_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Bad email address in certificate");
+            }
+        }
+    }
+
     /* create WOLFSSL_BIO for output */
     if (ret == WOLFCLU_SUCCESS) {
         out = wolfSSL_BIO_new_file(csign->outDir, "wb");
@@ -601,6 +744,56 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
     wolfSSL_BIO_free(out);
 
     return ret;
+}
+
+
+static void _setPolicy(word32* ret, char* str, word32 matchMask,
+        word32 suppliedMask)
+{
+    const char* match    = "match";
+    const char* supplied = "supplied";
+    const char* optional = "optional";
+
+    if (str != NULL) {
+        if (XSTRNCMP(str, match, XSTRLEN(match)) == 0) {
+            *ret |= matchMask;
+        }
+        else if (XSTRNCMP(str, supplied, XSTRLEN(supplied)) == 0) {
+            *ret |= suppliedMask;
+        }
+        else if (XSTRNCMP(str, optional, XSTRLEN(optional)) == 0) {
+            /* leave as 0 for optional */
+        }
+        else {
+            /* unknown argument */
+        }
+    }
+}
+
+
+static int wolfCLU_ParsePolicy(WOLFCLU_CERT_SIGN* csigner, char* sect)
+{
+    WOLFSSL_CONF* conf;
+    char* tmp;
+    word32 mask = 0;
+
+    conf = csigner->config;
+    tmp = wolfSSL_NCONF_get_string(conf, sect, "countryName");
+    _setPolicy(&mask, tmp, WOLFCLU_CN_MATCH, WOLFCLU_CN_SUPPLIED);
+    tmp = wolfSSL_NCONF_get_string(conf, sect, "stateOrProvinceName");
+    _setPolicy(&mask, tmp, WOLFCLU_SN_MATCH, WOLFCLU_SN_SUPPLIED);
+    tmp = wolfSSL_NCONF_get_string(conf, sect, "localityName");
+    _setPolicy(&mask, tmp, WOLFCLU_LN_MATCH, WOLFCLU_LN_SUPPLIED);
+    tmp = wolfSSL_NCONF_get_string(conf, sect, "organizationName");
+    _setPolicy(&mask, tmp, WOLFCLU_ON_MATCH, WOLFCLU_ON_SUPPLIED);
+    tmp = wolfSSL_NCONF_get_string(conf, sect, "organizationalUnitName");
+    _setPolicy(&mask, tmp, WOLFCLU_UN_MATCH, WOLFCLU_UN_SUPPLIED);
+    tmp = wolfSSL_NCONF_get_string(conf, sect, "emailAddress");
+    _setPolicy(&mask, tmp, WOLFCLU_EA_MATCH, WOLFCLU_EA_SUPPLIED);
+    tmp = wolfSSL_NCONF_get_string(conf, sect, "commonName");
+    _setPolicy(&mask, tmp, WOLFCLU_CM_MATCH, WOLFCLU_CM_SUPPLIED);
+    csigner->policy = mask;
+    return WOLFCLU_SUCCESS;
 }
 
 
@@ -755,6 +948,16 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         }
     }
 
+    /* get policy constraints */
+    if (ret != NULL) {
+        tmp = wolfSSL_NCONF_get_string(conf, CAsection, "policy");
+        if (tmp != NULL && wolfCLU_ParsePolicy(ret, tmp) != WOLFCLU_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error parsing policy section");
+            wolfCLU_CertSignFree(ret);
+            ret = NULL;
+        }
+    }
+
     /* read CRL information */
 #ifdef HAVE_CRL
     if (ret != NULL) {
@@ -787,5 +990,4 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     }
     return ret;
 }
-
 
