@@ -93,6 +93,15 @@ void wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
 
         wolfSSL_BIO_free(csign->dataBase);
         wolfSSL_BIO_free(csign->serialFile);
+
+        /* write out new 256 bytes of random data */
+        if (csign->randFile) {
+            byte seed[256];
+            int  seedSz = 256;
+
+            wolfSSL_RAND_bytes(seed, seedSz);
+            wolfSSL_BIO_write(csign->randFile, seed, seedSz);
+        }
         wolfSSL_BIO_free(csign->randFile);
         wolfSSL_X509_free(csign->ca);
         if (csign->keyType == RSAk || csign->keyType == ECDSAk) {
@@ -119,6 +128,16 @@ static void wolfCLU_CertSignSetRandFile(WOLFCLU_CERT_SIGN* csign, char* f)
     if (csign != NULL) {
         wolfSSL_BIO_free(csign->randFile);
         csign->randFile = wolfSSL_BIO_new_file(f, "wb+");
+        if (csign->randFile == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error reading rand file");
+        }
+        else {
+            byte seed[256];
+            int  seedSz = 256;
+
+            seedSz = wolfSSL_BIO_read(csign->randFile, seed, seedSz);
+            wolfSSL_RAND_add(seed, seedSz, 0); /* estimating randomness of 0 */
+        }
     }
 }
 
