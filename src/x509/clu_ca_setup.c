@@ -245,7 +245,11 @@ int wolfCLU_CASetup(int argc, char** argv)
     if (!selfSigned) {
         wolfSSL_X509_free(x509);
     }
-    wolfCLU_CertSignFree(signer);
+
+    /* check for success on signer free since random data is output */
+    if (wolfCLU_CertSignFree(signer) != WOLFCLU_SUCCESS) {
+        ret = WOLFCLU_FATAL_ERROR;
+    }
     return ret;
 }
 

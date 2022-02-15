@@ -209,6 +209,14 @@ if [ "$RESULT" != "serial=01" ]; then
     exit 99
 fi
 
+# test rand file
+wc -c rand-file-test | grep 256
+if [ $? != 0 ]; then
+    echo "rand file was not 256 bytes"
+    exit 99
+fi
+RAND=`cat rand-file-test`
+
 # test increment of serial number
 rm index.txt
 touch index.txt
@@ -216,6 +224,15 @@ run_success "ca -config ca-2.conf -in tmp-ca.csr -out test_ca.pem"
 run_success "x509 -in test_ca.pem -noout -serial"
 if [ "$RESULT" != "serial=02" ]; then
     echo "Unexpected serial number!"
+    exit 99
+fi
+
+# test rand file
+NEW_RAND=`cat rand-file-test`
+if [ "$RAND" == "$NEW_RAND" ]; then
+    echo "rand file was the same.."
+    echo $NEW_RAND | base64
+    echo $RAND | base64
     exit 99
 fi
 
