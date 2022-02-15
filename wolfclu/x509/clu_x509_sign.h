@@ -26,7 +26,7 @@
 typedef struct WOLFCLU_CERT_SIGN WOLFCLU_CERT_SIGN; 
 
 WOLFCLU_CERT_SIGN* wolfCLU_CertSignNew(void);
-void wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign);
+int wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign);
 void wolfCLU_CertSignSetSerial(WOLFCLU_CERT_SIGN* csign, WOLFSSL_BIO* s);
 void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
         void* key, int keyType);

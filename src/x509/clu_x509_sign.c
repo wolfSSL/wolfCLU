@@ -78,8 +78,10 @@ WOLFCLU_CERT_SIGN* wolfCLU_CertSignNew()
 }
 
 
-void wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
+int wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
 {
+    int ret = WOLFCLU_SUCCESS;
+
     if (csign != NULL) {
         if (csign->outDir != NULL) {
             XFREE(csign->outDir, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -99,8 +101,17 @@ void wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
             byte seed[256];
             int  seedSz = 256;
 
-            wolfSSL_RAND_bytes(seed, seedSz);
-            wolfSSL_BIO_write(csign->randFile, seed, seedSz);
+            if (wolfSSL_RAND_bytes(seed, seedSz) != WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Unable to generate new random data");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                if (wolfSSL_BIO_write(csign->randFile, seed, seedSz)
+                        != seedSz) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to write new random data");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
         }
         wolfSSL_BIO_free(csign->randFile);
         wolfSSL_X509_free(csign->ca);
@@ -109,6 +120,7 @@ void wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
         }
         XFREE(csign, HEAP_HINT, DYNAMIC_TYPE_CERT);
     }
+    return ret;
 }
 
 #ifdef HAVE_CRL
@@ -136,7 +148,8 @@ static void wolfCLU_CertSignSetRandFile(WOLFCLU_CERT_SIGN* csign, char* f)
             int  seedSz = 256;
 
             seedSz = wolfSSL_BIO_read(csign->randFile, seed, seedSz);
-            wolfSSL_RAND_add(seed, seedSz, 0); /* estimating randomness of 0 */
+            wolfSSL_RAND_add(seed, seedSz, 0);
+            /* estimating randomness of 0, wolfSSL seeds internally */
         }
     }
 }
@@ -844,7 +857,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     if (ret != NULL) {
         if (wolfSSL_NCONF_load(ret->config, config, &line) != WOLFSSL_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to open config file %s", config);
-            wolfCLU_CertSignFree(ret);
+            (void)wolfCLU_CertSignFree(ret);
             ret = NULL;
         }
 
@@ -867,7 +880,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
                 wolfCLU_CertSignAppendOut(ret, tmp) != WOLFCLU_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to set output certificate location "
                    "%s", tmp);
-            wolfCLU_CertSignFree(ret);
+            (void)wolfCLU_CertSignFree(ret);
             ret = NULL;
         }
     }
@@ -879,7 +892,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
             if (ret->dataBase == NULL) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Unable to open data base file %s",
                         tmp);
-                wolfCLU_CertSignFree(ret);
+                (void)wolfCLU_CertSignFree(ret);
                 ret = NULL;
             }
         }
@@ -892,7 +905,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
             ca = wolfSSL_X509_load_certificate_file(tmp, WOLFSSL_FILETYPE_PEM);
             if (ca == NULL) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Unable to open CA file %s", tmp);
-                wolfCLU_CertSignFree(ret);
+                (void)wolfCLU_CertSignFree(ret);
                 ret = NULL;
             }
         }
@@ -916,7 +929,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
             if (s == NULL) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Unable to open serial file %s",
                         serial);
-                wolfCLU_CertSignFree(ret);
+                (void)wolfCLU_CertSignFree(ret);
                 ret = NULL;
             }
             else {
@@ -957,7 +970,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
             if (in == NULL) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Unable to open private key file %s",
                         tmp);
-                wolfCLU_CertSignFree(ret);
+                (void)wolfCLU_CertSignFree(ret);
                 ret = NULL;
             }
             else {
@@ -972,7 +985,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         tmp = wolfSSL_NCONF_get_string(conf, CAsection, "policy");
         if (tmp != NULL && wolfCLU_ParsePolicy(ret, tmp) != WOLFCLU_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_E0, "Error parsing policy section");
-            wolfCLU_CertSignFree(ret);
+            (void)wolfCLU_CertSignFree(ret);
             ret = NULL;
         }
     }
