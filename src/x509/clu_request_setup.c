@@ -73,49 +73,51 @@ static int _wolfSSL_X509_print_serial(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
 
     XMEMSET(serial, 0, sz);
     if (wolfSSL_X509_get_serial_number(x509, serial, &sz) == WOLFSSL_SUCCESS) {
-        if (sz > 1) {
-            XSNPRINTF(scratch, MAX_WIDTH, "%*s%s", indent, "",
-                    "Serial Number:");
-            if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
+        
+        XSNPRINTF(scratch, MAX_WIDTH, "%*s%s", indent, "",
+                "Serial Number:");
+        if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
+            return WOLFSSL_FAILURE;
+        }
+
+        
+        if (sz > (int)sizeof(byte)) {
+            int i;
+            char tmp[100];
+            int  tmpSz = 100;
+            char val[5];
+            int  valSz = 5;
+
+            /* serial is larger than int size so print off hex values */
+            XSNPRINTF(scratch, MAX_WIDTH, "\n%*s", indent, "");
+            if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch))
+                    <= 0) {
                 return WOLFSSL_FAILURE;
             }
-
-            /* if serial can fit into byte than print on the same line */
-            if (sz <= (int)sizeof(byte)) {
-                XSNPRINTF(scratch, MAX_WIDTH, " %d (0x%x)\n", serial[0],
-                        serial[0]);
-                if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch))
-                        <= 0) {
-                    return WOLFSSL_FAILURE;
-                }
-            }
-            else {
-                int i;
-                char tmp[100];
-                int  tmpSz = 100;
-                char val[5];
-                int  valSz = 5;
-
-                /* serial is larger than int size so print off hex values */
-                XSNPRINTF(scratch, MAX_WIDTH, "\n%*s", indent, "");
-                if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch))
-                        <= 0) {
-                    return WOLFSSL_FAILURE;
-                }
-                tmp[0] = '\0';
-                for (i = 0; i < sz - 1 && (3 * i) < tmpSz - valSz; i++) {
-                    XSNPRINTF(val, sizeof(val) - 1, "%02x:", serial[i]);
-                    val[3] = '\0'; /* make sure is null terminated */
-                    XSTRNCAT(tmp, val, valSz);
-                }
-                XSNPRINTF(val, sizeof(val) - 1, "%02x\n", serial[i]);
+            tmp[0] = '\0';
+            for (i = 0; i < sz - 1 && (3 * i) < tmpSz - valSz; i++) {
+                XSNPRINTF(val, sizeof(val) - 1, "%02x:", serial[i]);
                 val[3] = '\0'; /* make sure is null terminated */
                 XSTRNCAT(tmp, val, valSz);
-                if (wolfSSL_BIO_write(bio, tmp, (int)XSTRLEN(tmp)) <= 0) {
-                    return WOLFSSL_FAILURE;
-                }
+            }
+            XSNPRINTF(val, sizeof(val) - 1, "%02x\n", serial[i]);
+            val[3] = '\0'; /* make sure is null terminated */
+            XSTRNCAT(tmp, val, valSz);
+            if (wolfSSL_BIO_write(bio, tmp, (int)XSTRLEN(tmp)) <= 0) {
+                return WOLFSSL_FAILURE;
             }
         }
+
+        /* if serial can fit into byte than print on the same line */
+        else if (sz <= (int)sizeof(byte)) {
+            XSNPRINTF(scratch, MAX_WIDTH, " %d (0x%x)\n", serial[0],
+                    serial[0]);
+            if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch))
+                    <= 0) {
+                return WOLFSSL_FAILURE;
+            }
+        }
+
     }
     return WOLFSSL_SUCCESS;
 }
