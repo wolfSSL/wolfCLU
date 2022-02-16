@@ -35,7 +35,6 @@ static const struct option req_options[] = {
     {"sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
     {"sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
     {"rsa",       no_argument,       0, WOLFCLU_RSA       },
-    {"ecc",       no_argument,       0, WOLFCLU_ECC       },
     {"ed25519",   no_argument,       0, WOLFCLU_ED25519   },
 
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
@@ -566,10 +565,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 algCheck = 1;
                 break;
 
-            case WOLFCLU_ECC:
-                algCheck = 3;
-                break;
-
             case WOLFCLU_ED25519:
                 algCheck = 2;
                 break;
@@ -781,35 +776,30 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
     /* sign the req/cert */
     if (ret == WOLFCLU_SUCCESS && (reqIn == NULL || reSign)) {
-        if (algCheck == 3) {
-            ret = make_self_signed_ecc_certificate(in, out, oid);
+        if (genX509) {
+            /* default to version 3 which supports extensions */
+            if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) !=
+                    WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Unable to set version 3 for cert");
+                ret = WOLFSSL_FAILURE;
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                ret = wolfSSL_X509_sign(x509, pkey, md);
+                if (ret > 0)
+                    ret = WOLFSSL_SUCCESS;
+            }
         }
         else {
-            if (genX509) {
-                /* default to version 3 which supports extensions */
-                if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) !=
-                        WOLFSSL_SUCCESS) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to set version 3 for cert");
-                    ret = WOLFSSL_FAILURE;
-                }
+            ret = wolfSSL_X509_REQ_sign(x509, pkey, md);
+        }
 
-                if (ret == WOLFCLU_SUCCESS) {
-                    ret = wolfSSL_X509_sign(x509, pkey, md);
-                    if (ret > 0)
-                        ret = WOLFSSL_SUCCESS;
-                }
-            }
-            else {
-                ret = wolfSSL_X509_REQ_sign(x509, pkey, md);
-            }
-
-            if (ret != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error %d signing", ret);
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                ret = WOLFCLU_SUCCESS;
-            }
+        if (ret != WOLFSSL_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error %d signing", ret);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = WOLFCLU_SUCCESS;
         }
     }
 
@@ -866,6 +856,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
             ret = WOLFCLU_SUCCESS;
         }
     }
+
+    (void)algCheck;
+    (void)in;
+    (void)oid;
 
     wolfSSL_BIO_free(reqIn);
     wolfSSL_BIO_free(keyIn);

@@ -33,7 +33,6 @@ wolfssl_SOURCES = src/clu_main.c \
 				    src/sign-verify/clu_crl_verify.c \
 				    src/sign-verify/clu_sign_verify_setup.c \
 				    src/sign-verify/clu_dgst_setup.c \
-				    src/certgen/clu_certgen_ecc.c \
 				    src/certgen/clu_certgen_ed25519.c \
 				    src/certgen/clu_certgen_rsa.c \
 				    src/pkey/clu_rsa.c \

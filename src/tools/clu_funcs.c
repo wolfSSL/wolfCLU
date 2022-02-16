@@ -566,10 +566,10 @@ void wolfCLU_certgenHelp() {
     WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
     WOLFCLU_LOG(WOLFCLU_L0, "\n");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\ncertgen USAGE:\nwolfssl -req -ecc/-rsa/-ed25519 -in <filename> -out"
+    WOLFCLU_LOG(WOLFCLU_L0, "\ncertgen USAGE:\nwolfssl -req -rsa/-ed25519 -in <filename> -out"
            " <filename> -sha/sha224/sha256/sha384/sha512\n");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -req ecc -in mykey -out cert.pem -sha256 "
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -req rsa -in mykey -out cert.pem -sha256 "
            "\n\nThe above command would output the file: cert.pem");
 }
 
