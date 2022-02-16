@@ -463,20 +463,10 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     /* print out the private key */
     if (ret == WOLFCLU_SUCCESS && pubOut == 0) {
         if (pkey != NULL) {
-            unsigned char *der = NULL;
-            int derSz = 0;
-            int keyType;
-
-            switch (wolfSSL_EVP_PKEY_id(pkey)) {
-                case EVP_PKEY_RSA: keyType = RSA_TYPE; break;
-                case EVP_PKEY_DSA: keyType = DSA_TYPE; break;
-                case EVP_PKEY_EC:  keyType = ECC_TYPE; break;
-                default:
-                    /* keep generic PRIVATEKEY_TYPE as type */
-                    keyType = PRIVATEKEY_TYPE;
-            }
-
             if (outForm == DER_FORM) {
+                unsigned char *der = NULL;
+                int derSz = 0;
+
                 if ((derSz = wolfCLU_pKeytoPriKey(pkey, &der)) <= 0) {
                     WOLFCLU_LOG(WOLFCLU_E0,
                             "Error converting der found to private key");
@@ -487,6 +477,10 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                     wolfSSL_BIO_write(bioOut, der, derSz);
 
                 }
+
+                if (der != NULL) {
+                    free(der);
+                }
             }
 
             if (outForm == PEM_FORM){
@@ -496,10 +490,6 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                             "Error getting private key from pem key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
-            }
-
-            if (der != NULL) {
-                free(der);
             }
         }
     }
