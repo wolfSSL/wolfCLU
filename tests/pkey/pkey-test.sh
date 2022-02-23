@@ -34,6 +34,23 @@ fi
 run_fail "pkey -pubin -in ./certs/ecc-key.pem"
 
 # pem -> der -> pem
+run "pkey -in ./certs/ecc-key.pem -outform der -out ecc.der"
+run "pkey -in ecc.der -inform der -outform pem -out ecc.pem"
+run "pkey -in ecc.pem"
+EXPECTED="-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEIEW2aQJznGyFoThbcujox6zEA41TNQT6bCjcNI3hqAmMoAoGCCqGSM49
+AwEHoUQDQgAEuzOsTCdQSsZKpQTDPN6fNttyLc6U6iv6yyAJOSwW6GEC6a9N0wKT
+mjFbl5Ihf/DPGNqREQI0huggWDMLgDSJ2A==
+-----END EC PRIVATE KEY-----"
+if [ "$RESULT" != "$EXPECTED" ]; then
+    echo "unexpected text output found"
+    echo "$RESULT"
+    exit 99
+fi
+rm -f ecc.der
+rm -f ecc.pem
+
+# pubkey pem -> der -> pem
 run "pkey -pubin -in ./certs/ecc-keyPub.pem -outform der -out ecc.der"
 run "pkey -pubin -in ecc.der -inform der -outform pem -out ecc.pem"
 run "pkey -pubin -in ecc.pem"
@@ -46,6 +63,8 @@ if [ "$RESULT" != "$EXPECTED" ]; then
     echo "$RESULT"
     exit 99
 fi
+rm -f ecc.der
+rm -f ecc.pem
 
 echo "Done"
 exit 0

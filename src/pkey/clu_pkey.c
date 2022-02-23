@@ -214,14 +214,14 @@ static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
 
     if (ret == 0) {
         if (isPrivateKey) {
-            ret = wc_EccPrivateKeyToDer((ecc_key*)ec->internal, der, derSz);
+            ret = wc_EccKeyToDer((ecc_key*)ec->internal, der, derSz);
         }
         else {
             ret = wc_EccPublicKeyToDer((ecc_key*)ec->internal, der, derSz, 1);
         }
 
         if (ret > 0) {
-            *out   = der;
+            *out = der;
         }
         else {
             ret = BAD_FUNC_ARG;
@@ -463,60 +463,33 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     /* print out the private key */
     if (ret == WOLFCLU_SUCCESS && pubOut == 0) {
         if (pkey != NULL) {
-            unsigned char *der = NULL;
-            int derSz = 0;
-            int keyType;
+            if (outForm == DER_FORM) {
+                unsigned char *der = NULL;
+                int derSz = 0;
 
-            switch (wolfSSL_EVP_PKEY_id(pkey)) {
-                case EVP_PKEY_RSA: keyType = RSA_TYPE; break;
-                case EVP_PKEY_DSA: keyType = DSA_TYPE; break;
-                case EVP_PKEY_EC:  keyType = ECC_TYPE; break;
-                default:
-                    /* keep generic PRIVATEKEY_TYPE as type */
-                    keyType = PRIVATEKEY_TYPE;
-            }
-
-            if (inForm == PEM_FORM) {
-                if (outForm == PEM_FORM) {
-                    ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
-                    if (ret != WOLFCLU_SUCCESS) {
-                        WOLFCLU_LOG(WOLFCLU_E0,
-                                "Error getting private key from pem key");
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-                }
-                else {
-                    if (wolfCLU_printDerPriKey(bioOut, der, derSz, keyType)
-                            != WOLFCLU_SUCCESS) {
-                        WOLFCLU_LOG(WOLFCLU_E0, "Error printing out pubkey");
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-                    if (ret == WOLFCLU_SUCCESS) {
-                        wolfSSL_BIO_write(bioOut, der, derSz);
-                    }
-                }
-            }
-            else {
                 if ((derSz = wolfCLU_pKeytoPriKey(pkey, &der)) <= 0) {
                     WOLFCLU_LOG(WOLFCLU_E0,
-                            "Error converting der found to public key");
+                            "Error converting der found to private key");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
-                else {
-                    if (outForm == PEM_FORM) {
-                        if (wolfCLU_printDerPriKey(bioOut, der, derSz, keyType)
-                                != WOLFCLU_SUCCESS) {
-                            WOLFCLU_LOG(WOLFCLU_E0, "Error printing out pubkey");
-                            ret = WOLFCLU_FATAL_ERROR;
-                        }
-                    }
-                    else {
-                        wolfSSL_BIO_write(bioOut, der, derSz);
-                    }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    wolfSSL_BIO_write(bioOut, der, derSz);
+
+                }
+
+                if (der != NULL) {
+                    free(der);
                 }
             }
-            if (der != NULL) {
-                free(der);
+
+            if (outForm == PEM_FORM){
+                ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
+                if (ret != WOLFCLU_SUCCESS) {
+                    WOLFCLU_LOG(WOLFCLU_E0,
+                            "Error getting private key from pem key");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
             }
         }
     }

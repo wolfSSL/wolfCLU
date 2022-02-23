@@ -10,7 +10,7 @@ if [ $? == 0 ]; then
     echo "Failed on test \"./wolfssl verify ./certs/server-cert.pem\""
     exit 99
 fi
-echo "$RESULT" | grep "Err (-188) : ASN no signer error to confirm failure"
+echo "$RESULT" | grep "Err (-188) : certificate verify failed"
 if [ $? != 0 ]; then
     echo "Unexpected error result on test \"./wolfssl verify ./certs/server-cert.pem\""
     exit 99

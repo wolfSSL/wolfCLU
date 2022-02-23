@@ -58,7 +58,7 @@ static const struct option req_options[] = {
 };
 
 
-#if LIBWOLFSSL_VERSION_HEX < 0x05002000
+#if LIBWOLFSSL_VERSION_HEX < 0x05003000
 
 #define MAX_WIDTH 80
 /* print serial number out
