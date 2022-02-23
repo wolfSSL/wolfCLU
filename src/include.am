@@ -15,7 +15,7 @@ wolfssl_SOURCES = src/clu_main.c \
 					src/crypto/clu_evp_crypto.c \
 					src/hash/clu_hash_setup.c \
 					src/hash/clu_hash.c \
-					src/hash/clu_md5.c \
+					src/hash/clu_alg_hash.c \
 					src/benchmark/clu_bench_setup.c \
 					src/benchmark/clu_benchmark.c \
 					src/x509/clu_request_setup.c \

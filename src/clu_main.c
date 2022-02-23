@@ -40,7 +40,10 @@ static const struct option mode_options[] = {
     {"enc",       no_argument,       0, WOLFCLU_CRYPT     },
     {"bench",     no_argument,       0, WOLFCLU_BENCHMARK },
     {"hash",      required_argument, 0, WOLFCLU_HASH      },
-    {"md5",       no_argument,       0, WOLFCLU_MD5       },
+    {"md5",       no_argument,       0, WOLFCLU_ALG_HASH  },
+    {"sha256",    no_argument,       0, WOLFCLU_ALG_HASH  },
+    {"sha384",    no_argument,       0, WOLFCLU_ALG_HASH  },
+    {"sha512",    no_argument,       0, WOLFCLU_ALG_HASH  },
     {"x509",      no_argument,       0, WOLFCLU_X509      },
     {"req",       no_argument,       0, WOLFCLU_REQUEST   },
     {"genkey",    required_argument, 0, WOLFCLU_GEN_KEY   },
@@ -204,8 +207,8 @@ int main(int argc, char** argv)
             ret = wolfCLU_hashSetup(argc, argv);
             break;
 
-        case WOLFCLU_MD5:
-            ret = wolfCLU_md5Setup(argc, argv);
+        case WOLFCLU_ALG_HASH:
+            ret = wolfCLU_algHashSetup(argc, argv);
             break;
 
         case WOLFCLU_X509:
