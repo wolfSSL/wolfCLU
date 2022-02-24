@@ -10,9 +10,6 @@
 #ifndef NO_RSA
     #include <wolfssl/wolfcrypt/rsa.h>
 #endif
-#ifdef HAVE_ECC
-    #include <wolfssl/wolfcrypt/ecc.h>
-#endif
 
 #define HEAP_HINT NULL
 #define FOURK_SZ 4096
@@ -24,8 +21,6 @@ enum {
     SHA_HASH384,
     SHA_HASH512
 };
-
-int make_self_signed_ecc_certificate(char*, char*, int);
 
 int make_self_signed_rsa_certificate(char*, char*, int);
 
