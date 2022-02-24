@@ -368,7 +368,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
  * @param argv array of arg strings
  * @return WOLFCLU_SUCCESS on success
  */
-int wolfCLU_algHashSetup(int argc, char** argv);
+int wolfCLU_algHashSetup(int argc, char** argv, int algorithm);
 
 /*
  * get the current Version

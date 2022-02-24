@@ -21,41 +21,51 @@
 
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
+#include <wolfclu/clu_optargs.h>
 
 #define MAX_BUFSIZE 8192
 
-int wolfCLU_algHashSetup(int argc, char** argv)
+int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
 {
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
-    int     ret         = 0;
-
-const char* algs[]  =   {   /* list of acceptable algorithms */
-#ifndef NO_MD5
-        "md5",
-#endif
-#ifndef NO_SHA256
-        "sha256",
-#endif
-#ifdef WOLFSSL_SHA384
-        "sha384",
-#endif
-#ifdef WOLFSSL_SHA512
-        "sha512",
-#endif
-        NULL /* terminal element (also stops the array from being 0-size */
-    };
-    size_t algsSz = sizeof(algs) / sizeof(algs[0]) - 1; /* -1 to ignore NULL */
-
+    int     ret         = 0;    /* return variable */
+    int     size        = 0;    /* message digest size */
     char*   alg;                /* algorithm being used */
-    int     size    =   0;      /* message digest size */
-    int     i          =   0;   /* loop variable */
-    
-    for (i = 0; i < (int)algsSz; ++i) {
-        /* checks for possible algorithms */
-        if (XSTRNCMP(argv[1], algs[i], XSTRLEN(algs[i])) == 0) {
-            alg = argv[1];
-        }
+
+    switch (algorithm) {
+        case WOLFCLU_MD5:
+        #ifndef NO_MD5
+            alg = (char*)"md5";
+            size = WC_MD5_DIGEST_SIZE;
+            break;
+        #endif
+
+        case WOLFCLU_CERT_SHA256:
+        #ifndef NO_SHA256
+            alg = (char*)"sha256";
+            size = WC_SHA256_DIGEST_SIZE;
+            break;
+        #endif
+
+        case WOLFCLU_CERT_SHA384:
+        #ifdef WOLFSSL_SHA384
+            alg = (char*)"sha384";
+            size = WC_SHA384_DIGEST_SIZE;
+            break;
+        #endif
+
+        case WOLFCLU_CERT_SHA512:
+        #ifdef WOLFSSL_SHA512
+            alg = (char*)"sha512";
+            size = WC_SHA512_DIGEST_SIZE;
+            break;
+        #endif
+
+        default:
+            WOLFCLU_LOG(WOLFCLU_E0, "Please reconfigure wolfSSL with support for that algorithm");
+            return NOT_COMPILED_IN;
+
     }
 
     /* was a file input provided? if so read from file */
@@ -67,31 +77,10 @@ const char* algs[]  =   {   /* list of acceptable algorithms */
         }
     }
 
-    /* sets default size of algorithm */
-#ifndef NO_MD5
-    if (XSTRNCMP(alg, "md5", 3) == 0)
-        size = WC_MD5_DIGEST_SIZE;
-#endif
-
-#ifndef NO_SHA256
-    if (XSTRNCMP(alg, "sha256", 6) == 0)
-        size = WC_SHA256_DIGEST_SIZE;
-#endif
-
-#ifdef WOLFSSL_SHA384
-    if (XSTRNCMP(alg, "sha384", 6) == 0)
-        size = WC_SHA384_DIGEST_SIZE;
-#endif
-
-#ifdef WOLFSSL_SHA512
-    if (XSTRNCMP(alg, "sha512", 6) == 0)
-        size = WC_SHA512_DIGEST_SIZE;
-#endif
-    
     /* hashing function */
     ret = wolfCLU_hash(bioIn, bioOut, alg, size);
     wolfSSL_BIO_free(bioIn);
-    
+
     return ret;
 }
 
