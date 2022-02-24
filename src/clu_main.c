@@ -34,30 +34,33 @@
  */
 
 static const struct option mode_options[] = {
-    {"ca",        no_argument,       0, WOLFCLU_CA        },
-    {"encrypt",   required_argument, 0, WOLFCLU_ENCRYPT   },
-    {"decrypt",   required_argument, 0, WOLFCLU_DECRYPT   },
-    {"enc",       no_argument,       0, WOLFCLU_CRYPT     },
-    {"bench",     no_argument,       0, WOLFCLU_BENCHMARK },
-    {"hash",      required_argument, 0, WOLFCLU_HASH      },
-    {"md5",       no_argument,       0, WOLFCLU_MD5       },
-    {"x509",      no_argument,       0, WOLFCLU_X509      },
-    {"req",       no_argument,       0, WOLFCLU_REQUEST   },
-    {"genkey",    required_argument, 0, WOLFCLU_GEN_KEY   },
-    {"ecparam",   no_argument,       0, WOLFCLU_ECPARAM   },
-    {"pkey",      no_argument,       0, WOLFCLU_PKEY      },
-    {"rsa",       no_argument,       0, WOLFCLU_RSA       },
-    {"ecc",       no_argument,       0, WOLFCLU_ECC       },
-    {"ed25519",   no_argument,       0, WOLFCLU_ED25519   },
-    {"dgst",      no_argument,       0, WOLFCLU_DGST      },
-    {"verify",    no_argument,       0, WOLFCLU_VERIFY    },
-    {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12    },
-    {"crl",       no_argument,       0, WOLFCLU_CRL       },
-    {"s_client",  no_argument,       0, WOLFCLU_CLIENT    },
-    {"rand",      no_argument,       0, WOLFCLU_RAND      },
-    {"dsaparam",  no_argument,       0, WOLFCLU_DSA       },
-    {"help",      no_argument,       0, WOLFCLU_HELP      },
-    {"h",         no_argument,       0, WOLFCLU_HELP      },
+    {"ca",        no_argument,       0, WOLFCLU_CA          },
+    {"encrypt",   required_argument, 0, WOLFCLU_ENCRYPT     },
+    {"decrypt",   required_argument, 0, WOLFCLU_DECRYPT     },
+    {"enc",       no_argument,       0, WOLFCLU_CRYPT       },
+    {"bench",     no_argument,       0, WOLFCLU_BENCHMARK   },
+    {"hash",      required_argument, 0, WOLFCLU_HASH        },
+    {"md5",       no_argument,       0, WOLFCLU_MD5         },
+    {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256 },
+    {"sha384",    no_argument,       0, WOLFCLU_CERT_SHA384 },
+    {"sha512",    no_argument,       0, WOLFCLU_CERT_SHA512 },
+    {"x509",      no_argument,       0, WOLFCLU_X509        },
+    {"req",       no_argument,       0, WOLFCLU_REQUEST     },
+    {"genkey",    required_argument, 0, WOLFCLU_GEN_KEY     },
+    {"ecparam",   no_argument,       0, WOLFCLU_ECPARAM     },
+    {"pkey",      no_argument,       0, WOLFCLU_PKEY        },
+    {"rsa",       no_argument,       0, WOLFCLU_RSA         },
+    {"ecc",       no_argument,       0, WOLFCLU_ECC         },
+    {"ed25519",   no_argument,       0, WOLFCLU_ED25519     },
+    {"dgst",      no_argument,       0, WOLFCLU_DGST        },
+    {"verify",    no_argument,       0, WOLFCLU_VERIFY      },
+    {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12      },
+    {"crl",       no_argument,       0, WOLFCLU_CRL         },
+    {"s_client",  no_argument,       0, WOLFCLU_CLIENT      },
+    {"rand",      no_argument,       0, WOLFCLU_RAND        },
+    {"dsaparam",  no_argument,       0, WOLFCLU_DSA         },
+    {"help",      no_argument,       0, WOLFCLU_HELP        },
+    {"h",         no_argument,       0, WOLFCLU_HELP        },
     {"v",         no_argument,       0, 'v'       },
     {"version",   no_argument,       0, 'v'       },
 
@@ -205,7 +208,19 @@ int main(int argc, char** argv)
             break;
 
         case WOLFCLU_MD5:
-            ret = wolfCLU_md5Setup(argc, argv);
+            ret = wolfCLU_algHashSetup(argc, argv, WOLFCLU_MD5);
+            break;
+
+        case WOLFCLU_CERT_SHA256:
+            ret = wolfCLU_algHashSetup(argc, argv, WOLFCLU_CERT_SHA256);
+            break;
+
+        case WOLFCLU_CERT_SHA384:
+            ret = wolfCLU_algHashSetup(argc, argv, WOLFCLU_CERT_SHA384);
+            break;
+
+        case WOLFCLU_CERT_SHA512:
+            ret = wolfCLU_algHashSetup(argc, argv, WOLFCLU_CERT_SHA512);
             break;
 
         case WOLFCLU_X509:

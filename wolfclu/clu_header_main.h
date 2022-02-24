@@ -362,13 +362,13 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
 
 
 /**
- * @brief Used to create a MD5 hash
+ * @brief Used to create a hash from a specified algorithm
  *
  * @param argc total number of args
  * @param argv array of arg strings
  * @return WOLFCLU_SUCCESS on success
  */
-int wolfCLU_md5Setup(int argc, char** argv);
+int wolfCLU_algHashSetup(int argc, char** argv, int algorithm);
 
 /*
  * get the current Version

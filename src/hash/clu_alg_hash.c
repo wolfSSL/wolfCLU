@@ -1,4 +1,4 @@
-/* clu_md5.c
+/* clu_alg_hash.c
  *
  * Copyright (C) 2006-2021 wolfSSL Inc.
  *
@@ -21,23 +21,52 @@
 
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
+#include <wolfclu/clu_optargs.h>
 
 #define MAX_BUFSIZE 8192
 
-int wolfCLU_md5Setup(int argc, char** argv)
+int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
 {
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
-    int     ret         = 0;
+    int     ret         = 0;    /* return variable */
+    int     size        = 0;    /* message digest size */
+    char*   alg;                /* algorithm being used */
 
-#ifdef NO_MD5
-    WOLFCLU_LOG(WOLFCLU_E0, "wolfCrypt compiled without MD5 support");
-    ret = NOT_COMPILED_IN;
-    (void)bioIn;
-    (void)bioOut;
-    (void) argc; /* silence unused variable warning */
-    (void) argv; /* silence unused variable warning */
-#else
+    switch (algorithm) {
+        case WOLFCLU_MD5:
+        #ifndef NO_MD5
+            alg = (char*)"md5";
+            size = WC_MD5_DIGEST_SIZE;
+            break;
+        #endif
+
+        case WOLFCLU_CERT_SHA256:
+        #ifndef NO_SHA256
+            alg = (char*)"sha256";
+            size = WC_SHA256_DIGEST_SIZE;
+            break;
+        #endif
+
+        case WOLFCLU_CERT_SHA384:
+        #ifdef WOLFSSL_SHA384
+            alg = (char*)"sha384";
+            size = WC_SHA384_DIGEST_SIZE;
+            break;
+        #endif
+
+        case WOLFCLU_CERT_SHA512:
+        #ifdef WOLFSSL_SHA512
+            alg = (char*)"sha512";
+            size = WC_SHA512_DIGEST_SIZE;
+            break;
+        #endif
+
+        default:
+            WOLFCLU_LOG(WOLFCLU_E0, "Please reconfigure wolfSSL with support for that algorithm");
+            return NOT_COMPILED_IN;
+
+    }
 
     /* was a file input provided? if so read from file */
     if (argc >= 3) {
@@ -49,9 +78,9 @@ int wolfCLU_md5Setup(int argc, char** argv)
     }
 
     /* hashing function */
-    ret = wolfCLU_hash(bioIn, bioOut, (char*)"md5", WC_MD5_DIGEST_SIZE);
+    ret = wolfCLU_hash(bioIn, bioOut, alg, size);
     wolfSSL_BIO_free(bioIn);
-#endif
+
     return ret;
 }
 
