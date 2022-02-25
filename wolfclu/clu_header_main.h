@@ -504,4 +504,10 @@ int wolfCLU_Rand(int argc, char** argv);
  * @brief function to generate dsa params and keys
  */
 int wolfCLU_DsaParamSetup(int argc, char** argv);
+
+/**
+ * @brief function to generate dh params and keys
+ */
+int wolfCLU_DhParamSetup(int argc, char** argv);
+
 #endif /* _WOLFSSL_CLU_HEADER_ */
