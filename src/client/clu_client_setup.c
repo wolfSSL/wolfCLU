@@ -29,6 +29,7 @@
 
 static const struct option client_options[] = {
     {"connect",   required_argument, 0, WOLFCLU_CONNECT   },
+    {"starttls",  required_argument, 0, WOLFCLU_STARTTLS  },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
 
@@ -39,13 +40,15 @@ static const struct option client_options[] = {
 static void wolfCLU_ClientHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_client\n"
-            "-connect <ip>:<port>");
+            "\t-connect <ip>:<port>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
 }
 
 static const char hostFlag[] = "-h";
 static const char portFlag[] = "-p";
 static const char noVerifyFlag[] = "-d";
 static const char noClientCert[] = "-x";
+static const char startTLSFlag[] = "-M";
 
 int myoptind = 0;
 char* myoptarg = NULL;
@@ -96,6 +99,13 @@ int wolfCLU_Client(int argc, char** argv)
                 if (ret == WOLFCLU_SUCCESS) {
                     clientArgv[clientArgc++] = portFlag;
                     clientArgv[clientArgc++] = optarg + idx + 1;
+                }
+                break;
+
+            case WOLFCLU_STARTTLS:
+                if (ret == WOLFCLU_SUCCESS) {
+                    clientArgv[clientArgc++] = startTLSFlag;
+                    clientArgv[clientArgc++] = optarg;
                 }
                 break;
 
