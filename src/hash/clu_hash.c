@@ -20,6 +20,8 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
+#include <wolfclu/clu_optargs.h>
 
 #define MAX_STDINSZ 8192
 
@@ -39,19 +41,33 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
     byte*   output;             /* output buffer */
 
     int     i  =   0;           /* loop variable */
-    int     ret = WOLFCLU_FATAL_ERROR;
-    int     inputSz;
+    int     ret = WOLFCLU_SUCCESS;
+    int     inputSz = MAX_STDINSZ;
     WOLFSSL_BIO* tmp;
 
     if (bioIn == NULL) {
-        inputSz = MAX_STDINSZ;
         tmp = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (tmp != NULL)
             wolfSSL_BIO_set_fp(tmp, stdin, BIO_NOCLOSE);
     }
     else {
+        /* get data size using raw FILE pointer and seek */
+        XFILE f;
         tmp = bioIn;
-        inputSz = wolfSSL_BIO_get_len(tmp);
+        if (wolfSSL_BIO_get_fp(tmp, &f) != WOLFSSL_SUCCESS) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get raw file pointer");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS && XFSEEK(f, 0, XSEEK_END) != 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to seek end of file");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            inputSz = (word32)XFTELL(f);
+            wolfSSL_BIO_reset(tmp);
+        }
     }
 
     input = (byte*)XMALLOC(inputSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -85,32 +101,32 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
 
     /* hashes using accepted algorithm */
 #ifndef NO_MD5
-    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "md5", 3) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "md5", 3) == 0) {
         ret = wc_Md5Hash(input, inputSz, output);
     }
 #endif
 #ifndef NO_SHA256
-    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "sha256", 6) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "sha256", 6) == 0) {
         ret = wc_Sha256Hash(input, inputSz, output);
     }
 #endif
 #ifdef WOLFSSL_SHA384
-    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "sha384", 6) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "sha384", 6) == 0) {
         ret = wc_Sha384Hash(input, inputSz, output);
     }
 #endif
 #ifdef WOLFSSL_SHA512
-    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "sha512", 6) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "sha512", 6) == 0) {
         ret = wc_Sha512Hash(input, inputSz, output);
     }
 #endif
 #ifndef NO_SHA
-    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "sha", 3) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "sha", 3) == 0) {
         ret = wc_ShaHash(input, inputSz, output);
     }
 #endif
 #ifdef HAVE_BLAKE2
-    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "blake2b", 7) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "blake2b", 7) == 0) {
         ret = wc_InitBlake2b(&hash, size);
         if (ret != 0) return ret;
         ret = wc_Blake2bUpdate(&hash, input, inputSz);
@@ -122,11 +138,11 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
 
 #ifndef NO_CODING
 #ifdef WOLFSSL_BASE64_ENCODE
-    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "base64enc", 9) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "base64enc", 9) == 0) {
         ret = Base64_Encode(input, inputSz, output, (word32*)&size);
     }
 #endif /* WOLFSSL_BASE64_ENCODE */
-    if (ret == WOLFCLU_FATAL_ERROR && XSTRNCMP(alg, "base64dec", 9) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "base64dec", 9) == 0) {
         ret = Base64_Decode(input, inputSz, output, (word32*)&size);
     }
 #endif /* !NO_CODING */
