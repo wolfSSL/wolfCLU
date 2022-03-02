@@ -206,7 +206,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         byte* outBuf = NULL;
         byte* pem    = NULL;
         word32 outBufSz = 0;
-        word32 pemSz    = 0;
+        int pemSz       = 0;
 
         if (wc_DsaKeyToParamsDer_ex(&dsa, NULL, &outBufSz) != LENGTH_ONLY_E) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");

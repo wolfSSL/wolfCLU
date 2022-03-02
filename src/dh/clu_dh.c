@@ -23,10 +23,16 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
-#define MAX_DH_BITS       4096
-#define MAX_DH_Q_SIZE     256
-
 #ifndef NO_DH
+
+#ifndef WOLFSSL_MAX_DH_BITS
+    #define WOLFSSL_MAX_DH_BITS       4096
+#endif
+
+#ifndef WOLFSSL_MAX_DH_Q_SIZE
+    #define WOLFSSL_MAX_DH_Q_SIZE     256
+#endif
+
 static const struct option dh_options[] = {
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
     {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
@@ -216,7 +222,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         byte* outBuf = NULL;
         byte* pem    = NULL;
         word32 outBufSz = 0;
-        word32 pemSz    = 0;
+        int pemSz       = 0;
 
         if (wc_DhParamsToDer(&dh, NULL, &outBufSz) != LENGTH_ONLY_E) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
@@ -268,14 +274,14 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
    
      /* Check if parameters are valid */
     if(ret == WOLFCLU_SUCCESS && check){
-        byte p[MAX_DH_BITS/8];
-        byte g[MAX_DH_BITS/8];
-        byte q[MAX_DH_Q_SIZE/8];
+        byte p[WOLFSSL_MAX_DH_BITS/8];
+        byte g[WOLFSSL_MAX_DH_BITS/8];
+        byte q[WOLFSSL_MAX_DH_Q_SIZE/8];
         word32 p_len, g_len, q_len;
 
-        p_len = sizeof(p);
-        q_len = sizeof(q);
-        g_len = sizeof(g);
+        p_len = (word32)sizeof(p);
+        q_len = (word32)sizeof(q);
+        g_len = (word32)sizeof(g);
         
         /* Export DH parameters */
         if (wc_DhExportParamsRaw(&dh, p, &p_len, q, &q_len, g, &g_len) != 0) {
@@ -286,20 +292,19 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         if (wc_DhSetCheckKey(&dh, p, p_len, g, g_len, q, q_len, 0, &rng) != 0) {
             WOLFCLU_LOG(WOLFCLU_E0, "Failed to set/check DH params");
             ret = WOLFCLU_FATAL_ERROR;
-
         }
-        else{
-
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "DH params are valid.");
         }
-        
+
      }
 
     /* print out the dh key */
     if (ret == WOLFCLU_SUCCESS && genKey) {
-        byte priv[MAX_DH_BITS/8];
-        byte pub[MAX_DH_BITS/8]; 
-        word32 privSz   = sizeof(priv);
-        word32 pubSz    = sizeof(pub);        
+        byte priv[WOLFSSL_MAX_DH_BITS/8];
+        byte pub[WOLFSSL_MAX_DH_BITS/8]; 
+        word32 privSz   = (word32)sizeof(priv);
+        word32 pubSz    = (word32)sizeof(pub);        
         byte* outBuf    = NULL;
         byte* pem       = NULL;
         word32 outBufSz = 0;
@@ -315,7 +320,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
             ret = WOLFCLU_FATAL_ERROR;
         }
-        else{
+        else {
             ret = WOLFCLU_SUCCESS;
         }
 
