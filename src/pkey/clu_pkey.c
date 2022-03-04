@@ -194,7 +194,7 @@ static int wolfCLU_DerToEncryptedPEM(WOLFSSL_BIO* bio, byte* key, word32 keySz,
     /* convert to PEM format and output */
     if (ret == WOLFCLU_SUCCESS) {
         pemBufSz = wolfCLU_KeyDerToPem(out, outSz, &pemBuf,
-                PKCS8_ENC_PRIVATEKEY_TYPE, DYNAMIC_TYPE_PUBLIC_KEY);
+                PKCS8_ENC_PRIVATEKEY_TYPE, DYNAMIC_TYPE_PRIVATE_KEY);
         if (pemBufSz <= 0) {
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -206,6 +206,9 @@ static int wolfCLU_DerToEncryptedPEM(WOLFSSL_BIO* bio, byte* key, word32 keySz,
         }
     }
 
+    if (pemBuf != NULL) {
+        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+    }
     if (out != NULL) {
         XFREE(out, heap, DYNAMIC_TYPE_TMP_BUFFER);
     }

@@ -970,6 +970,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 ret = wolfCLU_pKeyPEMtoPriKey(keyOutBio, pkey);
             }
         }
+        wolfSSL_BIO_free(keyOutBio);
     }
 
     (void)algCheck;
