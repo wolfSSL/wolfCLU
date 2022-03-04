@@ -1482,7 +1482,7 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
         else {
 
             /* check if option is present in argv */ 
-            index = wolfCLU_checkForArg(long_options[i].name, strlen(long_options[i].name), argc, argv); 
+            index = wolfCLU_checkForArg(long_options[i].name, (int)strlen(long_options[i].name), argc, argv); 
             optind++;
 
             /* if index matches *opt_index at first position or if index is found */
