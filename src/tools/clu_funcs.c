@@ -954,46 +954,6 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
 
 
 /*
- * secure data entry by turning off key echoing in the terminal
- * return WOLFCLU_SUCCESS on success
- */
-int wolfCLU_noEcho(char* pwdKey, int size)
-{
-    struct termios oflags, nflags;
-    char* success;
-    int ret;
-
-    /* disabling echo */
-    tcgetattr(fileno(stdin), &oflags);
-    nflags = oflags;
-    nflags.c_lflag &= ~ECHO;
-    nflags.c_lflag |= ECHONL;
-
-    if (tcsetattr(fileno(stdin), TCSANOW, &nflags) != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Error");
-        return WOLFCLU_FATAL_ERROR;
-    }
-
-    WOLFCLU_LOG(WOLFCLU_L0, "pwdKey: ");
-    success = fgets(pwdKey, size, stdin);
-    if (success == NULL) {
-        /* User wants manual input to be encrypted
-         * Do Nothing
-         */
-    }
-
-    pwdKey[strlen(pwdKey) - 1] = 0;
-
-    /* restore terminal */
-    ret = tcsetattr(fileno(stdin), TCSANOW, &oflags);
-    if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Error");
-        return WOLFCLU_FATAL_ERROR;
-    }
-    return WOLFCLU_SUCCESS;
-}
-
-/*
  * adds character to end of string
  */
 void wolfCLU_append(char* s, char c)

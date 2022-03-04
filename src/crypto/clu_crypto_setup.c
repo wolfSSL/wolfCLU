@@ -323,7 +323,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
             WOLFCLU_LOG(WOLFCLU_L0,
                     "No -pwd flag set, please enter a password to use for"
                     " encrypting.");
-            ret = wolfCLU_noEcho((char*)pwdKey, keySize);
+            ret = wolfCLU_GetStdinPassword(pwdKey, (word32*)&keySize);
             pwdKeyChk = 1;
         }
     }
