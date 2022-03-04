@@ -75,7 +75,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
     }
 
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    dsa_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_INFILE:

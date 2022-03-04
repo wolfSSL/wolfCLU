@@ -38,7 +38,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     int      formatArg;
     int      ret;
 
-    ret = wolfCLU_checkForArg("-h", 2, argc, argv);
+    ret = wolfCLU_checkForArg("h", 1, argc, argv);
     if (ret > 0) {
         wolfCLU_genKeyHelp();
         return WOLFCLU_SUCCESS;
@@ -54,7 +54,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         return ret;
     }
 
-    ret = wolfCLU_checkForArg("-out", 4, argc, argv);
+    ret = wolfCLU_checkForArg("out", 3, argc, argv);
     if (ret > 0) {
         if (argv[ret+1] != NULL) {
             XSTRNCPY(keyOutFName, argv[ret+1], XSTRLEN(argv[ret+1]));
@@ -73,7 +73,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         return USER_INPUT_ERROR;
     }
 
-    ret = wolfCLU_checkForArg("-outform", 8, argc, argv);
+    ret = wolfCLU_checkForArg("outform", 7, argc, argv);
     if (ret > 0) {
         format = argv[ret+1];
     }
@@ -96,7 +96,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
     #ifdef HAVE_ED25519
 
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
+        ret = wolfCLU_checkForArg("output", 6, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
                 if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
@@ -133,7 +133,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_L0, "generate ECC key");
 
         /* get the directive argument */
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
+        ret = wolfCLU_checkForArg("output", 6, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
                 if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
@@ -151,7 +151,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         /* get the curve name */
-        ret = wolfCLU_checkForArg("-name", 5, argc, argv);
+        ret = wolfCLU_checkForArg("name", 4, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
                 int i;
@@ -188,7 +188,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_L0, "generate RSA key");
 
         /* get the directive argument */
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
+        ret = wolfCLU_checkForArg("output", 6, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
                 if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
@@ -206,7 +206,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         /* get the size argument */
-        ret = wolfCLU_checkForArg("-size", 5, argc, argv);
+        ret = wolfCLU_checkForArg("size", 4, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
                 char* cur;
@@ -235,7 +235,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         /* get the exponent argument */
-        ret = wolfCLU_checkForArg("-exponent", 9, argc, argv);
+        ret = wolfCLU_checkForArg("exponent", 8, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
                 char* cur;

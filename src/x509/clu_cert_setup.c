@@ -20,7 +20,6 @@
  */
 
 #include <stdio.h>
-#include <unistd.h>
 
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
@@ -60,7 +59,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* help */
 /*---------------------------------------------------------------------------*/
-    if (wolfCLU_checkForArg("-h", 2, argc, argv) > 0) {
+    if (wolfCLU_checkForArg("h", 1, argc, argv) > 0) {
         wolfCLU_certHelp();
         return WOLFCLU_SUCCESS;
     }
@@ -68,7 +67,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* text */
 /*---------------------------------------------------------------------------*/
-    if (wolfCLU_checkForArg("-text", 5, argc, argv) > 0) {
+    if (wolfCLU_checkForArg("text", 4, argc, argv) > 0) {
         /* set flag for converting to human readable.
          */
         textFlag = 1;
@@ -76,7 +75,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* pubkey */
 /*--------------------------------------------------------------------------*/
-    if (wolfCLU_checkForArg("-pubkey", 7, argc, argv) > 0) {
+    if (wolfCLU_checkForArg("pubkey", 6, argc, argv) > 0) {
         /* set flag for converting to human readable.
          */
         textPubkey = 1;
@@ -85,7 +84,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /* inForm pem/der/??OTHER?? */
 /*---------------------------------------------------------------------------*/
     if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-inform", 7, argc, argv);
+        idx = wolfCLU_checkForArg("inform", 6, argc, argv);
         if (idx > 0) {
             inForm = wolfCLU_checkInform(argv[idx+1]);
         }
@@ -95,7 +94,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /* outForm pem/der/??OTHER?? */
 /*---------------------------------------------------------------------------*/
     if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-outform", 8, argc, argv);
+        idx = wolfCLU_checkForArg("outform", 7, argc, argv);
         if (idx > 0) {
             outForm = wolfCLU_checkOutform(argv[idx+1]);
         }
@@ -107,7 +106,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /* in file */
 /*---------------------------------------------------------------------------*/
     if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-in", 3, argc, argv);
+        idx = wolfCLU_checkForArg("in", 2, argc, argv);
         if (idx > 0) {
             /* set flag for in file and flag for input file OK if exists
              * check for error case below. If no error then read in file */
@@ -135,7 +134,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /* out file */
 /*---------------------------------------------------------------------------*/
     if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-out", 4, argc, argv);
+        idx = wolfCLU_checkForArg("out", 3, argc, argv);
         if (idx > 0) {
             /* set flag for out file, check for error case below. If no error
              * then write outFile */
@@ -151,7 +150,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /* noout */
 /*---------------------------------------------------------------------------*/
     if (ret == WOLFCLU_SUCCESS &&
-            wolfCLU_checkForArg("-noout", 6, argc, argv) > 0) {
+            wolfCLU_checkForArg("noout", 5, argc, argv) > 0) {
         /* set flag for no output file */
         nooutFlag = 1;
     } /* Optional flag do not return error */
@@ -159,7 +158,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 /* silent */
 /*---------------------------------------------------------------------------*/
     if (ret == WOLFCLU_SUCCESS &&
-            wolfCLU_checkForArg("-silent", 7, argc, argv) > 0) {
+            wolfCLU_checkForArg("silent", 6, argc, argv) > 0) {
         /* set flag for converting to human readable.
          * return NOT_YET_IMPLEMENTED error
          */
@@ -211,7 +210,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 
     /* Print out specific parts as requested */
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-subject", 8, argc, argv) != 0) {
+        if (wolfCLU_checkForArg("subject", 7, argc, argv) != 0) {
             printSubject = 1;
         }
     }
@@ -229,7 +228,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-issuer", 7, argc, argv) != 0) {
+        if (wolfCLU_checkForArg("issuer", 6, argc, argv) != 0) {
             printIssuer = 1;
         }
     }
@@ -247,7 +246,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-serial", 7, argc, argv) != 0) {
+        if (wolfCLU_checkForArg("serial", 6, argc, argv) != 0) {
             printSerial = 1;
         }
     }
@@ -282,7 +281,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-dates", 6, argc, argv) != 0) {
+        if (wolfCLU_checkForArg("dates", 5, argc, argv) != 0) {
             printDates = 1;
         }
     }
@@ -319,7 +318,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-email", 6, argc, argv) != 0) {
+        if (wolfCLU_checkForArg("email", 5, argc, argv) != 0) {
             printEmail = 1;
         }
     }
@@ -377,7 +376,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-fingerprint", 12, argc, argv) != 0) {
+        if (wolfCLU_checkForArg("fingerprint", 11, argc, argv) != 0) {
             printFinger = 1;
         }
     }
@@ -418,7 +417,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-purpose", 8, argc, argv) != 0) {
+        if (wolfCLU_checkForArg("purpose", 7, argc, argv) != 0) {
             printPurpose = 1;
         }
     }
@@ -435,7 +434,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-hash", 5, argc, argv) != 0) {
+        if (wolfCLU_checkForArg("hash", 4, argc, argv) != 0) {
             printSubjHash = 1;
         }
     }

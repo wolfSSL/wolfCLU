@@ -25,10 +25,14 @@
 #include <string.h>
 #include <stdio.h>
 #include <signal.h>
+
+#ifdef _WIN32 /* running on windows */
+#include <windows.h>
+#else /* running on *nix */
 #include <unistd.h>
 #include <termios.h>
 #include <sys/time.h>
-#include <getopt.h>
+#endif
 
 /* wolfssl includes */
 #include <wolfssl/options.h>
@@ -113,6 +117,26 @@
   * or code update
   */
 #define VERSION 0.3
+
+/**
+ * @brief structs and variables to parse commands
+ */
+struct option
+{
+    const char *name;
+    int has_arg;
+    int *flag;
+    int val;
+};
+
+#define required_argument 1
+#define no_argument       0
+
+#ifdef _WIN32
+extern char* optarg;
+extern int optind ;
+extern int opterr ;
+#endif
 
 /* encryption argument function
  *
@@ -374,6 +398,12 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm);
  * get the current Version
  */
 int wolfCLU_version(void);
+
+/**
+ * @brief Used to check for specified command
+ */
+int wolfCLU_GetOpt(int argc, char** argv, const char *options, const struct option *long_options, int *opt_index);
+
 
 /*
  * generic function to check for a specific input argument. Return the

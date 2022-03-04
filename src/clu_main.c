@@ -165,7 +165,7 @@ int main(int argc, char** argv)
     }
     else {
         /* retain old version of modes where '-' is used. i.e -x509, -req */
-        flag = getopt_long_only(argc, argv,"", mode_options, &longIndex);
+        flag = wolfCLU_GetOpt(argc, argv,"", mode_options, &longIndex);
 
         /* if -rsa was used then it is the older sign/verify version of rsa */
         if (flag == WOLFCLU_RSA) flag = WOLFCLU_RSALEGACY;
@@ -179,7 +179,7 @@ int main(int argc, char** argv)
 
         case WOLFCLU_CRYPT:
             /* generic 'enc' used, default to encrypt unless -d was used */
-            ret = wolfCLU_checkForArg("-d", 2, argc, argv);
+            ret = wolfCLU_checkForArg("d", 1, argc, argv);
             if (ret > 0) {
                 ret = wolfCLU_setup(argc, argv, 'd');
             }

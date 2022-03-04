@@ -413,7 +413,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     WOLFSSL_BIO *bioOut = NULL;
 
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    pkey_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_PUBOUT:

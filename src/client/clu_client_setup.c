@@ -72,7 +72,7 @@ int wolfCLU_Client(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "", client_options,
+    while ((option = wolfCLU_GetOpt(argc, argv, "", client_options,
                     &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_CONNECT:

@@ -39,33 +39,33 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     int     verifyCheck = 0;
     int     pubInCheck  = 0;
 
-    if (wolfCLU_checkForArg("-rsa", 4, argc, argv) > 0) {
+    if (wolfCLU_checkForArg("rsa", 3, argc, argv) > 0) {
         algCheck = RSA_SIG_VER;
     }
-    else if (wolfCLU_checkForArg("-ed25519", 8, argc, argv) > 0) {
+    else if (wolfCLU_checkForArg("ed25519", 7, argc, argv) > 0) {
         algCheck = ED25519_SIG_VER;
     }
-    else if (wolfCLU_checkForArg("-ecc", 4, argc, argv) > 0) {
+    else if (wolfCLU_checkForArg("ecc", 3, argc, argv) > 0) {
         algCheck = ECC_SIG_VER;
     }
     else {
         return WOLFCLU_FATAL_ERROR;
     }
 
-    ret = wolfCLU_checkForArg("-sign", 5, argc, argv);
+    ret = wolfCLU_checkForArg("sign", 4, argc, argv);
     if (ret > 0) {
         /* output file */
         signCheck = 1;
     }
 
-    ret = wolfCLU_checkForArg("-verify", 7, argc, argv);
+    ret = wolfCLU_checkForArg("verify", 6, argc, argv);
     if (ret > 0) {
         /* output file */
         verifyCheck = 1;
     }
 
     /* help checking */
-    ret = wolfCLU_checkForArg("-help", 5, argc, argv);
+    ret = wolfCLU_checkForArg("help", 4, argc, argv);
     if (ret > 0) {
         if (signCheck == 1) {
             wolfCLU_signHelp(algCheck);
@@ -80,7 +80,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         return 0;
     }
 
-    ret = wolfCLU_checkForArg("-inkey", 6, argc, argv);
+    ret = wolfCLU_checkForArg("inkey", 5, argc, argv);
     if (ret > 0) {
         priv = XMALLOC(XSTRLEN(argv[ret+1]) + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (priv == NULL) {
@@ -104,13 +104,13 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         return ret;
     }
 
-    ret = wolfCLU_checkForArg("-pubin", 6, argc, argv);
+    ret = wolfCLU_checkForArg("pubin", 5, argc, argv);
     if (ret > 0) {
         /* output file */
         pubInCheck = 1;
     }
 
-    ret = wolfCLU_checkForArg("-in", 3, argc, argv);
+    ret = wolfCLU_checkForArg("in", 2, argc, argv);
     if (ret > 0) {
         /* input file/text */
         in = XMALLOC(XSTRLEN(argv[ret+1]) + 1, HEAP_HINT,
@@ -133,7 +133,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         inCheck = 1;
     }
 
-    ret = wolfCLU_checkForArg("-sigfile", 8, argc, argv);
+    ret = wolfCLU_checkForArg("sigfile", 7, argc, argv);
     if (ret > 0) {
         sig = XMALLOC(strlen(argv[ret+1]) + 1, HEAP_HINT,
                       DYNAMIC_TYPE_TMP_BUFFER);
@@ -169,7 +169,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         return ret;
     }
 
-    ret = wolfCLU_checkForArg("-out", 4, argc, argv);
+    ret = wolfCLU_checkForArg("out", 3, argc, argv);
     if (ret > 0) {
         /* output file */
         out = argv[ret+1];

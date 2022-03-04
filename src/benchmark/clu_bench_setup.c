@@ -67,13 +67,13 @@ int wolfCLU_benchSetup(int argc, char** argv)
     /* acceptable option check */
     int optionCheck = 0;
 
-    ret = wolfCLU_checkForArg("-help", 5, argc, argv);
+    ret = wolfCLU_checkForArg("help", 4, argc, argv);
     if (ret > 0) {
             wolfCLU_benchHelp();
             return 0;
     }
 
-    ret = wolfCLU_checkForArg("-time", 5, argc, argv);
+    ret = wolfCLU_checkForArg("time", 4, argc, argv);
     if (ret > 0) {
         /* time for each test in seconds */
         time = XATOI(argv[ret+1]);
@@ -84,7 +84,7 @@ int wolfCLU_benchSetup(int argc, char** argv)
         }
     }
 
-    ret = wolfCLU_checkForArg("-all", 4, argc, argv);
+    ret = wolfCLU_checkForArg("all", 3, argc, argv);
     if (ret > 0) {
         /* perform all available tests */
         for (j = 0; j < (int)algsSz; j++) {

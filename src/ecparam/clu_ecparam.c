@@ -57,7 +57,7 @@ int wolfCLU_ecparam(int argc, char** argv)
     char* name = NULL;
     char* out  = NULL;    /* default output file name */
     int   ret        = WOLFCLU_SUCCESS;
-    int   longIndex  = 0;
+    int   longIndex  = 1;
     int   genKey     = 0;
     int   textOut    = 0;
     int   outForm    = PEM_FORM;
@@ -68,14 +68,14 @@ int wolfCLU_ecparam(int argc, char** argv)
     WOLFSSL_BIO* bioOut = NULL;
     WOLFSSL_EC_KEY* key = NULL;
 
-    if (wolfCLU_checkForArg("-h", 2, argc, argv) > 0) {
+    if (wolfCLU_checkForArg("h", 1, argc, argv) > 0) {
         wolfCLU_ecparamHelp();
         return WOLFCLU_SUCCESS;
     }
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    ecparam_options, &longIndex )) != -1) {
 
         switch (option) {

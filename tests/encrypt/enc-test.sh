@@ -55,8 +55,8 @@ fi
 rm -f test-dec.der
 rm -f test-enc.der
 
-run "enc -aes-128-cbc -in ./configure.ac -out ./configure.ac.enc -k 'test'"
-run "enc -d -aes-128-cbc -in ./configure.ac.enc -out ./configure.ac.dec -k 'test'"
+run "enc -aes-128-cbc -in ./configure.ac -out ./configure.ac.enc" "test"
+run "enc -d -aes-128-cbc -in ./configure.ac.enc -out ./configure.ac.dec" "test"
 diff ./configure.ac ./configure.ac.dec
 if [ $? != 0 ]; then
     echo "decrypted file does not match original file"

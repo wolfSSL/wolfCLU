@@ -88,14 +88,14 @@ int wolfCLU_setup(int argc, char** argv, char action)
                                  * reading a hex string passed in */
     word32   numBits    =   0;  /* number of bits in argument from the user */
     int      option;
-    int      longIndex = 0;
+    int      longIndex = 1;
 
     if (action == 'e')
         encCheck = 1;
     if (action == 'd')
         decCheck = 1;
 
-    ret = wolfCLU_checkForArg("-h", 2, argc, argv);
+    ret = wolfCLU_checkForArg("h", 1, argc, argv);
     if (ret > 0) {
         if (encCheck == 1) {
             wolfCLU_encryptHelp();
@@ -136,7 +136,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    crypt_options, &longIndex )) != -1) {
 
         switch (option) {

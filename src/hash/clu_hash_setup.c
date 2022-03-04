@@ -72,7 +72,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 #endif
 
     /* help checking */
-    ret = wolfCLU_checkForArg("-help", 5, argc, argv);
+    ret = wolfCLU_checkForArg("help", 4, argc, argv);
     if (ret > 0) {
         wolfCLU_hashHelp();
         return WOLFCLU_SUCCESS;
@@ -92,7 +92,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
     }
 
     /* returns location of the arg in question if present */
-    ret = wolfCLU_checkForArg("-in", 3, argc, argv);
+    ret = wolfCLU_checkForArg("in", 2, argc, argv);
     if (ret > 0) {
         bioIn = wolfSSL_BIO_new_file(argv[ret+1], "rb");
         if (bioIn == NULL) {
@@ -102,7 +102,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
         inCheck = 1;
     }
 
-    ret = wolfCLU_checkForArg("-out", 4, argc, argv);
+    ret = wolfCLU_checkForArg("out", 3, argc, argv);
     if (ret > 0) {
         bioOut = wolfSSL_BIO_new_file(argv[ret+1], "rb");
         if (bioOut == NULL) {
@@ -112,7 +112,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
         }
     }
 
-    ret = wolfCLU_checkForArg("-size", 5, argc, argv);
+    ret = wolfCLU_checkForArg("size", 4, argc, argv);
     if (ret > 0) {
         /* size of output */
 #ifndef HAVE_BLAKE2
