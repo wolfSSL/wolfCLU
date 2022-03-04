@@ -278,7 +278,7 @@ void wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
         if (fmt == PEM_FORM) {
             byte*  base64 = NULL;
             word32 base64Sz;
-    
+
             if (wolfSSL_BIO_write(out, header, (int)XSTRLEN(header)) <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -326,6 +326,7 @@ void wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
     if (objOID != NULL) {
         XFREE(objOID, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
+    (void)ret;
 }
 
 WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name)
@@ -358,6 +359,12 @@ WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name)
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
+
+    if (ret != WOLFCLU_SUCCESS) {
+        wolfSSL_EC_KEY_free(key);
+        key = NULL;
+    }
+
     return key;
 }
 #endif /* HAVE_ECC */
