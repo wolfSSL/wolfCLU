@@ -1,4 +1,4 @@
-/* clu_dsa.c
+/* clu_dh.c
  *
  * Copyright (C) 2006-2021 wolfSSL Inc.
  *
@@ -23,11 +23,21 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
-#ifndef NO_DSA
-static const struct option dsa_options[] = {
+#ifndef NO_DH
+
+#ifndef WOLFSSL_MAX_DH_BITS
+    #define WOLFSSL_MAX_DH_BITS       4096
+#endif
+
+#ifndef WOLFSSL_MAX_DH_Q_SIZE
+    #define WOLFSSL_MAX_DH_Q_SIZE     256
+#endif
+
+static const struct option dh_options[] = {
     {"in",        required_argument, 0, WOLFCLU_INFILE    },
     {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"genkey",    no_argument,       0, WOLFCLU_GEN_KEY   },
+    {"check",     no_argument,       0, WOLFCLU_CHECK     },
     {"noout",     no_argument,       0, WOLFCLU_NOOUT     },
     {"help",      no_argument,       0, WOLFCLU_HELP      },
     {"h",         no_argument,       0, WOLFCLU_HELP      },
@@ -36,35 +46,37 @@ static const struct option dsa_options[] = {
 };
 
 
-static void wolfCLU_DsaHelp(void)
+static void wolfCLU_DhHelp(void)
 {
-    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl dsaparam");
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl dhparam");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to output to (default stdout)");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-genkey generate DSA key using param input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-genkey generate DH key using param input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-check  check if parameters are valid");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-noout  do not print out the params");
 }
-#endif /* !NO_DSA */
+#endif /* !NO_DH */
 
 
-int wolfCLU_DsaParamSetup(int argc, char** argv)
+int wolfCLU_DhParamSetup(int argc, char** argv)
 {
-#ifndef NO_DSA
+#ifndef NO_DH
     WC_RNG rng;
-    DsaKey dsa;
+    DhKey dh;
     int modSz;
     int ret    = WOLFCLU_SUCCESS;
     int option;
     int longIndex = 1;
     char* out = NULL;
     byte genKey = 0;
+    byte check  = 0;
     byte noOut  = 0;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
 
-    /* last parameter is the dsa size */
+    /* last parameter is the dh size */
     if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
-        wolfCLU_DsaHelp();
+        wolfCLU_DhHelp();
         return WOLFCLU_SUCCESS;
     }
     else {
@@ -76,7 +88,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 
     optind = 0; /* start at indent 0 */
     while ((option = getopt_long_only(argc, argv, "",
-                   dsa_options, &longIndex )) != -1) {
+                   dh_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
@@ -94,13 +106,17 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
             case WOLFCLU_GEN_KEY:
                 genKey = 1;
                 break;
+            
+            case WOLFCLU_CHECK:
+                check = 1;
+                break;
 
             case WOLFCLU_NOOUT:
                 noOut = 1;
                 break;
 
             case WOLFCLU_HELP:
-                wolfCLU_DsaHelp();
+                wolfCLU_DhHelp();
                 return WOLFCLU_SUCCESS;
 
             case ':':
@@ -116,8 +132,8 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
     }
 
     /* try initializing both because both get free'd regardless at the end */
-    if (wc_InitRng(&rng) != 0 || wc_InitDsaKey(&dsa) != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Unable to initialize rng and dsa");
+    if (wc_InitRng(&rng) != 0 || wc_InitDhKey(&dh) != 0) {
+        WOLFCLU_LOG(WOLFCLU_E0, "Unable to initialize rng and dh");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -141,7 +157,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS &&
-                    wc_PemToDer(in, inSz, DSA_PARAM_TYPE, &pDer, NULL, NULL,
+                    wc_PemToDer(in, inSz, DH_PARAM_TYPE, &pDer, NULL, NULL,
                         NULL) != 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -157,7 +173,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS &&
-                    wc_DsaParamsDecode(in, &idx, &dsa, inSz) != 0) {
+                    wc_DhKeyDecode(in, &idx, &dh, inSz) != 0) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Unable to decode input params");
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -193,22 +209,22 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         }
     }
 
-    /* generate the dsa parameters */
+    /* generate the dh parameters */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
-        if (wc_MakeDsaParameters(&rng, modSz, &dsa) != 0) {
+        if (wc_DhGenerateParams(&rng, modSz, &dh) != 0) {
             WOLFCLU_LOG(WOLFCLU_E0, "Error generating parameters");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    /* print out the dsa parameters */
+    /* print out the dh parameters */
     if (ret == WOLFCLU_SUCCESS && !noOut) {
         byte* outBuf = NULL;
         byte* pem    = NULL;
         word32 outBufSz = 0;
         int pemSz       = 0;
 
-        if (wc_DsaKeyToParamsDer_ex(&dsa, NULL, &outBufSz) != LENGTH_ONLY_E) {
+        if (wc_DhParamsToDer(&dh, NULL, &outBufSz) != LENGTH_ONLY_E) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -221,12 +237,12 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS &&
-                wc_DsaKeyToParamsDer_ex(&dsa, outBuf, &outBufSz) <= 0) {
+                wc_DhParamsToDer(&dh, outBuf, &outBufSz) <= 0) {
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            pemSz = wc_DerToPem(outBuf, outBufSz, NULL, 0, DSA_PARAM_TYPE);
+            pemSz = wc_DerToPem(outBuf, outBufSz, NULL, 0, DH_PARAM_TYPE);
             if (pemSz > 0) {
                 pem = (byte*)XMALLOC(pemSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
                 if (pem == NULL) {
@@ -239,7 +255,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            pemSz = wc_DerToPem(outBuf, outBufSz, pem, pemSz, DSA_PARAM_TYPE);
+            pemSz = wc_DerToPem(outBuf, outBufSz, pem, pemSz, DH_PARAM_TYPE);
             if (pemSz <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -255,23 +271,57 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         if (outBuf != NULL)
             XFREE(outBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
     }
+   
+     /* Check if parameters are valid */
+    if(ret == WOLFCLU_SUCCESS && check){
+        byte p[WOLFSSL_MAX_DH_BITS/8];
+        byte g[WOLFSSL_MAX_DH_BITS/8];
+        byte q[WOLFSSL_MAX_DH_Q_SIZE/8];
+        word32 p_len, g_len, q_len;
 
-    /* print out the dsa key */
+        p_len = (word32)sizeof(p);
+        q_len = (word32)sizeof(q);
+        g_len = (word32)sizeof(g);
+        
+        /* Export DH parameters */
+        if (wc_DhExportParamsRaw(&dh, p, &p_len, q, &q_len, g, &g_len) != 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Failed to export DH params");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (wc_DhSetCheckKey(&dh, p, p_len, g, g_len, q, q_len, 0, &rng) != 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Failed to set/check DH params");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "DH params are valid.");
+        }
+
+     }
+
+    /* print out the dh key */
     if (ret == WOLFCLU_SUCCESS && genKey) {
-        byte* outBuf = NULL;
-        byte* pem    = NULL;
+        byte priv[WOLFSSL_MAX_DH_BITS/8];
+        byte pub[WOLFSSL_MAX_DH_BITS/8]; 
+        word32 privSz   = (word32)sizeof(priv);
+        word32 pubSz    = (word32)sizeof(pub);        
+        byte* outBuf    = NULL;
+        byte* pem       = NULL;
         word32 outBufSz = 0;
         word32 pemSz    = 0;
 
-        if (wc_MakeDsaKey(&rng, &dsa) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error making DSA key");
+        if (wc_DhGenerateKeyPair(&dh, &rng, priv, &privSz, pub, &pubSz) != 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error making DH key");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         /* get DER size (param has p,q,g and key has p,q,g,y,x) */
-        if (wc_DsaKeyToParamsDer_ex(&dsa, NULL, &outBufSz) != LENGTH_ONLY_E) {
+        if (wc_DhParamsToDer(&dh, NULL, &outBufSz) != LENGTH_ONLY_E) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
             ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = WOLFCLU_SUCCESS;
         }
 
         if (ret == WOLFCLU_SUCCESS) {
@@ -283,12 +333,13 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
             if (outBuf == NULL) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
+
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            ret = wc_DsaKeyToDer(&dsa, outBuf, outBufSz);
+            ret = wc_DhPrivKeyToDer(&dh, outBuf, &outBufSz);
             if (ret <= 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error converting DSA key to buffer");
+                WOLFCLU_LOG(WOLFCLU_E0, "Error converting DH key to buffer");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
@@ -298,7 +349,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            pemSz = wc_DerToPem(outBuf, outBufSz, NULL, 0, DSA_PRIVATEKEY_TYPE);
+            pemSz = wc_DerToPem(outBuf, outBufSz, NULL, 0, DH_PRIVATEKEY_TYPE);
             if (pemSz > 0) {
                 pem = (byte*)XMALLOC(pemSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
                 if (pem == NULL) {
@@ -312,7 +363,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 
         if (ret == WOLFCLU_SUCCESS) {
             pemSz = wc_DerToPem(outBuf, outBufSz, pem, pemSz,
-                    DSA_PRIVATEKEY_TYPE);
+                    DH_PRIVATEKEY_TYPE);
             if (pemSz <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -332,14 +383,14 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
 
-    wc_FreeDsaKey(&dsa);
+    wc_FreeDhKey(&dh);
     wc_FreeRng(&rng);
 
     return ret;
 #else
     (void)argc;
     (void)argv;
-    WOLFCLU_LOG(WOLFCLU_E0, "DSA support not compiled into wolfSSL");
+    WOLFCLU_LOG(WOLFCLU_E0, "DH support not compiled into wolfSSL");
     return WOLFCLU_FATAL_ERROR;
 #endif
 }
