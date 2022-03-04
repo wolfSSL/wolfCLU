@@ -6,7 +6,11 @@ if [ ! -d ./certs/ ]; then
 fi
 
 run_success() {
-    RESULT=`./wolfssl $1`
+    if [ -z "$2" ]; then
+        RESULT=`./wolfssl $1`
+    else
+        RESULT=`echo "$2" | ./wolfssl $1`
+    fi
     if [ $? != 0 ]; then
         echo "Fail on ./wolfssl $1"
         exit 99
@@ -99,8 +103,19 @@ then
     exit 99
 fi
 rm -f tmp.cert
-rm -f test.conf
 
+run_success "req -new -newkey rsa:2048 -config ./test.conf -x509 -out tmp.cert" "test"
+echo $RESULT | grep "ENCRYPTED"
+if [ $? -ne 0 ]; then
+    echo "no encrypted key found in result"
+    exit 99
+fi
+rm -f tmp.cert
+
+run_success "req -new -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -x509 -out tmp.cert" "test"
+rm -f tmp.cert
+rm -f new-key.pem
+rm -f test.conf
 echo "Done"
 exit 0
 

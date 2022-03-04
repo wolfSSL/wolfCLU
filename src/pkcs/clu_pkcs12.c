@@ -46,7 +46,7 @@ static void wolfCLU_pKeyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl pkcs12");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for pkcs12 bundle");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write results to (default stdout)");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nocerts no certificate output");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nokeys no key output");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-passin source to get password from");
@@ -217,9 +217,16 @@ int wolfCLU_PKCS12(int argc, char** argv)
 
     /* print out the key */
     if (ret == WOLFCLU_SUCCESS && pkey != NULL && printKeys) {
-        ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
+        if (useDES) {
+            wolfCLU_GetStdinPassword((byte*)password, (word32*)&passwordSz);
+            ret = wolfCLU_pKeyPEMtoPriKeyEnc(bioOut, pkey, DES3b,
+                    (byte*)password, passwordSz);
+        }
+        else {
+            ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
+        }
         if (ret != WOLFCLU_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error getting pubkey from pem key");
+            WOLFCLU_LOG(WOLFCLU_E0, "Error printing out key");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

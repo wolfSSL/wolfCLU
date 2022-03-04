@@ -99,4 +99,6 @@ void wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
 
 WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name);
 
+int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
+        int heapType);
 #endif /* CLU_GENKEY_H */

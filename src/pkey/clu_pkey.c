@@ -23,6 +23,7 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/pkey/clu_pkey.h>
+#include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
 
@@ -141,6 +142,78 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
 }
 
 
+/* return WOLFCLU_SUCCESS on success */
+static int wolfCLU_DerToEncryptedPEM(WOLFSSL_BIO* bio, byte* key, word32 keySz,
+        int encAlgId, byte* password, word32 passwordSz)
+{
+    int ret = WOLFCLU_SUCCESS;
+    byte* out    = NULL;
+    word32 outSz = 0;
+    WC_RNG rng;
+
+    byte* pemBuf  = NULL;
+    int   pemBufSz;
+    byte* salt    = NULL;
+    word32 saltSz = 0;
+    int itt       = 1000;
+    void* heap    = NULL;
+
+    if (wc_InitRng(&rng) != 0) {
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wc_CreateEncryptedPKCS8Key(key, keySz, NULL, &outSz,
+                    (const char*)password, passwordSz, PKCS5, PBES2, encAlgId,
+                    salt, saltSz, itt, &rng, heap) != LENGTH_ONLY_E) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        out = (byte*)XMALLOC(outSz, heap, DYNAMIC_TYPE_TMP_BUFFER);
+        if (out == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        int err;
+        err = wc_CreateEncryptedPKCS8Key(key, keySz, out, &outSz,
+                    (const char*)password, passwordSz, PKCS5, PBES2, encAlgId,
+                    salt, saltSz, itt, &rng, heap);
+        if (err <= 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            outSz = err;
+        }
+    }
+
+    /* convert to PEM format and output */
+    if (ret == WOLFCLU_SUCCESS) {
+        pemBufSz = wolfCLU_KeyDerToPem(out, outSz, &pemBuf,
+                PKCS8_ENC_PRIVATEKEY_TYPE, DYNAMIC_TYPE_PUBLIC_KEY);
+        if (pemBufSz <= 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfSSL_BIO_write(bio, pemBuf, pemBufSz) <= 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (out != NULL) {
+        XFREE(out, heap, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    wc_FreeRng(&rng);
+    return ret;
+}
+
+
 /* print out PEM private key
  * returns WOLFCLU_SUCCESS on success other return values are considered
  * 'not success'
@@ -173,6 +246,26 @@ int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
         return WOLFCLU_FATAL_ERROR;
     }
 }
+
+
+/* return WOLFCLU_SUCCESS on success */
+int wolfCLU_pKeyPEMtoPriKeyEnc(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
+        int encAlgId, byte* password, word32 passwordSz)
+{
+    unsigned char* der = NULL;
+    int derSz;
+    int ret = WOLFCLU_FATAL_ERROR;
+
+    derSz = wolfSSL_i2d_PrivateKey(pkey, &der);
+    if (derSz > 0) {
+        ret = wolfCLU_DerToEncryptedPEM(bio, der, (word32)derSz, encAlgId,
+                password, passwordSz);
+    }
+    if (der != NULL)
+        free(der);
+    return ret;
+}
+
 
 /* return key size on success */
 static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,

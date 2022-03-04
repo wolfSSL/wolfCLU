@@ -24,6 +24,7 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/x509/clu_request.h>
 #include <wolfclu/x509/clu_cert.h>
+#include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
 #ifdef WOLFSSL_CERT_REQ
@@ -41,7 +42,9 @@ static const struct option req_options[] = {
     {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"key",       required_argument, 0, WOLFCLU_KEY       },
     {"new",       no_argument,       0, WOLFCLU_NEW       },
+    {"newkey",    required_argument, 0, WOLFCLU_NEWKEY },
     {"inkey",     required_argument, 0, WOLFCLU_INKEY     },
+    {"keyout",    required_argument, 0, WOLFCLU_OUTKEY     },
     {"inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
     {"config",    required_argument, 0, WOLFCLU_CONFIG },
@@ -52,6 +55,9 @@ static const struct option req_options[] = {
     {"text",      no_argument,       0, WOLFCLU_TEXT_OUT },
     {"noout",     no_argument,       0, WOLFCLU_NOOUT },
     {"extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
+    {"nodes",     no_argument,       0, WOLFCLU_NODES },
+    {"h",         no_argument,       0, WOLFCLU_HELP },
+    {"help",      no_argument,       0, WOLFCLU_HELP },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -497,6 +503,9 @@ int wolfCLU_requestSetup(int argc, char** argv)
     char*   config = NULL;
     char*   subj = NULL;
     char*   ext = NULL;
+    char*   keyType = NULL;
+    char*   keyInfo = NULL;
+    char*   keyOut  = NULL;
 
     int     algCheck =   0;     /* algorithm type */
     int     oid      =   0;
@@ -511,6 +520,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     byte doTextOut = 0;
     byte reSign    = 0; /* flag for if resigning req is needed */
     byte noOut     = 0;
+    byte useDes    = 1;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -520,6 +530,40 @@ int wolfCLU_requestSetup(int argc, char** argv)
         switch (option) {
             case WOLFCLU_EXTENSIONS:
                 ext = optarg;
+                break;
+
+            case WOLFCLU_NODES:
+                useDes = 0;
+                break;
+
+            case WOLFCLU_OUTKEY:
+                keyOut = optarg;
+                break;
+
+            case WOLFCLU_NEWKEY:
+                if (XSTRSTR(optarg, ":") == NULL) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "key string does not have ':'");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    int idx;
+
+                    idx     = (int)strcspn(optarg, ":");
+                    keyType = (char*)XMALLOC(idx + 1, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (keyType == NULL) {
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    else {
+                        XMEMCPY(keyType, optarg, idx);
+                        keyType[idx] = '\0';
+                    }
+
+                    if (ret == WOLFCLU_SUCCESS) {
+                        keyInfo = optarg + idx + 1;
+                    }
+                }
                 break;
 
             case WOLFCLU_INFILE:
@@ -698,7 +742,43 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && keyIn == NULL && reqIn == NULL) {
+    /* generate key for -newkey */
+    if (ret == WOLFCLU_SUCCESS && keyType != NULL && keyInfo != NULL &&
+            pkey == NULL) {
+        WOLFSSL_EVP_PKEY_CTX* ctx = NULL;
+
+        if (XSTRNCMP("ec", keyType, 2) == 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "No supporting ecc gen with -newkey yet, "
+                    "use ecparam command instead");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (XSTRNCMP("rsa", keyType, 3) == 0) {
+            ctx = wolfSSL_EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
+            ret = wolfSSL_EVP_PKEY_CTX_set_rsa_keygen_bits(ctx,
+                    (int)XATOI(keyInfo));
+        }
+
+        if (ret == WOLFCLU_SUCCESS && ctx == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Unknown/unsupported algo name");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            if (wolfSSL_EVP_PKEY_keygen(ctx, &pkey) != WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error with keygen");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        wolfSSL_EVP_PKEY_CTX_free(ctx);
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_X509_set_pubkey(x509, pkey) != WOLFSSL_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && reqIn == NULL && pkey == NULL) {
         WOLFCLU_LOG(WOLFCLU_E0, "Please specify a -key <key> option when "
                "generating a certificate.");
         wolfCLU_certgenHelp();
@@ -757,8 +837,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL && out != NULL) {
         bioOut = wolfSSL_BIO_new_file(out, "wb");
         if (bioOut == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
-                    optarg);
+            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s", out);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -857,9 +936,49 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
 
+    if (ret == WOLFCLU_SUCCESS && keyType != NULL && keyInfo != NULL) {
+        WOLFSSL_BIO* keyOutBio;
+
+        if (keyOut != NULL) {
+            keyOutBio = wolfSSL_BIO_new_file(keyOut, "wb");
+        }
+        else {
+            keyOutBio = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
+            if (keyOutBio != NULL) {
+                if (wolfSSL_BIO_set_fp(keyOutBio, stdout, BIO_NOCLOSE)
+                    != WOLFSSL_SUCCESS) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+        }
+
+        if (keyOutBio == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error opening keyout file %s", keyOut);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            if (useDes) {
+                byte password[MAX_PASSWORD_SIZE];
+                word32 passwordSz = MAX_PASSWORD_SIZE;
+
+                wolfCLU_GetStdinPassword(password, &passwordSz);
+                ret = wolfCLU_pKeyPEMtoPriKeyEnc(keyOutBio, pkey, DES3b,
+                        password, passwordSz);
+            }
+            else {
+                ret = wolfCLU_pKeyPEMtoPriKey(keyOutBio, pkey);
+            }
+        }
+    }
+
     (void)algCheck;
     (void)in;
     (void)oid;
+
+    if (keyType != NULL) {
+        XFREE(keyType, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    }
 
     wolfSSL_BIO_free(reqIn);
     wolfSSL_BIO_free(keyIn);

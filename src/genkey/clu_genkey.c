@@ -518,8 +518,8 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
  * success.
  * returns size of PEM buffer created on success
  * returns 0 or negative value on failure */
-static int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out,
-        int pemType, int heapType)
+int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
+        int heapType)
 {
     int pemBufSz;
     byte* pemBuf = NULL;
