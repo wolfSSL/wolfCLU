@@ -155,7 +155,7 @@ static int wolfCLU_DerToEncryptedPEM(WOLFSSL_BIO* bio, byte* key, word32 keySz,
     int   pemBufSz;
     byte* salt    = NULL;
     word32 saltSz = 0;
-    int itt       = 1000;
+    int itt       = WC_PKCS12_ITT_DEFAULT;
     void* heap    = NULL;
 
     if (wc_InitRng(&rng) != 0) {
