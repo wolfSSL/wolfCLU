@@ -212,14 +212,6 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size);
  */
 const WOLFSSL_EVP_CIPHER* wolfCLU_CipherTypeFromAlgo(int alg);
 
-
-/* secure entry of password
- *
- * @param pwdKey the password provide by the user
- * @param size the size as determnined by wolfCLU_GetAlgo
- */
-int wolfCLU_noEcho(char* pwdKey, int size);
-
 /* adds characters to end of string
  *
  * @param s the char array we'll be appending to
