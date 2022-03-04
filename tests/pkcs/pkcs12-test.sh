@@ -44,5 +44,7 @@ fi
 
 run "./wolfssl pkcs12 -nodes -passin pass:\"wolfSSL test\" -passout pass: -in ./certs/test-servercert.p12"
 
+run "pkcs12 -passin stdin -passout pass: -in ./certs/test-servercert.p12 -nocerts" "wolfSSL test"
+
 echo "Done"
 exit 0

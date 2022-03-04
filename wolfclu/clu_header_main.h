@@ -510,4 +510,9 @@ int wolfCLU_DsaParamSetup(int argc, char** argv);
  */
 int wolfCLU_DhParamSetup(int argc, char** argv);
 
+
+/**
+ * @brief function to prompt user for password from stdin
+ */
+int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz);
 #endif /* _WOLFSSL_CLU_HEADER_ */

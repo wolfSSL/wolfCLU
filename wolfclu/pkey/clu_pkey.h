@@ -39,6 +39,9 @@ int wolfCLU_pKeySetup(int argc, char** argv);
 /* print out the private key from pkey into bio */
 int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey);
 
+/* print out the encrypted private key from pkey into bio */
+int wolfCLU_pKeyPEMtoPriKeyEnc(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
+        int encAlgId, byte* password, word32 passwordSz);
 
 int wolfCLU_RSA(int argc, char** argv);
 

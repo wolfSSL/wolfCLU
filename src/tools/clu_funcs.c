@@ -564,13 +564,14 @@ void wolfCLU_certgenHelp() {
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-x509 generate self signed certificate");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
-    WOLFCLU_LOG(WOLFCLU_L0, "\n");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\ncertgen USAGE:\nwolfssl -req -rsa/-ed25519 -in <filename> -out"
-           " <filename> -sha/sha224/sha256/sha384/sha512\n");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -req rsa -in mykey -out cert.pem -sha256 "
-           "\n\nThe above command would output the file: cert.pem");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey generate the private key to use with req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey private key to use with req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-keyout file to output key to");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-subj use a specified subject name, ie O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-verify check the signature on the req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-text output human readable text of req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-noout do not print out the generated results");
 }
 
 
@@ -1371,4 +1372,93 @@ int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
     }
     return ret;
 }
+
+
+#ifndef WOLFCLU_NO_TERM_SUPPORT
+
+#if !defined(USE_WINDOWS_API) && !defined(MICROCHIP_PIC32)
+static int HideEcho(struct termios* originalTerm)
+{
+    struct termios newTerm;
+    if (tcgetattr(STDIN_FILENO, originalTerm) != 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    XMEMCPY(&newTerm, originalTerm, sizeof(struct termios));
+    newTerm.c_lflag &= ~ECHO;
+    newTerm.c_lflag |= (ICANON | ECHONL);
+
+    if (tcsetattr(STDIN_FILENO, TCSANOW, &newTerm) != 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    return WOLFCLU_SUCCESS;
+}
+
+
+static int ShowEcho(struct termios* originalTerm)
+{
+    if (tcsetattr(STDIN_FILENO, TCSANOW, originalTerm) != 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    return WOLFCLU_SUCCESS;
+}
+
+#else
+
+static int HideEcho(DWORD* originalTerm)
+{
+    HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
+    if (GetConsoleMode(stdinHandle, originalTerm) == 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    DWORD newTerm = *originalTerm;
+    newTerm &= ~ENABLE_ECHO_INPUT;
+    if (SetConsoleMode(stdinHandle, newTerm) == 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    return WOLFCLU_SUCCESS;
+}
+
+
+static int ShowEcho(DWORD* originalTerm)
+{
+    if (SetConsoleMode(stdinHandle, *originalTerm) == 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    return WOLFCLU_SUCCESS;
+}
+#endif
+
+
+/* return WOLFCLU_SUCCESS on success */
+int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz)
+{
+    int ret;
+#if !defined(USE_WINDOWS_API) && !defined(MICROCHIP_PIC32)
+    struct termios originalTerm;
+#else
+    DWORD originalTerm;
+#endif
+
+    if (password == NULL || passwordSz == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    ret = HideEcho(&originalTerm);
+    if (ret == WOLFCLU_SUCCESS) {
+        printf("Input Password: ");
+        if (fgets((char*)password, *passwordSz, stdin) == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            char* c = strpbrk((char*)password, "\r\n");
+            if (c != NULL)
+                *c = '\0';
+        }
+        *passwordSz = (word32)XSTRLEN((const char*)password);
+        ShowEcho(&originalTerm);
+    }
+    return ret;
+}
+#endif
 
