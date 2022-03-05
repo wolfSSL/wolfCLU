@@ -106,7 +106,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             case WOLFCLU_GEN_KEY:
                 genKey = 1;
                 break;
-            
+
             case WOLFCLU_CHECK:
                 check = 1;
                 break;
@@ -271,7 +271,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         if (outBuf != NULL)
             XFREE(outBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
     }
-   
+
      /* Check if parameters are valid */
     if(ret == WOLFCLU_SUCCESS && check){
         byte p[WOLFSSL_MAX_DH_BITS/8];
@@ -282,7 +282,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         p_len = (word32)sizeof(p);
         q_len = (word32)sizeof(q);
         g_len = (word32)sizeof(g);
-        
+
         /* Export DH parameters */
         if (wc_DhExportParamsRaw(&dh, p, &p_len, q, &q_len, g, &g_len) != 0) {
             WOLFCLU_LOG(WOLFCLU_E0, "Failed to export DH params");
@@ -302,9 +302,9 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
     /* print out the dh key */
     if (ret == WOLFCLU_SUCCESS && genKey) {
         byte priv[WOLFSSL_MAX_DH_BITS/8];
-        byte pub[WOLFSSL_MAX_DH_BITS/8]; 
+        byte pub[WOLFSSL_MAX_DH_BITS/8];
         word32 privSz   = (word32)sizeof(priv);
-        word32 pubSz    = (word32)sizeof(pub);        
+        word32 pubSz    = (word32)sizeof(pub);
         byte* outBuf    = NULL;
         byte* pem       = NULL;
         word32 outBufSz = 0;
@@ -315,13 +315,12 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
 
-        /* get DER size (param has p,q,g and key has p,q,g,y,x) */
-        if (wc_DhParamsToDer(&dh, NULL, &outBufSz) != LENGTH_ONLY_E) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            ret = WOLFCLU_SUCCESS;
+        if (ret == WOLFCLU_SUCCESS) {
+            /* get DER size (param has p,q,g and key has p,q,g,y,x) */
+            if (wc_DhParamsToDer(&dh, NULL, &outBufSz) != LENGTH_ONLY_E) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {

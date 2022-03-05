@@ -119,10 +119,10 @@ run3() {
                    test.pem tmp.pem
     rm -f test.pem tmp.pem
     echo "TEST 3.b"
-    ./wolfssl x509 -inform pem -in certs/ca-cert.pem -outform der -out test.der
-    cert_test_case "-inform pem -outform der -in certs/ca-cert.pem -out tmp.der" \
-                    test.der tmp.der
-    rm -f test.pem tmp.pem
+    ./wolfssl x509 -inform pem -in certs/ca-cert.pem -outform der -out x509_test.der
+    cert_test_case "-inform pem -outform der -in certs/ca-cert.pem -out x509_tmp.der" \
+                    x509_test.der x509_tmp.der
+    rm -f x509_test.pem x509_tmp.pem
     echo "TEST 3.c"
     test_case "-in certs/server-cert.pem -subject -noout"
     EXPECTED="/C=US/ST=Montana/L=Bozeman/O=wolfSSL/OU=Support/CN=www.wolfssl.com/emailAddress=info@wolfssl.com"

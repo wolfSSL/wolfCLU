@@ -25,6 +25,7 @@
 
 
 cleanup_genkey_sign_ver(){
+    rm -f ecckey
     rm ecckey.priv
     rm ecckey.pub
     rm edkey.priv
