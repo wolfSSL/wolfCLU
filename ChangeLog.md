@@ -3,7 +3,7 @@
 - Add rand command
 - Add PKCS12 parsing support and command
 - Add a basic s_client command for simple TLS client connections
-- Add support for x509 verify commnad
+- Add support for x509 verify command
 - Add initial rsa command support
 - Add CRL verify command
 - Add ca command
@@ -18,7 +18,7 @@
 - Added support for -nosalt option
 - Fix for RSA free with dgst command
 - Testing with FIPS 140-3 wolfCrypt
-- Add -subj support to req commnad
+- Add -subj support to req command
 - Fix for -base64 with enc
 - Fix for piping errors to stderr instead of stdout
 - Removed testing-certs directory in favor of certs directory
@@ -41,7 +41,7 @@
 - Add support for parsing a config file when creating a certificate or CSR
 - Refactor all file calls to use XFILE wrapping
 - Refactor strncmp and other system calls to use the X* wrapping
-- Formating on if else newlines throughout wolfCLU
+- Formatting on if else newlines throughout wolfCLU
 - Change the name of bundle created with 'make dist'
 - Add some error print outs and checking with FIPS builds
 - Add check for warnings (Wall) as errors and the resulting fixes
