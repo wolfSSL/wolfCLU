@@ -53,7 +53,23 @@ static const char startTLSFlag[] = "-M";
 int myoptind = 0;
 char* myoptarg = NULL;
 
-#define MAX_CLIENT_ARGS 10
+#define MAX_CLIENT_ARGS 15
+
+/* return WOLFCLU_SUCCESS on success */
+static int _addClientArg(const char** args, const char* in, int* idx)
+{
+    int ret = WOLFCLU_SUCCESS;
+
+    if (*idx >= MAX_CLIENT_ARGS) {
+        WOLFCLU_LOG(WOLFCLU_E0, "Too many client args for array");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+    else {
+        args[*idx] = in;
+        *idx = *idx + 1;
+    }
+    return ret;
+}
 
 int wolfCLU_Client(int argc, char** argv)
 {
@@ -68,7 +84,7 @@ int wolfCLU_Client(int argc, char** argv)
     const char* clientArgv[MAX_CLIENT_ARGS];
 
     /* burn one argv for executable name spot */
-    clientArgv[clientArgc++] = "wolfclu";
+    ret = _addClientArg(clientArgv, "wolfclu", &clientArgc);
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -91,21 +107,28 @@ int wolfCLU_Client(int argc, char** argv)
                     else {
                         XMEMCPY(host, optarg, idx);
                         host[idx] = '\0';
-                        clientArgv[clientArgc++] = hostFlag;
-                        clientArgv[clientArgc++] = host;
+                        ret = _addClientArg(clientArgv, hostFlag, &clientArgc);
+                        if (ret == WOLFCLU_SUCCESS) {
+                            ret = _addClientArg(clientArgv, host, &clientArgc);
+                        }
                     }
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
-                    clientArgv[clientArgc++] = portFlag;
-                    clientArgv[clientArgc++] = optarg + idx + 1;
+                    ret = _addClientArg(clientArgv, portFlag, &clientArgc);
+                    if (ret == WOLFCLU_SUCCESS) {
+                        ret = _addClientArg(clientArgv, optarg + idx + 1,
+                                &clientArgc);
+                    }
                 }
                 break;
 
             case WOLFCLU_STARTTLS:
                 if (ret == WOLFCLU_SUCCESS) {
-                    clientArgv[clientArgc++] = startTLSFlag;
-                    clientArgv[clientArgc++] = optarg;
+                    ret = _addClientArg(clientArgv, startTLSFlag, &clientArgc);
+                    if (ret == WOLFCLU_SUCCESS) {
+                        ret = _addClientArg(clientArgv, optarg, &clientArgc);
+                    }
                 }
                 break;
 
@@ -125,14 +148,23 @@ int wolfCLU_Client(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS) {
         /* @TODO later check for -CAfile flag and default to verify */
-        clientArgv[clientArgc++] = noVerifyFlag;
+        ret = _addClientArg(clientArgv, noVerifyFlag, &clientArgc);
+    }
 
-        clientArgv[clientArgc++] = noClientCert;
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = _addClientArg(clientArgv, noClientCert, &clientArgc);
+    }
 
+    if (ret == WOLFCLU_SUCCESS) {
         /* add TLS downgrade support i.e -v d to arguments */
-        clientArgv[clientArgc++] = "-v";
-        clientArgv[clientArgc++] = "d";
+        ret = _addClientArg(clientArgv, "-v", &clientArgc);
+    }
 
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = _addClientArg(clientArgv, "d", &clientArgc);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
         args.argv = (char**)clientArgv;
         args.argc = clientArgc;
 
