@@ -322,7 +322,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                                                 NULL, NULL, NULL,
                                                 NULL, NULL, NULL,
                                                 NULL, NULL, NULL);
-            if (hexRet != 0) {
+            if (hexRet !=  WOLFCLU_SUCCESS) {
                 WOLFCLU_LOG(WOLFCLU_E0, "failed during conversion of input, "
                         "ret = %d", hexRet);
                 ret = WOLFCLU_FATAL_ERROR;

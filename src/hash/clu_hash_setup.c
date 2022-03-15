@@ -104,7 +104,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
     ret = wolfCLU_checkForArg("-out", 4, argc, argv);
     if (ret > 0) {
-        bioOut = wolfSSL_BIO_new_file(argv[ret+1], "rb");
+        bioOut = wolfSSL_BIO_new_file(argv[ret+1], "wb");
         if (bioOut == NULL) {
             WOLFCLU_LOG(WOLFCLU_E0, "unable to open output file %s",
                     argv[ret+1]);
