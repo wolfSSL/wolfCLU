@@ -186,7 +186,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL);
                     XFREE(ivString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                    if (ret != 0) {
+                    if (ret != WOLFCLU_SUCCESS) {
                         WOLFCLU_LOG(WOLFCLU_E0,
                             "failed during conversion of IV, ret = %d", ret);
                         wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
@@ -268,7 +268,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL);
                 XFREE(keyString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                if (ret != 0) {
+                if (ret != WOLFCLU_SUCCESS) {
                     WOLFCLU_LOG(WOLFCLU_E0,
                             "failed during conversion of Key, ret = %d", ret);
                     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);

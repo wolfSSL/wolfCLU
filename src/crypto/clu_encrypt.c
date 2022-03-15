@@ -173,7 +173,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                                                 NULL, NULL, NULL,
                                                 NULL, NULL, NULL,
                                                 NULL, NULL, NULL);
-                     if (hexRet != 0) {
+                     if (hexRet != WOLFCLU_SUCCESS) {
                         WOLFCLU_LOG(WOLFCLU_E0, "failed during conversion of input,"
                             " ret = %d", hexRet);
                         return hexRet;
