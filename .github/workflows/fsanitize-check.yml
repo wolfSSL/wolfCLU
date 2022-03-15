@@ -1,4 +1,4 @@
-name: Ubuntu Build Test
+name: fsanitize check test
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
     - name: autogen
       run: ./autogen.sh
     - name: configure
-      run: ./configure
+      run: ./configure CC="gcc -fsanitize=address"
     - name: make
       run: make
     - name: make check
