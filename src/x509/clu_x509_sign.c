@@ -498,7 +498,12 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
     if (ret == WOLFCLU_SUCCESS) {
         switch (csign->hashType) {
             case WC_HASH_TYPE_MD5:
+            #ifndef NO_MD5
                 md  = wolfSSL_EVP_md5();
+            #else
+                WOLFCLU_LOG(WOLFCLU_E0, "MD5 not compiled in");
+                ret = WOLFCLU_FATAL_ERROR;
+            #endif
                 break;
 
             case WC_HASH_TYPE_SHA:

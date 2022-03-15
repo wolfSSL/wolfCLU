@@ -23,7 +23,8 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
-#ifndef NO_DH
+/* WOLFSSL_DH_EXTRA is needed for DER output of params and key */
+#if !defined(NO_DH) && defined(WOLFSSL_DH_EXTRA)
 
 #ifndef WOLFSSL_MAX_DH_BITS
     #define WOLFSSL_MAX_DH_BITS       4096
@@ -60,7 +61,7 @@ static void wolfCLU_DhHelp(void)
 
 int wolfCLU_DhParamSetup(int argc, char** argv)
 {
-#ifndef NO_DH
+#if !defined(NO_DH) && defined(WOLFSSL_DH_EXTRA)
     WC_RNG rng;
     DhKey dh;
     int modSz;
