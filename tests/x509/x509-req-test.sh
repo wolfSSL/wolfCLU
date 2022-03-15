@@ -112,6 +112,22 @@ if [ $? -ne 0 ]; then
 fi
 rm -f tmp.cert
 
+#testing hash and key algos
+run_success "req -new -days 3650 -rsa -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
+rm -f tmp.cert
+run_success "req -new -days 3650 -ed25519 -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
+rm -f tmp.cert
+run_success "req -new -days 3650 -sha -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
+rm -f tmp.cert
+run_success "req -new -days 3650 -sha224 -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
+rm -f tmp.cert
+run_success "req -new -days 3650 -sha256 -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
+rm -f tmp.cert
+run_success "req -new -days 3650 -sha384 -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
+rm -f tmp.cert
+run_success "req -new -days 3650 -sha512 -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
+rm -f tmp.cert
+
 run_success "req -new -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -x509 -out tmp.cert" "test"
 rm -f tmp.cert
 rm -f new-key.pem

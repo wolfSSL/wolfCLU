@@ -70,6 +70,10 @@ run1() {
     echo "TEST 1.f"
     test_case "-inform der -text -noout -in certs/ca-cert.der"
     echo ""
+    echo "TEST 1.g"
+    test_case "-inform der -pubkey -noout -in certs/ca-cert.der"
+    echo ""
+
 }
 
 run2() {

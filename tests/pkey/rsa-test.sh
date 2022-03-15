@@ -68,5 +68,21 @@ if [ $? == 0 ]; then
     exit 99
 fi
 
+run "rsa -inform der -in ./certs/server-key.der -RSAPublicKey_in"
+EXPECTED="-----BEGIN PUBLIC KEY-----
+MIIBHzANBgkqhkiG9w0BAQEFAAOCAQwAMIIBBwIAAoIBAQDAlQjhV0HycW230kVB
+JwFlxkWu8rwkMLiVzi9O1vYciLx8n/uoZ3/+XJxRdfeKygfnNS+P4b17wC98q2So
+F/zKXXu64CHlci5vLobYlXParBtTuV8/1xkNJU/hY2NRiwtkP61DuKUcXDSzrgCg
+Y8X2fwtZaHhzpowYqQJtr8MZAS64EOPGzEC0aaNGM2mHbsS7F6bz6N2tc7x7LyG1
+/WZRDL1Us+FtXxy8I3PRCQOJFNIQuWTDKtChlkq84dQaW8egwMFjeA9ENzAyloAy
+I5Whd7oT0pdz4l0lyWoNwzlgpLSwaUJCCenYCLwzILNYIqeq68Th5mGDxdKW39nQ
+T63X
+-----END PUBLIC KEY-----"
+if [ "$RESULT" != "$EXPECTED" ]; then
+    echo "unexpected text output found"
+    echo "$RESULT"
+    exit 99
+fi
+
 echo "Done"
 exit 0

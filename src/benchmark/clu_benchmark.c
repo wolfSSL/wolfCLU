@@ -123,6 +123,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifdef WOLFSSL_AES_COUNTER
     /* aes-ctr test */
@@ -174,6 +175,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifndef NO_DES3
     /* 3des test */
@@ -226,6 +228,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifdef HAVE_CAMELLIA
     #define CAM_SZ CAMELLIA_BLOCK_SIZE
@@ -281,6 +284,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifndef NO_MD5
     /* md5 test */
@@ -320,6 +324,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifndef NO_SHA
     /* sha test */
@@ -359,6 +364,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifndef NO_SHA256
     #define SHA256_SZ WC_SHA256_DIGEST_SIZE
@@ -400,6 +406,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifdef WOLFSSL_SHA384
     #define SHA384_SZ WC_SHA384_DIGEST_SIZE
@@ -440,6 +447,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifdef WOLFSSL_SHA512
     #define SHA512_SZ WC_SHA512_DIGEST_SIZE
@@ -480,6 +488,7 @@ int wolfCLU_benchmark(int timer, int* option)
         loop = 1;
     }
     i++;
+    ret = WOLFCLU_SUCCESS;
 #endif
 #ifdef HAVE_BLAKE2
     /* blake2b test */
@@ -516,6 +525,7 @@ int wolfCLU_benchmark(int timer, int* option)
         XMEMSET(digest, 0, BLAKE2B_OUTBYTES);
         wolfCLU_freeBins(digest, plain, NULL, NULL, NULL);
     }
+    ret = WOLFCLU_SUCCESS;
 #endif
     (void)blocks;
     (void)loop;
