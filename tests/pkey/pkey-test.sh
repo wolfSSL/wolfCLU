@@ -66,6 +66,8 @@ fi
 rm -f ecc.der
 rm -f ecc.pem
 
+rm -rf ecc.pem ecc.der
+
 echo "Done"
 exit 0
 
