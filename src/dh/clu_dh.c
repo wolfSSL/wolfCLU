@@ -49,7 +49,7 @@ static const struct option dh_options[] = {
 
 static void wolfCLU_DhHelp(void)
 {
-    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl dhparam");
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl dhparam [options] [numbits]");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to output to (default stdout)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-genkey generate DH key using param input");
