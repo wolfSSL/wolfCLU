@@ -56,6 +56,47 @@ run "ecparam -genkey -out ecc-key.der -outform der"
 
 run_fail "ecparam -in certs/ca-key.pem -text"
 
+
+# get all possible curve name types and test @TODO leaving out SAKKE for now
+NAMES=`./wolfssl ecparam -help | grep -A 100 "name options" | tr -d '[:blank:]' | grep -v "options" | grep -v "SAKKE"`
+
+for name in $NAMES; do
+    CURRENT="${name//[$'\t\r\n']}"
+    run "ecparam -genkey -name $CURRENT -out tmp_ecparam.key"
+    run "ecparam -text -in tmp_ecparam.key -out tmp_ecparam_text"
+    printf "grep $CURRENT tmp_ecparam_text\n"
+    grep $CURRENT tmp_ecparam_text
+    if [ "$?" != "0" ]; then
+        echo Failed when testing curve name $CURRENT
+        exit 99
+    fi
+    rm -rf tmp_ecparam.key
+    rm -rf tmp_ecparam_text
+done
+
+# test an unknown curve name
+run_fail "ecparam -genkey -name bad_curve_name -out tmp_ecparam.key"
+if [ -f tmp_ecparam.key ]; then
+    echo File tmp_ecparam.key should not have been created
+    exit 99
+fi
+
+# re-run the test but now with genkey command
+for name in $NAMES; do
+    CURRENT="${name//[$'\t\r\n']}"
+    run "genkey ecc -name $CURRENT -outform PEM -out tmp_ecparam"
+    run "ecparam -text -in tmp_ecparam.priv -out tmp_ecparam_text"
+    printf "grep $CURRENT tmp_ecparam_text\n"
+    grep $CURRENT tmp_ecparam_text
+    if [ "$?" != "0" ]; then
+        echo Failed when testing curve name $CURRENT
+        exit 99
+    fi
+    rm -rf tmp_ecparam.priv
+    rm -rf tmp_ecparam.pub
+    rm -rf tmp_ecparam_text
+done
+
 echo "Done"
 exit 0
 

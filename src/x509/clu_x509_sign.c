@@ -573,6 +573,8 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             bn = wolfSSL_BN_new();
             if (wolfSSL_BN_rand(bn, (defaultSerialSz*WOLFSSL_BIT_SIZE), 0, 0)
                     != WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Creating a random serail number fail");
+                ret = WOLFCLU_FATAL_ERROR;
             }
 
             /* make positive */

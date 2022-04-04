@@ -169,7 +169,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         ret = wolfCLU_GenAndOutput_ECC(&rng, keyOutFName, directiveArg,
-                                 formatArg, NULL);
+                                 formatArg, name);
     #else
         WOLFCLU_LOG(WOLFCLU_E0, "Invalid option, ECC not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-ecc and "
