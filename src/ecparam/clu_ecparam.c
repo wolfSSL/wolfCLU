@@ -42,12 +42,26 @@ static const struct option ecparam_options[] = {
 };
 
 
+static void wolfCLU_ecparamNamesPrint(void)
+{
+    int id;
+
+    WOLFCLU_LOG(WOLFCLU_L0, "\tname options:");
+    for (id = 0; id < ECC_CURVE_MAX; id++) {
+        const char* name = wc_ecc_get_name(id);
+        if (name != NULL && XSTRNCMP(name, "SAKKE", 5) != 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "\t\t%s", wc_ecc_get_name(id));
+        }
+    }
+}
+
 static void wolfCLU_ecparamHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl ecparam");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-genkey create new key");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out output file");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-name curve name i.e. secp384r1");
+    wolfCLU_ecparamNamesPrint();
 }
 
 

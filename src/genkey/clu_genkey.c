@@ -331,26 +331,91 @@ void wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
 
 WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name)
 {
+    char* lower = NULL;
     int ret = WOLFCLU_SUCCESS;
-    WOLFSSL_EC_KEY* key;
+    int nameSz;
+    WOLFSSL_EC_KEY* key = NULL;
 
-    key = wolfSSL_EC_KEY_new();
-    if (key != NULL && name != NULL) {
-        WOLFSSL_EC_GROUP *group;
 
-        group = wolfSSL_EC_GROUP_new_by_curve_name(wolfSSL_OBJ_txt2nid(name));
-        if (group == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to set curve");
-            ret = WOLFCLU_FATAL_ERROR;
+    if (name != NULL) {
+        nameSz = (int)XSTRLEN(name) + 1;
+        lower  = (char*)XMALLOC(nameSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (lower == NULL) {
+            ret = MEMORY_E;
         }
 
-        if (ret == WOLFCLU_SUCCESS) {
-            if (wolfSSL_EC_KEY_set_group(key, group) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "unable to set ec group");
+    }
+
+    if (name != NULL && ret == WOLFCLU_SUCCESS) {
+        XSTRNCPY(lower, name, nameSz);
+        wolfCLU_convertToLower(lower, nameSz - 1);
+    }
+
+    /* use prime256v1 instead of secp256r1 so that txt2nid can handle it */
+    if (name != NULL && ret == WOLFCLU_SUCCESS &&
+            XSTRNCMP(lower, "secp256r1", nameSz) == 0) {
+        nameSz = (int)XSTRLEN("prime256v1") + 1;
+        XFREE(lower, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        lower  = (char*)XMALLOC(nameSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (lower == NULL) {
+            ret = MEMORY_E;
+        }
+        else {
+            XSTRNCPY(lower, "prime256v1", nameSz);
+        }
+    }
+
+    /* use prime192v1 instead of secp192r1 so that txt2nid can handle it */
+    if (name != NULL && ret == WOLFCLU_SUCCESS &&
+            XSTRNCMP(lower, "secp192r1", nameSz) == 0) {
+        nameSz = (int)XSTRLEN("prime192v1") + 1;
+        XFREE(lower, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        lower  = (char*)XMALLOC(nameSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (lower == NULL) {
+            ret = MEMORY_E;
+        }
+        else {
+            XSTRNCPY(lower, "prime192v1", nameSz);
+        }
+    }
+
+    /* brainpool needs a capital p before value */
+    if (name != NULL && ret == WOLFCLU_SUCCESS &&
+            XSTRNCMP(lower, "brainpool", 9) == 0) {
+        lower[9] = 'P';
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        key = wolfSSL_EC_KEY_new();
+        if (key != NULL && name != NULL) {
+            WOLFSSL_EC_GROUP *group = NULL;
+            int nid;
+
+            WOLFCLU_LOG(WOLFCLU_L0, "Setting ECC group with curve %s", lower);
+            nid = wolfSSL_OBJ_txt2nid(lower);
+            if (nid <= 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error getting NID value for curve %s",
+                        lower);
                 ret = WOLFCLU_FATAL_ERROR;
             }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                group = wolfSSL_EC_GROUP_new_by_curve_name(
+                        wolfSSL_OBJ_txt2nid(lower));
+                if (group == NULL) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "unable to set curve");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                if (wolfSSL_EC_KEY_set_group(key, group) != WOLFSSL_SUCCESS) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "unable to set ec group");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+            wolfSSL_EC_GROUP_free(group);
         }
-        wolfSSL_EC_GROUP_free(group);
     }
 
     if (key != NULL && ret == WOLFCLU_SUCCESS) {
@@ -363,6 +428,10 @@ WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name)
     if (ret != WOLFCLU_SUCCESS) {
         wolfSSL_EC_KEY_free(key);
         key = NULL;
+    }
+
+    if (lower != NULL) {
+        XFREE(lower, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     return key;
@@ -389,6 +458,14 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
     if (rng == NULL || fName == NULL)
         return BAD_FUNC_ARG;
     fNameSz = (int)XSTRLEN(fName);
+
+    if (name != NULL) {
+        if (wc_ecc_get_curve_idx_from_name(name) < 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Bad curve name %s (could be not compiled in)",
+                    name);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
 
     key = wolfCLU_GenKeyECC(name);
     if (key == NULL) {

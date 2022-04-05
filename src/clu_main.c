@@ -148,13 +148,13 @@ int main(int argc, char** argv)
     }
 #endif
 
-    if (wolfCrypt_Init() != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "wolfCyprt initialization failed!");
-        return -1;
-    }
 #ifdef DEBUG_WOLFSSL
     wolfSSL_Debugging_ON();
 #endif
+    if (wolfSSL_Init() != WOLFSSL_SUCCESS) {
+        WOLFCLU_LOG(WOLFCLU_E0, "wolfSSL initialization failed!");
+        return -1;
+    }
 
     /* If the first string does not have a '-' in front of it then try to
      * get the mode to use i.e. x509, req, version ... this is for
@@ -310,7 +310,7 @@ int main(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_E0, "Error returned: %d.", ret);
         ret = WOLFCLU_FATAL_ERROR;
     }
-    wolfCrypt_Cleanup();
+    wolfSSL_Cleanup();
 
     /* main function we want to return 0 on success so that the executable
      * returns the expected 0 on success */
