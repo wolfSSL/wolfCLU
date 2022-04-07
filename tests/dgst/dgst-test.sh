@@ -60,6 +60,23 @@ if [ $? -ne 0 ]; then
     exit 99
 fi
 
+# run an enc/dec test on the large file
+run "enc -aes-256-cbc -in ./large-test.txt -out large-test.txt.enc -k 12345678901234"
+diff large-test.txt large-test.txt.enc &> /dev/null
+if [ $? -eq 0 ]; then
+    echo "Encryption of large file failed"
+    exit 99
+fi
+
+run "enc -d -aes-256-cbc -in ./large-test.txt.enc -out large-test.txt.dec -k 12345678901234"
+diff large-test.txt large-test.txt.dec
+if [ $? -ne 0 ]; then
+    echo "Decryption of large file failed"
+    exit 99
+fi
+
+rm -f large-test.txt.enc
+rm -f large-test.txt.dec
 rm -f large-test.txt
 
 run "dgst -sha256 -sign ./certs/ecc-key.pem -out configure.sig configure.ac"

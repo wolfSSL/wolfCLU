@@ -65,6 +65,20 @@ fi
 rm -f configure.ac.dec
 rm -f configure.ac.enc
 
+# small file test
+rm -rf enc_small.txt
+echo " " > enc_small.txt
+run "enc -aes-128-cbc -in ./enc_small.txt -out ./enc_small.txt.enc -k 'test'"
+run "enc -d -aes-128-cbc -in ./enc_small.txt.enc -out ./enc_small.txt.dec -k 'test'"
+diff ./enc_small.txt ./enc_small.txt.dec
+if [ $? != 0 ]; then
+    echo "enc_small decrypted file does not match original file"
+    exit 99
+fi
+rm -f enc_small.txt
+rm -f enc_small.txt.dec
+rm -f enc_small.txt.enc
+
 # interoperability testing
 openssl enc --help &> /dev/null
 if [ $? == 0 ]; then
