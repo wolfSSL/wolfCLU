@@ -1748,6 +1748,28 @@ static void Usage(void)
 #endif
 }
 
+#ifndef USE_WINDOWS_API
+int checkStdin(void)
+{
+    int stop = 0;
+    fd_set readfds;
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+
+    FD_ZERO(&readfds);
+
+    FD_SET(STDIN_FILENO, &readfds);
+
+    if (select(1, &readfds, NULL, NULL, &timeout)){
+        stop = 1;
+    }
+
+    return stop;
+
+}
+#endif
+
 THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 {
     SOCKET_T sockfd = WOLFSSL_SOCKET_INVALID;
@@ -3883,6 +3905,13 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         wolfSSL_CTX_free(ctx); ctx = NULL;
         goto exit;
     }
+
+#ifndef USE_WINDOWS_API
+    int stop = checkStdin();
+
+    if(stop)
+        goto exit;
+#endif
 
     err = ClientRead(ssl, reply, sizeof(reply)-1, 1, "", exitWithRet);
     if (exitWithRet && (err != 0)) {

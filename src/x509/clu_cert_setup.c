@@ -54,6 +54,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     byte printSubjHash = 0;
 
     WOLFSSL_BIO* in  = NULL;
+    WOLFSSL_BIO* in_mem = NULL;
     WOLFSSL_BIO* out = NULL;
     WOLFSSL_X509* x509 = NULL;
 
@@ -118,19 +119,29 @@ int wolfCLU_certSetup(int argc, char** argv)
                     inFile);
                 ret = INPUT_FILE_ERROR;
             }
+            if (ret == WOLFCLU_SUCCESS) {
+                if (access(inFile, F_OK) != 0) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "ERROR: input file \"%s\" does not exist",
+                            inFile);
+                    ret = INPUT_FILE_ERROR;
+                }
+            }
+        }
+    }
+    
+    if (ret == WOLFCLU_SUCCESS && idx <= 0) {
+        in = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
+        if (in == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            ret = WOLFCLU_FATAL_ERROR;
+            if (wolfSSL_BIO_set_fp(in, stdin, BIO_NOCLOSE)
+                    != WOLFSSL_SUCCESS) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        if (access(inFile, F_OK) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "ERROR: input file \"%s\" does not exist",
-                    inFile);
-            ret = INPUT_FILE_ERROR;
-        }
-    }
 /*---------------------------------------------------------------------------*/
 /* out file */
 /*---------------------------------------------------------------------------*/
@@ -169,12 +180,19 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* END ARG PROCESSING */
 /*---------------------------------------------------------------------------*/
+    in_mem = wolfSSL_BIO_new(wolfSSL_BIO_s_mem());
+
+    char read;
+    while (wolfSSL_BIO_read(in, &read, 1) == 1) {
+         wolfSSL_BIO_write(in_mem, &read, 1);
+    }
+
     if (ret == WOLFCLU_SUCCESS) {
         if (inForm == PEM_FORM) {
-            x509 = wolfSSL_PEM_read_bio_X509(in, NULL, NULL, NULL);
+            x509 = wolfSSL_PEM_read_bio_X509(in_mem, NULL, NULL, NULL);
         }
         else if (inForm == DER_FORM) {
-            x509 = wolfSSL_d2i_X509_bio(in, NULL);
+            x509 = wolfSSL_d2i_X509_bio(in_mem, NULL);
         }
 
         if (x509 == NULL) {
@@ -185,6 +203,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 
     /* done with input file */
     wolfSSL_BIO_free(in);
+    wolfSSL_BIO_free(in_mem);
 
     /* try to open output file if set */
     if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
