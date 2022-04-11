@@ -302,15 +302,19 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         }
     }
 
-    /* loop, encrypt 1kB at a time till length <= 0 */
-    while (ret == WOLFCLU_SUCCESS && wolfSSL_BIO_get_len(in) > 0) {
+    /* loop, encrypt 1kB at a time */
+    while (ret == WOLFCLU_SUCCESS) {
         int err;
 
         /* Read in 1kB to input[] */
         err = wolfSSL_BIO_read(in, input, WOLFCLU_MAX_BUFFER);
         if (err < 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "error reading in data");
-            ret = WOLFCLU_FATAL_ERROR;
+            /* check for case that an error happened from a read when the BIO
+             * length is at 0 */
+            if (wolfSSL_BIO_get_len(in) != 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "error reading in data");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
             break;
         }
         if (err == 0) {
@@ -342,7 +346,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         }
 
         if (err >= 0) {
-            if (wolfSSL_BIO_write(out, output, outputSz) <= 0) {
+            if (wolfSSL_BIO_write(out, output, outputSz) < 0) {
                 WOLFCLU_LOG(WOLFCLU_E0, "Error writing out encrypted data");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
