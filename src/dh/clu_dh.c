@@ -212,6 +212,15 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 
     /* generate the dh parameters */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
+    #ifdef HAVE_FFDHE_4096
+        if (modSz == 4096) {
+            if (wc_DhSetNamedKey(&dh, WC_FFDHE_4096) != 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error setting named 4096 parameters");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else
+    #endif
         if (wc_DhGenerateParams(&rng, modSz, &dh) != 0) {
             WOLFCLU_LOG(WOLFCLU_E0, "Error generating parameters");
             ret = WOLFCLU_FATAL_ERROR;
