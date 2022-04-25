@@ -373,49 +373,43 @@ int wolfCLU_certSetup(int argc, char** argv)
         WOLFSSL_X509_NAME* name = NULL;
 
         name = wolfSSL_X509_get_subject_name(x509);
-        if (name == NULL) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS) {
+        if (name != NULL) {
+            /* check if there is an email to print out */
             emailSz = wolfSSL_X509_NAME_get_text_by_NID(name, NID_emailAddress,
                 NULL, 0);
-            if (emailSz < 0) {
-                ret = WOLFCLU_FATAL_ERROR;
+            if (emailSz > 0) {
+                emailSz += 1;
+                emailBuf = (char*)XMALLOC(emailSz, HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (emailBuf == NULL) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                if (ret == WOLFCLU_SUCCESS &&
+                        wolfSSL_X509_NAME_get_text_by_NID(name,
+                        NID_emailAddress, emailBuf, emailSz) <= 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    emailBuf[emailSz-1] = '\0';
+                }
+
+                if (ret == WOLFCLU_SUCCESS &&
+                        wolfSSL_BIO_write(out, emailBuf, (int)XSTRLEN(emailBuf))
+                        < 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                if (ret == WOLFCLU_SUCCESS &&
+                        wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                if (emailBuf != NULL) {
+                    XFREE(emailBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                }
             }
-            emailSz += 1;
-        }
-
-        if (ret == WOLFCLU_SUCCESS) {
-            emailBuf = (char*)XMALLOC(emailSz, HEAP_HINT,
-                    DYNAMIC_TYPE_TMP_BUFFER);
-            if (emailBuf == NULL) {
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-
-        if (ret == WOLFCLU_SUCCESS &&
-                wolfSSL_X509_NAME_get_text_by_NID(name, NID_emailAddress,
-                emailBuf, emailSz) <= 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS) {
-            emailBuf[emailSz-1] = '\0';
-        }
-
-        if (ret == WOLFCLU_SUCCESS &&
-                wolfSSL_BIO_write(out, emailBuf, (int)XSTRLEN(emailBuf)) < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS &&
-                wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (emailBuf != NULL) {
-            XFREE(emailBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         }
     }
 
