@@ -49,7 +49,7 @@ static const struct option dh_options[] = {
 
 static void wolfCLU_DhHelp(void)
 {
-    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl dhparam");
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl dhparam [options] [numbits]");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file input for key to read");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to output to (default stdout)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-genkey generate DH key using param input");
@@ -212,6 +212,27 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 
     /* generate the dh parameters */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
+    #if defined(HAVE_FFDHE_4096)
+        #if LIBWOLFSSL_VERSION_HEX > 0x05001000
+        if (modSz == 4096) {
+            if (wc_DhSetNamedKey(&dh, WC_FFDHE_4096) != 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error setting named 4096 parameters");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else
+        #else
+        if (modSz == 4096) {
+            const DhParams* params = wc_Dh_ffdhe4096_Get();
+            if (wc_DhSetKey(&dh, (byte*)params->p, params->p_len,
+                        (byte*)params->g, params->g_len) != 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error setting named 4096 parameters");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else
+        #endif /* end of version check for using named parameters */
+    #endif /* have 4096 named parameters */
         if (wc_DhGenerateParams(&rng, modSz, &dh) != 0) {
             WOLFCLU_LOG(WOLFCLU_E0, "Error generating parameters");
             ret = WOLFCLU_FATAL_ERROR;

@@ -110,8 +110,10 @@ run2() {
     fail_case "-outform pem -inform der -outform -noout"
     echo "TEST 2.p"
     fail_case "-outform -noout"
-    echo "TEST 2.q"
-    fail_case "-inform pem -outform pem -noout"
+
+#    hangs waiting on stdin input (same as openssl)
+#    echo "TEST 2.q"
+#    fail_case "-inform pem -outform pem -noout"
 }
 
 run3() {

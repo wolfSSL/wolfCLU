@@ -89,6 +89,12 @@ int wolfCLU_certSetup(int argc, char** argv)
         idx = wolfCLU_checkForArg("-inform", 7, argc, argv);
         if (idx > 0) {
             inForm = wolfCLU_checkInform(argv[idx+1]);
+            if (inForm == USER_INPUT_ERROR) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        if (idx < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -99,6 +105,12 @@ int wolfCLU_certSetup(int argc, char** argv)
         idx = wolfCLU_checkForArg("-outform", 8, argc, argv);
         if (idx > 0) {
             outForm = wolfCLU_checkOutform(argv[idx+1]);
+            if (outForm == USER_INPUT_ERROR) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        if (idx < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -110,25 +122,34 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS) {
         idx = wolfCLU_checkForArg("-in", 3, argc, argv);
         if (idx > 0) {
-            /* set flag for in file and flag for input file OK if exists
-             * check for error case below. If no error then read in file */
-            inFile = argv[idx+1];
-            in = wolfSSL_BIO_new_file(inFile, "rb");
-            if (in == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "ERROR: in file \"%s\" does not exist",
-                    inFile);
-                ret = INPUT_FILE_ERROR;
+            if (idx == USER_INPUT_ERROR) {
+                ret = WOLFCLU_FATAL_ERROR;
             }
-            if (ret == WOLFCLU_SUCCESS) {
-                if (access(inFile, F_OK) != 0) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "ERROR: input file \"%s\" does not exist",
-                            inFile);
+            else {
+                /* set flag for in file and flag for input file OK if exists
+                 * check for error case below. If no error then read in file */
+                inFile = argv[idx+1];
+                in = wolfSSL_BIO_new_file(inFile, "rb");
+                if (in == NULL) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "ERROR: in file \"%s\" does not"
+                            " exist", inFile);
                     ret = INPUT_FILE_ERROR;
+                }
+                if (ret == WOLFCLU_SUCCESS) {
+                    if (access(inFile, F_OK) != 0) {
+                        WOLFCLU_LOG(WOLFCLU_E0, "ERROR: input file \"%s\" does"
+                               " not exist", inFile);
+                        ret = INPUT_FILE_ERROR;
+                    }
                 }
             }
         }
+        if (idx < 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
-    
+
+    /* -in not used, look for stdin for input */
     if (ret == WOLFCLU_SUCCESS && idx <= 0) {
         in = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (in == NULL) {
@@ -180,11 +201,14 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 /* END ARG PROCESSING */
 /*---------------------------------------------------------------------------*/
-    in_mem = wolfSSL_BIO_new(wolfSSL_BIO_s_mem());
 
-    char read;
-    while (wolfSSL_BIO_read(in, &read, 1) == 1) {
-         wolfSSL_BIO_write(in_mem, &read, 1);
+    if (ret == WOLFCLU_SUCCESS) {
+        char read;
+
+        in_mem = wolfSSL_BIO_new(wolfSSL_BIO_s_mem());
+        while (wolfSSL_BIO_read(in, &read, 1) == 1) {
+             wolfSSL_BIO_write(in_mem, &read, 1);
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -443,6 +467,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && printPurpose) {
+    #if LIBWOLFSSL_VERSION_HEX > 0x05001000
         unsigned int keyUsage;
 
         keyUsage = wolfSSL_X509_get_extended_key_usage(x509);
@@ -451,6 +476,10 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
 
         wolfCLU_extKeyUsagePrint(out, keyUsage, 0, 1);
+    #else
+        WOLFCLU_LOG(WOLFCLU_E0, "not supported by version of wolfSSL");
+        ret = WOLFCLU_FATAL_ERROR;
+    #endif
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -460,6 +489,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && printSubjHash) {
+    #if LIBWOLFSSL_VERSION_HEX > 0x05001000
         WOLFSSL_X509_NAME* name;
         unsigned long h;
         char txt[MAX_TERM_WIDTH];
@@ -477,6 +507,10 @@ int wolfCLU_certSetup(int argc, char** argv)
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
+    #else
+        WOLFCLU_LOG(WOLFCLU_E0, "not supported by version of wolfSSL");
+        ret = WOLFCLU_FATAL_ERROR;
+    #endif
     }
 
 

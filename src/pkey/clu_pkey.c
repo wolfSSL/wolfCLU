@@ -71,7 +71,12 @@ static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
             derSz = wolfSSL_i2d_PrivateKey(pkey, &der);
         }
         else {
+        #if LIBWOLFSSL_VERSION_HEX > 0x05001000
             derSz = wolfSSL_i2d_PublicKey(pkey, &der);
+        #else
+            WOLFCLU_LOG(WOLFCLU_E0, "not supported by version of wolfSSL");
+            derSz = WOLFCLU_FATAL_ERROR;
+        #endif
         }
 
         if (derSz >= 0) {

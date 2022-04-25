@@ -63,8 +63,6 @@ static const struct option req_options[] = {
 };
 
 
-#if LIBWOLFSSL_VERSION_HEX < 0x05003000
-
 #define MAX_WIDTH 80
 /* print serial number out
  * return WOLFSSL_SUCCESS on success
@@ -238,10 +236,12 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
                                     (int)XSTRLEN(scratch));
                         }
                         break;
+                #if LIBWOLFSSL_VERSION_HEX > 0x05001000
                     case NID_key_usage:
                         _keyUsagePrint(bio, wolfSSL_X509_get_key_usage(x509),
                                 indent + 8);
                         break;
+                #endif
                     default:
                         /* extension nid not yet supported */
                         XSNPRINTF(scratch, MAX_WIDTH,
@@ -479,7 +479,6 @@ static int wolfSSL_X509_REQ_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509)
 
     return WOLFSSL_SUCCESS;
 }
-#endif /* version check on wolfSSL */
 #endif
 
 /* return WOLFCLU_SUCCESS on success */
