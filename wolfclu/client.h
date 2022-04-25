@@ -28,7 +28,7 @@ typedef void* THREAD_RETURN;
 #define WOLFSSL_THREAD
 
 THREAD_RETURN WOLFSSL_THREAD client_test(void* args);
-
+int checkStdin(void);
 
 #endif /* WOLFSSL_CLIENT_H */
 

@@ -182,7 +182,6 @@ int wolfCLU_CRLVerify(int argc, char** argv)
         test = wolfSSL_d2i_X509_CRL(NULL, der, derSz);
         if (test == NULL) {
             WOLFCLU_LOG(WOLFCLU_E0, "Unable to parse CRL file");
-            ret = WOLFCLU_FATAL_ERROR;
         }
         else {
             wolfSSL_X509_CRL_free(test);
@@ -255,7 +254,6 @@ int wolfCLU_CRLVerify(int argc, char** argv)
                 WOLFCLU_LOG(WOLFCLU_E0, "Verification failed");
                 WOLFCLU_LOG(WOLFCLU_E0, "Err (%d) : %s",
                     err, wolfSSL_ERR_reason_error_string(err));
-                ret = WOLFCLU_FATAL_ERROR;
             }
         }
         wolfSSL_CertManagerFree(cm);
