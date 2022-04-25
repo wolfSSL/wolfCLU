@@ -536,6 +536,8 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             case WC_HASH_TYPE_SHA3_512:
             case WC_HASH_TYPE_BLAKE2B:
             case WC_HASH_TYPE_BLAKE2S:
+
+    #if LIBWOLFSSL_VERSION_HEX > 0x05001000
         #ifndef WOLFSSL_NOSHA512_224
             case WC_HASH_TYPE_SHA512_224:
         #endif
@@ -546,6 +548,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             case WC_HASH_TYPE_SHAKE128:
             case WC_HASH_TYPE_SHAKE256:
         #endif
+    #endif
             default:
                 WOLFCLU_LOG(WOLFCLU_E0, "Unsupported hash type");
                 ret = WOLFCLU_FATAL_ERROR;

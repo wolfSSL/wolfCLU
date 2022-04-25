@@ -389,8 +389,7 @@ int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
     return WOLFCLU_SUCCESS;
 }
 #else
-static int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
-            char* sect)
+int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
 {
     (void)x509;
     (void)conf;

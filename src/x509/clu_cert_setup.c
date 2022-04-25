@@ -467,6 +467,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && printPurpose) {
+    #if LIBWOLFSSL_VERSION_HEX > 0x05001000
         unsigned int keyUsage;
 
         keyUsage = wolfSSL_X509_get_extended_key_usage(x509);
@@ -475,6 +476,10 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
 
         wolfCLU_extKeyUsagePrint(out, keyUsage, 0, 1);
+    #else
+        WOLFCLU_LOG(WOLFCLU_E0, "not supported by version of wolfSSL");
+        ret = WOLFCLU_FATAL_ERROR;
+    #endif
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -484,6 +489,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && printSubjHash) {
+    #if LIBWOLFSSL_VERSION_HEX > 0x05001000
         WOLFSSL_X509_NAME* name;
         unsigned long h;
         char txt[MAX_TERM_WIDTH];
@@ -501,6 +507,10 @@ int wolfCLU_certSetup(int argc, char** argv)
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
+    #else
+        WOLFCLU_LOG(WOLFCLU_E0, "not supported by version of wolfSSL");
+        ret = WOLFCLU_FATAL_ERROR;
+    #endif
     }
 
 
