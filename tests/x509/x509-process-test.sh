@@ -209,6 +209,10 @@ Time Stamp Signing : YES"
         echo "expected $EXPECTED"
         exit 99
     fi
+    echo "TEST 3.l"
+    ./wolfssl req -new -days 3650 -key ./certs/server-key.pem -subj /O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit -out x509-process-tmp.cert -x509
+    test_case "-in x509-process-tmp.cert -email -noout"
+    rm -f x509-process-tmp.cert
 }
 
 run4() {
