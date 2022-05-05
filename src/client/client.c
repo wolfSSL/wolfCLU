@@ -75,6 +75,8 @@ static const char *wolfsentry_config_path = NULL;
     #include <wolfssl/wolfcrypt/ecc.h>
 #endif
 
+#include <wolfclu/clu_log.h>
+
 #ifdef WOLFSSL_ASYNC_CRYPT
     static int devId = INVALID_DEVID;
 #endif
@@ -1770,6 +1772,18 @@ int checkStdin(void)
 }
 #endif
 
+static int AlwaysAllow(int preverify, WOLFSSL_X509_STORE_CTX* store)
+{
+    (void)preverify;
+
+    if (store->error != 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Verification error: %s\n",
+                    wc_GetErrorString(store->error));
+    }
+
+    return 1;
+}
+
 THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 {
     SOCKET_T sockfd = WOLFSSL_SOCKET_INVALID;
@@ -1861,7 +1875,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     unsigned char alpn_opt = 0;
     char*  cipherList = NULL;
     int    useDefCipherList = 0;
-    const char* verifyCert;
+    const char* verifyCert = NULL;
     const char* ourCert;
     const char* ourKey;
 
@@ -1956,30 +1970,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #endif
 
     ((func_args*)args)->return_code = -1; /* error state */
-
-#ifndef NO_RSA
-    verifyCert = caCertFile;
-    ourCert    = cliCertFile;
-    ourKey     = cliKeyFile;
-#else
-    #ifdef HAVE_ECC
-        verifyCert = caEccCertFile;
-        ourCert    = cliEccCertFile;
-        ourKey     = cliEccKeyFile;
-    #elif defined(HAVE_ED25519)
-        verifyCert = caEdCertFile;
-        ourCert    = cliEdCertFile;
-        ourKey     = cliEdKeyFile;
-    #elif defined(HAVE_ED448)
-        verifyCert = caEd448CertFile;
-        ourCert    = cliEd448CertFile;
-        ourKey     = cliEd448KeyFile;
-    #else
-        verifyCert = NULL;
-        ourCert    = NULL;
-        ourKey     = NULL;
-    #endif
-#endif
 
     (void)session;
     (void)sslResume;
@@ -3069,9 +3059,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     #ifdef TEST_BEFORE_DATE
         verify_flags |= WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY;
     #endif
-        if (doPeerCheck != 0 &&
-            wolfSSL_CTX_load_verify_locations_ex(ctx, verifyCert, 0, verify_flags)
-                                                           != WOLFSSL_SUCCESS) {
+        if (verifyCert != NULL && wolfSSL_CTX_load_verify_locations_ex(ctx,
+            verifyCert, 0, verify_flags) != WOLFSSL_SUCCESS) {
             wolfSSL_CTX_free(ctx); ctx = NULL;
             err_sys("can't load ca file, Please run from wolfSSL home dir");
         }
@@ -3079,26 +3068,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         load_buffer(ctx, verifyCert, WOLFSSL_CA);
     #endif  /* !NO_FILESYSTEM */
 
-    #ifdef HAVE_ECC
-        /* load ecc verify too, echoserver uses it by default w/ ecc */
-        #ifdef NO_FILESYSTEM
-        if (doPeerCheck != 0 &&
-            wolfSSL_CTX_load_verify_buffer(ctx, ca_ecc_cert_der_256,
-                sizeof_ca_ecc_cert_der_256, SSL_FILETYPE_ASN1) != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
-            err_sys("can't load ecc ca buffer");
-        }
-        #elif !defined(TEST_LOAD_BUFFER)
-        if (doPeerCheck != 0 &&
-            wolfSSL_CTX_load_verify_locations_ex(ctx, eccCertFile, 0, verify_flags)
-                                                           != WOLFSSL_SUCCESS) {
-            wolfSSL_CTX_free(ctx); ctx = NULL;
-            err_sys("can't load ecc ca file, Please run from wolfSSL home dir");
-        }
-        #else
-        load_buffer(ctx, eccCertFile, WOLFSSL_CA);
-        #endif /* !TEST_LOAD_BUFFER */
-    #endif /* HAVE_ECC */
     #if defined(WOLFSSL_TRUST_PEER_CERT) && !defined(NO_FILESYSTEM)
         if (trustCert) {
             if ((ret = wolfSSL_CTX_trust_peer_cert(ctx, trustCert,
@@ -3119,7 +3088,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, myVerify);
     }
     else if (!usePsk && !useAnon && doPeerCheck == 0) {
-        wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_NONE, NULL);
+        wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, AlwaysAllow);
     }
     else if (!usePsk && !useAnon && myVerifyAction == VERIFY_OVERRIDE_DATE_ERR) {
         wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, myVerify);
