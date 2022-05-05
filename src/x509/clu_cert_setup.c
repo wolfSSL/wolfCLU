@@ -378,7 +378,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             emailSz = wolfSSL_X509_NAME_get_text_by_NID(name, NID_emailAddress,
                 NULL, 0);
             if (emailSz > 0) {
-                emailSz += 1;
+                emailSz += 2; /* +2 for \n\0 at the end of string */
                 emailBuf = (char*)XMALLOC(emailSz, HEAP_HINT,
                         DYNAMIC_TYPE_TMP_BUFFER);
                 if (emailBuf == NULL) {
@@ -392,17 +392,13 @@ int wolfCLU_certSetup(int argc, char** argv)
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
+                    emailBuf[emailSz-2] = '\n';
                     emailBuf[emailSz-1] = '\0';
                 }
 
                 if (ret == WOLFCLU_SUCCESS &&
                         wolfSSL_BIO_write(out, emailBuf, (int)XSTRLEN(emailBuf))
                         < 0) {
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
-
-                if (ret == WOLFCLU_SUCCESS &&
-                        wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
