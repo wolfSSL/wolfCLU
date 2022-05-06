@@ -33,6 +33,9 @@ EXTRA_DIST+= manpages
 EXTRA_DIST+= README.md
 EXTRA_DIST+= LICENSE
 EXTRA_DIST+= ChangeLog.md
+EXTRA_DIST+= wolfclu.sln
+EXTRA_DIST+= wolfCLU.vcxproj
+EXTRA_DIST+= wolfCLU.vcxproj.filters
 
 man_MANS+= manpages/wolfCLU_benchmark.1
 man_MANS+= manpages/wolfCLU_decrypt.1
@@ -53,6 +56,7 @@ include tests/encrypt/include.am
 include tests/genkey_sign_ver/include.am
 include tests/hash/include.am
 include tests/bench/include.am
+include ide/include.am
 #####include data/include.am
 
 

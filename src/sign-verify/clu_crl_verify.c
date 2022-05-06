@@ -28,14 +28,14 @@
 
 #ifdef HAVE_CRL
 static const struct option crl_options[] = {
-    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"inform",    required_argument, 0, WOLFCLU_INFORM    },
-    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
-    {"CAfile",    required_argument, 0, WOLFCLU_CAFILE    },
-    {"noout",     no_argument,       0, WOLFCLU_NOOUT     },
-    {"help",      no_argument,       0, WOLFCLU_HELP      },
-    {"h",         no_argument,       0, WOLFCLU_HELP      },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"-outform",   required_argument, 0, WOLFCLU_OUTFORM   },
+    {"-CAfile",    required_argument, 0, WOLFCLU_CAFILE    },
+    {"-noout",     no_argument,       0, WOLFCLU_NOOUT     },
+    {"-help",      no_argument,       0, WOLFCLU_HELP      },
+    {"-h",         no_argument,       0, WOLFCLU_HELP      },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -74,7 +74,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "", crl_options,
+    while ((option = wolfCLU_GetOpt(argc, argv, "", crl_options,
                     &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_OUTFILE:

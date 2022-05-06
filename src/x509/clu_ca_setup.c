@@ -28,18 +28,18 @@
 #include <wolfclu/certgen/clu_certgen.h>
 
 static const struct option ca_options[] = {
-    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"keyfile",   required_argument, 0, WOLFCLU_KEY       },
-    {"cert",      required_argument, 0, WOLFCLU_CAFILE    },
-    {"extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
-    {"md",        required_argument, 0, WOLFCLU_MD        },
-    {"inform",    required_argument, 0, WOLFCLU_INFORM    },
-    {"config",    required_argument, 0, WOLFCLU_CONFIG },
-    {"days",      required_argument, 0, WOLFCLU_DAYS },
-    {"selfsign",  no_argument, 0, WOLFCLU_SELFSIGN },
-    {"h",         no_argument, 0, WOLFCLU_HELP },
-    {"help",      no_argument, 0, WOLFCLU_HELP },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-keyfile",   required_argument, 0, WOLFCLU_KEY       },
+    {"-cert",      required_argument, 0, WOLFCLU_CAFILE    },
+    {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
+    {"-md",        required_argument, 0, WOLFCLU_MD        },
+    {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"-config",    required_argument, 0, WOLFCLU_CONFIG },
+    {"-days",      required_argument, 0, WOLFCLU_DAYS },
+    {"-selfsign",  no_argument, 0, WOLFCLU_SELFSIGN },
+    {"-h",         no_argument, 0, WOLFCLU_HELP },
+    {"-help",      no_argument, 0, WOLFCLU_HELP },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -83,7 +83,7 @@ int wolfCLU_CASetup(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "", ca_options,
+    while ((option = wolfCLU_GetOpt(argc, argv, "", ca_options,
                     &longIndex )) != -1) {
 
         switch (option) {

@@ -27,15 +27,15 @@
 #include <wolfclu/x509/clu_parse.h>
 
 static const struct option pkcs12_options[] = {
-    {"nodes",     no_argument, 0, WOLFCLU_NODES   },
-    {"nocerts",   no_argument, 0, WOLFCLU_NOCERTS },
-    {"nokeys",    no_argument, 0, WOLFCLU_NOKEYS  },
-    {"passin",    required_argument, 0, WOLFCLU_PASSWORD     },
-    {"passout",   required_argument, 0, WOLFCLU_PASSWORD_OUT },
-    {"in",        required_argument, 0, WOLFCLU_INFILE       },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE      },
-    {"help",      no_argument, 0, WOLFCLU_HELP},
-    {"h",         no_argument, 0, WOLFCLU_HELP},
+    {"-nodes",     no_argument, 0, WOLFCLU_NODES   },
+    {"-nocerts",   no_argument, 0, WOLFCLU_NOCERTS },
+    {"-nokeys",    no_argument, 0, WOLFCLU_NOKEYS  },
+    {"-passin",    required_argument, 0, WOLFCLU_PASSWORD     },
+    {"-passout",   required_argument, 0, WOLFCLU_PASSWORD_OUT },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE       },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE      },
+    {"-help",      no_argument, 0, WOLFCLU_HELP},
+    {"-h",         no_argument, 0, WOLFCLU_HELP},
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -74,7 +74,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    pkcs12_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_NODES:

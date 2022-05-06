@@ -30,34 +30,34 @@
 #ifdef WOLFSSL_CERT_REQ
 static const struct option req_options[] = {
 
-    {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
-    {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
-    {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
-    {"sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
-    {"sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
-    {"rsa",       no_argument,       0, WOLFCLU_RSA       },
-    {"ed25519",   no_argument,       0, WOLFCLU_ED25519   },
+    {"-sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
+    {"-sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
+    {"-sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
+    {"-sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
+    {"-sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
+    {"-rsa",       no_argument,       0, WOLFCLU_RSA       },
+    {"-ed25519",   no_argument,       0, WOLFCLU_ED25519   },
 
-    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"key",       required_argument, 0, WOLFCLU_KEY       },
-    {"new",       no_argument,       0, WOLFCLU_NEW       },
-    {"newkey",    required_argument, 0, WOLFCLU_NEWKEY },
-    {"inkey",     required_argument, 0, WOLFCLU_INKEY     },
-    {"keyout",    required_argument, 0, WOLFCLU_OUTKEY     },
-    {"inform",    required_argument, 0, WOLFCLU_INFORM    },
-    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
-    {"config",    required_argument, 0, WOLFCLU_CONFIG },
-    {"days",      required_argument, 0, WOLFCLU_DAYS },
-    {"x509",      no_argument,       0, WOLFCLU_X509 },
-    {"subj",      required_argument, 0, WOLFCLU_SUBJECT },
-    {"verify",    no_argument,       0, WOLFCLU_VERIFY },
-    {"text",      no_argument,       0, WOLFCLU_TEXT_OUT },
-    {"noout",     no_argument,       0, WOLFCLU_NOOUT },
-    {"extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
-    {"nodes",     no_argument,       0, WOLFCLU_NODES },
-    {"h",         no_argument,       0, WOLFCLU_HELP },
-    {"help",      no_argument,       0, WOLFCLU_HELP },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-key",       required_argument, 0, WOLFCLU_KEY       },
+    {"-new",       no_argument,       0, WOLFCLU_NEW       },
+    {"-newkey",    required_argument, 0, WOLFCLU_NEWKEY },
+    {"-inkey",     required_argument, 0, WOLFCLU_INKEY     },
+    {"-keyout",    required_argument, 0, WOLFCLU_OUTKEY     },
+    {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"-outform",   required_argument, 0, WOLFCLU_OUTFORM   },
+    {"-config",    required_argument, 0, WOLFCLU_CONFIG },
+    {"-days",      required_argument, 0, WOLFCLU_DAYS },
+    {"-x509",      no_argument,       0, WOLFCLU_X509 },
+    {"-subj",      required_argument, 0, WOLFCLU_SUBJECT },
+    {"-verify",    no_argument,       0, WOLFCLU_VERIFY },
+    {"-text",      no_argument,       0, WOLFCLU_TEXT_OUT },
+    {"-noout",     no_argument,       0, WOLFCLU_NOOUT },
+    {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
+    {"-nodes",     no_argument,       0, WOLFCLU_NODES },
+    {"-h",         no_argument,       0, WOLFCLU_HELP },
+    {"-help",      no_argument,       0, WOLFCLU_HELP },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -525,7 +525,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "", req_options,
+    while ((option = wolfCLU_GetOpt(argc, argv, "", req_options,
                     &longIndex )) != -1) {
 
         switch (option) {

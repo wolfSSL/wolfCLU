@@ -55,8 +55,8 @@ fi
 rm -f test-dec.der
 rm -f test-enc.der
 
-run "enc -aes-128-cbc -in ./configure.ac -out ./configure.ac.enc -k 'test'"
-run "enc -d -aes-128-cbc -in ./configure.ac.enc -out ./configure.ac.dec -k 'test'"
+run "enc -aes-128-cbc -in ./configure.ac -out ./configure.ac.enc" "test"
+run "enc -d -aes-128-cbc -in ./configure.ac.enc -out ./configure.ac.dec" "test"
 diff ./configure.ac ./configure.ac.dec
 if [ $? != 0 ]; then
     echo "decrypted file does not match original file"
@@ -68,8 +68,8 @@ rm -f configure.ac.enc
 # small file test
 rm -rf enc_small.txt
 echo " " > enc_small.txt
-run "enc -aes-128-cbc -in ./enc_small.txt -out ./enc_small.txt.enc -k 'test'"
-run "enc -d -aes-128-cbc -in ./enc_small.txt.enc -out ./enc_small.txt.dec -k 'test'"
+run "enc -aes-128-cbc -in ./enc_small.txt -out ./enc_small.txt.enc 'test'"
+run "enc -d -aes-128-cbc -in ./enc_small.txt.enc -out ./enc_small.txt.dec 'test'"
 diff ./enc_small.txt ./enc_small.txt.dec
 if [ $? != 0 ]; then
     echo "enc_small decrypted file does not match original file"

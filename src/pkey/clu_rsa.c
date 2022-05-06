@@ -27,16 +27,16 @@
 #include <wolfclu/x509/clu_parse.h>
 
 static const struct option rsa_options[] = {
-    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-    {"inform",    required_argument, 0, WOLFCLU_INFORM    },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
-    {"passin",    required_argument, 0, WOLFCLU_PASSWORD  },
-    {"noout",     no_argument,       0, WOLFCLU_NOOUT     },
-    {"modulus",   no_argument,       0, WOLFCLU_MODULUS   },
-    {"RSAPublicKey_in", no_argument, 0, WOLFCLU_RSAPUBIN  },
-    {"help",      no_argument,       0, WOLFCLU_HELP      },
-    {"h",         no_argument,       0, WOLFCLU_HELP      },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-outform",   required_argument, 0, WOLFCLU_OUTFORM   },
+    {"-passin",    required_argument, 0, WOLFCLU_PASSWORD  },
+    {"-noout",     no_argument,       0, WOLFCLU_NOOUT     },
+    {"-modulus",   no_argument,       0, WOLFCLU_MODULUS   },
+    {"-RSAPublicKey_in", no_argument, 0, WOLFCLU_RSAPUBIN  },
+    {"-help",      no_argument,       0, WOLFCLU_HELP      },
+    {"-h",         no_argument,       0, WOLFCLU_HELP      },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -75,7 +75,7 @@ int wolfCLU_RSA(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    rsa_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_INFILE:

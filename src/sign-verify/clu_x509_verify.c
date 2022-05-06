@@ -26,10 +26,10 @@
 #include <wolfclu/x509/clu_cert.h>
 
 static const struct option verify_options[] = {
-    {"CAfile",    required_argument, 0, WOLFCLU_CAFILE    },
-    {"crl_check", no_argument,       0, WOLFCLU_CHECK_CRL },
-    {"help",      no_argument,       0, WOLFCLU_HELP      },
-    {"h",         no_argument,       0, WOLFCLU_HELP      },
+    {"-CAfile",    required_argument, 0, WOLFCLU_CAFILE    },
+    {"-crl_check", no_argument,       0, WOLFCLU_CHECK_CRL },
+    {"-help",      no_argument,       0, WOLFCLU_HELP      },
+    {"-h",         no_argument,       0, WOLFCLU_HELP      },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -73,7 +73,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
 
         opterr = 0; /* do not display unrecognized options */
         optind = 0; /* start at indent 0 */
-        while ((option = getopt_long_only(argc - 1, argv, "",
+        while ((option = wolfCLU_GetOpt(argc - 1, argv, "",
                        verify_options, &longIndex )) != -1) {
             switch (option) {
                 case WOLFCLU_CHECK_CRL:

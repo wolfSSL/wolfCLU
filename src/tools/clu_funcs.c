@@ -34,21 +34,21 @@ static int loop = 0;
 
 static const struct option crypt_algo_options[] = {
     /* AES */
-    {"aes-128-ctr", no_argument, 0, WOLFCLU_AES128CTR},
-    {"aes-192-ctr", no_argument, 0, WOLFCLU_AES192CTR},
-    {"aes-256-ctr", no_argument, 0, WOLFCLU_AES256CTR},
-    {"aes-128-cbc", no_argument, 0, WOLFCLU_AES128CBC},
-    {"aes-192-cbc", no_argument, 0, WOLFCLU_AES192CBC},
-    {"aes-256-cbc", no_argument, 0, WOLFCLU_AES256CBC},
+    {"-aes-128-ctr", no_argument, 0, WOLFCLU_AES128CTR},
+    {"-aes-192-ctr", no_argument, 0, WOLFCLU_AES192CTR},
+    {"-aes-256-ctr", no_argument, 0, WOLFCLU_AES256CTR},
+    {"-aes-128-cbc", no_argument, 0, WOLFCLU_AES128CBC},
+    {"-aes-192-cbc", no_argument, 0, WOLFCLU_AES192CBC},
+    {"-aes-256-cbc", no_argument, 0, WOLFCLU_AES256CBC},
 
     /* camellia */
-    {"camellia-128-cbc", no_argument, 0, WOLFCLU_CAMELLIA128CBC},
-    {"camellia-192-cbc", no_argument, 0, WOLFCLU_CAMELLIA192CBC},
-    {"camellia-256-cbc", no_argument, 0, WOLFCLU_CAMELLIA256CBC},
+    {"-camellia-128-cbc", no_argument, 0, WOLFCLU_CAMELLIA128CBC},
+    {"-camellia-192-cbc", no_argument, 0, WOLFCLU_CAMELLIA192CBC},
+    {"-camellia-256-cbc", no_argument, 0, WOLFCLU_CAMELLIA256CBC},
 
     /* 3des */
-    {"des-cbc", no_argument, 0, WOLFCLU_DESCBC},
-    {"d",       no_argument, 0, WOLFCLU_DECRYPT},
+    {"-des-cbc", no_argument, 0, WOLFCLU_DESCBC},
+    {"-d",       no_argument, 0, WOLFCLU_DECRYPT},
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -860,26 +860,17 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
     int longIndex = 2;
     int option;
     char name[80];
-    char *argvCopy[argc];
-    int i;
 
-    /* make a copy of args because getopt_long_only reorders them */
-    for (i = 0; i < argc; i++) argvCopy[i] = argv[i];
-
-    /* first just try the 3rd argument for backwords compatibility */
-    if (argc < 3 || argvCopy[2] == NULL) {
-        return WOLFCLU_FATAL_ERROR;
-    }
-
-    wolfCLU_oldAlgo(argc, argvCopy, 3);
+    wolfCLU_oldAlgo(argc, argv, 3);
     XMEMSET(name, 0, sizeof(name));
-    XSTRNCPY(name, argvCopy[2], XSTRLEN(argv[2]));
+    XSTRNCPY(name, argv[2], XSTRLEN(argv[2]));
     ret = wolfCLU_parseAlgo(name, alg, mode, size);
 
     /* next check for -cipher option passed through args */
     if (ret < 0) {
+        optind = 0;
         opterr = 0; /* do not print out unknown options */
-        while ((option = getopt_long_only(argc, argvCopy, "",
+        while ((option = wolfCLU_GetOpt(argc, argv, "",
                        crypt_algo_options, &longIndex )) != -1) {
             switch (option) {
                 /* AES */
@@ -979,11 +970,18 @@ void wolfCLU_stop(int signo)
  */
 double wolfCLU_getTime(void)
 {
+#if !defined(USE_WINDOWS_API) && !defined(MICROCHIP_PIC32)
     struct timeval tv;
 
     gettimeofday(&tv, 0);
 
     return (double)tv.tv_sec + (double)tv.tv_usec / 1000000;
+#else
+    struct _timeb mytime1;
+
+    _ftime64_s(&mytime1);
+    return mytime1.time + mytime1.millitm / 1000;
+#endif
 }
 
 /*
@@ -1024,7 +1022,6 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
     int i;
     int ret = 0;
     int argFound = 0;
-
     if (searchTerm == NULL) {
         return 0;
     }
@@ -1033,7 +1030,8 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
         if (argv[i] == NULL) {
             break; /* stop checking if no more args*/
         }
-        else if (XSTRNCMP(searchTerm, "-help", length) == 0 &&
+
+        if (XSTRNCMP(searchTerm, "-help", length) == 0 &&
                    XSTRNCMP(argv[i], "-help", XSTRLEN(argv[i])) == 0 &&
                    (int)XSTRLEN(argv[i]) > 0) {
            return 1;
@@ -1041,7 +1039,6 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
         }
         else if (XMEMCMP(argv[i], searchTerm, length) == 0 &&
                    (int)XSTRLEN(argv[i]) == length) {
-
             ret = i;
             if (argFound == 1) {
                 WOLFCLU_LOG(WOLFCLU_E0, "ERROR: argument found twice: \"%s\"", searchTerm);
@@ -1195,13 +1192,46 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
     return ret;
 }
 
+size_t wolfCLU_getline(char **lineptr, size_t *len, FILE *fp) {
+
+     char line[64];
+
+     *len = sizeof(line);
+     *lineptr = malloc(*len);
+
+     (*lineptr)[0] = '\0';
+
+     while(fgets(line, sizeof(line), fp) != NULL) {
+         size_t len_used = strlen(*lineptr);
+         size_t line_used = strlen(line);
+
+         if(*len - len_used < line_used) {
+            *len *= 2;
+             
+            if((*lineptr = realloc(*lineptr, *len)) == NULL) {
+                 return -1;
+            }
+         }
+
+         memcpy(*lineptr + len_used, line, line_used);
+         len_used += line_used;
+         (*lineptr)[len_used] = '\0';
+
+         if((*lineptr)[len_used - 1] == '\n') {
+             (*lineptr)[len_used - 1]='\0';
+             return len_used;
+         }
+     }
+
+     return -1;
+}
 
 /* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 {
     char   *in = NULL;
     size_t  inSz;
-    ssize_t ret;
+    size_t  ret;
     FILE *fout = stdout;
     FILE *fin = stdin; /* defaulting to stdin but using a fd variable to make it
                         * easy for expanding to other inputs */
@@ -1209,49 +1239,49 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
     fprintf(fout, "Enter without data will result in the field being "
             "skipped.\nExamples of inputs are provided as [*]\n");
     fprintf(fout, "Country [US] : ");
-    ret = getline(&in, &inSz, fin);
+    ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_PRINTABLE, NID_countryName, in);
         free(in); in = NULL;
     }
 
     fprintf(fout, "State or Province [Montana] : ");
-    ret = getline(&in, &inSz, fin);
+    ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_stateOrProvinceName, in);
         free(in); in = NULL;
     }
 
     fprintf(fout, "Locality [Bozeman] : ");
-    ret = getline(&in, &inSz, fin);
+    ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_localityName, in);
         free(in); in = NULL;
     }
 
     fprintf(fout, "Organization Name [wolfSSL] : ");
-    ret = getline(&in, &inSz, fin);
+    ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationName, in);
         free(in); in = NULL;
     }
 
     fprintf(fout, "Organization Unit [engineering] : ");
-    ret = getline(&in, &inSz, fin);
+    ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationalUnitName, in);
         free(in); in = NULL;
     }
 
     fprintf(fout, "Common Name : ");
-    ret = getline(&in, &inSz, fin);
+    ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_commonName, in);
         free(in); in = NULL;
     }
 
     fprintf(fout, "Email Address : ");
-    ret = getline(&in, &inSz, fin);
+    ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_emailAddress, in);
         free(in); in = NULL;
@@ -1383,6 +1413,7 @@ static int HideEcho(DWORD* originalTerm)
 
 static int ShowEcho(DWORD* originalTerm)
 {
+    HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
     if (SetConsoleMode(stdinHandle, *originalTerm) == 0) {
         return WOLFCLU_FATAL_ERROR;
     }
@@ -1423,3 +1454,41 @@ int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz)
 }
 #endif
 
+/* Not handling options char yet*/
+int wolfCLU_GetOpt(int argc, char** argv, const char *options, 
+       const struct option *long_options, int *opt_index)
+{
+    int end   = 0;      /* variable used to exit while loops */ 
+    int i     = optind; /* variable to keep track of starting option position */
+    int index = 0;      /* index at which option was found */
+
+    while(!end){
+
+        /* set end to 1 if last option is reached */ 
+        if (long_options[i].name == 0 ) {
+            end = 1;
+            return WOLFCLU_FATAL_ERROR; 
+        }
+        else {
+
+            /* check if option is present in argv */ 
+            index = wolfCLU_checkForArg(long_options[i].name, (int)strlen(long_options[i].name), argc, argv); 
+            optind++;
+
+            /* if index matches *opt_index at first position or if index is found */
+            if (index == *opt_index+1 || (*opt_index !=0 && index > 0)) {
+                if (long_options[i].has_arg == 1) {
+                    optarg=argv[index+1];
+                }
+                return long_options[i].val;
+            }
+        }
+
+        i++;
+    }
+
+    (void) *options;
+
+    return WOLFCLU_FATAL_ERROR; 
+
+}

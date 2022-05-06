@@ -24,8 +24,8 @@
 #include <wolfclu/clu_optargs.h>
 
 static const struct option rand_options[] = {
-    {"out",    required_argument, 0, WOLFCLU_OUTFILE},
-    {"base64", no_argument,       0, WOLFCLU_BASE64 },
+    {"-out",    required_argument, 0, WOLFCLU_OUTFILE},
+    {"-base64", no_argument,       0, WOLFCLU_BASE64 },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -65,7 +65,7 @@ int wolfCLU_Rand(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    rand_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_BASE64:

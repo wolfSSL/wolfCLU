@@ -35,13 +35,13 @@
 #endif
 
 static const struct option dh_options[] = {
-    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"genkey",    no_argument,       0, WOLFCLU_GEN_KEY   },
-    {"check",     no_argument,       0, WOLFCLU_CHECK     },
-    {"noout",     no_argument,       0, WOLFCLU_NOOUT     },
-    {"help",      no_argument,       0, WOLFCLU_HELP      },
-    {"h",         no_argument,       0, WOLFCLU_HELP      },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-genkey",    no_argument,       0, WOLFCLU_GEN_KEY   },
+    {"-check",     no_argument,       0, WOLFCLU_CHECK     },
+    {"-noout",     no_argument,       0, WOLFCLU_NOOUT     },
+    {"-help",      no_argument,       0, WOLFCLU_HELP      },
+    {"-h",         no_argument,       0, WOLFCLU_HELP      },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -88,7 +88,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
     }
 
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    dh_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_INFILE:

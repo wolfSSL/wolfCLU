@@ -20,7 +20,6 @@
  */
 
 #include <stdio.h>
-#include <unistd.h>
 
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>

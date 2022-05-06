@@ -22,16 +22,29 @@
 #ifndef _WOLFSSL_CLU_HEADER_
 #define _WOLFSSL_CLU_HEADER_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <string.h>
 #include <stdio.h>
-#include <signal.h>
+
+#ifdef _WIN32 /* running on windows */
+#include <winsock2.h>
+#include <windows.h>
+#include <corecrt_io.h>
+#include <sys/timeb.h>
+
+#else /* running on *nix */
 #include <unistd.h>
 #include <termios.h>
 #include <sys/time.h>
-#include <getopt.h>
+#endif
 
 /* wolfssl includes */
+#ifndef WOLFSSL_USER_SETTINGS
 #include <wolfssl/options.h>
+#endif
 #include <wolfssl/error-ssl.h>
 #include <wolfssl/ssl.h>
 #include <wolfssl/version.h>
@@ -113,6 +126,33 @@
   * or code update
   */
 #define VERSION 0.3
+
+/**
+ * @brief structs and variables to parse commands
+ */
+struct option
+{
+    const char *name;
+    int has_arg;
+    int *flag;
+    int val;
+};
+
+#define required_argument 1
+#define no_argument       0
+
+/* define macros, functions, and data types for windows */
+#ifdef _WIN32
+
+#define int64_t long long
+#define access _access
+#define F_OK 00
+#define strtok_r strtok_s
+
+extern char* optarg;
+extern int   optind ;
+extern int   opterr ;
+#endif
 
 /* encryption argument function
  *
@@ -367,6 +407,16 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm);
  */
 int wolfCLU_version(void);
 
+/**
+ * @brief Used to check for specified command
+ */
+int wolfCLU_GetOpt(int argc, char** argv, const char *options, const struct option *long_options, int *opt_index);
+
+/**
+ * @brief wolfCLU getline() implementation
+ */
+size_t wolfCLU_getline(char **line, size_t *len, FILE *fp);
+
 /*
  * generic function to check for a specific input argument. Return the
  * argv[i] where argument was found. Useful for getting following value after
@@ -507,4 +557,9 @@ int wolfCLU_DhParamSetup(int argc, char** argv);
  * @brief function to prompt user for password from stdin
  */
 int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* _WOLFSSL_CLU_HEADER_ */

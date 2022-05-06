@@ -28,14 +28,14 @@
 #include <wolfclu/x509/clu_parse.h>
 
 static const struct option pkey_options[] = {
-    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"inform",    required_argument, 0, WOLFCLU_INFORM    },
-    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
-    {"pubout",    no_argument,       0, WOLFCLU_PUBOUT    },
-    {"pubin",     no_argument,       0, WOLFCLU_PUBIN     },
-    {"help",      no_argument,       0, WOLFCLU_HELP      },
-    {"h",         no_argument,       0, WOLFCLU_HELP      },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"-outform",   required_argument, 0, WOLFCLU_OUTFORM   },
+    {"-pubout",    no_argument,       0, WOLFCLU_PUBOUT    },
+    {"-pubin",     no_argument,       0, WOLFCLU_PUBIN     },
+    {"-help",      no_argument,       0, WOLFCLU_HELP      },
+    {"-h",         no_argument,       0, WOLFCLU_HELP      },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -421,7 +421,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     WOLFSSL_BIO *bioOut = NULL;
 
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    pkey_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_PUBOUT:

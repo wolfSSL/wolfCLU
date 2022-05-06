@@ -24,26 +24,26 @@
 #include <wolfclu/clu_optargs.h>
 
 static const struct option crypt_options[] = {
-    {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
-    {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
-    {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
-    {"sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
-    {"sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
+    {"-sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
+    {"-sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
+    {"-sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
+    {"-sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
+    {"-sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
 
-    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"pwd",       required_argument, 0, WOLFCLU_PASSWORD  },
-    {"key",       required_argument, 0, WOLFCLU_KEY       },
-    {"iv",        required_argument, 0, WOLFCLU_IV        },
-    {"inkey",     required_argument, 0, WOLFCLU_INKEY     },
-    {"output",    required_argument, 0, WOLFCLU_OUTPUT    },
-    {"pbkdf2",    no_argument,       0, WOLFCLU_PBKDF2    },
-    {"md",        required_argument, 0, WOLFCLU_MD        },
-    {"d",         no_argument,       0, WOLFCLU_DECRYPT   },
-    {"p",         no_argument,       0, WOLFCLU_DEBUG     },
-    {"k",         required_argument, 0, WOLFCLU_PASSWORD  },
-    {"base64",    no_argument,       0, WOLFCLU_BASE64    },
-    {"nosalt",    no_argument,       0, WOLFCLU_NOSALT    },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-pwd",       required_argument, 0, WOLFCLU_PASSWORD  },
+    {"-key",       required_argument, 0, WOLFCLU_KEY       },
+    {"-iv",        required_argument, 0, WOLFCLU_IV        },
+    {"-inkey",     required_argument, 0, WOLFCLU_INKEY     },
+    {"-output",    required_argument, 0, WOLFCLU_OUTPUT    },
+    {"-pbkdf2",    no_argument,       0, WOLFCLU_PBKDF2    },
+    {"-md",        required_argument, 0, WOLFCLU_MD        },
+    {"-d",         no_argument,       0, WOLFCLU_DECRYPT   },
+    {"-p",         no_argument,       0, WOLFCLU_DEBUG     },
+    {"-k",         required_argument, 0, WOLFCLU_PASSWORD  },
+    {"-base64",    no_argument,       0, WOLFCLU_BASE64    },
+    {"-nosalt",    no_argument,       0, WOLFCLU_NOSALT    },
     {0, 0, 0, 0} /* terminal element */
 };
 
@@ -88,7 +88,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                                  * reading a hex string passed in */
     word32   numBits    =   0;  /* number of bits in argument from the user */
     int      option;
-    int      longIndex = 0;
+    int      longIndex = 1;
 
     if (action == 'e')
         encCheck = 1;
@@ -136,7 +136,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    crypt_options, &longIndex )) != -1) {
 
         switch (option) {
