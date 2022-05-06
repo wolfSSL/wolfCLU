@@ -64,8 +64,8 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 #if !defined(NO_DH) && defined(WOLFSSL_DH_EXTRA)
     WC_RNG rng;
     DhKey dh;
-    int modSz;
-    int ret    = WOLFCLU_SUCCESS;
+    int modSz = -1;
+    int ret   = WOLFCLU_SUCCESS;
     int option;
     int longIndex = 1;
     char* out = NULL;
@@ -74,18 +74,6 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
     byte noOut  = 0;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
-
-    /* last parameter is the dh size */
-    if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
-        wolfCLU_DhHelp();
-        return WOLFCLU_SUCCESS;
-    }
-    else {
-        modSz = XATOI(argv[argc-1]);
-        if (modSz <= 0) {
-            /* hold off on error'ing out in case there is '-in' used */
-        }
-    }
 
     optind = 0; /* start at indent 0 */
     while ((option = getopt_long_only(argc, argv, "",
@@ -129,6 +117,17 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             default:
                 WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
                 ret = USER_INPUT_ERROR;
+        }
+    }
+
+    /* go to the item directly after dhparam, this will be the first non '-'
+     * option found in the arguments passed in */
+    if (ret == WOLFCLU_SUCCESS && optind + 1 < argc) {
+        modSz = XATOI(argv[optind+1]);
+        if (modSz <= 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Can not parse %s as a number",
+                    argv[optind+1]);
+            ret = USER_INPUT_ERROR;
         }
     }
 
