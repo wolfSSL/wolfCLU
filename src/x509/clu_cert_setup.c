@@ -232,9 +232,9 @@ int wolfCLU_certSetup(int argc, char** argv)
     /* try to open output file if set */
     if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
         out = wolfSSL_BIO_new_file(outFile, "wb");
-        if (access(outFile, F_OK) != 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "output file \"%s\"did not exist, it will"
-                   " be created.", outFile);
+        if (out == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "unable to open/create output file");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -467,7 +467,8 @@ int wolfCLU_certSetup(int argc, char** argv)
 
         wolfCLU_extKeyUsagePrint(out, keyUsage, 0, 1);
     #else
-        WOLFCLU_LOG(WOLFCLU_E0, "not supported by version of wolfSSL");
+        WOLFCLU_LOG(WOLFCLU_E0, "Extended key function not supported by this"
+                " version of wolfSSL");
         ret = WOLFCLU_FATAL_ERROR;
     #endif
     }
@@ -498,7 +499,8 @@ int wolfCLU_certSetup(int argc, char** argv)
             }
         }
     #else
-        WOLFCLU_LOG(WOLFCLU_E0, "not supported by version of wolfSSL");
+        WOLFCLU_LOG(WOLFCLU_E0, "Subject name hash function not supported by"
+                " this version of wolfSSL");
         ret = WOLFCLU_FATAL_ERROR;
     #endif
     }
