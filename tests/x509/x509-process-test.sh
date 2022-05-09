@@ -37,14 +37,75 @@ cert_test_case() {
     echo ""
 }
 
+# For check_cert_signature to perform a meaningful check, it needs the public
+# key used to sign the cert (i.e. the cert must be self-signed).
+check_cert_signature() {
+    local FAILED=0
+
+    echo "Checking certificate $1's signature."
+
+    # Use OpenSSL to convert to PEM to remove any leading text in the
+    # certificate file or to convert DER to PEM.
+    openssl x509 -in $1 -out cert_stripped.pem -outform PEM
+
+    # Extract the hex of the signature from the cert.
+    SIGNATURE_HEX=$(openssl x509 -in cert_stripped.pem -text -noout \
+                                 -certopt ca_default -certopt no_validity \
+                                 -certopt no_serial -certopt no_subject \
+                                 -certopt no_extensions -certopt no_signame | \
+                                 grep -v 'Signature Algorithm' | \
+                                 tr -d '[:space:]:')
+    # Convert hex string to binary file.
+    echo ${SIGNATURE_HEX} | xxd -r -p > cert_sig.bin
+    # Write the certificate body to a binary file.
+    openssl asn1parse -in cert_stripped.pem -strparse 4 \
+                      -out cert_body.bin -noout
+    RESULT=$?
+    if [ $RESULT != 0 ]; then
+        echo "Failed to extract certificate body from $1."
+        FAILED=1
+    fi
+    if [ $FAILED == 0 ]; then
+        # Extract the public key from the cert.
+        openssl x509 -in cert_stripped.pem -noout -pubkey > cert_pub.pem
+        RESULT=$?
+        if [ $RESULT != 0 ]; then
+            echo "Failed to extract public key from $1."
+            FAILED=1
+        fi
+    fi
+    if [ $FAILED == 0 ]; then
+        # Verify the signature.
+        openssl dgst -$2 -verify cert_pub.pem \
+                     -signature cert_sig.bin cert_body.bin
+        RESULT=$?
+        if [ $RESULT != 0 ]; then
+            echo "Signature for $1 is bad."
+            FAILED=1
+        fi
+    fi
+
+    rm -f cert_sig.bin
+    rm -f cert_body.bin
+    rm -f cert_pub.pem
+
+    if [ $FAILED == 1 ]; then
+        exit 99
+    fi
+}
+
 run1() {
     echo "TEST 1: VALID"
     echo "TEST 1.a"
     test_case "-inform pem -outform pem -in certs/ca-cert.pem -out test.pem"
+    # Check PEM -> PEM didn't alter any data by checking the validity of the
+    # signature.
+    check_cert_signature test.pem sha256
     if [ ! -f test.pem ]; then
         echo "issue creating output file"
         exit 99
     fi
+    echo ""
 
     echo "TEST 1.b"
     ./wolfssl x509 -in test.pem -text -noout -out test.pem
@@ -56,24 +117,39 @@ run1() {
     fi
     rm -f ca-cert.pem
     rm -f test.pem
+    echo ""
 
     echo "TEST 1.c"
     test_case "-inform pem -outform der -in certs/ca-cert.pem -out test.der"
+    # Check PEM -> DER didn't alter any data
+    check_cert_signature test.der sha256
     rm -f test.der
+    echo ""
 
     echo "TEST 1.d"
     test_case "-inform der -outform pem -in certs/ca-cert.der"
+    echo ""
+
     echo "TEST 1.e"
     test_case "-inform der -outform der -in certs/ca-cert.der -out test.der"
+    # Check DER -> DER didn't alter any data
+    check_cert_signature test.der sha256
     rm -f test.der
     echo ""
+
     echo "TEST 1.f"
     test_case "-inform der -text -noout -in certs/ca-cert.der"
     echo ""
+
     echo "TEST 1.g"
     test_case "-inform der -pubkey -noout -in certs/ca-cert.der"
     echo ""
 
+    echo "TEST 1.h"
+    test_case "-inform der -outform pem -in certs/ca-cert.der -out test.pem"
+    # Check DER -> PEM didn't alter any data
+    check_cert_signature test.pem sha256
+    echo ""
 }
 
 run2() {
@@ -119,7 +195,8 @@ run2() {
 run3() {
     echo "TEST3: VALID INPUT FILES"
     echo "TEST 3.a"
-    #convert ca-cert.der to tmp.pem and compare to ca-cert.pem for valid transform
+    # convert ca-cert.der to tmp.pem and compare to ca-cert.pem for valid
+    # transform
     ./wolfssl x509 -inform pem -in certs/ca-cert.pem -outform pem -out test.pem
     cert_test_case "-inform der -in certs/ca-cert.der -outform pem -out tmp.pem" \
                    test.pem tmp.pem
