@@ -46,6 +46,16 @@ if [ $? != 0 ]; then
     echo "$RESULT"
     exit 99
 fi
+rm -f dh.params
+
+run "dhparam 1024 -out dh.params"
+run "dhparam -in dh.params"
+echo $RESULT | grep -e "-----BEGIN DH PARAMETERS-----"
+if [ $? != 0 ]; then
+    echo "unexpected text output found"
+    echo "$RESULT"
+    exit 99
+fi
 
 #check for no output
 run "dhparam -in dh.params -noout"
