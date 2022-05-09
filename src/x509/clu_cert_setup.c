@@ -69,6 +69,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     byte* inBufCertBegin = NULL;
     byte* tmpOutBuf = NULL;
     word32 tmpOutBufSz = 0;
+    const byte* derBufPtr = NULL;
     DerBuffer* derObj = NULL;
 
 /*---------------------------------------------------------------------------*/
@@ -222,7 +223,15 @@ int wolfCLU_certSetup(int argc, char** argv)
 /*---------------------------------------------------------------------------*/
 
     if (ret == WOLFCLU_SUCCESS) {
-        inBufSz = wolfSSL_BIO_get_len(in);
+        char read;
+
+        /* In case input is stdin, we need to read byte by byte. */
+        inMem = wolfSSL_BIO_new(wolfSSL_BIO_s_mem());
+        while (wolfSSL_BIO_read(in, &read, 1) == 1) {
+             wolfSSL_BIO_write(inMem, &read, 1);
+        }
+
+        inBufSz = wolfSSL_BIO_get_len(inMem);
         if (inBufSz <= 0) {
             WOLFCLU_LOG(WOLFCLU_E0, "wolfSSL_BIO_get_len failed.");
             ret = WOLFCLU_FATAL_ERROR;
@@ -234,7 +243,7 @@ int wolfCLU_certSetup(int argc, char** argv)
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                if (wolfSSL_BIO_read(in, inBufRaw, inBufSz) != inBufSz) {
+                if (wolfSSL_BIO_read(inMem, inBufRaw, inBufSz) != inBufSz) {
                     WOLFCLU_LOG(WOLFCLU_E0, "Failed to read input.");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -262,20 +271,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     }
 
     wolfSSL_BIO_free(in);
-
-    if (ret == WOLFCLU_SUCCESS) {
-        /* 
-         * Wrapping input in a memory BIO makes the code below
-         * calling wolfSSL_PEM_read_bio_X509 and wolfSSL_d2i_X509
-         * cleaner.
-         */
-        inMem = wolfSSL_BIO_new_mem_buf(inBuf, inBufSz);
-        if (inMem == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "wolfSSL_BIO_new_mem_buf "
-                                    "failed.");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
+    wolfSSL_BIO_free(inMem);
 
     if (inFormSet == 1 && outFormSet == 1 && (inForm == outForm)) {
         noConversion = 1;
@@ -283,10 +279,19 @@ int wolfCLU_certSetup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS && !noConversion) {
         if (inForm == PEM_FORM) {
-            x509 = wolfSSL_PEM_read_bio_X509(inMem, NULL, NULL, NULL);
+            if (wc_PemToDer(inBuf, inBufSz, CERT_TYPE, &derObj, HEAP_HINT, NULL,
+                            NULL) != 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "wc_PemToDer failed");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                derBufPtr = derObj->buffer;
+                x509 = wolfSSL_d2i_X509(NULL, &derBufPtr, derObj->length);
+            }
         }
         else if (inForm == DER_FORM) {
-            x509 = wolfSSL_d2i_X509_bio(inMem, NULL);
+            derBufPtr = inBuf;
+            x509 = wolfSSL_d2i_X509(NULL, &derBufPtr, inBufSz);
         }
 
         if (x509 == NULL) {
@@ -294,8 +299,6 @@ int wolfCLU_certSetup(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
-
-    wolfSSL_BIO_free(inMem);
 
     /* try to open output file if set */
     if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
@@ -624,16 +627,8 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
         /* PEM -> DER */
         else {
-            if (wc_PemToDer(inBuf, inBufSz, CERT_TYPE, &derObj, HEAP_HINT, NULL,
-                            NULL) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "wc_PemToDer failed");
+            if (wolfSSL_BIO_write(out, derObj->buffer, derObj->length) <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                if (wolfSSL_BIO_write(out, derObj->buffer,
-                                      derObj->length) <= 0) {
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
             }
         }
     }
