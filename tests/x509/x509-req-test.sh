@@ -74,6 +74,8 @@ rm -f tmp.cert
 run_success "req -new -key ./certs/server-key.pem -config ./test.conf -out tmp.csr"
 run_success "req -text -in tmp.csr"
 
+# fail when extensions can not be found
+run_fail "req -new -extensions v3_alt_ca_not_found -key ./certs/server-key.pem -config ./test.conf -x509 -out alt.crt"
 run_success "req -new -extensions v3_alt_ca -key ./certs/server-key.pem -config ./test.conf -x509 -out alt.crt"
 run_success "x509 -in alt.crt -text -noout"
 echo "$RESULT" | grep "CA:TRUE"
