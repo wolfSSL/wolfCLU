@@ -159,6 +159,37 @@ fi
 rm -f tmp.cert
 rm -f new-key.pem
 rm -f test.conf
+
+# test printing out CSR attributes, older versions of wolfSSL will fail this
+./wolfssl req -text -noout -in ./certs/attributes-csr.pem
+if [ $? -eq 0 ]; then
+    echo $RESULT | grep "initials" | grep "abc"
+    if [ $? -ne 0 ]; then
+        echo "no initials attribute found"
+        exit 99
+    fi
+    echo $RESULT | grep "dnQualifier" | grep "dn"
+    if [ $? -ne 0 ]; then
+        echo "no dnQualifier attribute found"
+        exit 99
+    fi
+    echo $RESULT | grep "challengePassword" | grep "test"
+    if [ $? -ne 0 ]; then
+        echo "no challengePassword attribute found"
+        exit 99
+    fi
+    echo $RESULT | grep "givenName" | grep "Given Name"
+    if [ $? -ne 0 ]; then
+        echo "no givenName attribute found"
+        exit 99
+    fi
+    echo $RESULT | grep "surname"
+    if [ $? -ne 0 ]; then
+        echo "no surname attribute found"
+        exit 99
+    fi
+fi
+
 echo "Done"
 exit 0
 

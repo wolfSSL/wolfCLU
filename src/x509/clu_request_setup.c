@@ -76,14 +76,13 @@ static int _wolfSSL_X509_print_serial(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
 
     XMEMSET(serial, 0, sz);
     if (wolfSSL_X509_get_serial_number(x509, serial, &sz) == WOLFSSL_SUCCESS) {
-        
+
         XSNPRINTF(scratch, MAX_WIDTH, "%*s%s", indent, "",
                 "Serial Number:");
         if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
             return WOLFSSL_FAILURE;
         }
 
-        
         if (sz > (int)sizeof(byte)) {
             int i;
             char tmp[100];
@@ -262,9 +261,41 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
 static int _wolfSSL_X509_REQ_attributes_print(WOLFSSL_BIO* bio,
         WOLFSSL_X509* x509, int indent)
 {
-    (void)bio;
-    (void)x509;
-    (void)indent;
+    WOLFSSL_X509_ATTRIBUTE* attr;
+    char scratch[MAX_WIDTH];
+    int i = 0;
+
+    XSNPRINTF(scratch, MAX_WIDTH, "%*s%s", indent, "", "Attributes: \n");
+    if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
+        return WOLFSSL_FAILURE;
+    }
+    do {
+        attr = wolfSSL_X509_REQ_get_attr(x509, i);
+        if (attr != NULL) {
+            char lName[NAME_SZ/4]; /* NAME_SZ default is 80 */
+            int lNameSz = NAME_SZ/4;
+            const byte* data;
+
+            wolfSSL_OBJ_obj2txt(lName, lNameSz, attr->object, 0);
+            lNameSz = (int)XSTRLEN(lName);
+            data = wolfSSL_ASN1_STRING_get0_data(
+                    attr->value->value.asn1_string);
+            if (data == NULL) {
+                WOLFCLU_LOG(WOLFCLU_E0, "No REQ attribute found when "
+                        "expected");
+                return WOLFSSL_FAILURE;
+            }
+            XSNPRINTF(scratch, MAX_WIDTH, "%*s%s%*s:%s\n", indent+4, "",
+                    lName, (NAME_SZ/4)-lNameSz, "", data);
+            if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch))
+                    <= 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Error writing REQ attribute");
+                return WOLFSSL_FAILURE;
+            }
+        }
+        i++;
+    } while (attr != NULL);
+
     return WOLFSSL_SUCCESS;
 }
 
