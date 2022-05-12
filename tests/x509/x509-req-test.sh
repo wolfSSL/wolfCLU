@@ -161,7 +161,7 @@ rm -f new-key.pem
 rm -f test.conf
 
 # test printing out CSR attributes, older versions of wolfSSL will fail this
-./wolfssl req -text -noout -in ./certs/attributes-csr.pem
+RESULT=`./wolfssl req -text -noout -in ./certs/attributes-csr.pem`
 if [ $? -eq 0 ]; then
     echo $RESULT | grep "initials" | grep "abc"
     if [ $? -ne 0 ]; then

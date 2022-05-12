@@ -308,7 +308,7 @@ static int _wolfSSL_X509_signature_print_ex(WOLFSSL_BIO* bio,
         WOLFSSL_X509* x509, int indent)
 {
     char scratch[MAX_WIDTH];
-    int sigSz;
+    int sigSz = 0;
 
     wolfSSL_X509_get_signature(x509, NULL, &sigSz);
     if (sigSz > 0) {
