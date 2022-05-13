@@ -48,6 +48,10 @@ subjectAltName = @alt_names
 basicConstraints = CA:TRUE
 keyUsage = digitalSignature
 subjectAltName = @alt_names
+[ v3_alt_req_full ]
+basicConstraints = CA:TRUE
+keyUsage = digitalSignature
+subjectAltName = @alt_names_full_skip
 [alt_names]
 DNS.1 = extraName
 DNS.2 = alt-name
@@ -55,6 +59,18 @@ DNS.3 = thirdName
 IP.1 = 2607:f8b0:400a:80b::2004
 DNS.4 = 2607:f8b0:400a:80b::2004 (google.com)
 IP.2 = 127.0.0.1
+[alt_names_full_skip]
+DNS.1 = extraName
+DNS.2 = alt-name
+DNS.4 = thirdName
+IP.1 = 2607:f8b0:400a:80b::2004
+DNS.5 = 2607:f8b0:400a:80b::2004 (google.com)
+IP.2 = 127.0.0.1
+DNS.6 = thirdName
+DNS.7 = thirdName
+DNS.8 = thirdName
+DNS.9 = thirdName
+DNS.10 = tenthName
 EOF
 
 
@@ -131,6 +147,15 @@ run_success "req -new -days 3650 -sha512 -key ./certs/server-key.pem -config ./t
 rm -f tmp.cert
 
 run_success "req -new -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -x509 -out tmp.cert" "test"
+
+run_success "req -new -key ./certs/ca-key.pem -config ./test.conf -extensions v3_alt_req_full -out tmp.cert"
+run_success "req -in ./tmp.cert -noout -text"
+echo $RESULT | grep tenthName
+if [ $? -ne 0 ]; then
+    echo Failed to find tenthName in alt names
+    exit 99
+fi
+
 rm -f tmp.cert
 rm -f new-key.pem
 rm -f test.conf

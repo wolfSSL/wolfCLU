@@ -288,8 +288,8 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
 static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             char* sect)
 {
-    char *current;
-    int  i;
+    WOLFSSL_STACK *altNames;
+    int i, ret = WOLFCLU_SUCCESS;
 
     if (sect == NULL) {
         return WOLFCLU_SUCCESS; /* none set */
@@ -299,54 +299,65 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     WOLFCLU_LOG(WOLFCLU_L0, "Skipping alt names, recompile wolfSSL with WOLFSSL_ALT_NAMES...");
 #else
 
-    /* get DNS names */
-    i = 1;
-    do {
-        char name[7];
-        snprintf(name, 6, "DNS.%d", i);
-        current = wolfSSL_NCONF_get_string(conf, sect, name);
-        if (current != NULL) {
-            if (wolfSSL_X509_add_altname(x509, current, ASN_DNS_TYPE)
-                    != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "error adding alt name %s", current);
+    altNames = wolfSSL_NCONF_get_section(conf, sect);
+    if (altNames != NULL) {
+        int total;
+
+        total = wolfSSL_sk_CONF_VALUE_num(altNames);
+        for (i = 0; i < total; i++) {
+            WOLFSSL_CONF_VALUE *c;
+            WOLFSSL_ASN1_STRING *ipStr = NULL;
+            char *s   = NULL;
+            int   sSz = 0;
+            int   type;
+
+            c = wolfSSL_sk_CONF_VALUE_value(altNames, i);
+            if (c == NULL) {
+                WOLFCLU_LOG(WOLFCLU_L0, "Unexpected null value found in alt "
+                        "names stack");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
             }
-        }
-        i++;
-    } while(current != NULL);
 
-    /* get IP names */
-    i = 1;
-    do {
-        char name[7];
-        snprintf(name, 6, "IP.%d", i);
-        current = wolfSSL_NCONF_get_string(conf, sect, name);
-        if (current != NULL) {
-            /* convert to hex value */
-            WOLFSSL_ASN1_STRING *str = wolfSSL_a2i_IPADDRESS(current);
+            if (XSTRNCMP(c->name, "IP", 2) == 0) {
+                ipStr = wolfSSL_a2i_IPADDRESS(c->value);
 
-            if (str != NULL) {
-                unsigned char *data;
-                int dataSz;
+                if (ipStr != NULL) {
+                    s   = (char*)wolfSSL_ASN1_STRING_data(ipStr);
+                    sSz = wolfSSL_ASN1_STRING_length(ipStr);
+                    type = ASN_IP_TYPE;
 
-                data   = wolfSSL_ASN1_STRING_data(str);
-                dataSz = wolfSSL_ASN1_STRING_length(str);
-
-                if (wolfSSL_X509_add_altname_ex(x509, (const char*)data, dataSz,
-                            ASN_IP_TYPE) != WOLFSSL_SUCCESS) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "error adding ip alt name %s", data);
                 }
-                wolfSSL_ASN1_STRING_free(str);
+                else {
+                    WOLFCLU_LOG(WOLFCLU_E0, "bad IP found %s", c->value);
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+                }
+
             }
-            else {
-                WOLFCLU_LOG(WOLFCLU_E0, "bad IP found %s", current);
-                return WOLFCLU_FATAL_ERROR;
+
+            if (XSTRNCMP(c->name, "DNS", 3) == 0) {
+                type = ASN_DNS_TYPE;
+                s = c->value;
+                sSz = (int)XSTRLEN(c->value);
             }
+
+            if (wolfSSL_X509_add_altname_ex(x509, s, sSz, type)
+                    != WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "error adding alt name %s", c->value);
+                if (ipStr != NULL)
+                    wolfSSL_ASN1_STRING_free(ipStr);
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
+
+            if (ipStr != NULL)
+                wolfSSL_ASN1_STRING_free(ipStr);
         }
-        i++;
-    } while(current != NULL);
+    }
 #endif
 
-    return WOLFCLU_SUCCESS;
+    return ret;
 }
 
 
@@ -355,6 +366,7 @@ int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
 {
     char *current;
     int  idx = 1;
+    int  ret = WOLFCLU_SUCCESS;
 
     if (sect == NULL) {
         return WOLFCLU_SUCCESS; /* none set */
@@ -384,9 +396,9 @@ int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
     current = wolfSSL_NCONF_get_string(conf, sect, "subjectAltName");
     if (current != NULL && current[0] == '@') {
         current = current+1;
-        wolfCLU_setAltNames(x509, conf, current);
+        ret = wolfCLU_setAltNames(x509, conf, current);
     }
-    return WOLFCLU_SUCCESS;
+    return ret;
 }
 #else
 int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
