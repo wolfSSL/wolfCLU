@@ -46,7 +46,6 @@ int wolfCLU_certSetup(int argc, char** argv)
     int   outForm = PEM_FORM; /* the output format */
     int inFormSet = 0; /* flag indicating if -inform was given */
     int outFormSet = 0; /* flag indicating if -outform was given */
-    int noConversion = 0; /* flag indicating if inform == outform */
 
     /* flags for printing out specific parts of the x509 */
     byte printSubject = 0;
@@ -273,11 +272,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     wolfSSL_BIO_free(in);
     wolfSSL_BIO_free(inMem);
 
-    if (inFormSet == 1 && outFormSet == 1 && (inForm == outForm)) {
-        noConversion = 1;
-    }
-
-    if (ret == WOLFCLU_SUCCESS && !noConversion) {
+    if (ret == WOLFCLU_SUCCESS) {
         if (inForm == PEM_FORM) {
             if (wc_PemToDer(inBuf, inBufSz, CERT_TYPE, &derObj, HEAP_HINT, NULL,
                             NULL) != 0) {
@@ -592,15 +587,25 @@ int wolfCLU_certSetup(int argc, char** argv)
 
     /* write out certificate */
     if (ret == WOLFCLU_SUCCESS && !nooutFlag) {
-        /* PEM -> PEM or DER -> DER*/
-        if (noConversion) {
-            if (wolfSSL_BIO_write(out, inBuf, inBufSz) <= 0) {
+        const byte* derBuf = inBuf;
+        int   derBufSz     = inBufSz;
+
+        /* if inform is PEM we convert to DER for excluding input that is not
+         * part of the certificate */
+        if (inForm == PEM_FORM) {
+            derBuf   = derObj->buffer;
+            derBufSz = derObj->length;
+        }
+
+        /* PEM/DER -> DER */
+        if (outForm == DER_FORM) {
+            if (wolfSSL_BIO_write(out, derBuf, derBufSz) <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
-        /* DER -> PEM */
+        /* PEM/DER -> PEM */
         else if (outForm == PEM_FORM) {
-            tmpOutBufSz = wc_DerToPem(inBuf, inBufSz, NULL, 0, CERT_TYPE);
+            tmpOutBufSz = wc_DerToPem(derBuf, derBufSz, NULL, 0, CERT_TYPE);
             if (tmpOutBufSz <= 0) {
                 WOLFCLU_LOG(WOLFCLU_E0, "wc_DerToPem to get necessary length "
                                         "failed");
@@ -613,7 +618,7 @@ int wolfCLU_certSetup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
-                    if (wc_DerToPem(inBuf, inBufSz, tmpOutBuf, tmpOutBufSz,
+                    if (wc_DerToPem(derBuf, derBufSz, tmpOutBuf, tmpOutBufSz,
                                     CERT_TYPE) <= 0) {
                         WOLFCLU_LOG(WOLFCLU_E0, "wc_DerToPem failed");
                         ret = WOLFCLU_FATAL_ERROR;
@@ -625,12 +630,6 @@ int wolfCLU_certSetup(int argc, char** argv)
                         }
                     }
                 }
-            }
-        }
-        /* PEM -> DER */
-        else {
-            if (wolfSSL_BIO_write(out, derObj->buffer, derObj->length) <= 0) {
-                ret = WOLFCLU_FATAL_ERROR;
             }
         }
     }
