@@ -165,6 +165,7 @@ run1() {
         echo "Unexpected output difference"
         exit 99
     fi
+    rm -f combined.pem
     rm -f process_x509.pem
     rm -f process_ca-cert.pem
     echo ""
