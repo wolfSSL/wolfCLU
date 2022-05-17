@@ -44,8 +44,6 @@ int wolfCLU_certSetup(int argc, char** argv)
     char* outFile = NULL;   /* pointer to the outFile name */
     int   inForm  = PEM_FORM; /* the input format */
     int   outForm = PEM_FORM; /* the output format */
-    int inFormSet = 0; /* flag indicating if -inform was given */
-    int outFormSet = 0; /* flag indicating if -outform was given */
 
     /* flags for printing out specific parts of the x509 */
     byte printSubject = 0;
@@ -105,9 +103,6 @@ int wolfCLU_certSetup(int argc, char** argv)
             if (inForm == USER_INPUT_ERROR) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
-            else {
-                inFormSet = 1;
-            }
         }
         if (idx < 0) {
             ret = WOLFCLU_FATAL_ERROR;
@@ -123,9 +118,6 @@ int wolfCLU_certSetup(int argc, char** argv)
             outForm = wolfCLU_checkOutform(argv[idx+1]);
             if (outForm == USER_INPUT_ERROR) {
                 ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                outFormSet = 1;
             }
         }
         if (idx < 0) {
