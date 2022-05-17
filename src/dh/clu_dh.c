@@ -294,30 +294,54 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
     }
 
      /* Check if parameters are valid */
-    if(ret == WOLFCLU_SUCCESS && check){
-        byte p[WOLFSSL_MAX_DH_BITS/8];
-        byte g[WOLFSSL_MAX_DH_BITS/8];
-        byte q[WOLFSSL_MAX_DH_Q_SIZE/8];
-        word32 p_len, g_len, q_len;
-
-        p_len = (word32)sizeof(p);
-        q_len = (word32)sizeof(q);
-        g_len = (word32)sizeof(g);
+    if (ret == WOLFCLU_SUCCESS && check){
+        byte *p = NULL;
+        byte *g = NULL;
+        byte *q = NULL;
+        word32 p_len = 0, g_len = 0, q_len = 0;
 
         /* Export DH parameters */
-        if (wc_DhExportParamsRaw(&dh, p, &p_len, q, &q_len, g, &g_len) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Failed to export DH params");
+        if (wc_DhExportParamsRaw(&dh, p, &p_len, q, &q_len, g, &g_len) !=
+                LENGTH_ONLY_E) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Failed to get sizes for export DH params");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
-        if (wc_DhSetCheckKey(&dh, p, p_len, g, g_len, q, q_len, 0, &rng) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Failed to set/check DH params");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            WOLFCLU_LOG(WOLFCLU_L0, "DH params are valid.");
+        if (ret == WOLFCLU_SUCCESS) {
+            p = (byte*)XMALLOC(p_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+            q = (byte*)XMALLOC(q_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+            g = (byte*)XMALLOC(g_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+            if (p == NULL || q == NULL || g == NULL) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Failed to malloc DH params buffer");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
 
+        if (ret == WOLFCLU_SUCCESS) {
+            if (wc_DhExportParamsRaw(&dh, p, &p_len, q, &q_len, g, &g_len) !=
+                    0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Failed to export DH params");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            if (wc_DhSetCheckKey(&dh, p, p_len, g, g_len, q, q_len, 0, &rng)
+                    != 0) {
+                WOLFCLU_LOG(WOLFCLU_E0, "Failed to set/check DH params");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                WOLFCLU_LOG(WOLFCLU_L0, "DH params are valid.");
+            }
+        }
+
+        if (p != NULL)
+            XFREE(p, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        if (q != NULL)
+            XFREE(q, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        if (g != NULL)
+            XFREE(g, NULL, DYNAMIC_TYPE_TMP_BUFFER);
      }
 
     /* print out the dh key */
