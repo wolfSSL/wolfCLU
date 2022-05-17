@@ -150,6 +150,25 @@ run1() {
     # Check DER -> PEM didn't alter any data
     check_cert_signature test.pem sha256
     echo ""
+
+    echo "TEST 1.i"
+    cat ./certs/ca-key.pem > combined.pem
+    cat ./certs/ca-cert.pem >> combined.pem
+    test_case "-in combined.pem -out process_x509.pem"
+    test_case "-in process_x509.pem -text"
+    echo -e $OUTPUT > ./process_x509.pem
+
+    test_case "-in ./certs/ca-cert.pem -text"
+    echo -e $OUTPUT > ./process_ca-cert.pem
+    diff ./process_ca-cert.pem ./process_x509.pem
+    if [ $? -ne 0 ]; then
+        echo "Unexpected output difference"
+        exit 99
+    fi
+    rm -f combined.pem
+    rm -f process_x509.pem
+    rm -f process_ca-cert.pem
+    echo ""
 }
 
 run2() {
