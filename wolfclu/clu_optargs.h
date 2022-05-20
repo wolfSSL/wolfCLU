@@ -95,7 +95,7 @@ enum {
     WOLFCLU_HELP,
     WOLFCLU_DEBUG,
     WOLFCLU_CHECK,
-
+    WOLFCLU_VERIFY_RETURN_ERROR,
 };
 
 /* algos */

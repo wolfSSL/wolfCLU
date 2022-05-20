@@ -28,10 +28,12 @@
 #include <wolfclu/client.h>
 
 static const struct option client_options[] = {
-    {"connect",   required_argument, 0, WOLFCLU_CONNECT   },
-    {"starttls",  required_argument, 0, WOLFCLU_STARTTLS  },
-    {"help",      no_argument,       0, WOLFCLU_HELP      },
-    {"h",         no_argument,       0, WOLFCLU_HELP      },
+    {"connect",             required_argument, 0, WOLFCLU_CONNECT            },
+    {"starttls",            required_argument, 0, WOLFCLU_STARTTLS           },
+    {"CAfile",              required_argument, 0, WOLFCLU_CAFILE             },
+    {"verify_return_error", no_argument,       0, WOLFCLU_VERIFY_RETURN_ERROR},
+    {"help",                no_argument,       0, WOLFCLU_HELP               },
+    {"h",                   no_argument,       0, WOLFCLU_HELP               },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -44,11 +46,13 @@ static void wolfCLU_ClientHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
 }
 
-static const char hostFlag[] = "-h";
-static const char portFlag[] = "-p";
-static const char noVerifyFlag[] = "-d";
-static const char noClientCert[] = "-x";
-static const char startTLSFlag[] = "-M";
+static const char hostFlag[]       = "-h";
+static const char portFlag[]       = "-p";
+static const char noVerifyFlag[]   = "-d";
+static const char caFileFlag[]     = "-A";
+static const char noClientCert[]   = "-x";
+static const char startTLSFlag[]   = "-M";
+static const char disableCRLFlag[] = "-C";
 
 int myoptind = 0;
 char* myoptarg = NULL;
@@ -79,6 +83,8 @@ int wolfCLU_Client(int argc, char** argv)
     int option;
     char* host = NULL;
     int   idx  = 0;
+    /* Don't verify peer by default (same as OpenSSL). */
+    int   verify = 0;
 
     int    clientArgc = 0;
     const char* clientArgv[MAX_CLIENT_ARGS];
@@ -132,6 +138,21 @@ int wolfCLU_Client(int argc, char** argv)
                 }
                 break;
 
+            case WOLFCLU_CAFILE:
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = _addClientArg(clientArgv, caFileFlag, &clientArgc);
+                    if (ret == WOLFCLU_SUCCESS) {
+                        ret = _addClientArg(clientArgv, optarg, &clientArgc);
+                    }
+                }
+                break;
+
+            case WOLFCLU_VERIFY_RETURN_ERROR:
+                if (ret == WOLFCLU_SUCCESS) {
+                    verify = 1;
+                }
+                break;
+
             case WOLFCLU_HELP:
                 wolfCLU_ClientHelp();
                 return WOLFCLU_SUCCESS;
@@ -146,22 +167,28 @@ int wolfCLU_Client(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        /* @TODO later check for -CAfile flag and default to verify */
+    if (ret == WOLFCLU_SUCCESS && !verify) {
         ret = _addClientArg(clientArgv, noVerifyFlag, &clientArgc);
+
+        WOLFCLU_LOG(WOLFCLU_L0, "\nWarning: -verify_return_error not specified."
+            " Defaulting to NOT verifying peer.");
     }
 
     if (ret == WOLFCLU_SUCCESS) {
         ret = _addClientArg(clientArgv, noClientCert, &clientArgc);
     }
 
+    /* add TLS downgrade support i.e -v d to arguments */
     if (ret == WOLFCLU_SUCCESS) {
-        /* add TLS downgrade support i.e -v d to arguments */
         ret = _addClientArg(clientArgv, "-v", &clientArgc);
     }
-
     if (ret == WOLFCLU_SUCCESS) {
         ret = _addClientArg(clientArgv, "d", &clientArgc);
+    }
+
+    /* No CRL support, yet. Disable CRL check. */
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = _addClientArg(clientArgv, disableCRLFlag, &clientArgc);
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -169,9 +196,6 @@ int wolfCLU_Client(int argc, char** argv)
         args.argc = clientArgc;
 
         client_test(&args);
-
-        WOLFCLU_LOG(WOLFCLU_E0, "\nWARNING!!! peer was not verified, -CAfile "
-                "is upcoming");
     }
 
     if (host != NULL) {
