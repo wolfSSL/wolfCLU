@@ -44,10 +44,18 @@ static const struct option ecparam_options[] = {
 
 static void wolfCLU_ecparamNamesPrint(void)
 {
+    int maxId;
     int id;
 
+#if defined(HAVE_FIPS) && \
+    defined(HAVE_FIPS_VERSION) && (HAVE_FIPS_VERSION < 4)
+    maxId = ECC_BRAINPOOLP512R1;
+#else
+    maxId = ECC_CURVE_MAX;
+#endif
+
     WOLFCLU_LOG(WOLFCLU_L0, "\tname options:");
-    for (id = 0; id < ECC_CURVE_MAX; id++) {
+    for (id = 0; id < maxId; id++) {
         const char* name = wc_ecc_get_name(id);
         if (name != NULL && XSTRNCMP(name, "SAKKE", 5) != 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "\t\t%s", wc_ecc_get_name(id));
