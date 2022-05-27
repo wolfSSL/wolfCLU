@@ -45,6 +45,24 @@ if [ $? != 0 ]; then
     exit 99
 fi
 
+RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem ./certs/server-cert.pem`
+if [ $? != 0 ]; then
+    echo "Failed on test \"./wolfssl verify -CAfile ./certs/ca-cert.pem ./certs/server-cert.pem\""
+    exit 99
+fi
+
+RESULT=`./wolfssl verify -CAfile ./certs/server-cert.pem ./certs/server-cert.pem`
+if [ $? == 0 ]; then
+    echo "Failed on test \"./wolfssl verify -CAfile ./certs/server-cert.pem ./certs/server-cert.pem\""
+    exit 99
+fi
+
+RESULT=`./wolfssl verify -partial_check -CAfile ./certs/server-cert.pem ./certs/server-cert.pem`
+if [ $? != 0 ]; then
+    echo "Failed on test \"./wolfssl verify -partial_check -CAfile ./certs/server-cert.pem ./certs/server-cert.pem\""
+    exit 99
+fi
+
 RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem -crl_check ./certs/server-cert.pem 2>&1 | grep "recompile wolfSSL with CRL"`
 HAVE_CRL=$?
 
