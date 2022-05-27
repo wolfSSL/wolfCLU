@@ -22,7 +22,9 @@
 #ifndef CLU_PKEY_H
 #define CLU_PKEY_H
 
+#ifndef WOLFSSL_USER_SETTINGS
 #include <wolfssl/options.h>
+#endif
 #ifdef HAVE_ED25519
     #include <wolfssl/wolfcrypt/ed25519.h>
 #endif

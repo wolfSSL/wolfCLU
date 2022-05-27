@@ -19,7 +19,9 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#ifndef WOLFSSL_USER_SETTINGS
 #include <wolfssl/options.h>
+#endif
 #include <wolfssl/wolfcrypt/asn_public.h> /* wc_DerToPem */
 
 #if defined(WOLFSSL_KEY_GEN) && !defined(NO_ASN)

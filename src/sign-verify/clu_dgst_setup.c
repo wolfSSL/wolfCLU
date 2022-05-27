@@ -29,19 +29,19 @@
 
 static const struct option dgst_options[] = {
 
-    {"md5",       no_argument,       0, WOLFCLU_MD5        },
-    {"sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
-    {"sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
-    {"sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
-    {"sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
-    {"sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
+    {"-md5",       no_argument,       0, WOLFCLU_MD5        },
+    {"-sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
+    {"-sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
+    {"-sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
+    {"-sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
+    {"-sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
 
-    {"out",       required_argument, 0, WOLFCLU_INFILE    },
-    {"signature", required_argument, 0, WOLFCLU_INFILE    },
-    {"verify",    required_argument, 0, WOLFCLU_VERIFY    },
-    {"sign",     required_argument, 0, WOLFCLU_SIGN      },
-    {"h",        no_argument,       0, WOLFCLU_HELP      },
-    {"help",     no_argument,       0, WOLFCLU_HELP      },
+    {"-out",       required_argument, 0, WOLFCLU_INFILE    },
+    {"-signature", required_argument, 0, WOLFCLU_INFILE    },
+    {"-verify",    required_argument, 0, WOLFCLU_VERIFY    },
+    {"-sign",     required_argument, 0, WOLFCLU_SIGN      },
+    {"-h",        no_argument,       0, WOLFCLU_HELP      },
+    {"-help",     no_argument,       0, WOLFCLU_HELP      },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -192,7 +192,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    dgst_options, &longIndex )) != -1) {
 
         switch (option) {

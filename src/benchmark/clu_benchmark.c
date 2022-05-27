@@ -62,8 +62,6 @@ int wolfCLU_benchmark(int timer, int* option)
 
     wc_InitRng(&rng);
 
-    signal(SIGALRM, wolfCLU_stop);
-
     /* @fragile:
      * this function assumes that it perfectly knows the order and length of
      * the option array in clu_src/benchmark/clu_bench_setup.c. Looping over a
@@ -99,7 +97,6 @@ int wolfCLU_benchmark(int timer, int* option)
         wc_RNG_GenerateBlock(&rng, key, AES_BLOCK_SIZE);
         wc_RNG_GenerateBlock(&rng, iv, AES_BLOCK_SIZE);
         start = wolfCLU_getTime();
-        alarm(timer);
 
         wc_AesSetKey(&aes, key, AES_BLOCK_SIZE, iv, AES_ENCRYPTION);
 
@@ -153,7 +150,6 @@ int wolfCLU_benchmark(int timer, int* option)
         wc_RNG_GenerateBlock(&rng, key, AES_BLOCK_SIZE);
         wc_RNG_GenerateBlock(&rng, iv, AES_BLOCK_SIZE);
         start = wolfCLU_getTime();
-        alarm(timer);
 
         wc_AesSetKeyDirect(&aes, key, AES_BLOCK_SIZE, iv, AES_ENCRYPTION);
         while (loop) {
@@ -206,7 +202,6 @@ int wolfCLU_benchmark(int timer, int* option)
         wc_RNG_GenerateBlock(&rng, iv, DES3_BLOCK_SIZE);
 
         start = wolfCLU_getTime();
-        alarm(timer);
 
         wc_Des3_SetKey(&des3, key, iv, DES_ENCRYPTION);
         while (loop) {
@@ -262,7 +257,6 @@ int wolfCLU_benchmark(int timer, int* option)
         wc_RNG_GenerateBlock(&rng, iv, CAMELLIA_BLOCK_SIZE);
 
         start = wolfCLU_getTime();
-        alarm(timer);
 
         wc_CamelliaSetKey(&camellia, key, CAMELLIA_BLOCK_SIZE, iv);
         while (loop) {
@@ -304,7 +298,6 @@ int wolfCLU_benchmark(int timer, int* option)
 
         wc_InitMd5(&md5);
         start = wolfCLU_getTime();
-        alarm(timer);
 
         while (loop) {
             wc_Md5Update(&md5, plain, MEGABYTE);
@@ -344,7 +337,6 @@ int wolfCLU_benchmark(int timer, int* option)
 
         wc_InitSha(&sha);
         start = wolfCLU_getTime();
-        alarm(timer);
 
         while (loop) {
             wc_ShaUpdate(&sha, plain, MEGABYTE);
@@ -385,7 +377,6 @@ int wolfCLU_benchmark(int timer, int* option)
 
         wc_InitSha256(&sha256);
         start = wolfCLU_getTime();
-        alarm(timer);
 
         while (loop) {
             wc_Sha256Update(&sha256, plain, MEGABYTE);
@@ -427,7 +418,6 @@ int wolfCLU_benchmark(int timer, int* option)
 
         wc_InitSha384(&sha384);
         start = wolfCLU_getTime();
-        alarm(timer);
 
         while (loop) {
             wc_Sha384Update(&sha384, plain, MEGABYTE);
@@ -468,7 +458,6 @@ int wolfCLU_benchmark(int timer, int* option)
 
         wc_InitSha512(&sha512);
         start = wolfCLU_getTime();
-        alarm(timer);
 
         while (loop) {
             wc_Sha512Update(&sha512, plain, MEGABYTE);
@@ -508,7 +497,6 @@ int wolfCLU_benchmark(int timer, int* option)
 
         wc_InitBlake2b(&b2b, BLAKE2B_OUTBYTES);
         start = wolfCLU_getTime();
-        alarm(timer);
 
         while (loop) {
             wc_Blake2bUpdate(&b2b, plain, MEGABYTE);

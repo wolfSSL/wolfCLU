@@ -39,13 +39,15 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     int     verifyCheck = 0;
     int     pubInCheck  = 0;
 
-    if (wolfCLU_checkForArg("-rsa", 4, argc, argv) > 0) {
+    /* checkForArg doesn't look for "-" here, as it would have been 
+     * removed in clu_main.c if present */
+    if (wolfCLU_checkForArg("rsa", 3, argc, argv) > 0) {
         algCheck = RSA_SIG_VER;
     }
-    else if (wolfCLU_checkForArg("-ed25519", 8, argc, argv) > 0) {
+    else if (wolfCLU_checkForArg("ed25519", 7, argc, argv) > 0) {
         algCheck = ED25519_SIG_VER;
     }
-    else if (wolfCLU_checkForArg("-ecc", 4, argc, argv) > 0) {
+    else if (wolfCLU_checkForArg("ecc", 3, argc, argv) > 0) {
         algCheck = ECC_SIG_VER;
     }
     else {

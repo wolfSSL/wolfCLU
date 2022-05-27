@@ -24,7 +24,6 @@
 #define WOLFSSL_CLIENT_H
 
 #define NO_MAIN_DRIVER
-typedef void* THREAD_RETURN;
 #define WOLFSSL_THREAD
 
 THREAD_RETURN WOLFSSL_THREAD client_test(void* args);

@@ -30,13 +30,13 @@
 #endif
 
 static const struct option ecparam_options[] = {
-    {"in",        required_argument, 0, WOLFCLU_INFILE    },
-    {"out",       required_argument, 0, WOLFCLU_OUTFILE   },
-    {"inform",    required_argument, 0, WOLFCLU_INFORM    },
-    {"outform",   required_argument, 0, WOLFCLU_OUTFORM   },
-    {"genkey",    no_argument,       0, WOLFCLU_GEN_KEY    },
-    {"name",      required_argument, 0, WOLFCLU_CURVE_NAME },
-    {"text",      no_argument,       0, WOLFCLU_TEXT_OUT },
+    {"-in",        required_argument, 0, WOLFCLU_INFILE    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"-outform",   required_argument, 0, WOLFCLU_OUTFORM   },
+    {"-genkey",    no_argument,       0, WOLFCLU_GEN_KEY    },
+    {"-name",      required_argument, 0, WOLFCLU_CURVE_NAME },
+    {"-text",      no_argument,       0, WOLFCLU_TEXT_OUT },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -71,7 +71,7 @@ int wolfCLU_ecparam(int argc, char** argv)
     char* name = NULL;
     char* out  = NULL;    /* default output file name */
     int   ret        = WOLFCLU_SUCCESS;
-    int   longIndex  = 0;
+    int   longIndex  = 1;
     int   genKey     = 0;
     int   textOut    = 0;
     int   outForm    = PEM_FORM;
@@ -89,7 +89,7 @@ int wolfCLU_ecparam(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = getopt_long_only(argc, argv, "",
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
                    ecparam_options, &longIndex )) != -1) {
 
         switch (option) {

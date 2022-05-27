@@ -29,6 +29,14 @@
 #include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 #include <wolfclu/sign-verify/clu_verify.h>
+
+#ifdef _WIN32 
+char* optarg;
+int   optind ;
+int   opterr ;
+#endif
+
+
 /* enumerate optionals beyond ascii range to dis-allow use of alias IE we
  * do not want "-e" to work for encrypt, user must use "encrypt"
  */
@@ -156,19 +164,22 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    /* If the first string does not have a '-' in front of it then try to
-     * get the mode to use i.e. x509, req, version ... this is for
-     * compatibility with the behavior of the OpenSSL command line utility
-     */
-    if (argc > 1 && argv[1] != NULL && argv[1][0] != '-') {
+    optind = 0;
+
+    /* retain old version of modes where '-' is used. i.e -x509, -req */
+    if (argc > 1 && argv[1] != NULL && argv[1][0] == '-') {
+        argv[1] = argv[1] + 1; 
         flag = getMode(argv[1]);
-    }
-    else {
-        /* retain old version of modes where '-' is used. i.e -x509, -req */
-        flag = getopt_long_only(argc, argv,"", mode_options, &longIndex);
 
         /* if -rsa was used then it is the older sign/verify version of rsa */
         if (flag == WOLFCLU_RSA) flag = WOLFCLU_RSALEGACY;
+    }
+   /* If the first string does not have a '-' in front of it then try to
+     * get the mode to use i.e. x509, req, version ... this is for
+     * compatibility with the behavior of the OpenSSL command line utility
+     */
+    else {
+        flag = wolfCLU_GetOpt(argc, argv,"", mode_options, &longIndex);
     }
 
     switch (flag) {
