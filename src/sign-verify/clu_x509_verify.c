@@ -28,7 +28,7 @@
 static const struct option verify_options[] = {
     {"-CAfile",        required_argument, 0, WOLFCLU_CAFILE        },
     {"-crl_check",     no_argument,       0, WOLFCLU_CHECK_CRL     },
-    {"-partial_check", no_argument,       0, WOLFCLU_PARTIAL_CHECK },
+    {"-partial_chain", no_argument,       0, WOLFCLU_PARTIAL_CHAIN },
     {"-help",          no_argument,       0, WOLFCLU_HELP          },
     {"-h",             no_argument,       0, WOLFCLU_HELP          },
 
@@ -39,7 +39,7 @@ static const struct option verify_options[] = {
 static void wolfCLU_x509VerifyHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl verify -CAfile <ca file name> "
-            "[-crl_check] [-partial_check] <cert to verify>");
+            "[-crl_check] [-partial_chain] <cert to verify>");
 }
 
 
@@ -48,7 +48,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     int ret    = WOLFCLU_SUCCESS;
     int inForm = PEM_FORM;
     int crlCheck     = 0;
-    int partialCheck = 0;
+    int partialChain = 0;
     int longIndex    = 1;
     int option;
     char* caCert     = NULL;
@@ -91,8 +91,8 @@ int wolfCLU_x509Verify(int argc, char** argv)
                     caCert = optarg;
                     break;
                
-                case WOLFCLU_PARTIAL_CHECK:
-                    partialCheck = 1;
+                case WOLFCLU_PARTIAL_CHAIN:
+                    partialChain = 1;
                     break;
 
                 case WOLFCLU_INFORM:
@@ -137,9 +137,9 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    /* Confirm CA file is root CA unless parialCheck enabled */
+    /* Confirm CA file is root CA unless partialChain enabled */
     if (ret == WOLFCLU_SUCCESS){ 
-        if (!partialCheck && caCert != NULL){
+        if (!partialChain && caCert != NULL){
             int error;
 
             error = wolfSSL_CertManagerVerify(store->cm, caCert,

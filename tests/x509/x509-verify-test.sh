@@ -57,9 +57,9 @@ if [ $? == 0 ]; then
     exit 99
 fi
 
-RESULT=`./wolfssl verify -partial_check -CAfile ./certs/server-cert.pem ./certs/server-cert.pem`
+RESULT=`./wolfssl verify -partial_chain -CAfile ./certs/server-cert.pem ./certs/server-cert.pem`
 if [ $? != 0 ]; then
-    echo "Failed on test \"./wolfssl verify -partial_check -CAfile ./certs/server-cert.pem ./certs/server-cert.pem\""
+    echo "Failed on test \"./wolfssl verify -partial_chain -CAfile ./certs/server-cert.pem ./certs/server-cert.pem\""
     exit 99
 fi
 
