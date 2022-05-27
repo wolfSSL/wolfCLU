@@ -40,6 +40,8 @@
 #define WOLFCLU_EA_MATCH    0x00001000 /* email must match */
 #define WOLFCLU_EA_SUPPLIED 0x00002000 /* email must be set */
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 struct WOLFCLU_CERT_SIGN {
     char* outDir;
     char* ext; /* location of extensions to use */
@@ -1033,3 +1035,4 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     return ret;
 }
 
+#endif /* WOLFCLU_NO_FILESYSTEM */

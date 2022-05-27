@@ -27,6 +27,8 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 static const struct option pkey_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
@@ -405,10 +407,11 @@ int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
 
     return ret;
 }
-
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 
 int wolfCLU_pKeySetup(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     int ret    = WOLFCLU_SUCCESS;
     int inForm  = PEM_FORM;
     int outForm = PEM_FORM;
@@ -600,5 +603,11 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     wolfSSL_EVP_PKEY_free(pkey);
 
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
 

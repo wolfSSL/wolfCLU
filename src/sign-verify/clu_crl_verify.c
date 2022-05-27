@@ -26,7 +26,7 @@
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_cert.h>
 
-#ifdef HAVE_CRL
+#if defined(HAVE_CRL) && !defined(WOLFCLU_NO_FILESYSTEM)
 static const struct option crl_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
@@ -58,7 +58,7 @@ static void wolfCLU_CRLVerifyHelp(void)
 
 int wolfCLU_CRLVerify(int argc, char** argv)
 {
-#ifdef HAVE_CRL
+#if defined(HAVE_CRL) && !defined(WOLFCLU_NO_FILESYSTEM) 
     int ret     = WOLFCLU_SUCCESS;
     int inForm  = PEM_FORM;
     int outForm = PEM_FORM;
@@ -270,7 +270,12 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 #else
     (void)argc;
     (void)argv;
+#ifndef HAVE_CRL
     WOLFCLU_LOG(WOLFCLU_E0, "recompile wolfSSL with CRL support");
+#endif
+#ifdef WOLFCLU_NO_FILESYSTEM
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+#endif 
     return WOLFCLU_FATAL_ERROR;
 #endif
 }

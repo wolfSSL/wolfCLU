@@ -27,6 +27,8 @@
 #include <wolfclu/x509/clu_x509_sign.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 static const struct option ca_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
@@ -58,10 +60,12 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-selfsign sign with key associated with cert");
 }
+#endif
 
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_CASetup(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     WOLFCLU_CERT_SIGN* signer = NULL;
     WOLFSSL_BIO *keyIn  = NULL;
     WOLFSSL_BIO *reqIn  = NULL;
@@ -251,5 +255,10 @@ int wolfCLU_CASetup(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
-

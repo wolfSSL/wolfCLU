@@ -27,6 +27,8 @@
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 #include <wolfclu/pkey/clu_pkey.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 static const struct option dgst_options[] = {
 
     {"-md5",       no_argument,       0, WOLFCLU_MD5        },
@@ -150,11 +152,12 @@ static int ExtractKey(void* key, WOLFSSL_EVP_PKEY* pkey, int* keySz,
 
     return ret;
 }
-
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_dgst_setup(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     ecc_key ecc;
     RsaKey  rsa;
     WOLFSSL_BIO *sigBio = NULL;
@@ -473,5 +476,11 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     wolfSSL_BIO_free(dataBio);
 
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
 

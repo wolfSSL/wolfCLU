@@ -328,3 +328,63 @@ int main(int argc, char** argv)
     return (ret == WOLFCLU_SUCCESS)? 0 : ret;
 }
 
+#ifdef WOLFCLU_FREERTOS
+
+#ifndef HAL_CONSOLE_UART
+#define HAL_CONSOLE_UART huart4
+#endif
+extern UART_HandleTypeDef HAL_CONSOLE_UART;
+
+/* When building on FreeRTOS, clu_entry() acts as the entry function and
+ * parses the UART-transmitted command. Be sure to rename the main function
+ *  above, to clu_main() so the right function is called below */
+int clu_entry(const void* argument)
+{
+
+	HAL_StatusTypeDef halRet;
+	uint8_t buffer[50];
+
+	WOLFCLU_LOG(WOLFCLU_L0, "Please enter a wolfCLU command (wolfssl -h for help)");
+
+        /* Recieve the command from the UART console */
+        do {
+	    halRet = HAL_UART_Receive(&HAL_CONSOLE_UART, buffer, sizeof(buffer),100);
+	} while (halRet != HAL_OK || buffer[0] == '\n' || buffer[0] == '\r');
+
+	WOLFCLU_LOG(WOLFCLU_L0, "Command received.");
+
+	char* command = (char*)buffer;
+	char* token;
+	int argc = 1;
+	int i = 0;
+
+	for(i=0;command[i]!='\0';i++){
+		if (command[i]==' '){
+			argc++;
+		}
+	}
+
+	char* argv[argc];
+
+	i=0;
+	token = strtok(command, " ");
+
+        /* split the command string to correspond to separate argv[i] */
+	while( token != NULL ) {
+	    argv[i] = malloc(XSTRLEN(token)+1);
+	    XMEMSET(argv[i], 0, XSTRLEN(token)+1);
+	    XSTRNCPY(argv[i], token, XSTRLEN(token));
+	    i++;
+	    if(i==(argc-1)){
+	    	token = strtok(NULL, "\r");
+	    }
+	    else{
+	    	token = strtok(NULL, " ");
+	    }
+	}
+
+	int ret = clu_main(argc, argv);
+
+	return ret;
+}
+#endif

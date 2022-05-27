@@ -27,6 +27,7 @@
 
 int wolfCLU_sign_verify_setup(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     int     ret  = WOLFCLU_SUCCESS;
     char*   in   = NULL; /* input variable */
     char*   out  = NULL; /* output variable */
@@ -237,6 +238,11 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (sig)
         XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }

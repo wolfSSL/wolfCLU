@@ -26,6 +26,8 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 static const struct option pkcs12_options[] = {
     {"-nodes",     no_argument, 0, WOLFCLU_NODES   },
     {"-nocerts",   no_argument, 0, WOLFCLU_NOCERTS },
@@ -52,11 +54,11 @@ static void wolfCLU_pKeyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-passin source to get password from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-passout source to output password to");
 }
-
+#endif
 
 int wolfCLU_PKCS12(int argc, char** argv)
 {
-#ifdef HAVE_PKCS12
+#if defined(HAVE_PKCS12) && !defined(WOLFCLU_NO_FILESYSTEM)
     char password[MAX_PASSWORD_SIZE];
     int passwordSz = MAX_PASSWORD_SIZE;
     int ret    = WOLFCLU_SUCCESS;
@@ -241,8 +243,14 @@ int wolfCLU_PKCS12(int argc, char** argv)
     (void)useDES;
     return ret;
 #else
-    WOLFCLU_LOG(WOLFCLU_E0, "Recompile wolfSSL with PKCS12 support");
+    (void)argc;
+    (void)argv;
+#ifndef HAVE_PKCS12
+    WOLFCLU_LOG(WOLFCLU_E0, "PKCS12 support not compiled into wolfSSL");
+#endif
+#ifdef WOLFCLU_NO_FILESYSTEM 
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+#endif    
     return WOLFCLU_FATAL_ERROR;
 #endif
 }
-

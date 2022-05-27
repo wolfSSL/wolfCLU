@@ -35,10 +35,12 @@ extern "C" {
 #include <corecrt_io.h>
 #include <sys/timeb.h>
 
-#else /* running on *nix */
+#else
 #include <unistd.h>
-#include <termios.h>
 #include <sys/time.h>
+#ifndef WOLFCLU_FREERTOS
+#include <termios.h>
+#endif
 #endif
 
 /* wolfssl includes */
@@ -65,7 +67,9 @@ extern "C" {
 #include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/signature.h>
 #include <wolfssl/wolfcrypt/pkcs12.h>
+#ifndef WOLFCLU_NO_FILESYSTEM
 #include <wolfssl/test.h>
+#endif
 
 #ifdef HAVE_FIPS
     #include <wolfssl/wolfcrypt/fips_test.h>
@@ -99,6 +103,12 @@ extern "C" {
 
 #define BLOCK_SIZE 16384
 #define MEGABYTE (1024*1024)
+#define KILOBYTE 1024
+#ifdef WOLFCLU_FREERTOS
+	#define BYTE_UNIT KILOBYTE
+#else
+	#define BYTE_UNIT MEGABYTE
+#endif
 #define MAX_TERM_WIDTH 80
 #define MAX_THREADS 64
 #define MAX_FILENAME_SZ 256
@@ -119,6 +129,10 @@ extern "C" {
 #endif
 
 #include <wolfclu/clu_error_codes.h>
+
+#ifdef WOLFCLU_NO_FILESYSTEM
+    #define WOLFCLU_NO_TERM_SUPPORT 
+#endif
 
  /* @VERSION
   * Update every time library change,

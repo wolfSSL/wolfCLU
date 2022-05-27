@@ -27,6 +27,8 @@
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_cert.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 #define MAX_CERT_SIZE 16384
 
 enum {
@@ -206,3 +208,4 @@ int wolfCLU_extKeyUsagePrint(WOLFSSL_BIO* bio, unsigned int keyUsage,
     return WOLFSSL_SUCCESS;
 }
 
+#endif /* WOLFCLU_NO_FILESYSTEM */

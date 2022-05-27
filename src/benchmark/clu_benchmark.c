@@ -289,18 +289,18 @@ int wolfCLU_benchmark(int timer, int* option)
                          DYNAMIC_TYPE_TMP_BUFFER);
         if (digest == NULL)
             return MEMORY_E;
-        plain = XMALLOC(MEGABYTE, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        plain = XMALLOC(BYTE_UNIT, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (plain == NULL) {
             wolfCLU_freeBins(digest, NULL, NULL, NULL, NULL);
             return MEMORY_E;
         }
-        wc_RNG_GenerateBlock(&rng, plain, MEGABYTE);
+        wc_RNG_GenerateBlock(&rng, plain, BYTE_UNIT);
 
         wc_InitMd5(&md5);
         start = wolfCLU_getTime();
 
         while (loop) {
-            wc_Md5Update(&md5, plain, MEGABYTE);
+            wc_Md5Update(&md5, plain, BYTE_UNIT);
             blocks++;
             currTime = wolfCLU_getTime();
             stop = currTime - start;
@@ -309,8 +309,8 @@ int wolfCLU_benchmark(int timer, int* option)
         }
         wc_Md5Final(&md5, digest);
         printf("MD5 ");
-        wolfCLU_stats(start, MEGABYTE, blocks);
-        XMEMSET(plain, 0, MEGABYTE);
+        wolfCLU_stats(start, BYTE_UNIT, blocks);
+        XMEMSET(plain, 0, BYTE_UNIT);
         XMEMSET(digest, 0, WC_MD5_DIGEST_SIZE);
         wolfCLU_freeBins(digest, plain, NULL, NULL, NULL);
         blocks = 0;
@@ -328,18 +328,18 @@ int wolfCLU_benchmark(int timer, int* option)
                          DYNAMIC_TYPE_TMP_BUFFER);
         if (digest == NULL)
             return MEMORY_E;
-        plain = XMALLOC(MEGABYTE, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        plain = XMALLOC(BYTE_UNIT, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (plain == NULL) {
             wolfCLU_freeBins(digest, NULL, NULL, NULL, NULL);
             return MEMORY_E;
         }
-        wc_RNG_GenerateBlock(&rng, plain, MEGABYTE);
+        wc_RNG_GenerateBlock(&rng, plain, BYTE_UNIT);
 
         wc_InitSha(&sha);
         start = wolfCLU_getTime();
 
         while (loop) {
-            wc_ShaUpdate(&sha, plain, MEGABYTE);
+            wc_ShaUpdate(&sha, plain, BYTE_UNIT);
             blocks++;
             currTime = wolfCLU_getTime();
             stop = currTime - start;
@@ -348,8 +348,8 @@ int wolfCLU_benchmark(int timer, int* option)
         }
         wc_ShaFinal(&sha, digest);
         printf("Sha ");
-        wolfCLU_stats(start, MEGABYTE, blocks);
-        XMEMSET(plain, 0, MEGABYTE);
+        wolfCLU_stats(start, BYTE_UNIT, blocks);
+        XMEMSET(plain, 0, BYTE_UNIT);
         XMEMSET(digest, 0, WC_SHA_DIGEST_SIZE);
         wolfCLU_freeBins(plain, digest, NULL, NULL, NULL);
         blocks = 0;
@@ -367,19 +367,19 @@ int wolfCLU_benchmark(int timer, int* option)
         digest = XMALLOC(SHA256_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (digest == NULL)
             return MEMORY_E;
-        plain = XMALLOC(MEGABYTE, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        plain = XMALLOC(BYTE_UNIT, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (plain == NULL) {
             wolfCLU_freeBins(digest, NULL, NULL, NULL, NULL);
             return MEMORY_E;
         }
 
-        wc_RNG_GenerateBlock(&rng, plain, MEGABYTE);
+        wc_RNG_GenerateBlock(&rng, plain, BYTE_UNIT);
 
         wc_InitSha256(&sha256);
         start = wolfCLU_getTime();
 
         while (loop) {
-            wc_Sha256Update(&sha256, plain, MEGABYTE);
+            wc_Sha256Update(&sha256, plain, BYTE_UNIT);
             blocks++;
             currTime = wolfCLU_getTime();
             stop = currTime - start;
@@ -388,8 +388,8 @@ int wolfCLU_benchmark(int timer, int* option)
         }
         wc_Sha256Final(&sha256, digest);
         printf("Sha256 ");
-        wolfCLU_stats(start, MEGABYTE, blocks);
-        XMEMSET(plain, 0, MEGABYTE);
+        wolfCLU_stats(start, BYTE_UNIT, blocks);
+        XMEMSET(plain, 0, BYTE_UNIT);
         XMEMSET(digest, 0, WC_SHA256_DIGEST_SIZE);
         wolfCLU_freeBins(plain, digest, NULL, NULL, NULL);
         /* resets used for debug, uncomment if needed */
@@ -408,19 +408,19 @@ int wolfCLU_benchmark(int timer, int* option)
         digest = XMALLOC(SHA384_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (digest == NULL)
             return MEMORY_E;
-        plain = XMALLOC(MEGABYTE, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        plain = XMALLOC(BYTE_UNIT, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (plain == NULL) {
             wolfCLU_freeBins(digest, NULL, NULL, NULL, NULL);
             return MEMORY_E;
         }
 
-        wc_RNG_GenerateBlock(&rng, plain, MEGABYTE);
+        wc_RNG_GenerateBlock(&rng, plain, BYTE_UNIT);
 
         wc_InitSha384(&sha384);
         start = wolfCLU_getTime();
 
         while (loop) {
-            wc_Sha384Update(&sha384, plain, MEGABYTE);
+            wc_Sha384Update(&sha384, plain, BYTE_UNIT);
             blocks++;
             currTime = wolfCLU_getTime();
             stop = currTime - start;
@@ -429,8 +429,8 @@ int wolfCLU_benchmark(int timer, int* option)
         }
         wc_Sha384Final(&sha384, digest);
         printf("Sha384 ");
-        wolfCLU_stats(start, MEGABYTE, blocks);
-        XMEMSET(plain, 0, MEGABYTE);
+        wolfCLU_stats(start, BYTE_UNIT, blocks);
+        XMEMSET(plain, 0, BYTE_UNIT);
         XMEMSET(digest, 0, WC_SHA384_DIGEST_SIZE);
         wolfCLU_freeBins(plain, digest, NULL, NULL, NULL);
         blocks = 0;
@@ -448,19 +448,19 @@ int wolfCLU_benchmark(int timer, int* option)
         digest = XMALLOC(SHA512_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (digest == NULL)
             return MEMORY_E;
-        plain = XMALLOC(MEGABYTE, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        plain = XMALLOC(BYTE_UNIT, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (plain == NULL) {
             wolfCLU_freeBins(digest, NULL, NULL, NULL, NULL);
             return MEMORY_E;
         }
 
-        wc_RNG_GenerateBlock(&rng, plain, MEGABYTE);
+        wc_RNG_GenerateBlock(&rng, plain, BYTE_UNIT);
 
         wc_InitSha512(&sha512);
         start = wolfCLU_getTime();
 
         while (loop) {
-            wc_Sha512Update(&sha512, plain, MEGABYTE);
+            wc_Sha512Update(&sha512, plain, BYTE_UNIT);
             blocks++;
             currTime = wolfCLU_getTime();
             stop = currTime - start;
@@ -469,8 +469,8 @@ int wolfCLU_benchmark(int timer, int* option)
         }
         wc_Sha512Final(&sha512, digest);
         printf("Sha512 ");
-        wolfCLU_stats(start, MEGABYTE, blocks);
-        XMEMSET(plain, 0, MEGABYTE);
+        wolfCLU_stats(start, BYTE_UNIT, blocks);
+        XMEMSET(plain, 0, BYTE_UNIT);
         XMEMSET(digest, 0, WC_SHA512_DIGEST_SIZE);
         wolfCLU_freeBins(plain, digest, NULL, NULL, NULL);
         blocks = 0;
@@ -487,19 +487,19 @@ int wolfCLU_benchmark(int timer, int* option)
         digest = XMALLOC(BLAKE2B_OUTBYTES, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (digest == NULL)
             return MEMORY_E;
-        plain = XMALLOC(MEGABYTE, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        plain = XMALLOC(BYTE_UNIT, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (plain == NULL) {
             wolfCLU_freeBins(digest, NULL, NULL, NULL, NULL);
             return MEMORY_E;
         }
 
-        wc_RNG_GenerateBlock(&rng, plain, MEGABYTE);
+        wc_RNG_GenerateBlock(&rng, plain, BYTE_UNIT);
 
         wc_InitBlake2b(&b2b, BLAKE2B_OUTBYTES);
         start = wolfCLU_getTime();
 
         while (loop) {
-            wc_Blake2bUpdate(&b2b, plain, MEGABYTE);
+            wc_Blake2bUpdate(&b2b, plain, BYTE_UNIT);
             blocks++;
             currTime = wolfCLU_getTime();
             stop = currTime - start;
@@ -508,8 +508,8 @@ int wolfCLU_benchmark(int timer, int* option)
         }
         wc_Blake2bFinal(&b2b, digest, BLAKE2B_OUTBYTES);
         printf("Blake2b ");
-        wolfCLU_stats(start, MEGABYTE, blocks);
-        XMEMSET(plain, 0, MEGABYTE);
+        wolfCLU_stats(start, BYTE_UNIT, blocks);
+        XMEMSET(plain, 0, BYTE_UNIT);
         XMEMSET(digest, 0, BLAKE2B_OUTBYTES);
         wolfCLU_freeBins(digest, plain, NULL, NULL, NULL);
     }
