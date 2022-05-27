@@ -122,12 +122,24 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 
     /* go to the item directly after dhparam, this will be the first non '-'
      * option found in the arguments passed in */
-    if (ret == WOLFCLU_SUCCESS && optind + 1 < argc) {
-        modSz = XATOI(argv[optind+1]);
-        if (modSz <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Can not parse %s as a number",
-                    argv[optind+1]);
-            ret = USER_INPUT_ERROR;
+
+    if (ret == WOLFCLU_SUCCESS) {
+        int i = 2; // start at 2 because wolfssl & dhparam will be in first and second
+        int found = 0; 
+        while (i + 1 <= argc && !found) {
+            /* confirm arg is a non '-' option that does not correspond
+             * to an '-in' or '-out' file */
+            if (argv[i][0] != '-' && XSTRCMP(argv[i-1], "-in") != 0
+                    && XSTRCMP(argv[i-1], "-out") != 0){
+                found = 1;
+                modSz = XATOI(argv[i]);
+                if (modSz <= 0) {
+                    WOLFCLU_LOG(WOLFCLU_E0, "Can not parse %s as a number",
+                            argv[i]);
+                    ret = USER_INPUT_ERROR;
+                }
+            }
+            i++;
         }
     }
 
