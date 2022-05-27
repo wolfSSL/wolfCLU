@@ -23,6 +23,8 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/sign-verify/clu_sign.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
 {
     int ret;
@@ -374,3 +376,4 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey)
     return NOT_COMPILED_IN;
 #endif
 }
+#endif /* !WOLFCLU_NO_FILESYSTEM */

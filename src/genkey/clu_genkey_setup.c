@@ -27,6 +27,7 @@
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKeySetup(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     char     keyOutFName[MAX_FILENAME_SZ];  /* default outFile for genKey */
     char     defaultFormat[4] = "der\0";
     WC_RNG   rng;
@@ -281,5 +282,11 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
     wc_FreeRng(&rng);
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
 

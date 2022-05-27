@@ -27,7 +27,7 @@
 #include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
-#ifdef WOLFSSL_CERT_REQ
+#if defined(WOLFSSL_CERT_REQ) && !defined(WOLFCLU_NO_FILESYSTEM)
 static const struct option req_options[] = {
 
     {"-sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
@@ -523,6 +523,12 @@ int wolfCLU_requestSetup(int argc, char** argv)
 {
 #ifndef WOLFSSL_CERT_REQ
     wolfCLU_LogError("wolfSSL not compiled with --enable-certreq");
+     /* silence unused variable warnings */
+    (void) argc;
+    (void) argv;
+    return NOT_COMPILED_IN;
+#elif defined(WOLFCLU_NO_FILESYSTEM)
+    WOLFCLU_LOG(WOLFCLU_E0, "No Filesystem Support.");
      /* silence unused variable warnings */
     (void) argc;
     (void) argv;

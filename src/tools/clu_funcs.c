@@ -972,13 +972,29 @@ void wolfCLU_stop(int signo)
  */
 double wolfCLU_getTime(void)
 {
-#if !defined(USE_WINDOWS_API) && !defined(MICROCHIP_PIC32)
+#ifdef HAL_RTC_MODULE_ENABLED /* get time on HAL HW */
+    extern RTC_HandleTypeDef hrtc;
+
+    RTC_TimeTypeDef time;
+    RTC_DateTypeDef date;
+    uint32_t subsec = 0;
+
+    /*get time and date here due to STM32 HW bug */
+    HAL_RTC_GetTime(&hrtc, &time, FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &date, FORMAT_BIN);
+    (void) date;
+
+    return ((double) time.Hours * 24) + ((double) time.Minutes * 60)
+                    + (double) time.Seconds + ((double) subsec / 1000);
+
+#elif !defined(USE_WINDOWS_API) && !defined(MICROCHIP_PIC32) /* get time on WIN */
     struct timeval tv;
 
     gettimeofday(&tv, 0);
 
     return (double)tv.tv_sec + (double)tv.tv_usec / 1000000;
-#else
+
+#else /* get time on unix */
     struct _timeb mytime1;
 
     _ftime64_s(&mytime1);
@@ -991,19 +1007,24 @@ double wolfCLU_getTime(void)
  */
 void wolfCLU_stats(double start, int blockSize, int64_t blocks)
 {
-    double mbs;
+    double bytes;
     double time_total = wolfCLU_getTime() - start;
 
+#if (BYTE_UNIT==KILOBYTE)
+    char unit[]="KB";
+#else
+    char unit[]="MB";
+#endif
     WOLFCLU_LOG(WOLFCLU_L0, "took %6.3f seconds, blocks = %llu", time_total,
             (unsigned long long)blocks);
 
-    mbs = ((blocks * blockSize) / MEGABYTE) / time_total;
-    WOLFCLU_LOG(WOLFCLU_L0, "Average MB/s = %8.1f", mbs);
+    bytes = ((blocks * blockSize) / MEGABYTE) / time_total;
+    WOLFCLU_LOG(WOLFCLU_L0, "Average %s/s = %8.1f", unit, bytes);
     if (blockSize != MEGABYTE) {
         WOLFCLU_LOG(WOLFCLU_L0, "Block size of this algorithm is: %d.\n", blockSize);
     }
     else {
-        WOLFCLU_LOG(WOLFCLU_L0, "Benchmarked using 1 Megabyte at a time\n");
+        WOLFCLU_LOG(WOLFCLU_L0, "Benchmarked using 1 %s at a time\n", unit);
     }
 }
 
@@ -1307,6 +1328,7 @@ void wolfCLU_ForceZero(void* mem, unsigned int len)
     while (len--) *z++ = 0;
 }
 
+#ifndef WOLFCLU_NO_TERM_SUPPORT
 
 int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
 {
@@ -1364,9 +1386,6 @@ int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
     }
     return ret;
 }
-
-
-#ifndef WOLFCLU_NO_TERM_SUPPORT
 
 #if !defined(USE_WINDOWS_API) && !defined(MICROCHIP_PIC32)
 static int HideEcho(struct termios* originalTerm)

@@ -23,6 +23,8 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 void free_things_rsa(byte** a, byte** b, byte** c, RsaKey* d, RsaKey* e,
                                                                      WC_RNG* f);
 
@@ -257,3 +259,4 @@ void free_things_rsa(byte** a, byte** b, byte** c, RsaKey* d, RsaKey* e,
 
 }
 
+#endif /* !WOLFCLU_NO_FILESYSTEM */

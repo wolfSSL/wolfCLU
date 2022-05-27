@@ -24,6 +24,7 @@
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/sign-verify/clu_sign.h> /* for RSA_SIG_VER, ECC_SIG_VER,
                                              ED25519_SIG_VER */
+#ifndef WOLFCLU_NO_FILESYSTEM
 
 static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
                                       int* outBufSz)
@@ -532,3 +533,4 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     return NOT_COMPILED_IN;
 #endif
 }
+#endif /* WOLFCLU_NO_FILESYSTEM */

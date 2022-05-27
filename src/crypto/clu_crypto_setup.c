@@ -23,6 +23,8 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 static const struct option crypt_options[] = {
     {"-sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
     {"-sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
@@ -47,10 +49,13 @@ static const struct option crypt_options[] = {
     {"-pass",      required_argument, 0, WOLFCLU_PASSWORD_SOURCE  },
     {0, 0, 0, 0} /* terminal element */
 };
+#endif
 
 /* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_setup(int argc, char** argv, char action)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM 
+    int      ret        =   0;  /* return variable */
     char     outNameEnc[256];     /* default outFile for encrypt */
     char     outNameDec[256];     /* default outfile for decrypt */
     char     inName[256];       /* name of the in File if not provided */
@@ -68,7 +73,6 @@ int wolfCLU_setup(int argc, char** argv, char action)
     int      noSalt     =   0;
     int      isBase64   =   0;
     int      keySize    =   0;  /* keysize from name */
-    int      ret        =   0;  /* return variable */
     int      block      =   0;  /* block size based on algorithm */
     int      pwdKeyChk  =   0;  /* if a pwdKey has been provided */
     int      ivCheck    =   0;  /* if the user sets the IV explicitly */
@@ -434,6 +438,12 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
     if (mode != NULL)
         XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    (void)action;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }

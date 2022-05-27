@@ -73,12 +73,17 @@ int wolfCLU_Rand(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
+#ifdef WOLFCLU_NO_FILESYSTEM
+                WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");
+                ret = WOLFCLU_FATAL_ERROR;
+#else
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
                 if (bioOut == NULL) {
                     wolfCLU_LogError("Unable to open output file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
+#endif
                 break;
 
             case WOLFCLU_HELP:
