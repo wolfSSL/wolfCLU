@@ -44,15 +44,13 @@ static const struct option ecparam_options[] = {
 
 static void wolfCLU_ecparamNamesPrint(void)
 {
-    int maxId;
-    int id;
-
 #if defined(HAVE_FIPS) && \
-    defined(HAVE_FIPS_VERSION) && (HAVE_FIPS_VERSION < 4)
-    maxId = ECC_BRAINPOOLP512R1;
+    defined(HAVE_FIPS_VERSION) && FIPS_VERSION_LT(4,0)
+    const int maxId = ECC_BRAINPOOLP512R1;
 #else
-    maxId = ECC_CURVE_MAX;
+    const int maxId = ECC_CURVE_MAX;
 #endif
+    int id;
 
     WOLFCLU_LOG(WOLFCLU_L0, "\tname options:");
     for (id = 0; id < maxId; id++) {
