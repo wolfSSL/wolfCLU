@@ -125,6 +125,11 @@ if [ $? == 0 ]; then
         echo "issue wolfssl decrypt using -pass"
         exit 99
     fi
+    diff "./certs/crl.der" "./test-dec.der" &> /dev/null
+    if [ $? != 0 ]; then
+        echo "issue wolfssl -pass decrypt mismatch"
+        exit 99
+    fi
     rm -f test-dec.der
     rm -f test-enc.der
 fi
