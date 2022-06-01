@@ -44,6 +44,7 @@ static const struct option crypt_options[] = {
     {"-k",         required_argument, 0, WOLFCLU_PASSWORD  },
     {"-base64",    no_argument,       0, WOLFCLU_BASE64    },
     {"-nosalt",    no_argument,       0, WOLFCLU_NOSALT    },
+    {"-pass",      required_argument, 0, WOLFCLU_PASSWORD_SOURCE  },
     {0, 0, 0, 0} /* terminal element */
 };
 
@@ -63,6 +64,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
     byte*    iv = NULL;         /* iv for initial encryption */
 
 
+    int      passwordSz =   0;
     int      noSalt     =   0;
     int      isBase64   =   0;
     int      keySize    =   0;  /* keysize from name */
@@ -140,6 +142,13 @@ int wolfCLU_setup(int argc, char** argv, char action)
                    crypt_options, &longIndex )) != -1) {
 
         switch (option) {
+        case WOLFCLU_PASSWORD_SOURCE:
+            passwordSz = keySize;
+            ret = wolfCLU_GetPassword((char*)pwdKey, &passwordSz, optarg);
+            pwdKeyChk = 1;
+            keyType   = 1;
+            break;
+
         case WOLFCLU_PASSWORD:
             if (optarg == NULL) {
                 return WOLFCLU_FATAL_ERROR;

@@ -120,6 +120,16 @@ if [ $? == 0 ]; then
         echo "issue wolfssl enc and openssl dec pbkdf2"
         exit 99
     fi
+    ./wolfssl enc -base64 -d -pbkdf2 -aes-256-cbc -pass 'pass:test password' -in test-enc.der -out test-dec.der
+    if [ $? != 0 ]; then
+        echo "issue wolfssl decrypt using -pass"
+        exit 99
+    fi
+    diff "./certs/crl.der" "./test-dec.der" &> /dev/null
+    if [ $? != 0 ]; then
+        echo "issue wolfssl -pass decrypt mismatch"
+        exit 99
+    fi
     rm -f test-dec.der
     rm -f test-enc.der
 fi
