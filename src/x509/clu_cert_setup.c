@@ -617,6 +617,7 @@ int wolfCLU_certSetup(int argc, char** argv)
                 wolfSSL_BIO_write(out, info, (int)XSTRLEN(info));
 
             }
+            wolfSSL_EVP_PKEY_free(pkey); 
         }
     }
 
