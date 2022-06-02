@@ -28,12 +28,12 @@
 #include <wolfclu/client.h>
 
 static const struct option client_options[] = {
-    {"connect",             required_argument, 0, WOLFCLU_CONNECT            },
-    {"starttls",            required_argument, 0, WOLFCLU_STARTTLS           },
-    {"CAfile",              required_argument, 0, WOLFCLU_CAFILE             },
-    {"verify_return_error", no_argument,       0, WOLFCLU_VERIFY_RETURN_ERROR},
-    {"help",                no_argument,       0, WOLFCLU_HELP               },
-    {"h",                   no_argument,       0, WOLFCLU_HELP               },
+    {"-connect",             required_argument, 0, WOLFCLU_CONNECT            },
+    {"-starttls",            required_argument, 0, WOLFCLU_STARTTLS           },
+    {"-CAfile",              required_argument, 0, WOLFCLU_CAFILE             },
+    {"-verify_return_error", no_argument,       0, WOLFCLU_VERIFY_RETURN_ERROR},
+    {"-help",                no_argument,       0, WOLFCLU_HELP               },
+    {"-h",                   no_argument,       0, WOLFCLU_HELP               },
 
     {0, 0, 0, 0} /* terminal element */
 };

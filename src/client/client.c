@@ -34,6 +34,11 @@
 
 #include <wolfssl/ssl.h>
 
+#ifdef WOLFSSL_IPV6
+    #define HAVE_GETADDRINFO 1
+    #define HAVE_ERRNO_H 1
+#endif
+
 #ifdef WOLFSSL_WOLFSENTRY_HOOKS
 #include <wolfsentry/wolfsentry.h>
 #if !defined(NO_FILESYSTEM) && !defined(WOLFSENTRY_NO_JSON)
@@ -3878,8 +3883,11 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #ifndef USE_WINDOWS_API
     int stop = checkStdin();
 
-    if(stop)
+    if(stop){
+        wolfSSL_free(ssl); ssl = NULL;
+        wolfSSL_CTX_free(ctx); ctx = NULL;
         goto exit;
+    }
 #endif
 
     err = ClientRead(ssl, reply, sizeof(reply)-1, 1, "", exitWithRet);
