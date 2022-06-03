@@ -196,6 +196,10 @@ int wolfCLU_Client(int argc, char** argv)
         args.argc = clientArgc;
 
         client_test(&args);
+
+        if (args.return_code != 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
     if (host != NULL) {

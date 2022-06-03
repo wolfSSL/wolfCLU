@@ -76,14 +76,13 @@ static int _wolfSSL_X509_print_serial(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
 
     XMEMSET(serial, 0, sz);
     if (wolfSSL_X509_get_serial_number(x509, serial, &sz) == WOLFSSL_SUCCESS) {
-        
+
         XSNPRINTF(scratch, MAX_WIDTH, "%*s%s", indent, "",
                 "Serial Number:");
         if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
             return WOLFSSL_FAILURE;
         }
 
-        
         if (sz > (int)sizeof(byte)) {
             int i;
             char tmp[100];
@@ -262,9 +261,42 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
 static int _wolfSSL_X509_REQ_attributes_print(WOLFSSL_BIO* bio,
         WOLFSSL_X509* x509, int indent)
 {
-    (void)bio;
-    (void)x509;
-    (void)indent;
+    WOLFSSL_X509_ATTRIBUTE* attr;
+    char scratch[MAX_WIDTH];
+    int i = 0;
+
+    XSNPRINTF(scratch, MAX_WIDTH, "%*s%s", indent, "", "Attributes: \n");
+    if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
+        return WOLFSSL_FAILURE;
+    }
+
+    attr = wolfSSL_X509_REQ_get_attr(x509, i);
+    while (attr != NULL) {
+        char longName[NAME_SZ/4]; /* NAME_SZ default is 80 */
+        int longNameSz = NAME_SZ/4;
+        const byte* data;
+
+        wolfSSL_OBJ_obj2txt(longName, longNameSz, attr->object, 0);
+        longNameSz = (int)XSTRLEN(longName);
+        data = wolfSSL_ASN1_STRING_get0_data(
+                attr->value->value.asn1_string);
+        if (data == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "No REQ attribute found when "
+                    "expected");
+            return WOLFSSL_FAILURE;
+        }
+        XSNPRINTF(scratch, MAX_WIDTH, "%*s%s%*s:%s\n", indent+4, "",
+                longName, (NAME_SZ/4)-longNameSz, "", data);
+        if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch))
+                <= 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error writing REQ attribute");
+            return WOLFSSL_FAILURE;
+        }
+
+        i++;
+        attr = wolfSSL_X509_REQ_get_attr(x509, i);
+    }
+
     return WOLFSSL_SUCCESS;
 }
 
@@ -277,7 +309,7 @@ static int _wolfSSL_X509_signature_print_ex(WOLFSSL_BIO* bio,
         WOLFSSL_X509* x509, int indent)
 {
     char scratch[MAX_WIDTH];
-    int sigSz;
+    int sigSz = 0;
 
     wolfSSL_X509_get_signature(x509, NULL, &sigSz);
     if (sigSz > 0) {
