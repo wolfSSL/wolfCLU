@@ -269,32 +269,33 @@ static int _wolfSSL_X509_REQ_attributes_print(WOLFSSL_BIO* bio,
     if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
         return WOLFSSL_FAILURE;
     }
-    do {
-        attr = wolfSSL_X509_REQ_get_attr(x509, i);
-        if (attr != NULL) {
-            char lName[NAME_SZ/4]; /* NAME_SZ default is 80 */
-            int lNameSz = NAME_SZ/4;
-            const byte* data;
 
-            wolfSSL_OBJ_obj2txt(lName, lNameSz, attr->object, 0);
-            lNameSz = (int)XSTRLEN(lName);
-            data = wolfSSL_ASN1_STRING_get0_data(
-                    attr->value->value.asn1_string);
-            if (data == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "No REQ attribute found when "
-                        "expected");
-                return WOLFSSL_FAILURE;
-            }
-            XSNPRINTF(scratch, MAX_WIDTH, "%*s%s%*s:%s\n", indent+4, "",
-                    lName, (NAME_SZ/4)-lNameSz, "", data);
-            if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch))
-                    <= 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error writing REQ attribute");
-                return WOLFSSL_FAILURE;
-            }
+    attr = wolfSSL_X509_REQ_get_attr(x509, i);
+    while (attr != NULL) {
+        char longName[NAME_SZ/4]; /* NAME_SZ default is 80 */
+        int longNameSz = NAME_SZ/4;
+        const byte* data;
+
+        wolfSSL_OBJ_obj2txt(longName, longNameSz, attr->object, 0);
+        longNameSz = (int)XSTRLEN(longName);
+        data = wolfSSL_ASN1_STRING_get0_data(
+                attr->value->value.asn1_string);
+        if (data == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "No REQ attribute found when "
+                    "expected");
+            return WOLFSSL_FAILURE;
         }
+        XSNPRINTF(scratch, MAX_WIDTH, "%*s%s%*s:%s\n", indent+4, "",
+                longName, (NAME_SZ/4)-longNameSz, "", data);
+        if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch))
+                <= 0) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error writing REQ attribute");
+            return WOLFSSL_FAILURE;
+        }
+
         i++;
-    } while (attr != NULL);
+        attr = wolfSSL_X509_REQ_get_attr(x509, i);
+    }
 
     return WOLFSSL_SUCCESS;
 }
