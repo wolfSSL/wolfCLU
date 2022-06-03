@@ -38,6 +38,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     int textPubkey  = 0;   /* does user desire human readable pubkey info */
     int nooutFlag   = 0;   /* are we outputting a file */
     int silentFlag  = 0;   /* set to disable echo to command line */
+    int modulus     = 0;   /* set to view modulus of cert */
 
     char* inFile  = NULL;   /* pointer to the inFile name */
     char* outFile = NULL;   /* pointer to the outFile name */
@@ -207,6 +208,14 @@ int wolfCLU_certSetup(int argc, char** argv)
          */
         silentFlag = 1;
 	(void)silentFlag;
+    } /* Optional flag do not return error */
+/*---------------------------------------------------------------------------*/
+/* modulus */
+/*---------------------------------------------------------------------------*/
+    if (ret == WOLFCLU_SUCCESS &&
+            wolfCLU_checkForArg("-modulus", 8, argc, argv) > 0) {
+        /* set flag for viewing modulus */
+        modulus = 1;
     } /* Optional flag do not return error */
 /*---------------------------------------------------------------------------*/
 /* END ARG PROCESSING */
@@ -568,6 +577,47 @@ int wolfCLU_certSetup(int argc, char** argv)
         if (wolfSSL_X509_print(out, x509) != WOLFSSL_SUCCESS) {
             WOLFCLU_LOG(WOLFCLU_E0, "unable to print certificate out");
             ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    /* print modulus */
+    if (ret == WOLFCLU_SUCCESS && modulus) {
+        EVP_PKEY *pkey;
+        pkey = X509_get0_pubkey(x509);
+
+        if (pkey == NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Modulus=unavailable");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            if (wolfSSL_EVP_PKEY_id(pkey) == EVP_PKEY_RSA) {
+                    const WOLFSSL_BIGNUM *num;
+                    char *hex;
+
+                    wolfSSL_RSA_get0_key(EVP_PKEY_get0_RSA(pkey), &num, NULL, NULL);
+                    hex = wolfSSL_BN_bn2hex(num);
+
+                    if (hex != NULL) {
+                        if (wolfSSL_BIO_write(out, "Modulus=", (int)XSTRLEN("Modulus="))
+                                <= 0) {
+                            ret = WOLFCLU_FATAL_ERROR;
+                        }
+
+                        if (ret == WOLFCLU_SUCCESS &&
+                                wolfSSL_BIO_write(out, hex, (int)XSTRLEN(hex)) <= 0) {
+                            ret = WOLFCLU_FATAL_ERROR;
+                        }
+                        XFREE(hex, NULL, DYNAMIC_TYPE_OPENSSL);
+                    }
+
+                    wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n"));
+            }   
+            else {
+                char info[] = "Wrong Algorithm type";
+                wolfSSL_BIO_write(out, info, (int)XSTRLEN(info));
+
+            }
+            wolfSSL_EVP_PKEY_free(pkey); 
         }
     }
 
