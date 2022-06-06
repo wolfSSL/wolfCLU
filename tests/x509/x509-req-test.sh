@@ -122,7 +122,7 @@ then
 fi
 rm -f tmp.cert
 
-run_success "req -new -newkey rsa:2048 -config ./test.conf -x509 -out tmp.cert" "test"
+run_success "req -new -newkey rsa:2048 -config ./test.conf -x509 -out tmp.cert -passout stdin" "test"
 echo $RESULT | grep "ENCRYPTED"
 if [ $? -ne 0 ]; then
     echo "no encrypted key found in result"
@@ -146,7 +146,7 @@ rm -f tmp.cert
 run_success "req -new -days 3650 -sha512 -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
 rm -f tmp.cert
 
-run_success "req -new -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -x509 -out tmp.cert" "test"
+run_success "req -new -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -x509 -out tmp.cert -passout stdin" "test"
 
 run_success "req -new -key ./certs/ca-key.pem -config ./test.conf -extensions v3_alt_req_full -out tmp.cert"
 run_success "req -in ./tmp.cert -noout -text"
@@ -155,6 +155,10 @@ if [ $? -ne 0 ]; then
     echo Failed to find tenthName in alt names
     exit 99
 fi
+
+#test passout
+run_success "req -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -out tmp.cert -passout pass:123456 -outform pem -sha256"
+run_success "rsa -in new-key.pem -passin pass:123456" 
 
 rm -f tmp.cert
 rm -f new-key.pem

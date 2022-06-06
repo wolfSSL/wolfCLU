@@ -53,6 +53,7 @@ static const struct option req_options[] = {
     {"-subj",      required_argument, 0, WOLFCLU_SUBJECT },
     {"-verify",    no_argument,       0, WOLFCLU_VERIFY },
     {"-text",      no_argument,       0, WOLFCLU_TEXT_OUT },
+    {"-passout",   required_argument, 0, WOLFCLU_PASSWORD_OUT },
     {"-noout",     no_argument,       0, WOLFCLU_NOOUT },
     {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
     {"-nodes",     no_argument,       0, WOLFCLU_NODES },
@@ -516,6 +517,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
     int     longIndex = 1;
     int     days = 0;
     int     genX509 = 0;
+    int     passout = 0;
+
+    char password[MAX_PASSWORD_SIZE];
+    int passwordSz = MAX_PASSWORD_SIZE;
 
     byte doVerify  = 0;
     byte doTextOut = 0;
@@ -657,6 +662,11 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_TEXT_OUT:
                 doTextOut = 1;
+                break;
+
+            case WOLFCLU_PASSWORD_OUT:
+                passout = 1;
+                ret = wolfCLU_GetPassword(password, &passwordSz, optarg);
                 break;
 
             case WOLFCLU_NOOUT:
@@ -960,12 +970,23 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
         if (ret == WOLFCLU_SUCCESS) {
             if (useDes) {
-                byte password[MAX_PASSWORD_SIZE];
-                word32 passwordSz = MAX_PASSWORD_SIZE;
-
-                wolfCLU_GetStdinPassword(password, &passwordSz);
-                ret = wolfCLU_pKeyPEMtoPriKeyEnc(keyOutBio, pkey, DES3b,
-                        password, passwordSz);
+                if (!passout) {
+                    byte pass[MAX_PASSWORD_SIZE];
+                    wolfCLU_GetStdinPassword(pass, (word32*)&passwordSz);
+                    
+                    if (pass[0] == '\0') {
+                        WOLFCLU_LOG(WOLFCLU_E0, "Please enter a password");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    else {
+                        ret = wolfCLU_pKeyPEMtoPriKeyEnc(keyOutBio, pkey, DES3b,
+                                pass, passwordSz);
+                    }
+                }
+                else {
+                    ret = wolfCLU_pKeyPEMtoPriKeyEnc(keyOutBio, pkey, DES3b,
+                            (byte*)password, passwordSz);
+                }
             }
             else {
                 ret = wolfCLU_pKeyPEMtoPriKey(keyOutBio, pkey);
