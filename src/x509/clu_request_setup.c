@@ -213,8 +213,8 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
             WOLFSSL_X509_EXTENSION* ext = wolfSSL_X509_get_ext(x509, i);
             if (ext != NULL) {
                 WOLFSSL_ASN1_OBJECT* obj;
-                char buf[MAX_WIDTH-4]; /* -4 to avoid warning when used in
-                                        * in XSNPRINTF */
+                char buf[MAX_WIDTH-19]; /* -19 to avoid warning when used in
+                                        * in XSPRINTF */
                 char* altName;
                 int nid;
 

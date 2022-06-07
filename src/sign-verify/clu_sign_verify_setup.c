@@ -95,7 +95,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
 
-        XSTRNCPY(priv, &argv[ret+1][0], XSTRLEN(argv[ret+1]));
+        XSTRLCPY(priv, &argv[ret+1][0], XSTRLEN(argv[ret+1])+1);
         priv[XSTRLEN(argv[ret+1])] = '\0';
     }
     else {
@@ -130,7 +130,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
 
-        XSTRNCPY(in, &argv[ret+1][0], XSTRLEN(argv[ret+1]));
+        XSTRLCPY(in, &argv[ret+1][0], XSTRLEN(argv[ret+1])+1);
         in[XSTRLEN(argv[ret+1])] = '\0';
         inCheck = 1;
     }
@@ -156,7 +156,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
 
-        XSTRNCPY(sig, &argv[ret+1][0], XSTRLEN(argv[ret+1]));
+        XSTRLCPY(sig, &argv[ret+1][0], XSTRLEN(argv[ret+1])+1);
         sig[XSTRLEN(argv[ret+1])] = '\0';
     }
     else if (verifyCheck == 1) {

@@ -57,7 +57,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     ret = wolfCLU_checkForArg("-out", 4, argc, argv);
     if (ret > 0) {
         if (argv[ret+1] != NULL) {
-            XSTRNCPY(keyOutFName, argv[ret+1], XSTRLEN(argv[ret+1]));
+            XSTRLCPY(keyOutFName, argv[ret+1], XSTRLEN(argv[ret+1])+1);
         }
         else {
             WOLFCLU_LOG(WOLFCLU_E0, "ERROR: No output file name specified");
