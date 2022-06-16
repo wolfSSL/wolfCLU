@@ -68,15 +68,15 @@ if [ $? == 0 ]; then
     exit 99
 fi
 
-run "rsa -inform der -in ./certs/server-key.der -RSAPublicKey_in"
+run "rsa -in ./certs/server-keyPub.pem -RSAPublicKey_in"
 EXPECTED="-----BEGIN PUBLIC KEY-----
-MIIBHzANBgkqhkiG9w0BAQEFAAOCAQwAMIIBBwIAAoIBAQDAlQjhV0HycW230kVB
-JwFlxkWu8rwkMLiVzi9O1vYciLx8n/uoZ3/+XJxRdfeKygfnNS+P4b17wC98q2So
-F/zKXXu64CHlci5vLobYlXParBtTuV8/1xkNJU/hY2NRiwtkP61DuKUcXDSzrgCg
-Y8X2fwtZaHhzpowYqQJtr8MZAS64EOPGzEC0aaNGM2mHbsS7F6bz6N2tc7x7LyG1
-/WZRDL1Us+FtXxy8I3PRCQOJFNIQuWTDKtChlkq84dQaW8egwMFjeA9ENzAyloAy
-I5Whd7oT0pdz4l0lyWoNwzlgpLSwaUJCCenYCLwzILNYIqeq68Th5mGDxdKW39nQ
-T63X
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwJUI4VdB8nFtt9JFQScB
+ZcZFrvK8JDC4lc4vTtb2HIi8fJ/7qGd//lycUXX3isoH5zUvj+G9e8AvfKtkqBf8
+yl17uuAh5XIuby6G2JVz2qwbU7lfP9cZDSVP4WNjUYsLZD+tQ7ilHFw0s64AoGPF
+9n8LWWh4c6aMGKkCba/DGQEuuBDjxsxAtGmjRjNph27Euxem8+jdrXO8ey8htf1m
+UQy9VLPhbV8cvCNz0QkDiRTSELlkwyrQoZZKvOHUGlvHoMDBY3gPRDcwMpaAMiOV
+oXe6E9KXc+JdJclqDcM5YKS0sGlCQgnp2Ai8MyCzWCKnquvE4eZhg8XSlt/Z0E+t
+1wIDAQAB
 -----END PUBLIC KEY-----"
 if [ "$RESULT" != "$EXPECTED" ]; then
     echo "unexpected text output found"
