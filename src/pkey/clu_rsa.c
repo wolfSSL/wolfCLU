@@ -219,7 +219,8 @@ int wolfCLU_RSA(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS) {
-                derSz = wolfSSL_i2d_RSAPublicKey(rsa, &der);
+                unsigned char* pt = der; /* call advances pointer */
+                derSz = wolfSSL_i2d_RSAPublicKey(rsa, &pt);
             }
         }
         else {
@@ -239,7 +240,8 @@ int wolfCLU_RSA(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS) {
-                derSz = wolfSSL_i2d_RSAPrivateKey(rsa, &der);
+                unsigned char* pt = der; /* call advances pointer */
+                derSz = wolfSSL_i2d_RSAPrivateKey(rsa, &pt);
             }
         }
 
