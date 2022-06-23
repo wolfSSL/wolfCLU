@@ -243,6 +243,10 @@ int wolfCLU_RSA(int argc, char** argv)
             }
         }
 
+        if (derSz > 0 && ret == WOLFCLU_SUCCESS) {
+            der -= derSz;
+        }
+
         if (outForm == PEM_FORM) {
             ret = wolfCLU_printDer(bioOut, der, derSz, pemType, heapType);
         }
