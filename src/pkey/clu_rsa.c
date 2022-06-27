@@ -198,6 +198,8 @@ int wolfCLU_RSA(int argc, char** argv)
     /* print out the key */
     if (ret == WOLFCLU_SUCCESS && noOut == 0) {
         unsigned char *der = NULL;
+        unsigned char *pt; /* use pt with i2d to handle potential pointer
+                              increment */
         int derSz = 0;
         int pemType;
         int heapType;
@@ -219,7 +221,8 @@ int wolfCLU_RSA(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS) {
-                derSz = wolfSSL_i2d_RSAPublicKey(rsa, &der);
+                pt    = der;
+                derSz = wolfSSL_i2d_RSAPublicKey(rsa, &pt);
             }
         }
         else {
@@ -239,12 +242,9 @@ int wolfCLU_RSA(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS) {
-                derSz = wolfSSL_i2d_RSAPrivateKey(rsa, &der);
+                pt    = der;
+                derSz = wolfSSL_i2d_RSAPrivateKey(rsa, &pt);
             }
-        }
-
-        if (derSz > 0 && ret == WOLFCLU_SUCCESS) {
-            der -= derSz;
         }
 
         if (outForm == PEM_FORM) {

@@ -242,7 +242,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     }
 
     /* when encrypting a file write out the salt value generated */
-    if (ret == WOLFCLU_SUCCESS && enc) {
+    if (ret == WOLFCLU_SUCCESS && enc && !noSalt) {
         if (wolfSSL_BIO_write(out, isSalted, (int)XSTRLEN(isSalted)) !=
                 (int)XSTRLEN(isSalted)) {
             WOLFCLU_LOG(WOLFCLU_E0, "issue writing out isSalted");
@@ -250,7 +250,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && enc) {
+    if (ret == WOLFCLU_SUCCESS && enc && !noSalt) {
         if (wolfSSL_BIO_write(out, salt, SALT_SIZE) != SALT_SIZE) {
             WOLFCLU_LOG(WOLFCLU_E0, "issue writing out salt");
             ret = WOLFCLU_FATAL_ERROR;
