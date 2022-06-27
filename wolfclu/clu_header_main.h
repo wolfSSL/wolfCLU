@@ -38,7 +38,7 @@ extern "C" {
 #else
 #include <unistd.h>
 #include <sys/time.h>
-#ifndef WOLFCLU_FREERTOS
+#ifndef FREERTOS
 #include <termios.h>
 #endif
 #endif
@@ -104,7 +104,7 @@ extern "C" {
 #define BLOCK_SIZE 16384
 #define MEGABYTE (1024*1024)
 #define KILOBYTE 1024
-#ifdef WOLFCLU_FREERTOS
+#ifdef FREERTOS
 	#define BYTE_UNIT KILOBYTE
 #else
 	#define BYTE_UNIT MEGABYTE
