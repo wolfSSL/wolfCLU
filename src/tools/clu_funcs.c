@@ -864,7 +864,7 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
 
     wolfCLU_oldAlgo(argc, argv, 3);
     XMEMSET(name, 0, sizeof(name));
-    XSTRNCPY(name, argv[2], XSTRLEN(argv[2]));
+    XSTRLCPY(name, argv[2], XSTRLEN(argv[2])+1);
     ret = wolfCLU_parseAlgo(name, alg, mode, size);
 
     /* next check for -cipher option passed through args */

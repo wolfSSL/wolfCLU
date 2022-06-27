@@ -1881,8 +1881,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     char*  cipherList = NULL;
     int    useDefCipherList = 0;
     const char* verifyCert = NULL;
-    const char* ourCert;
-    const char* ourKey;
+    const char* ourCert = NULL;
+    const char* ourKey = NULL;
 
     int   doSTARTTLS    = 0;
     char* starttlsProt = NULL;

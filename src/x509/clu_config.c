@@ -309,7 +309,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             WOLFSSL_ASN1_STRING *ipStr = NULL;
             char *s   = NULL;
             int   sSz = 0;
-            int   type;
+            int   type= 0;
 
             c = wolfSSL_sk_CONF_VALUE_value(altNames, i);
             if (c == NULL) {
@@ -340,6 +340,11 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                 type = ASN_DNS_TYPE;
                 s = c->value;
                 sSz = (int)XSTRLEN(c->value);
+            }
+
+            if (type == 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+                break; 
             }
 
             if (wolfSSL_X509_add_altname_ex(x509, s, sSz, type)

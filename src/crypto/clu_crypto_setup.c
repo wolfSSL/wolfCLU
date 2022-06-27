@@ -154,7 +154,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 return WOLFCLU_FATAL_ERROR;
             }
             else {
-                XSTRNCPY((char*)pwdKey, optarg, keySize);
+                XSTRLCPY((char*)pwdKey, optarg, keySize);
                 pwdKeyChk = 1;
                 keyType   = 1;
             }
@@ -189,7 +189,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                         return MEMORY_E;
                     }
 
-                    XSTRNCPY(ivString, optarg, XSTRLEN(optarg));
+                    XSTRLCPY(ivString, optarg, XSTRLEN(optarg));
                     ret = wolfCLU_hexToBin(ivString, &iv, &ivSize,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL,
@@ -271,7 +271,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                     return MEMORY_E;
                 }
 
-                XSTRNCPY(keyString, optarg, XSTRLEN(optarg));
+                XSTRLCPY(keyString, optarg, XSTRLEN(optarg));
                 ret = wolfCLU_hexToBin(keyString, &key, &numBits,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL,

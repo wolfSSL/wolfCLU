@@ -213,16 +213,18 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
             WOLFSSL_X509_EXTENSION* ext = wolfSSL_X509_get_ext(x509, i);
             if (ext != NULL) {
                 WOLFSSL_ASN1_OBJECT* obj;
-                char buf[MAX_WIDTH-4]; /* -4 to avoid warning when used in
-                                        * in XSNPRINTF */
+                char buf[MAX_WIDTH];
                 char* altName;
                 int nid;
 
                 obj = wolfSSL_X509_EXTENSION_get_object(ext);
                 wolfSSL_OBJ_obj2txt(buf, MAX_WIDTH, obj, 0);
-                XSNPRINTF(scratch, MAX_WIDTH, "%*s%s%s\n", indent + 4, "",
-                   buf,
-                   (wolfSSL_X509_EXTENSION_get_critical(ext))? ": Critical" : ":");
+                XSNPRINTF(scratch, MAX_WIDTH, "%*s", indent + 4, "");
+                XSTRLCAT(scratch, buf, MAX_WIDTH);
+               
+                int crit = wolfSSL_X509_EXTENSION_get_critical(ext) ? 1 : 0;
+                XSTRLCAT(scratch, crit ? ": Critical\n" : ":\n", crit ? 11 : 2);
+                (void)crit;
 
                 wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
                 nid = wolfSSL_OBJ_obj2nid(obj);
