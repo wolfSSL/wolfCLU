@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Skip test if filesystem disabled
+FILESYSTEM=`cat config.log | grep "disable\-filesystem"`
+if [ "$FILESYSTEM" != "" ]
+then
+    exit 77
+fi
+
 RESULT=`./wolfssl rand -base64 10`
 if [ $? != 0 ]; then
     echo "Failed on test \"./wolfssl rand -base64 10\""

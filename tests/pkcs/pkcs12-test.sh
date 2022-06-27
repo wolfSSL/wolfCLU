@@ -5,6 +5,13 @@ if [ ! -d ./certs/ ]; then
     exit 77
 fi
 
+# Skip test if filesystem disabled
+FILESYSTEM=`cat config.log | grep "disable\-filesystem"`
+if [ "$FILESYSTEM" != "" ]
+then
+    exit 77
+fi
+
 RESULT=`./wolfssl pkcs12 -nodes -passin pass:"wolfSSL test" -passout pass: -in ./certs/test-servercert.p12 2>&1`
 echo "$RESULT" | grep "Recompile wolfSSL with PKCS12 support"
 if [ $? == 0 ]; then

@@ -851,3 +851,4 @@ int wolfCLU_genKey_PWDBASED(WC_RNG* rng, byte* pwdKey, int size, byte* salt,
 
     return WOLFCLU_SUCCESS;
 }
+
