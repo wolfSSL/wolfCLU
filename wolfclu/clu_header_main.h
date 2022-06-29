@@ -489,6 +489,11 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext);
  */
 int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect);
 
+/**
+ * @brief used to get an object for a given NID and set it to the given
+ *  extension
+ */
+WOLFSSL_ASN1_OBJECT* wolfCLU_extenstionGetObjectNID(WOLFSSL_X509_EXTENSION *ext, int nid, int crit);
 
 /**
  * @brief function to processes 'ca' command

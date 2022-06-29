@@ -863,6 +863,28 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
 
+    /* default to CA:TRUE for req -x509 command */
+    if (ret == WOLFCLU_SUCCESS && !wolfSSL_X509_ext_isSet_by_NID(x509, NID_basic_constraints)) {
+        WOLFSSL_X509_EXTENSION *newExt;
+        WOLFSSL_ASN1_OBJECT *obj;
+
+        newExt = wolfSSL_X509_EXTENSION_new();
+        obj = wolfCLU_extenstionGetObjectNID(newExt, NID_basic_constraints, 1);
+
+        if (obj == NULL || newExt == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            obj->ca = 1;
+
+            ret = wolfSSL_X509_add_ext(x509, newExt, -1);
+            if (ret != WOLFSSL_SUCCESS) {
+                WOLFCLU_LOG(WOLFCLU_E0, "error %d adding Basic Constraints extesion", ret);
+            }
+            wolfSSL_X509_EXTENSION_free(newExt);
+        }
+    }
+
     /* default to version 1 when generating CSR */
     if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V1) !=

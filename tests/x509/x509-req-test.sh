@@ -122,6 +122,16 @@ then
 fi
 rm -f tmp.cert
 
+# test default basic constraints extenstion
+run_success "req -new -x509 -key certs/server-key.pem -subj O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit -out tmp.cert"
+run_success "x509 -in tmp.cert -text -noout"
+echo "$RESULT" | grep "CA:TRUE"
+if [ $? != 0 ]; then
+    echo "was expecting cert extensions to have CA set to TRUE"
+    exit 99
+fi
+rm -f tmp.cert
+
 run_success "req -new -newkey rsa:2048 -config ./test.conf -x509 -out tmp.cert -passout stdin" "test"
 echo $RESULT | grep "ENCRYPTED"
 if [ $? -ne 0 ]; then
