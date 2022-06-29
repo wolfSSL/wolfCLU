@@ -44,8 +44,11 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
         return MEMORY_E;
     }
 
-    XFSEEK(f, 0, SEEK_SET);
-    XFREAD(data, 1, fSz, f);
+    if (XFSEEK(f, 0, SEEK_SET) != 0 || (int)XFREAD(data, 1, fSz, f) != fSz) {
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+ 
     XFCLOSE(f);
 
     switch(keyType) {
@@ -111,10 +114,12 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
         XFCLOSE(privKeyFile);
         return MEMORY_E;
     }
-    XFSEEK(privKeyFile, 0, SEEK_SET);
-    XFREAD(keyBuf, 1, privFileSz, privKeyFile);
+    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+        XFCLOSE(privKeyFile);
+        return WOLFCLU_FATAL_ERROR;
+    }
     XFCLOSE(privKeyFile);
-
+    
     /* retrieving private key and storing in the RsaKey */
     ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -222,8 +227,10 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey)
         wc_FreeRng(&rng);
         return MEMORY_E;
     }
-    XFSEEK(privKeyFile, 0, SEEK_SET);
-    XFREAD(keyBuf, 1, privFileSz, privKeyFile);
+    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+        XFCLOSE(privKeyFile);
+        return WOLFCLU_FATAL_ERROR;
+    }
     XFCLOSE(privKeyFile);
 
     /* retrieving private key and storing in the Ecc Key */
@@ -317,8 +324,10 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey)
         wc_FreeRng(&rng);
         return MEMORY_E;
     }
-    XFSEEK(privKeyFile, 0, SEEK_SET);
-    XFREAD(keyBuf, 1, privFileSz, privKeyFile);
+    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+        XFCLOSE(privKeyFile);
+        return WOLFCLU_FATAL_ERROR;
+    }
     XFCLOSE(privKeyFile);
 
     /* retrieving private key and storing in the ED25519 Key */
