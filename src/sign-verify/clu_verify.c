@@ -134,7 +134,7 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
         return WOLFCLU_FATAL_ERROR;
     }
     XFCLOSE(privKeyFile);
- 
+
     /* retrieving private key and storing in the ED25519 */
     ret = wc_ed25519_import_private_key(privBuf,
                                         ED25519_KEY_SIZE,
@@ -193,7 +193,6 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
         XFCLOSE(f);
         return WOLFCLU_FATAL_ERROR;
     }
-
     XFCLOSE(f);
 
     switch(keyType) {

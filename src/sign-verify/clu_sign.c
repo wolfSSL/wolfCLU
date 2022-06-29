@@ -48,7 +48,6 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
         XFCLOSE(f);
         return WOLFCLU_FATAL_ERROR;
     }
- 
     XFCLOSE(f);
 
     switch(keyType) {
@@ -119,7 +118,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
         return WOLFCLU_FATAL_ERROR;
     }
     XFCLOSE(privKeyFile);
-    
+
     /* retrieving private key and storing in the RsaKey */
     ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
