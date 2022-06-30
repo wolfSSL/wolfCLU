@@ -330,6 +330,10 @@ int main(int argc, char** argv)
 
 #ifdef FREERTOS
 
+#ifndef MAX_COMMAND_ARGS
+#define MAX_COMMAND_ARGS 30
+#endif
+
 #ifndef HAL_CONSOLE_UART
 #define HAL_CONSOLE_UART huart4
 #endif
@@ -341,53 +345,55 @@ extern UART_HandleTypeDef HAL_CONSOLE_UART;
 int clu_entry(const void* argument)
 {
 
-	HAL_StatusTypeDef halRet;
-	byte buffer[50];
+    HAL_StatusTypeDef halRet;
+    byte buffer[50];
 
-	char* command;
-	char* token;
-	int argc = 1;
-	int i = 0;
-        int ret;
-        
-        WOLFCLU_LOG(WOLFCLU_L0, "Please enter a wolfCLU command (wolfssl -h for help)");
+    char* command;
+    char* token;
 
-        /* Recieve the command from the UART console */
-        do {
-	    halRet = HAL_UART_Receive(&HAL_CONSOLE_UART, buffer, sizeof(buffer), 100);
-	} while (halRet != HAL_OK || buffer[0] == '\n' || buffer[0] == '\r');
+    char* argv[MAX_COMMAND_ARGS];
+    int argc = 1;
 
-	WOLFCLU_LOG(WOLFCLU_L0, "Command received.");
+    int i = 0;
+    int ret;
 
-	command = (char*)buffer;
+    WOLFCLU_LOG(WOLFCLU_L0, "Please enter a wolfCLU command (wolfssl -h for help)");
 
-	for (i = 0; command[i] != '\0' && i < XSTRLEN(command); i++) {
-		if (command[i]==' ') {
-			argc++;
-		}
-	}
+    /* Recieve the command from the UART console */
+    do {
+        halRet = HAL_UART_Receive(&HAL_CONSOLE_UART, buffer, sizeof(buffer), 100);
+    } while (halRet != HAL_OK || buffer[0] == '\n' || buffer[0] == '\r');
 
-	char* argv[argc];
+    WOLFCLU_LOG(WOLFCLU_L0, "Command received.");
 
-	i = 0;
-	token = strtok(command, " ");
+    command = (char*)buffer;
 
-        /* split the command string to correspond to separate argv[i] */
-	while (token != NULL) {
-	    argv[i] = malloc(XSTRLEN(token)+1);
-	    XMEMSET(argv[i], 0, XSTRLEN(token)+1);
-	    XSTRNCPY(argv[i], token, XSTRLEN(token));
-	    i++;
-	    if (i==(argc-1)) {
-	    	token = strtok(NULL, "\r");
-	    }
-	    else {
-	    	token = strtok(NULL, " ");
-	    }
-	}
+    /* Determine the number of supplied arguments */ 
+    for (i = 0; command[i] != '\0' && i < XSTRLEN(command); i++) {
+        if (command[i]==' ') {
+            argc++;
+        }
+    }
 
-	ret = clu_main(argc, argv);
+    i = 0;
+    token = strtok(command, " ");
 
-	return ret;
+    /* split the command string to correspond to separate argv[i] */
+    while (token != NULL) {
+        argv[i] = malloc(XSTRLEN(token)+1);
+        XMEMSET(argv[i], 0, XSTRLEN(token)+1);
+        XSTRNCPY(argv[i], token, XSTRLEN(token));
+        i++;
+        if (i==(argc-1)) {
+            token = strtok(NULL, "\r");
+        }
+        else {
+            token = strtok(NULL, " ");
+        }
+    }
+
+    ret = clu_main(argc, argv);
+
+    return ret;
 }
 #endif
