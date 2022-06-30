@@ -42,7 +42,11 @@ static const struct option client_options[] = {
 static void wolfCLU_ClientHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_client\n"
-            "\t-connect <ip>:<port>");
+            "\t-connect <ip>:<port>"
+        #ifdef WOLFSSL_IPV6
+            "\n\t-connect <[ipv6]>:<port>"
+        #endif
+            );
     WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
 }
 
@@ -85,6 +89,7 @@ int wolfCLU_Client(int argc, char** argv)
     int   idx  = 0;
     /* Don't verify peer by default (same as OpenSSL). */
     int   verify = 0;
+    char* ipv6 = NULL;
 
     int    clientArgc = 0;
     const char* clientArgv[MAX_CLIENT_ARGS];
@@ -98,21 +103,68 @@ int wolfCLU_Client(int argc, char** argv)
                     &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_CONNECT:
+            #ifdef WOLFSSL_IPV6
+                /* check for [] ipv6 address */
+                ipv6 = XSTRSTR(optarg, "[");
+                if (ipv6 != NULL) {
+                    int strSz;
+
+                    strSz = (int)XSTRLEN(ipv6);
+                    for (idx = 0; idx < strSz; idx++) {
+                        if (ipv6[idx] == ']') {
+                            break;
+                        }
+                    }
+
+                    if (idx == strSz) {
+                        WOLFCLU_LOG(WOLFCLU_E0,
+                                "No right bracket found for ipv6");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+
+                    /* current idx is at ']' string is expected to have
+                     * ']:<port>' format, check there is space left for it */
+                    if (ret == WOLFCLU_SUCCESS && idx + 2 >= strSz) {
+                        WOLFCLU_LOG(WOLFCLU_E0,
+                                "No spaces left in string for port number");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    idx++; /* increment idx to ':' for getting port next */
+                }
+
+            #endif
                 if (XSTRSTR(optarg, ":") == NULL) {
                     WOLFCLU_LOG(WOLFCLU_E0, "connect string does not have ':'");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
-                if (ret == WOLFCLU_SUCCESS) {
+                /* expecting ipv4 address if ipv6 not found */
+                if (ret == WOLFCLU_SUCCESS && ipv6 == NULL) {
                     idx = (int)strcspn(optarg, ":");
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
                     host = (char*)XMALLOC(idx + 1, HEAP_HINT,
                             DYNAMIC_TYPE_TMP_BUFFER);
                     if (host == NULL) {
                         ret = WOLFCLU_FATAL_ERROR;
                     }
                     else {
-                        XMEMCPY(host, optarg, idx);
-                        host[idx] = '\0';
+                        if (ipv6) {
+                            /* remove the '[' and ']' characters */
+                            if (idx <= 2) {
+                                ret = WOLFCLU_FATAL_ERROR;
+                                XMEMSET(host, 0, idx);
+                            }
+                            else {
+                                XMEMCPY(host, optarg + 1, idx - 2);
+                                host[idx - 2] = '\0';
+                            }
+                        }
+                        else {
+                            XMEMCPY(host, optarg, idx);
+                            host[idx] = '\0';
+                        }
                         ret = _addClientArg(clientArgv, hostFlag, &clientArgc);
                         if (ret == WOLFCLU_SUCCESS) {
                             ret = _addClientArg(clientArgv, host, &clientArgc);
