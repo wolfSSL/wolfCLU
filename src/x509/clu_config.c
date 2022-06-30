@@ -49,19 +49,13 @@ static int wolfCLU_setAttributes(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
 
 #ifdef WOLFSSL_CERT_EXT
-static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* str, int crit)
-{
-    char* word, *end;
-    char* deli = (char*)":";
-    WOLFSSL_X509_EXTENSION *ext;
+WOLFSSL_ASN1_OBJECT* wolfCLU_extenstionGetObjectNID(WOLFSSL_X509_EXTENSION *ext, int nid, int crit) {
     WOLFSSL_ASN1_OBJECT *obj;
-
-    ext = wolfSSL_X509_EXTENSION_new();
-    if (ext == NULL || str == NULL)
+    if (ext == NULL)
         return NULL;
 
     wolfSSL_X509_EXTENSION_set_critical(ext, crit);
-    obj = wolfSSL_OBJ_nid2obj(NID_basic_constraints);
+    obj = wolfSSL_OBJ_nid2obj(nid);
     if (wolfSSL_X509_EXTENSION_set_object(ext, obj) != WOLFSSL_SUCCESS) {
         wolfSSL_X509_EXTENSION_free(ext);
         wolfSSL_ASN1_OBJECT_free(obj);
@@ -75,17 +69,33 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* str, int crit)
         return NULL;
     }
 
-    for (word = strtok_r(str, deli, &end); word != NULL;
-            word = strtok_r(NULL, deli, &end)) {
-        if (word != NULL && strncmp(word, "CA", strlen(word)) == 0) {
-            word = strtok_r(NULL, deli, &end);
-            if (word != NULL && strncmp(word, "TRUE", strlen(word)) == 0) {
+    return obj;
+}
+
+static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* str, int crit)
+{
+    char* word, *end;
+    char* deli = (char*)":";
+    WOLFSSL_X509_EXTENSION *ext;
+    WOLFSSL_ASN1_OBJECT *obj;
+
+    ext = wolfSSL_X509_EXTENSION_new();
+    obj = wolfCLU_extenstionGetObjectNID(ext, NID_basic_constraints, crit);
+
+    if (obj == NULL || str == NULL)
+        return NULL;
+
+    for (word = XSTRTOK(str, deli, &end); word != NULL;
+            word = XSTRTOK(NULL, deli, &end)) {
+        if (word != NULL && XSTRNCMP(word, "CA", XSTRLEN(word)) == 0) {
+            word = XSTRTOK(NULL, deli, &end);
+            if (word != NULL && XSTRNCMP(word, "TRUE", XSTRLEN(word)) == 0) {
                 obj->ca = 1;
             }
         }
 
-        if (word != NULL && strncmp(word, "pathlen", strlen(word)) == 0) {
-            word = strtok_r(NULL, deli, &end);
+        if (word != NULL && XSTRNCMP(word, "pathlen", XSTRLEN(word)) == 0) {
+            word = XSTRTOK(NULL, deli, &end);
             if (word != NULL) {
                 if (obj->pathlen != NULL)
                     wolfSSL_ASN1_INTEGER_free(obj->pathlen);
@@ -111,10 +121,10 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseSubjectKeyID(char* str, int crit,
     if (x509 == NULL || str == NULL)
         return NULL;
 
-    for (word = strtok_r(str, deli, &end); word != NULL;
-            word = strtok_r(NULL, deli, &end)) {
+    for (word = XSTRTOK(str, deli, &end); word != NULL;
+            word = XSTRTOK(NULL, deli, &end)) {
 
-        if (strncmp(word, "hash", strlen(word)) == 0) {
+        if (XSTRNCMP(word, "hash", XSTRLEN(word)) == 0) {
             WOLFSSL_ASN1_STRING *data;
             int  keyType;
             void *key = NULL;
@@ -180,8 +190,8 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseKeyUsage(char* str, int crit,
     if (x509 == NULL || str == NULL)
         return NULL;
 
-    for (word = strtok_r(str, deli, &end); word != NULL;
-            word = strtok_r(NULL, deli, &end)) {
+    for (word = XSTRTOK(str, deli, &end); word != NULL;
+            word = XSTRTOK(NULL, deli, &end)) {
 
         /* remove empty spaces at beginning of word */
         int mxSz = (int)XSTRLEN(word);
@@ -190,40 +200,40 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseKeyUsage(char* str, int crit,
             mxSz--;
         }
 
-        if (strncmp(word, "digitalSignature", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "digitalSignature", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_DIGITAL_SIG;
         }
 
-        if (strncmp(word, "nonRepudiation", XSTRLEN(word)) == 0 ||
-                strncmp(word, "contentCommitment", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "nonRepudiation", XSTRLEN(word)) == 0 ||
+                XSTRNCMP(word, "contentCommitment", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_CONTENT_COMMIT;
         }
 
-        if (strncmp(word, "keyEncipherment", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "keyEncipherment", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_KEY_ENCIPHER;
         }
 
-        if (strncmp(word, "dataEncipherment", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "dataEncipherment", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_DATA_ENCIPHER;
         }
 
-        if (strncmp(word, "keyAgreement", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "keyAgreement", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_KEY_AGREE;
         }
 
-        if (strncmp(word, "keyCertSign", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "keyCertSign", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_KEY_CERT_SIGN;
         }
 
-        if (strncmp(word, "cRLSign", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "cRLSign", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_CRL_SIGN;
         }
 
-        if (strncmp(word, "encipherOnly", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "encipherOnly", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_ENCIPHER_ONLY;
         }
 
-        if (strncmp(word, "decipherOnly", XSTRLEN(word)) == 0) {
+        if (XSTRNCMP(word, "decipherOnly", XSTRLEN(word)) == 0) {
             keyUseFlag |= KEYUSE_DECIPHER_ONLY;
         }
     }
