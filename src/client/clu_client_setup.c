@@ -41,12 +41,11 @@ static const struct option client_options[] = {
 
 static void wolfCLU_ClientHelp(void)
 {
-    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_client\n"
-            "\t-connect <ip>:<port>"
-        #ifdef WOLFSSL_IPV6
-            "\n\t-connect <[ipv6]>:<port>"
-        #endif
-            );
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_client");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-connect <ip>:<port>");
+#ifdef WOLFSSL_IPV6
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-connect <[ipv6]>:<port>");
+#endif
     WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
 }
 
