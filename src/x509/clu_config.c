@@ -686,9 +686,12 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext)
             ret = wolfCLU_setExtensions(x509, conf, ext);
         }
     }
-    wolfCLU_setDisNames(x509, conf,
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfCLU_setDisNames(x509, conf,
             wolfSSL_NCONF_get_string(conf, sect, "distinguished_name"),
             noPrompt);
+    }
 
     (void)defaultKey;
     wolfSSL_NCONF_free(conf);
