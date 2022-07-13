@@ -26,6 +26,7 @@
 #include <wolfclu/x509/clu_cert.h>        /* for PEM_FORM and DER_FORM */
 #include <wolfclu/sign-verify/clu_sign.h> /* for RSA_SIG_VER, ECC_SIG_VER,
                                              ED25519_SIG_VER */
+#include <wolfclu/x509/clu_parse.h>
 
 #define SALT_SIZE       8
 #define DES3_BLOCK_SIZE 24
@@ -1097,8 +1098,7 @@ int wolfCLU_checkInform(char* inform)
 }
 
 
-static void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid,
-        char* str)
+void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid, char* str)
 {
     int i, sz;
     WOLFSSL_X509_NAME_ENTRY *entry;
@@ -1114,9 +1114,9 @@ static void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid,
             i--;
         }
 
-        /* treats an empty string as 'do not add' */
+        /* treats a '.' string as 'do not add' */
         sz = (int)XSTRLEN((const char*)str);
-        if (sz > 0) {
+        if (XSTRCMP(str, ".") != 0) {
             entry = wolfSSL_X509_NAME_ENTRY_create_by_NID(NULL, nid,
                 type, (const unsigned char*)str, sz);
             wolfSSL_X509_NAME_add_entry(name, entry, -1, 0);
