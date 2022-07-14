@@ -832,7 +832,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS && config != NULL) {
         ret = wolfCLU_readConfig(x509, config, (char*)"req", ext);
-
         reSign = 1; /* re-sign after config changes */
     }
 

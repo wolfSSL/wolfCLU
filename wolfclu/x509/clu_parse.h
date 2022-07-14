@@ -83,4 +83,6 @@ int wolfCLU_printX509PubKey(WOLFSSL_X509* x509, WOLFSSL_BIO* out);
  */
 int wolfCLU_extKeyUsagePrint(WOLFSSL_BIO* bio, unsigned int keyUsage,
         int indent, int flag);
+
+void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid, char* str);
 #endif /* WOLFCLU_PARSE_H */

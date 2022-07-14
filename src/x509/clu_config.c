@@ -72,25 +72,58 @@ WOLFSSL_ASN1_OBJECT* wolfCLU_extenstionGetObjectNID(WOLFSSL_X509_EXTENSION *ext,
     return obj;
 }
 
-static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* str, int crit)
+static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* in, int crit)
 {
-    char* word, *end;
+    int   idx = 0; /* offset into string */
+    char* word, *end, *str = in;
     char* deli = (char*)":";
     WOLFSSL_X509_EXTENSION *ext;
     WOLFSSL_ASN1_OBJECT *obj;
 
+    if (str == NULL) {
+        return NULL;
+    }
+
+    /* if critical key word was found, then advance string pointer past
+     * 'critical,' */
+    if (crit) {
+        int inSz = (int)XSTRLEN(in);
+
+        for (idx = 0; idx < inSz; idx++) {
+            if (str[idx] == ',') break;
+        }
+
+        if (idx + 1 >= inSz) {
+            WOLFCLU_LOG(WOLFCLU_E0, "bad basic constraint string in conf file");
+            return NULL;
+        }
+
+        /* advance past any white spaces */
+        for (idx = idx + 1; idx < inSz; idx++) {
+            if (str[idx] != ' ') break;
+        }
+    }
+
     ext = wolfSSL_X509_EXTENSION_new();
     obj = wolfCLU_extenstionGetObjectNID(ext, NID_basic_constraints, crit);
-
-    if (obj == NULL || str == NULL)
+    if (obj == NULL) {
         return NULL;
+    }
 
-    for (word = XSTRTOK(str, deli, &end); word != NULL;
+
+    for (word = XSTRTOK(str + idx, deli, &end); word != NULL;
             word = XSTRTOK(NULL, deli, &end)) {
         if (word != NULL && XSTRNCMP(word, "CA", XSTRLEN(word)) == 0) {
             word = XSTRTOK(NULL, deli, &end);
-            if (word != NULL && XSTRNCMP(word, "TRUE", XSTRLEN(word)) == 0) {
-                obj->ca = 1;
+            if (word != NULL) {
+                int z, wordSz;
+
+                wordSz = (int)XSTRLEN(word);
+                for (z = 0; z < wordSz; z++)
+                    word[z] = toupper(word[z]);
+                if (XSTRNCMP(word, "TRUE", XSTRLEN(word)) == 0) {
+                    obj->ca = 1;
+                }
             }
         }
 
@@ -260,7 +293,7 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
     WOLFSSL_X509_EXTENSION *ext = NULL;
     int   ret, crit = 0;
 
-    if (strstr("critical", str) != NULL) {
+    if (XSTRSTR(str, "critical") != NULL) {
         crit = 1;
     }
     switch (nid) {
@@ -354,7 +387,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
             if (type == 0) {
                 ret = WOLFCLU_FATAL_ERROR;
-                break; 
+                break;
             }
 
             if (wolfSSL_X509_add_altname_ex(x509, s, sSz, type)
@@ -428,37 +461,120 @@ int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
 #endif /* WOLFSSL_CERT_EXT */
 
 
-/* return WOLFCLU_SUCCESS on success, WOLFCLU_FAILURE if unable to find or add
- * the entry */
-static int wolfCLU_X509addEntry(WOLFSSL_X509_NAME* name, WOLFSSL_CONF* conf,
-        int nid, int type, const char* sect, const char* str)
-{
-    const unsigned char *current;
-    WOLFSSL_X509_NAME_ENTRY *entry;
+#define MAX_DIST_NAME 80
+#define DEFAULT_STR_SZ 9
+#define MIN_MAX_STR_SZ 5
 
-    current = (const unsigned char*)wolfSSL_NCONF_get_string(conf, sect, str);
-    if (current != NULL) {
-        entry = wolfSSL_X509_NAME_ENTRY_create_by_NID(NULL, nid,
-                type, current, (int)XSTRLEN((const char*)current));
-        wolfSSL_X509_NAME_add_entry(name, entry, -1, 0);
-        wolfSSL_X509_NAME_ENTRY_free(entry);
-        return WOLFCLU_SUCCESS;
+static int CheckDisName(WOLFSSL_CONF* conf, char* sect, WOLFSSL_X509_NAME* name,
+        const char* str, int nid, int strType, int noPrompt)
+{
+    int  ret = WOLFCLU_SUCCESS;
+    long mn = 0;
+    long mx = 0;
+    FILE *fout = stdout;
+    FILE *fin = stdin; /* defaulting to stdin but using a fd variable to make it
+                        * easy for expanding to other inputs */
+    char* curnt = NULL;
+    char* deflt = NULL;
+    char   *in = NULL;
+    size_t  inSz;
+
+    char* deflt_str = NULL;
+    char* mn_str = NULL;
+    char* mx_str = NULL;
+
+    if (noPrompt) {
+        curnt = wolfSSL_NCONF_get_string(conf, sect, str);
+        if (curnt != NULL) {
+            wolfCLU_AddNameEntry(name, strType, nid, curnt);
+        }
+        return ret;
     }
-    return WOLFCLU_FAILURE;
+
+    inSz = (int)XSTRLEN(str);
+    deflt_str = (char*)XMALLOC(inSz + DEFAULT_STR_SZ, NULL,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (deflt_str == NULL) {
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+    else {
+        XMEMSET(deflt_str, 0, inSz + DEFAULT_STR_SZ);
+        XSTRNCPY(deflt_str, str, inSz);
+        XSTRNCAT(deflt_str, "_default", inSz + DEFAULT_STR_SZ);
+    }
+
+    mn_str = (char*)XMALLOC(inSz + MIN_MAX_STR_SZ, NULL,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (mn_str == NULL) {
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+    else {
+        XMEMSET(mn_str, 0, inSz + MIN_MAX_STR_SZ);
+        XSTRNCPY(mn_str, str, inSz);
+        XSTRNCAT(mn_str, "_min", inSz + MIN_MAX_STR_SZ);
+    }
+
+    mx_str = (char*)XMALLOC(inSz + MIN_MAX_STR_SZ, NULL,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (mx_str == NULL) {
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+    else {
+        XMEMSET(mx_str, 0, inSz + MIN_MAX_STR_SZ);
+        XSTRNCPY(mx_str, str, inSz);
+        XSTRNCAT(mx_str, "_max", inSz + MIN_MAX_STR_SZ);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        curnt = wolfSSL_NCONF_get_string(conf, sect, str);
+        if (curnt != NULL) {
+            deflt = wolfSSL_NCONF_get_string(conf, sect, deflt_str);
+            fprintf(fout, "%s [%s] : ", curnt, (deflt)?deflt:"");
+
+            if (wolfCLU_getline(&in, &inSz, fin) > 1) {
+                deflt = in;
+            }
+
+            if (deflt && XSTRCMP(deflt, ".") != 0) {
+                if (wolfSSL_NCONF_get_number(conf, sect, mx_str, &mx) ==
+                        WOLFSSL_SUCCESS && (long)XSTRLEN(deflt) > mx) {
+                    WOLFCLU_LOG(WOLFCLU_E0,
+                            "Name %s is larger than max %ld", deflt, mx);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                if (wolfSSL_NCONF_get_number(conf, sect, mn_str, &mn) ==
+                        WOLFSSL_SUCCESS && (long)XSTRLEN(deflt) < mn) {
+                    WOLFCLU_LOG(WOLFCLU_E0,
+                            "Name %s is smaller than min %ld", deflt, mn);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    wolfCLU_AddNameEntry(name, strType, nid, deflt);
+                }
+            }
+            free(in); in = NULL;
+        }
+    }
+
+    XFREE(deflt_str, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(mn_str, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(mx_str, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    return ret;
 }
 
-#define MAX_DIST_NAME 80
 /* extracts the distinguished names from the conf file and puts them into
  * the x509
  * returns WOLFCLU_SUCCESS on success */
 static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
-        char* sect)
+        char* sect, int noPrompt)
 {
-    int  i, ret;
+    int  i;
+    int ret = WOLFCLU_SUCCESS;
     char buf[MAX_DIST_NAME];
     WOLFSSL_X509_NAME *name;
-    long countryName_min = 0;
-    long countryName_max = 0;
+    FILE *fout = stdout;
 
     if (sect == NULL) {
         return WOLFCLU_SUCCESS; /* none set */
@@ -469,57 +585,66 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         return WOLFCLU_FATAL_ERROR;
     }
 
-    wolfCLU_X509addEntry(name, conf, NID_countryName, CTC_PRINTABLE, sect,
-            "countryName_default");
-    wolfCLU_X509addEntry(name, conf, NID_countryName, CTC_PRINTABLE, sect,
-            "countryName");
+    fprintf(fout, "Enter '.' will result in the field being "
+            "skipped.\nExamples of inputs are provided as [*]\n");
 
-    wolfSSL_NCONF_get_number(conf, sect, "countryName_min", &countryName_min);
-    wolfSSL_NCONF_get_number(conf, sect, "countryName_max", &countryName_max);
+    ret = CheckDisName(conf, sect, name, "countryName", NID_countryName,
+            CTC_PRINTABLE, noPrompt);
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "stateOrProvinceName",
+                NID_stateOrProvinceName, CTC_UTF8, noPrompt);
+    }
 
-    wolfCLU_X509addEntry(name, conf, NID_stateOrProvinceName, CTC_UTF8, sect,
-            "stateOrProvinceName_default");
-    wolfCLU_X509addEntry(name, conf, NID_stateOrProvinceName, CTC_UTF8, sect,
-            "stateOrProvinceName");
-    wolfCLU_X509addEntry(name, conf, NID_localityName, CTC_UTF8, sect,
-            "localityName_default");
-    wolfCLU_X509addEntry(name, conf, NID_localityName, CTC_UTF8, sect,
-            "localityName");
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "localityName", NID_localityName,
+                CTC_UTF8, noPrompt);
+    }
 
 
     /* check for additional organization names, keep going while successfully
      * finding an entry */
-    wolfCLU_X509addEntry(name, conf, NID_organizationName, CTC_UTF8, sect,
-            "organizationName_default");
-    wolfCLU_X509addEntry(name, conf, NID_organizationName, CTC_UTF8, sect,
-            "organizationName");
-    i = 0;
-    do {
-        XSNPRINTF(buf, sizeof(buf), "%d.organizationName", i++);
-        ret = wolfCLU_X509addEntry(name, conf, NID_organizationName, CTC_UTF8,
-                sect, buf);
-    } while (ret == WOLFCLU_SUCCESS);
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "organizationName",
+                NID_organizationName, CTC_UTF8, noPrompt);
+    }
 
+    if (ret == WOLFCLU_SUCCESS) {
+        i = 0;
+        for (i = 0; i < 10; i++) {
+            XSNPRINTF(buf, sizeof(buf), "%d.organizationName", i);
+            ret = CheckDisName(conf, sect, name, buf, NID_organizationName,
+                    CTC_UTF8, noPrompt);
+            if (ret != WOLFCLU_SUCCESS) {
+                break;
+            }
+        }
+    }
 
-    wolfCLU_X509addEntry(name, conf, NID_organizationalUnitName, CTC_UTF8, sect,
-            "organizationalUnitName_default");
-    wolfCLU_X509addEntry(name, conf, NID_organizationalUnitName, CTC_UTF8, sect,
-            "organizationalUnitName");
-    wolfCLU_X509addEntry(name, conf, NID_commonName, CTC_UTF8, sect,
-            "commonName_default");
-    wolfCLU_X509addEntry(name, conf, NID_commonName, CTC_UTF8, sect,
-            "commonName");
-    wolfCLU_X509addEntry(name, conf, NID_commonName, CTC_UTF8, sect,
-            "CN");
-    wolfCLU_X509addEntry(name, conf, NID_emailAddress, CTC_UTF8, sect,
-            "emailAddress_default");
-    wolfCLU_X509addEntry(name, conf, NID_emailAddress, CTC_UTF8, sect,
-            "emailAddress");
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "organizationalUnitName",
+                NID_organizationalUnitName, CTC_UTF8, noPrompt);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "commonName", NID_commonName,
+                CTC_UTF8, noPrompt);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "CN", NID_commonName, CTC_UTF8,
+                noPrompt);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "emailAddress", NID_emailAddress,
+                CTC_UTF8, noPrompt);
+    }
 
     wolfSSL_X509_REQ_set_subject_name(x509, name);
     wolfSSL_X509_NAME_free(name);
-    return WOLFCLU_SUCCESS;
+    return ret;
 }
+
 
 /* Make a new WOLFSSL_X509 based off of the config file read */
 int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext)
@@ -529,9 +654,17 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext)
     long line = 0;
     long defaultBits = 0;
     char *defaultKey = NULL;
+    int noPrompt = 0;
+    char *curnt;
 
     conf = wolfSSL_NCONF_new(NULL);
     wolfSSL_NCONF_load(conf, config, &line);
+
+    /* check if no prompting */
+    curnt = wolfSSL_NCONF_get_string(conf, sect, "prompt");
+    if (curnt != NULL && XSTRSTR(curnt, "no")) {
+        noPrompt = 1;
+    }
 
     wolfSSL_NCONF_get_number(conf, sect, "default_bits", &defaultBits);
     defaultKey = wolfSSL_NCONF_get_string(conf, sect, "default_keyfile");
@@ -553,8 +686,12 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext)
             ret = wolfCLU_setExtensions(x509, conf, ext);
         }
     }
-    wolfCLU_setDisNames(x509, conf,
-            wolfSSL_NCONF_get_string(conf, sect, "distinguished_name"));
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfCLU_setDisNames(x509, conf,
+            wolfSSL_NCONF_get_string(conf, sect, "distinguished_name"),
+            noPrompt);
+    }
 
     (void)defaultKey;
     wolfSSL_NCONF_free(conf);

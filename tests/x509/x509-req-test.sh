@@ -18,7 +18,11 @@ run_success() {
 }
 
 run_fail() {
-    RESULT=`./wolfssl $1`
+    if [ -z "$2" ]; then
+        RESULT=`./wolfssl $1`
+    else
+        RESULT=`echo "$2" | ./wolfssl $1`
+    fi
     if [ $? == 0 ]; then
         echo "Fail on ./wolfssl $1"
         exit 99
@@ -71,6 +75,24 @@ DNS.7 = thirdName
 DNS.8 = thirdName
 DNS.9 = thirdName
 DNS.10 = tenthName
+EOF
+
+cat << EOF >> test-prompt.conf
+[ req ]
+distinguished_name =req_distinguished_name
+attributes =req_attributes
+x509_extensions = v3_req
+req_extensions = v3_req
+[ req_distinguished_name ]
+countryName = 2 Letter Country Name
+countryName_default = US
+countryName_max = 2
+coutnryName_min = 2
+[ req_attributes ]
+[ v3_req ]
+basicConstraints = critical,CA:true
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
 EOF
 
 
@@ -168,11 +190,16 @@ fi
 
 #test passout
 run_success "req -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -out tmp.cert -passout pass:123456 -outform pem -sha256"
-run_success "rsa -in new-key.pem -passin pass:123456" 
+run_success "rsa -in new-key.pem -passin pass:123456"
 
 rm -f tmp.cert
+
+run_success "req -new -x509 -key ./certs/ca-key.pem -config ./test-prompt.conf -out tmp.cert" "AA"
+run_fail "req -new -x509 -key ./certs/ca-key.pem -config ./test-prompt.conf -out tmp.cert" "LONG"
+
 rm -f new-key.pem
 rm -f test.conf
+rm -f test-prompt.conf
 
 # test printing out CSR attributes, older versions of wolfSSL will fail this
 RESULT=`./wolfssl req -text -noout -in ./certs/attributes-csr.pem`
