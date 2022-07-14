@@ -1116,7 +1116,7 @@ void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid, char* str)
 
         /* treats a '.' string as 'do not add' */
         sz = (int)XSTRLEN((const char*)str);
-        if (XSTRCMP(str, ".") != 0) {
+        if (sz > 0 && XSTRCMP(str, ".") != 0) {
             entry = wolfSSL_X509_NAME_ENTRY_create_by_NID(NULL, nid,
                 type, (const unsigned char*)str, sz);
             wolfSSL_X509_NAME_add_entry(name, entry, -1, 0);
