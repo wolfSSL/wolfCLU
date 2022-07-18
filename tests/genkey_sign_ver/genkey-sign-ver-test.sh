@@ -96,12 +96,12 @@ gen_key_sign_ver_test(){
     [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 sign" && exit -1
 
     if [ $1 = "rsa" ]; then
-        ORIGINAL=`cat sign-this.txt`
+        ORIGINAL=`cat -A sign-this.txt`
 
-        DECRYPTED=`cat $4.private_result`
+        DECRYPTED=`cat -A $4.private_result`
         rsa_compare_decrypted "${DECRYPTED}" "${ORIGINAL}"
 
-        DECRYPTED=`cat $4.public_result`
+        DECRYPTED=`cat -A $4.public_result`
         rsa_compare_decrypted "${DECRYPTED}" "${ORIGINAL}"
     fi
 

@@ -346,7 +346,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
             ret = BAD_FUNC_ARG;
         }
         else {
-            XFWRITE(outBuf, 1, outBufSz, s);
+            XFWRITE(outBuf, 1, ret, s);
             XFCLOSE(s);
         }
     }
