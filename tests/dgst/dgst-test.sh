@@ -5,6 +5,13 @@ if [ ! -d ./certs/ ]; then
     exit 77
 fi
 
+# Skip test if filesystem disabled
+FILESYSTEM=`cat config.log | grep "disable\-filesystem"`
+if [ "$FILESYSTEM" != "" ]
+then
+    exit 77
+fi
+
 run() {
     RESULT=`./wolfssl $1`
     if [ $? != 0 ]; then

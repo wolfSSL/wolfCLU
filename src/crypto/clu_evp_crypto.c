@@ -24,6 +24,8 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/genkey/clu_genkey.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 #ifndef WOLFCLU_MAX_BUFFER
 #define WOLFCLU_MAX_BUFFER 1024
 #endif
@@ -409,3 +411,4 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     return ret;
 }
 
+#endif /* !WOLFCLU_NO_FILESYSTEM */

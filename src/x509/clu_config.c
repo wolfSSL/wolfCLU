@@ -25,6 +25,7 @@
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
 
 /* return WOLFCLU_SUCCESS on success */
 static int wolfCLU_setAttributes(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
@@ -723,3 +724,4 @@ int wolfCLU_GetTypeFromPKEY(WOLFSSL_EVP_PKEY* key)
     return keyType;
 }
 
+#endif /* !WOLFCLU_NO_FILESYSTEM */

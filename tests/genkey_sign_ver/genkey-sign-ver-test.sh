@@ -23,6 +23,12 @@
 #/
 #
 
+# Skip test if filesystem disabled
+FILESYSTEM=`cat config.log | grep "disable\-filesystem"`
+if [ "$FILESYSTEM" != "" ]
+then
+    exit 77
+fi
 
 cleanup_genkey_sign_ver(){
     rm -f ecckey

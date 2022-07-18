@@ -5,6 +5,13 @@ if [ ! -d ./certs/ ]; then
     exit 77
 fi
 
+# Skip test if filesystem disabled
+FILESYSTEM=`cat config.log | grep "disable\-filesystem"`
+if [ "$FILESYSTEM" != "" ]
+then
+    exit 77
+fi
+
 
 echo | ./wolfssl s_client -connect www.google.com:443 | ./wolfssl x509 -outform pem -out tmp.crt
 

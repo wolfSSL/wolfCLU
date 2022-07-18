@@ -27,6 +27,7 @@
 
 int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
     int     ret         = 0;    /* return variable */
@@ -82,5 +83,12 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
     wolfSSL_BIO_free(bioIn);
 
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    (void)algorithm;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
 
