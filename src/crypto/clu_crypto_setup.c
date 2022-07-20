@@ -112,7 +112,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
     /* gets blocksize, algorithm, mode, and key size from name argument */
     block = wolfCLU_getAlgo(argc, argv, &alg, &mode, &keySize);
     if (block < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to find algorithm to use");
+        wolfCLU_LogError("unable to find algorithm to use");
         return WOLFCLU_FATAL_ERROR;
     }
 
@@ -242,7 +242,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
         case WOLFCLU_INKEY:
             if (optarg == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "no key passed in..");
+                wolfCLU_LogError("no key passed in..");
                 wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
                 return WOLFCLU_FATAL_ERROR;
             }
@@ -303,7 +303,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
         case WOLFCLU_MD:
             hashType = wolfSSL_EVP_get_digestbyname(optarg);
             if (hashType == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Invalid digest name");
+                wolfCLU_LogError("Invalid digest name");
                 return WOLFCLU_FATAL_ERROR;
             }
             break;
@@ -321,7 +321,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
     if (pwdKeyChk == 0 && keyCheck == 0) {
         if (decCheck == 1) {
             WOLFCLU_LOG(WOLFCLU_L0, "\nDECRYPT ERROR:");
-            WOLFCLU_LOG(WOLFCLU_E0, "no key or passphrase set");
+            wolfCLU_LogError("no key or passphrase set");
             WOLFCLU_LOG(WOLFCLU_L0,
                     "Please type \"wolfssl -decrypt -help\" for decryption"
                                                             " usage \n");
@@ -358,7 +358,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
     }
 
     if (inCheck == 0 && decCheck == 1) {
-        WOLFCLU_LOG(WOLFCLU_E0, "File/string to decrypt needed");
+        wolfCLU_LogError("File/string to decrypt needed");
         wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
         return WOLFCLU_FATAL_ERROR;
     }

@@ -38,7 +38,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     byte* keyBuf;
 
     if (outBufSz == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Unexpected null output size variable");
+        wolfCLU_LogError("Unexpected null output size variable");
         return NULL;
     }
 
@@ -47,7 +47,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
 
     ret = wc_InitRsaKey(&key, NULL);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize RsaKey.\nRet: %d", ret);
+        wolfCLU_LogError("Failed to initialize RsaKey.\nRet: %d", ret);
         *outBufSz = ret;
         return outBuf;
     }
@@ -57,7 +57,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
 
     privKeyFile = XFOPEN(privKey, "rb");
     if (privKeyFile == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Unable to open file %s", privKey);
+        wolfCLU_LogError("Unable to open file %s", privKey);
         wc_FreeRsaKey(&key);
         return NULL;
     }
@@ -74,7 +74,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret < 0 ) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
         *outBufSz = ret;
         wc_FreeRsaKey(&key);
         return outBuf;
@@ -93,7 +93,7 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
 
     ret = wc_RsaKeyToPublicDer(&key, outBuf, *outBufSz);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to create RSA public key.\nBuf size: %d\nRET: %d",
+        wolfCLU_LogError("Failed to create RSA public key.\nBuf size: %d\nRET: %d",
                *outBufSz, ret);
         *outBufSz = ret;
         wc_FreeRsaKey(&key);
@@ -121,7 +121,7 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
 
     ret = wc_ed25519_init(&key);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize ED25519.\nRet: %d", ret);
+        wolfCLU_LogError("Failed to initialize ED25519.\nRet: %d", ret);
         return ret;
     }
 
@@ -137,14 +137,14 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
                                         ED25519_KEY_SIZE,
                                         &key);
     if (ret < 0 ) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
         return ret;
     }
 
     /* retrive public key from private */
     ret = wc_ed25519_export_public(&key, outBuf, &outLen);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to create ED25519 public key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to create ED25519 public key.\nRET: %d", ret);
         return ret;
     }
     return WOLFCLU_SUCCESS;
@@ -172,7 +172,7 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
 
     f = XFOPEN(sig, "rb");
     if (f == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", sig);
+        wolfCLU_LogError("unable to open file %s", sig);
         return BAD_FUNC_ARG;
     }
 
@@ -196,7 +196,7 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
         case ECC_SIG_VER:
             h = XFOPEN(hashFile,"rb");
             if (h == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", hashFile);
+                wolfCLU_LogError("unable to open file %s", hashFile);
                 ret = BAD_FUNC_ARG;
                 break;
             }
@@ -222,7 +222,7 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
         #ifdef HAVE_ED25519
             h = XFOPEN(hashFile, "rb");
             if (h == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", hashFile);
+                wolfCLU_LogError("unable to open file %s", hashFile);
                 ret = BAD_FUNC_ARG;
                 break;
             }
@@ -246,7 +246,7 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
             break;
 
         default:
-            WOLFCLU_LOG(WOLFCLU_E0, "No valid verify algorithm selected.");
+            wolfCLU_LogError("No valid verify algorithm selected.");
             ret = -1;
     }
 
@@ -279,7 +279,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
     ret = wc_InitRsaKey(&key, NULL);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize RsaKey.\nRet: %d", ret);
+        wolfCLU_LogError("Failed to initialize RsaKey.\nRet: %d", ret);
         return ret;
     }
 
@@ -287,7 +287,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         /* read in and store rsa key */
         keyPathFile = XFOPEN(keyPath, "rb");
         if (keyPathFile == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", keyPath);
+            wolfCLU_LogError("unable to open file %s", keyPath);
             wc_FreeRsaKey(&key);
             return BAD_FUNC_ARG;
         }
@@ -304,7 +304,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     else {
         keyBuf = wolfCLU_generate_public_key_rsa(keyPath, keyBuf, &keyFileSz);
         if (keyFileSz < 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Failed to derive public key from private key.");
+                wolfCLU_LogError("Failed to derive public key from private key.");
                 wc_FreeRsaKey(&key);
                 return ret;
         }
@@ -317,7 +317,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     }
 
     if (ret < 0 ) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode public key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
         wc_FreeRsaKey(&key);
         return ret;
     }
@@ -326,7 +326,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     outBufSz = wc_RsaEncryptSize(&key);
     outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (outBuf == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to malloc output buffer");
+        wolfCLU_LogError("Failed to malloc output buffer");
         wc_FreeRsaKey(&key);
         return MEMORY_E;
     }
@@ -334,7 +334,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
     ret = wc_RsaSSL_Verify(sig, sigSz, outBuf, (word32)outBufSz, &key);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to verify data with RSA public key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to verify data with RSA public key.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRsaKey(&key);
         return ret;
@@ -342,7 +342,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     else {
         XFILE s = XFOPEN(out, "wb");
         if (s == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", out);
+            wolfCLU_LogError("unable to open file %s", out);
             ret = BAD_FUNC_ARG;
         }
         else {
@@ -380,14 +380,14 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
 
     ret = wc_ecc_init(&key);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize ecc key.\nRet: %d", ret);
+        wolfCLU_LogError("Failed to initialize ecc key.\nRet: %d", ret);
         return ret;
     }
 
     /* read in and store ecc key */
     keyPathFile = XFOPEN(keyPath, "rb");
     if (keyPathFile == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", keyPath);
+        wolfCLU_LogError("unable to open file %s", keyPath);
         return BAD_FUNC_ARG;
     }
 
@@ -404,7 +404,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         /* retrieving public key and storing in the ecc key */
         ret = wc_EccPublicKeyDecode(keyBuf, &index, &key, keyFileSz);
         if (ret < 0 ) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode public key.\nRET: %d", ret);
+            wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
@@ -413,7 +413,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         /* retrieving private key and storing in the Ecc Key */
         ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
         if (ret != 0 ) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode private key.\nRET: %d", ret);
+            wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
@@ -424,14 +424,14 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
 
     ret = wc_ecc_verify_hash(sig, sigSz, hash, hashSz, &stat, &key);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to verify data with Ecc public key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to verify data with Ecc public key.\nRET: %d", ret);
         return ret;
     }
     else if (stat == 1) {
         WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
     }
     else {
-        WOLFCLU_LOG(WOLFCLU_E0, "Invalid Signature.");
+        wolfCLU_LogError("Invalid Signature.");
     }
 
     return WOLFCLU_SUCCESS;
@@ -452,7 +452,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     byte* keyBuf = (byte*)XMALLOC(ED25519_KEY_SIZE, HEAP_HINT,
             DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "malloc failed");
+        wolfCLU_LogError("malloc failed");
         return MEMORY_E;
     }
 
@@ -461,7 +461,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 
     ret = wc_ed25519_init(&key);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize ED25519 key.\nRet: %d", ret);
+        wolfCLU_LogError("Failed to initialize ED25519 key.\nRet: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
@@ -481,7 +481,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     else {
         ret = wolfCLU_generate_public_key_ed25519(keyPath, keyBuf);
         if (ret != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Failed to derive public key from private key.");
+            wolfCLU_LogError("Failed to derive public key from private key.");
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
@@ -489,7 +489,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 
     ret = wc_ed25519_import_public(keyBuf, ED25519_KEY_SIZE, &key);
     if (ret != 0 ) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode public key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
@@ -497,14 +497,14 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 
     ret = wc_ed25519_verify_msg(sig, sigSz, hash, hashSz, &stat, &key);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to verify data with ED25519 public key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to verify data with ED25519 public key.\nRET: %d", ret);
         return ret;
     }
     else if (stat == 1) {
         WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
     }
     else {
-        WOLFCLU_LOG(WOLFCLU_E0, "Invalid Signature.");
+        wolfCLU_LogError("Invalid Signature.");
     }
 
     return WOLFCLU_SUCCESS;

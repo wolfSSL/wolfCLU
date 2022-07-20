@@ -63,7 +63,7 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
         #endif
 
         default:
-            WOLFCLU_LOG(WOLFCLU_E0, "Please reconfigure wolfSSL with support for that algorithm");
+            wolfCLU_LogError("Please reconfigure wolfSSL with support for that algorithm");
             return NOT_COMPILED_IN;
 
     }
@@ -72,7 +72,7 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
     if (argc >= 3) {
         bioIn = wolfSSL_BIO_new_file(argv[2], "rb");
         if (bioIn == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", argv[2]);
+            wolfCLU_LogError("unable to open file %s", argv[2]);
             return USER_INPUT_ERROR;
         }
     }

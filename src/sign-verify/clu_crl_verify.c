@@ -84,7 +84,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "unable to open input file %s",
+                    wolfCLU_LogError("unable to open input file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -181,7 +181,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
         test = wolfSSL_d2i_X509_CRL(NULL, der, derSz);
         if (test == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to parse CRL file");
+            wolfCLU_LogError("Unable to parse CRL file");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -193,7 +193,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && output != 0 && out != NULL) {
         bioOut = wolfSSL_BIO_new_file(out, "wb");
         if (bioOut == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to open output file %s",
+            wolfCLU_LogError("unable to open output file %s",
                     optarg);
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -232,14 +232,14 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
         cm = wolfSSL_CertManagerNew();
         if (wolfSSL_CertManagerLoadCA(cm, caCert, NULL) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open CA file");
+            wolfCLU_LogError("Unable to open CA file");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             if (wolfSSL_CertManagerEnableCRL(cm, WOLFSSL_CRL_CHECKALL)
                     != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Failed to enable CRL use");
+                wolfCLU_LogError("Failed to enable CRL use");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -252,9 +252,8 @@ int wolfCLU_CRLVerify(int argc, char** argv)
                 WOLFCLU_LOG(WOLFCLU_L0, "OK");
             }
             else {
-                WOLFCLU_LOG(WOLFCLU_E0, "Verification failed");
-                WOLFCLU_LOG(WOLFCLU_E0, "Err (%d) : %s",
-                    err, wolfSSL_ERR_reason_error_string(err));
+                wolfCLU_LogError("Verification failed\nErr (%d): %s", err,
+                                 wolfSSL_ERR_reason_error_string(err));
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -270,7 +269,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 #else
     (void)argc;
     (void)argv;
-    WOLFCLU_LOG(WOLFCLU_E0, "recompile wolfSSL with CRL support");
+    wolfCLU_LogError("recompile wolfSSL with CRL support");
     return WOLFCLU_FATAL_ERROR;
 #endif
 }

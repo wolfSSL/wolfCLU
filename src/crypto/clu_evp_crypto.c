@@ -64,7 +64,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
 
     /* Start up the random number generator */
     if (wc_InitRng(&rng) != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Random Number Generator failed to start.");
+        wolfCLU_LogError("Random Number Generator failed to start.");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -110,14 +110,14 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     }
 
     if (in == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", fileIn);
+        wolfCLU_LogError("unable to open file %s", fileIn);
         ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret == WOLFCLU_SUCCESS) {
         ctx = wolfSSL_EVP_CIPHER_CTX_new();
         if (ctx == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to create new ctx");
+            wolfCLU_LogError("Unable to create new ctx");
             ret = MEMORY_E;
         }
     }
@@ -128,7 +128,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         if (enc) {
             /* randomly generates salt */
             if (wc_RNG_GenerateBlock(&rng, salt, SALT_SIZE) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error creating salt");
+                wolfCLU_LogError("Error creating salt");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -137,20 +137,20 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                 char s[sizeof(isSalted)];
 
                 if (wolfSSL_BIO_read(in, s, (int)XSTRLEN(isSalted)) <= 0) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Error reading salted string");
+                    wolfCLU_LogError("Error reading salted string");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 s[XSTRLEN(isSalted)] = '\0';
 
                 if (ret >= 0 &&
                     XMEMCMP(s, isSalted, (int)XSTRLEN(isSalted)) != 0) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Was expecting salt");
+                    wolfCLU_LogError("Was expecting salt");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
                     if (wolfSSL_BIO_read(in, salt, SALT_SIZE) != SALT_SIZE) {
-                        WOLFCLU_LOG(WOLFCLU_E0, "error reading salt");
+                        wolfCLU_LogError("error reading salt");
                         ret = WOLFCLU_FATAL_ERROR;
                     }
                 }
@@ -163,7 +163,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         if (pbkVersion == WOLFCLU_PBKDF2) {
         #ifdef HAVE_FIPS
             if (strlen((const char*)pwdKey) < HMAC_FIPS_MIN_KEY) {
-                WOLFCLU_LOG(WOLFCLU_E0, "For use with FIPS mode key needs to be"
+                wolfCLU_LogError("For use with FIPS mode key needs to be"
                         " at least %d characters long", HMAC_FIPS_MIN_KEY);
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -180,7 +180,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                     hashType, keySz + ivSz, pwdKey);
                 }
                 if (ret != WOLFSSL_SUCCESS) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "failed to create key, ret = %d", ret);
+                    wolfCLU_LogError("failed to create key, ret = %d", ret);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
@@ -206,7 +206,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                     pwdKey, (int)strlen((const char*)pwdKey), iter, key, iv);
             }
             if (ret == 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "failed to create key, ret = %d", ret);
+                wolfCLU_LogError("failed to create key, ret = %d", ret);
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
@@ -226,7 +226,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             wolfSSL_BIO_set_fp(out, stdout, BIO_NOCLOSE);
         }
         if (out == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to open output file %s", fileOut);
+            wolfCLU_LogError("unable to open output file %s", fileOut);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -236,7 +236,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         tmp = out;
         out = wolfSSL_BIO_new(wolfSSL_BIO_s_mem());
         if (out == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to create temporary memory");
+            wolfCLU_LogError("unable to create temporary memory");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -245,14 +245,14 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     if (ret == WOLFCLU_SUCCESS && enc && !noSalt) {
         if (wolfSSL_BIO_write(out, isSalted, (int)XSTRLEN(isSalted)) !=
                 (int)XSTRLEN(isSalted)) {
-            WOLFCLU_LOG(WOLFCLU_E0, "issue writing out isSalted");
+            wolfCLU_LogError("issue writing out isSalted");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
     if (ret == WOLFCLU_SUCCESS && enc && !noSalt) {
         if (wolfSSL_BIO_write(out, salt, SALT_SIZE) != SALT_SIZE) {
-            WOLFCLU_LOG(WOLFCLU_E0, "issue writing out salt");
+            wolfCLU_LogError("issue writing out salt");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -280,7 +280,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     if (ret == WOLFCLU_SUCCESS) {
         wolfSSL_EVP_CIPHER_CTX_init(ctx);
         if (wolfSSL_EVP_CipherInit(ctx, cphr, key, iv, enc) != WOLFSSL_SUCCESS){
-            WOLFCLU_LOG(WOLFCLU_E0, "failed to init evp ctx");
+            wolfCLU_LogError("failed to init evp ctx");
             ret = MEMORY_E;
         }
     }
@@ -312,7 +312,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             /* check for case that an error happened from a read when the BIO
              * length is at 0 */
             if (wolfSSL_BIO_get_len(in) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "error reading in data");
+                wolfCLU_LogError("error reading in data");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             break;
@@ -327,7 +327,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                                                 NULL, NULL, NULL,
                                                 NULL, NULL, NULL);
             if (hexRet !=  WOLFCLU_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "failed during conversion of input, "
+                wolfCLU_LogError("failed during conversion of input, "
                         "ret = %d", hexRet);
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
@@ -339,7 +339,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             outputSz = WOLFCLU_MAX_BUFFER + AES_BLOCK_SIZE;
             if (wolfSSL_EVP_CipherUpdate(ctx, output, &outputSz, input, tempMax)
                     != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error with cipher update");
+                wolfCLU_LogError("Error with cipher update");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
             }
@@ -347,7 +347,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
 
         if (err >= 0) {
             if (wolfSSL_BIO_write(out, output, outputSz) < 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error writing out encrypted data");
+                wolfCLU_LogError("Error writing out encrypted data");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
             }
@@ -359,7 +359,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         outputSz = tempMax + AES_BLOCK_SIZE;
         if (wolfSSL_EVP_CipherFinal(ctx, output, &outputSz)
                 != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error decrypting message");
+            wolfCLU_LogError("Error decrypting message");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -374,7 +374,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         WOLFSSL_BIO *base64Bio = NULL;
 
         if (wolfSSL_BIO_get_mem_ptr(out, &mem) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error getting internal memory of input");
+            wolfCLU_LogError("Error getting internal memory of input");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -382,7 +382,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             base64Bio = wolfSSL_BIO_push(wolfSSL_BIO_new(
                         wolfSSL_BIO_f_base64()), tmp);
             if (base64Bio == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error setting up base64 encoding");
+                wolfCLU_LogError("Error setting up base64 encoding");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {

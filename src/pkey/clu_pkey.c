@@ -74,7 +74,7 @@ static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
         #if LIBWOLFSSL_VERSION_HEX > 0x05001000
             derSz = wolfSSL_i2d_PublicKey(pkey, &der);
         #else
-            WOLFCLU_LOG(WOLFCLU_E0, "not supported by version of wolfSSL");
+            wolfCLU_LogError("not supported by version of wolfSSL");
             derSz = WOLFCLU_FATAL_ERROR;
         #endif
         }
@@ -135,7 +135,7 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
         case EVP_PKEY_DSA:
             FALL_THROUGH;
         default:
-            WOLFCLU_LOG(WOLFCLU_E0, "unknown / unsupported key type");
+            wolfCLU_LogError("unknown / unsupported key type");
     }
 
     if (ret == WOLFSSL_SUCCESS) {
@@ -244,7 +244,7 @@ int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
         case EVP_PKEY_DSA:
             FALL_THROUGH;
         default:
-            WOLFCLU_LOG(WOLFCLU_E0, "unknown / unsupported key type");
+            wolfCLU_LogError("unknown / unsupported key type");
     }
 
     if (ret == WOLFSSL_SUCCESS) {
@@ -286,7 +286,7 @@ static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
 
     ec = wolfSSL_EVP_PKEY_get0_EC_KEY(pkey);
     if (ec == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "No ecc key found in pkey");
+        wolfCLU_LogError("No ecc key found in pkey");
         ret = BAD_FUNC_ARG;
     }
 
@@ -299,7 +299,7 @@ static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
         }
 
         if (derSz < 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get ecc der size");
+            wolfCLU_LogError("Unable to get ecc der size");
             ret = BAD_FUNC_ARG;
         }
     }
@@ -308,7 +308,7 @@ static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
         der = (unsigned char*)XMALLOC(derSz, HEAP_HINT,
                 DYNAMIC_TYPE_TMP_BUFFER);
         if (der == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to malloc der buffer");
+            wolfCLU_LogError("Unable to malloc der buffer");
             ret = MEMORY_E;
         }
     }
@@ -357,7 +357,7 @@ int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
             break;
 
         case EVP_PKEY_DSA:
-            WOLFCLU_LOG(WOLFCLU_E0, "DSA key not yet supported");
+            wolfCLU_LogError("DSA key not yet supported");
             ret = USER_INPUT_ERROR;
             break;
 
@@ -366,7 +366,7 @@ int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
             break;
 
         default:
-            WOLFCLU_LOG(WOLFCLU_E0, "unknown / unsupported key type");
+            wolfCLU_LogError("unknown / unsupported key type");
             ret = USER_INPUT_ERROR;
     }
 
@@ -390,7 +390,7 @@ int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
             break;
 
         case EVP_PKEY_DSA:
-            WOLFCLU_LOG(WOLFCLU_E0, "DSA key not yet supported");
+            wolfCLU_LogError("DSA key not yet supported");
             ret = USER_INPUT_ERROR;
             break;
 
@@ -399,7 +399,7 @@ int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
             break;
 
         default:
-            WOLFCLU_LOG(WOLFCLU_E0, "unknown / unsupported key type");
+            wolfCLU_LogError("unknown / unsupported key type");
             ret = USER_INPUT_ERROR;
     }
 
@@ -436,7 +436,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open public key file %s",
+                    wolfCLU_LogError("Unable to open public key file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -445,7 +445,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
             case WOLFCLU_OUTFILE:
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
                 if (bioOut == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
+                    wolfCLU_LogError("Unable to open output file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -465,12 +465,12 @@ int wolfCLU_pKeySetup(int argc, char** argv)
 
             case ':':
             case '?':
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
+                wolfCLU_LogError("Bad argument");
                 ret = USER_INPUT_ERROR;
                 break;
 
             default:
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
+                wolfCLU_LogError("Bad argument");
                 ret = USER_INPUT_ERROR;
         }
     }
@@ -494,7 +494,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
             }
         }
         if (pkey == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error reading key from file");
+            wolfCLU_LogError("Error reading key from file");
             ret = USER_INPUT_ERROR;
         }
     }
@@ -547,7 +547,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                     if (outForm == PEM_FORM) {
                         if (wolfCLU_printDerPubKey(bioOut, der, derSz) !=
                             WOLFCLU_SUCCESS) {
-                            WOLFCLU_LOG(WOLFCLU_E0, "Error printing out pubkey");
+                            wolfCLU_LogError("Error printing out pubkey");
                             ret = WOLFCLU_FATAL_ERROR;
                         }
                     }

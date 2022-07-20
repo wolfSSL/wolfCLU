@@ -82,7 +82,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open input file %s",
+                    wolfCLU_LogError("Unable to open input file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -110,12 +110,12 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 
             case ':':
             case '?':
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
+                wolfCLU_LogError("Bad argument");
                 ret = USER_INPUT_ERROR;
                 break;
 
             default:
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
+                wolfCLU_LogError("Bad argument");
                 ret = USER_INPUT_ERROR;
         }
     }
@@ -134,7 +134,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
                 found = 1;
                 modSz = XATOI(argv[i]);
                 if (modSz <= 0) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Can not parse %s as a number",
+                    wolfCLU_LogError("Can not parse %s as a number",
                             argv[i]);
                     ret = USER_INPUT_ERROR;
                 }
@@ -145,7 +145,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 
     /* try initializing both because both get free'd regardless at the end */
     if (wc_InitRng(&rng) != 0 || wc_InitDhKey(&dh) != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Unable to initialize rng and dh");
+        wolfCLU_LogError("Unable to initialize rng and dh");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -186,7 +186,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 
             if (ret == WOLFCLU_SUCCESS &&
                     wc_DhKeyDecode(in, &idx, &dh, inSz) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to decode input params");
+                wolfCLU_LogError("Unable to decode input params");
                 ret = WOLFCLU_FATAL_ERROR;
             }
 
@@ -201,7 +201,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         if (out != NULL) {
             bioOut = wolfSSL_BIO_new_file(out, "wb");
             if (bioOut == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
+                wolfCLU_LogError("Unable to open output file %s",
                         optarg);
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -227,7 +227,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         #if LIBWOLFSSL_VERSION_HEX > 0x05001000
         if (modSz == 4096) {
             if (wc_DhSetNamedKey(&dh, WC_FFDHE_4096) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error setting named 4096 parameters");
+                wolfCLU_LogError("Error setting named 4096 parameters");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -237,7 +237,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             const DhParams* params = wc_Dh_ffdhe4096_Get();
             if (wc_DhSetKey(&dh, (byte*)params->p, params->p_len,
                         (byte*)params->g, params->g_len) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error setting named 4096 parameters");
+                wolfCLU_LogError("Error setting named 4096 parameters");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -245,7 +245,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         #endif /* end of version check for using named parameters */
     #endif /* have 4096 named parameters */
         if (wc_DhGenerateParams(&rng, modSz, &dh) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error generating parameters");
+            wolfCLU_LogError("Error generating parameters");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -258,7 +258,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         int pemSz       = 0;
 
         if (wc_DhParamsToDer(&dh, NULL, &outBufSz) != LENGTH_ONLY_E) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
+            wolfCLU_LogError("Unable to get output buffer size");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -315,7 +315,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         /* Export DH parameters */
         if (wc_DhExportParamsRaw(&dh, p, &p_len, q, &q_len, g, &g_len) !=
                 LENGTH_ONLY_E) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Failed to get sizes for export DH params");
+            wolfCLU_LogError("Failed to get sizes for export DH params");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -324,7 +324,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             q = (byte*)XMALLOC(q_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
             g = (byte*)XMALLOC(g_len, NULL, DYNAMIC_TYPE_TMP_BUFFER);
             if (p == NULL || q == NULL || g == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Failed to malloc DH params buffer");
+                wolfCLU_LogError("Failed to malloc DH params buffer");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -332,7 +332,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         if (ret == WOLFCLU_SUCCESS) {
             if (wc_DhExportParamsRaw(&dh, p, &p_len, q, &q_len, g, &g_len) !=
                     0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Failed to export DH params");
+                wolfCLU_LogError("Failed to export DH params");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -340,7 +340,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         if (ret == WOLFCLU_SUCCESS) {
             if (wc_DhSetCheckKey(&dh, p, p_len, g, g_len, q, q_len, 0, &rng)
                     != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Failed to set/check DH params");
+                wolfCLU_LogError("Failed to set/check DH params");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
@@ -368,14 +368,14 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         word32 pemSz    = 0;
 
         if (wc_DhGenerateKeyPair(&dh, &rng, priv, &privSz, pub, &pubSz) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error making DH key");
+            wolfCLU_LogError("Error making DH key");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             /* get DER size (param has p,q,g and key has p,q,g,y,x) */
             if (wc_DhParamsToDer(&dh, NULL, &outBufSz) != LENGTH_ONLY_E) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
+                wolfCLU_LogError("Unable to get output buffer size");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -395,7 +395,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         if (ret == WOLFCLU_SUCCESS) {
             ret = wc_DhPrivKeyToDer(&dh, outBuf, &outBufSz);
             if (ret <= 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error converting DH key to buffer");
+                wolfCLU_LogError("Error converting DH key to buffer");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
@@ -446,7 +446,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 #else
     (void)argc;
     (void)argv;
-    WOLFCLU_LOG(WOLFCLU_E0, "DH support not compiled into wolfSSL");
+    wolfCLU_LogError("DH support not compiled into wolfSSL");
     return WOLFCLU_FATAL_ERROR;
 #endif
 }

@@ -89,7 +89,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Inkey file %s did not exist. Please check your options.",
+            wolfCLU_LogError("Inkey file %s did not exist. Please check your options.",
                     argv[ret+1]);
             XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return MEMORY_E;
@@ -123,7 +123,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_E0, "In file did not exist. Please check your options.");
+            wolfCLU_LogError("In file did not exist. Please check your options.");
             XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (priv)
                 XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -147,7 +147,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             return MEMORY_E;
         }
         else if (access(argv[ret+1], F_OK) == -1) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Signature file did not exist. Please check your options.");
+            wolfCLU_LogError("Signature file did not exist. Please check your options.");
             if (priv)
                 XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (in)
@@ -160,7 +160,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         sig[XSTRLEN(argv[ret+1])] = '\0';
     }
     else if (verifyCheck == 1) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Please specify -sigfile <sig> when verifying.");
+        wolfCLU_LogError("Please specify -sigfile <sig> when verifying.");
         wolfCLU_verifyHelp(algCheck);
         if (priv)
             XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -213,7 +213,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             /* ignore no -in. RSA verify doesn't check original message */
         }
         else {
-            WOLFCLU_LOG(WOLFCLU_E0, "Must have input as either a file or standard I/O");
+            wolfCLU_LogError("Must have input as either a file or standard I/O");
             if (priv)
                 XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (in)

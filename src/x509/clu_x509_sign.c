@@ -102,13 +102,13 @@ int wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
             int  seedSz = 256;
 
             if (wolfSSL_RAND_bytes(seed, seedSz) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to generate new random data");
+                wolfCLU_LogError("Unable to generate new random data");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
                 if (wolfSSL_BIO_write(csign->randFile, seed, seedSz)
                         != seedSz) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to write new random data");
+                    wolfCLU_LogError("Unable to write new random data");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
             }
@@ -141,7 +141,7 @@ static void wolfCLU_CertSignSetRandFile(WOLFCLU_CERT_SIGN* csign, char* f)
         wolfSSL_BIO_free(csign->randFile);
         csign->randFile = wolfSSL_BIO_new_file(f, "wb+");
         if (csign->randFile == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error reading rand file");
+            wolfCLU_LogError("Error reading rand file");
         }
         else {
             byte seed[256];
@@ -259,7 +259,7 @@ static int _wolfCLU_CertSetDate(WOLFSSL_X509* x509, int days)
         notBefore = wolfSSL_ASN1_TIME_adj(NULL, t, 0, 0);
         notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, days, 0);
         if (notBefore == NULL || notAfter == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error creating not before/after dates");
+            wolfCLU_LogError("Error creating not before/after dates");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -377,14 +377,14 @@ static int wolfCLU_CertSignLog(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                NULL, 0); 
         if (wolfSSL_BIO_write(csign->dataBase, subject, (int)XSTRLEN(subject))
                 <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to write to data base");
+            wolfCLU_LogError("Unable to write to data base");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (ret == WOLFCLU_SUCCESS &&
                 wolfSSL_BIO_write(csign->dataBase, "\n", (int)XSTRLEN("\n"))
                 <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to write to data base");
+            wolfCLU_LogError("Unable to write to data base");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -463,12 +463,12 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
     int ret = WOLFCLU_SUCCESS;
 
     if (csign == NULL || x509 == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Bad argument to certificate sign");
+        wolfCLU_LogError("Bad argument to certificate sign");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret == WOLFCLU_SUCCESS && csign->ca == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Bad argument no signing certificate");
+        wolfCLU_LogError("Bad argument no signing certificate");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -483,12 +483,12 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
         name = wolfSSL_X509_get_subject_name(csign->ca);
         if (name == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error getting issuer name");
+            wolfCLU_LogError("Error getting issuer name");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
             if (wolfSSL_X509_set_issuer_name(x509, name) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error setting issuer name");
+                wolfCLU_LogError("Error setting issuer name");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -501,7 +501,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             #ifndef NO_MD5
                 md  = wolfSSL_EVP_md5();
             #else
-                WOLFCLU_LOG(WOLFCLU_E0, "MD5 not compiled in");
+                wolfCLU_LogError("MD5 not compiled in");
                 ret = WOLFCLU_FATAL_ERROR;
             #endif
                 break;
@@ -550,7 +550,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         #endif
     #endif
             default:
-                WOLFCLU_LOG(WOLFCLU_E0, "Unsupported hash type");
+                wolfCLU_LogError("Unsupported hash type");
                 ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -565,7 +565,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             s = wolfSSL_ASN1_INTEGER_new();
             if (wolfSSL_a2i_ASN1_INTEGER(csign->serialFile, s, buf, size)
                     != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Issue reading serial number from file");
+                wolfCLU_LogError("Issue reading serial number from file");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -576,7 +576,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             bn = wolfSSL_BN_new();
             if (wolfSSL_BN_rand(bn, (defaultSerialSz*WOLFSSL_BIT_SIZE), 0, 0)
                     != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Creating a random serail number fail");
+                wolfCLU_LogError("Creating a random serail number fail");
                 ret = WOLFCLU_FATAL_ERROR;
             }
 
@@ -600,14 +600,14 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         if (ret == WOLFCLU_SUCCESS) {
             if (wolfSSL_X509_check_private_key(csign->ca, csign->caKey.pkey) !=
                     WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Private key does not match with CA");
+                wolfCLU_LogError("Private key does not match with CA");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
             if (wolfSSL_X509_sign(x509, csign->caKey.pkey, md) <= 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error signing certificate");
+                wolfCLU_LogError("Error signing certificate");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -639,14 +639,14 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             }
 
             if (subj == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error parsing out subject name");
+                wolfCLU_LogError("Error parsing out subject name");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
             }
 
             current = wolfCLU_ParseX509NameString(subj, (int)XSTRLEN(subj));
             if (wolfSSL_X509_NAME_cmp(subject, current) == 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Subject name already exists");
+                wolfCLU_LogError("Subject name already exists");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
             }
@@ -665,7 +665,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                     (csign->policy & WOLFCLU_CN_SUPPLIED),
                     (csign->policy & WOLFCLU_CN_MATCH));
             if (ret != WOLFCLU_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad country name in certificate");
+                wolfCLU_LogError("Bad country name in certificate");
             }
         }
 
@@ -674,7 +674,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                     (csign->policy & WOLFCLU_SN_SUPPLIED),
                     (csign->policy & WOLFCLU_SN_MATCH));
             if (ret != WOLFCLU_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad state name in certificate");
+                wolfCLU_LogError("Bad state name in certificate");
             }
         }
 
@@ -683,7 +683,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                     (csign->policy & WOLFCLU_LN_SUPPLIED),
                     (csign->policy & WOLFCLU_LN_MATCH));
             if (ret != WOLFCLU_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad locality name in certificate");
+                wolfCLU_LogError("Bad locality name in certificate");
             }
         }
 
@@ -692,7 +692,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                     (csign->policy & WOLFCLU_ON_SUPPLIED),
                     (csign->policy & WOLFCLU_ON_MATCH));
             if (ret != WOLFCLU_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad org. name in certificate");
+                wolfCLU_LogError("Bad org. name in certificate");
             }
         }
 
@@ -701,7 +701,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                     (csign->policy & WOLFCLU_UN_SUPPLIED),
                     (csign->policy & WOLFCLU_UN_MATCH));
             if (ret != WOLFCLU_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad org. unit name in certificate");
+                wolfCLU_LogError("Bad org. unit name in certificate");
             }
         }
 
@@ -710,7 +710,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                     (csign->policy & WOLFCLU_CM_SUPPLIED),
                     (csign->policy & WOLFCLU_CM_MATCH));
             if (ret != WOLFCLU_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad common name in certificate");
+                wolfCLU_LogError("Bad common name in certificate");
             }
         }
 
@@ -719,7 +719,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                     (csign->policy & WOLFCLU_EA_SUPPLIED),
                     (csign->policy & WOLFCLU_EA_MATCH));
             if (ret != WOLFCLU_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad email address in certificate");
+                wolfCLU_LogError("Bad email address in certificate");
             }
         }
     }
@@ -728,7 +728,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
     if (ret == WOLFCLU_SUCCESS) {
         out = wolfSSL_BIO_new_file(csign->outDir, "wb");
         if (out == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Could not open output file %s",
+            wolfCLU_LogError("Could not open output file %s",
                     csign->outDir);
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -737,7 +737,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
     /* write out the certificate */
     if (ret == WOLFCLU_SUCCESS && out != NULL) {
         if (wolfSSL_PEM_write_bio_X509(out, x509) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error writing out certificate");
+            wolfCLU_LogError("Error writing out certificate");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -753,7 +753,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         wolfSSL_BIO_reset(csign->serialFile);
         if (wolfSSL_a2i_ASN1_INTEGER(csign->serialFile, s, buf, size)
                 != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Issue reading serial number from file");
+            wolfCLU_LogError("Issue reading serial number from file");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -766,14 +766,14 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
         if (ret == WOLFCLU_SUCCESS &&
                 wolfSSL_ASN1_INTEGER_set(s, cur + 1) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Issue incrementing serial number");
+            wolfCLU_LogError("Issue incrementing serial number");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         wolfSSL_BIO_reset(csign->serialFile);
         if (ret == WOLFCLU_SUCCESS &&
                 wolfSSL_i2a_ASN1_INTEGER(csign->serialFile, s) <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Issue writing serial number");
+            wolfCLU_LogError("Issue writing serial number");
             ret = WOLFCLU_FATAL_ERROR;
         }
         wolfSSL_ASN1_INTEGER_free(s);
@@ -858,7 +858,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     if (ret != NULL) {
         ret->config = wolfSSL_NCONF_new(NULL);
         if (ret->config == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to create new config struct");
+            wolfCLU_LogError("Unable to create new config struct");
             wolfCLU_CertSignFree(ret);
             ret = NULL;
         }
@@ -866,7 +866,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
 
     if (ret != NULL) {
         if (wolfSSL_NCONF_load(ret->config, config, &line) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open config file %s", config);
+            wolfCLU_LogError("Unable to open config file %s", config);
             (void)wolfCLU_CertSignFree(ret);
             ret = NULL;
         }
@@ -888,7 +888,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         }
         if (tmp == NULL ||
                 wolfCLU_CertSignAppendOut(ret, tmp) != WOLFCLU_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to set output certificate location "
+            wolfCLU_LogError("Unable to set output certificate location "
                    "%s", tmp);
             (void)wolfCLU_CertSignFree(ret);
             ret = NULL;
@@ -900,7 +900,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         if (tmp != NULL) {
             ret->dataBase = wolfSSL_BIO_new_file(tmp, "ab+");
             if (ret->dataBase == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to open data base file %s",
+                wolfCLU_LogError("Unable to open data base file %s",
                         tmp);
                 (void)wolfCLU_CertSignFree(ret);
                 ret = NULL;
@@ -914,7 +914,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         if (tmp != NULL) {
             ca = wolfSSL_X509_load_certificate_file(tmp, WOLFSSL_FILETYPE_PEM);
             if (ca == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to open CA file %s", tmp);
+                wolfCLU_LogError("Unable to open CA file %s", tmp);
                 (void)wolfCLU_CertSignFree(ret);
                 ret = NULL;
             }
@@ -937,7 +937,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
 
             s = wolfSSL_BIO_new_file(serial, "rb+");
             if (s == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to open serial file %s",
+                wolfCLU_LogError("Unable to open serial file %s",
                         serial);
                 (void)wolfCLU_CertSignFree(ret);
                 ret = NULL;
@@ -978,7 +978,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         if (tmp != NULL) {
             WOLFSSL_BIO* in = wolfSSL_BIO_new_file(tmp, "rb");
             if (in == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to open private key file %s",
+                wolfCLU_LogError("Unable to open private key file %s",
                         tmp);
                 (void)wolfCLU_CertSignFree(ret);
                 ret = NULL;
@@ -994,7 +994,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     if (ret != NULL) {
         tmp = wolfSSL_NCONF_get_string(conf, CAsection, "policy");
         if (tmp != NULL && wolfCLU_ParsePolicy(ret, tmp) != WOLFCLU_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error parsing policy section");
+            wolfCLU_LogError("Error parsing policy section");
             (void)wolfCLU_CertSignFree(ret);
             ret = NULL;
         }

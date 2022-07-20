@@ -10,7 +10,7 @@ if [ $? == 0 ]; then
     echo "Failed on test \"./wolfssl verify ./certs/server-cert.pem\""
     exit 99
 fi
-echo "$RESULT" | grep "Err (-188) : certificate verify failed"
+echo "$RESULT" | grep "Err (-188): certificate verify failed"
 if [ $? != 0 ]; then
     echo "Unexpected error result on test \"./wolfssl verify ./certs/server-cert.pem\""
     exit 99
@@ -21,7 +21,7 @@ if [ $? == 0 ]; then
     echo "Failed on test \"./wolfssl verify ./certs/ca-cert.pem\""
     exit 99
 fi
-echo "$RESULT" | grep "Err (-275) : ASN self-signed certificate error"
+echo "$RESULT" | grep "Err (-275): ASN self-signed certificate error"
 if [ $? != 0 ]; then
     echo "Unexpected error result on test \"./wolfssl verify ./certs/ca-cert.pem\""
     exit 99
