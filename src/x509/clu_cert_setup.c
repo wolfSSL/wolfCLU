@@ -142,14 +142,14 @@ int wolfCLU_certSetup(int argc, char** argv)
                 inFile = argv[idx+1];
                 in = wolfSSL_BIO_new_file(inFile, "rb");
                 if (in == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "ERROR: in file \"%s\" does not"
-                            " exist", inFile);
+                    wolfCLU_LogError("ERROR: in file \"%s\" does not"
+                                     " exist", inFile);
                     ret = INPUT_FILE_ERROR;
                 }
                 if (ret == WOLFCLU_SUCCESS) {
                     if (access(inFile, F_OK) != 0) {
-                        WOLFCLU_LOG(WOLFCLU_E0, "ERROR: input file \"%s\" does"
-                               " not exist", inFile);
+                        wolfCLU_LogError("ERROR: input file \"%s\" does"
+                                         " not exist", inFile);
                         ret = INPUT_FILE_ERROR;
                     }
                 }
@@ -232,7 +232,7 @@ int wolfCLU_certSetup(int argc, char** argv)
 
         inBufSz = wolfSSL_BIO_get_len(inMem);
         if (inBufSz <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "wolfSSL_BIO_get_len failed.");
+            wolfCLU_LogError("wolfSSL_BIO_get_len failed.");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -243,7 +243,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             }
             else {
                 if (wolfSSL_BIO_read(inMem, inBufRaw, inBufSz) != inBufSz) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Failed to read input.");
+                    wolfCLU_LogError("Failed to read input.");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
@@ -252,8 +252,8 @@ int wolfCLU_certSetup(int argc, char** argv)
                         inBufCertBegin = (byte*)XSTRSTR((char*)inBufRaw,
                                                         PEM_BEGIN_CERT);
                         if (inBufCertBegin == NULL) {
-                            WOLFCLU_LOG(WOLFCLU_E0, "Failed to find PEM "
-                                                    "certificate header.");
+                            wolfCLU_LogError("Failed to find PEM "
+                                             "certificate header.");
                             ret = WOLFCLU_FATAL_ERROR;
                         }
                         else {
@@ -276,7 +276,7 @@ int wolfCLU_certSetup(int argc, char** argv)
         if (inForm == PEM_FORM) {
             if (wc_PemToDer(inBuf, inBufSz, CERT_TYPE, &derObj, HEAP_HINT, NULL,
                             NULL) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "wc_PemToDer failed");
+                wolfCLU_LogError("wc_PemToDer failed");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
@@ -290,7 +290,7 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
 
         if (x509 == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to parse input file");
+            wolfCLU_LogError("unable to parse input file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -299,7 +299,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
         out = wolfSSL_BIO_new_file(outFile, "wb");
         if (out == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to open/create output file");
+            wolfCLU_LogError("unable to open/create output file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -533,8 +533,8 @@ int wolfCLU_certSetup(int argc, char** argv)
 
         wolfCLU_extKeyUsagePrint(out, keyUsage, 0, 1);
     #else
-        WOLFCLU_LOG(WOLFCLU_E0, "Extended key function not supported by this"
-                " version of wolfSSL");
+        wolfCLU_LogError("Extended key function not supported by this"
+                         " version of wolfSSL");
         ret = WOLFCLU_FATAL_ERROR;
     #endif
     }
@@ -565,8 +565,8 @@ int wolfCLU_certSetup(int argc, char** argv)
             }
         }
     #else
-        WOLFCLU_LOG(WOLFCLU_E0, "Subject name hash function not supported by"
-                " this version of wolfSSL");
+        wolfCLU_LogError("Subject name hash function not supported by"
+                         " this version of wolfSSL");
         ret = WOLFCLU_FATAL_ERROR;
     #endif
     }
@@ -575,7 +575,7 @@ int wolfCLU_certSetup(int argc, char** argv)
     /* write out human readable text if set to */
     if (ret == WOLFCLU_SUCCESS && textFlag) {
         if (wolfSSL_X509_print(out, x509) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "unable to print certificate out");
+            wolfCLU_LogError("unable to print certificate out");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -586,7 +586,7 @@ int wolfCLU_certSetup(int argc, char** argv)
         pkey = X509_get0_pubkey(x509);
 
         if (pkey == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Modulus=unavailable");
+            wolfCLU_LogError("Modulus=unavailable");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -648,8 +648,7 @@ int wolfCLU_certSetup(int argc, char** argv)
         else if (outForm == PEM_FORM) {
             tmpOutBufSz = wc_DerToPem(derBuf, derBufSz, NULL, 0, CERT_TYPE);
             if (tmpOutBufSz <= 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "wc_DerToPem to get necessary length "
-                                        "failed");
+                wolfCLU_LogError("wc_DerToPem to get necessary length failed");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
@@ -661,7 +660,7 @@ int wolfCLU_certSetup(int argc, char** argv)
                 else {
                     if (wc_DerToPem(derBuf, derBufSz, tmpOutBuf, tmpOutBufSz,
                                     CERT_TYPE) <= 0) {
-                        WOLFCLU_LOG(WOLFCLU_E0, "wc_DerToPem failed");
+                        wolfCLU_LogError("wc_DerToPem failed");
                         ret = WOLFCLU_FATAL_ERROR;
                     }
                     else {

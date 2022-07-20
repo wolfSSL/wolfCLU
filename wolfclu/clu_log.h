@@ -38,13 +38,18 @@ void wolfCLU_OutputON(void);
 void wolfCLU_OutputOFF(void);
 
 #ifdef __GNUC__
-    #define FMTCHECK __attribute__((format(printf,2,3)))
+    #define FMTCHECK_1_2 __attribute__((format(printf,1,2)))
+    #define FMTCHECK_2_3 __attribute__((format(printf,2,3)))
 #else
-    #define FMTCHECK
+    #define FMTCHECK_1_2
+    #define FMTCHECK_2_3
 #endif /* __GNUC__ */
 
 
-void wolfCLU_Log(int logLevel, const char *const, ...) FMTCHECK;
+void wolfCLU_Log(int logLevel, const char *const, ...) FMTCHECK_2_3;
+void wolfCLU_LogErrorQueue(void);
+void wolfCLU_LogError(const char *const fmt, ...) FMTCHECK_1_2;
+
 
 #define WOLFCLU_LOG(...) wolfCLU_Log(__VA_ARGS__);
 

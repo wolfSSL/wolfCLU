@@ -23,7 +23,7 @@
 #include <wolfclu/clu_log.h>
 
 #ifndef WOLCLU_LOG_LINE_WIDTH
-#define WOLCLU_LOG_LINE_WIDTH 80
+#define WOLCLU_LOG_LINE_WIDTH 120
 #endif
 
 static int loggingLevel = 0; /* 0 is error level and always print,
@@ -50,11 +50,8 @@ void wolfCLU_OutputON(void)
 
 void DefaultLoggingCb(int logLevel, const char *const msgStr)
 {
-    if (loggingEnabled && loggingLevel <= logLevel) {
-        printf("%s\r\n", msgStr);
-    }
-
-    if (logLevel == WOLFCLU_E0) {
+    if ((loggingEnabled && loggingLevel <= logLevel) ||
+        logLevel == WOLFCLU_E0) {
         fprintf(stderr, "%s\r\n", msgStr);
     }
 }
@@ -76,4 +73,40 @@ void wolfCLU_Log(int logLevel, const char *const fmt, ...)
 
     if (logFunction)
         logFunction(logLevel, msgStr);
+}
+
+
+void wolfCLU_LogErrorQueue(void)
+{
+    unsigned long err;
+    const char* file;
+    int line = 0;
+
+    while ((err = wolfSSL_ERR_get_error_line_data(&file, &line,
+                                                  NULL, NULL)) != 0) {
+        if (file != NULL) {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error %s:%d: %s (%ld)", file, line,
+                        wolfSSL_ERR_error_string(err, NULL), -err);
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_E0, "Error: %s (%ld)",
+                        wolfSSL_ERR_error_string(err, NULL), -err);
+        }
+    }
+}
+
+
+void wolfCLU_LogError(const char *const fmt, ...)
+{
+    va_list vlist;
+    char    msgStr[WOLCLU_LOG_LINE_WIDTH];
+
+    /* format msg */
+    va_start(vlist, fmt);
+    XVSNPRINTF(msgStr, sizeof(msgStr), fmt, vlist);
+    va_end(vlist);
+
+    WOLFCLU_LOG(WOLFCLU_E0, "%s", msgStr);
+
+    wolfCLU_LogErrorQueue();
 }

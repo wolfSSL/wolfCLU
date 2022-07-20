@@ -64,8 +64,8 @@ int wolfCLU_x509Verify(int argc, char** argv)
     else {
         verifyCert = argv[argc-1];
         if (verifyCert == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to open certificate file %s",
-                    argv[argc-1]);
+            wolfCLU_LogError("Unable to open certificate file %s",
+                             argv[argc-1]);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -80,7 +80,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
             switch (option) {
                 case WOLFCLU_CHECK_CRL:
                 #ifndef HAVE_CRL
-                    WOLFCLU_LOG(WOLFCLU_E0, "recompile wolfSSL with CRL");
+                    wolfCLU_LogError("recompile wolfSSL with CRL");
                     ret = WOLFCLU_FATAL_ERROR;
                 #endif
                     crlCheck = 1;
@@ -123,7 +123,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS) {
         if (inForm != PEM_FORM) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Only handling PEM CA files");
+            wolfCLU_LogError("Only handling PEM CA files");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -132,7 +132,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
         lookup = wolfSSL_X509_STORE_add_lookup(store,
                 wolfSSL_X509_LOOKUP_file());
         if (lookup == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Failed to setup lookup");
+            wolfCLU_LogError("Failed to setup lookup");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -145,9 +145,21 @@ int wolfCLU_x509Verify(int argc, char** argv)
             error = wolfSSL_CertManagerVerify(store->cm, caCert,
                     WOLFSSL_FILETYPE_PEM);
 
-            if (error != ASN_SELF_SIGNED_E){
-                    WOLFCLU_LOG(WOLFCLU_E0, "CA file is not root CA");
-                    ret = WOLFCLU_FATAL_ERROR;
+            if (error != ASN_SELF_SIGNED_E) {
+                wolfCLU_LogError("CA file is not root CA");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                /*
+                 * We're expecting these errors, since root certs are
+                 * self-signed so remove them from the error queue.
+                 */
+                if (wolfSSL_ERR_peek_error() == -ASN_NO_SIGNER_E) {
+                    wolfSSL_ERR_get_error();
+                    if (wolfSSL_ERR_peek_error() == -ASN_SELF_SIGNED_E) {
+                        wolfSSL_ERR_get_error();
+                    }
+                }
             }
         }
     }
@@ -155,7 +167,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
         if (wolfSSL_X509_LOOKUP_load_file(lookup, caCert, X509_FILETYPE_PEM)
                 != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Failed to load CA file");
+            wolfCLU_LogError("Failed to load CA file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -166,13 +178,13 @@ int wolfCLU_x509Verify(int argc, char** argv)
         if (crlCheck) {
             if (wolfSSL_CertManagerEnableCRL(store->cm, WOLFSSL_CRL_CHECKALL)
                     != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Failed to enable CRL use");
+                wolfCLU_LogError("Failed to enable CRL use");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         else {
             if (wolfSSL_CertManagerDisableCRL(store->cm) != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Failed to disable CRL use");
+                wolfCLU_LogError("Failed to disable CRL use");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -190,9 +202,8 @@ int wolfCLU_x509Verify(int argc, char** argv)
                     WOLFSSL_FILETYPE_ASN1);
         }
         if (err != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Verification Failed");
-            WOLFCLU_LOG(WOLFCLU_E0, "Err (%d) : %s",
-                    err, wolfSSL_ERR_reason_error_string(err));
+            wolfCLU_LogError("Verification Failed\nErr (%d): %s",
+                             err, wolfSSL_ERR_reason_error_string(err));
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {

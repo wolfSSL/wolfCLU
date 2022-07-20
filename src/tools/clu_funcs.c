@@ -612,7 +612,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     };
 
     if (name == NULL || alg == NULL || mode == NULL || size == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "null input to get algo function");
+        wolfCLU_LogError("null input to get algo function");
         return WOLFCLU_FATAL_ERROR;
     }
 
@@ -650,19 +650,19 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     /* if name or mode doesn't match acceptable options */
     if (nameCheck == 0 || modeCheck == 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Invalid entry, issue with algo name and mode");
+        wolfCLU_LogError("Invalid entry, issue with algo name and mode");
         return WOLFCLU_FATAL_ERROR;
     }
 
     /* checks key sizes for acceptability */
     if (XSTRNCMP(tmpAlg, "aes", 3) == 0) {
     #ifdef NO_AES
-        WOLFCLU_LOG(WOLFCLU_E0, "AES not compiled in.");
+        wolfCLU_LogError("AES not compiled in.");
         return NOT_COMPILED_IN;
     #else
         ret = AES_BLOCK_SIZE;
         if (*size != 128 && *size != 192 && *size != 256) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Invalid AES pwdKey size. Should be: %d", ret);
+            wolfCLU_LogError("Invalid AES pwdKey size. Should be: %d", ret);
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -698,12 +698,12 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     else if (XSTRNCMP(tmpAlg, "3des", 4) == 0) {
     #ifdef NO_DES3
-        WOLFCLU_LOG(WOLFCLU_E0, "3DES not compiled in.");
+        wolfCLU_LogError("3DES not compiled in.");
         return NOT_COMPILED_IN;
     #else
         ret = DES3_BLOCK_SIZE;
         if (*size != 56 && *size != 112 && *size != 168) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Invalid 3DES pwdKey size");
+            wolfCLU_LogError("Invalid 3DES pwdKey size");
             ret = WOLFCLU_FATAL_ERROR;
         }
         *alg = WOLFCLU_DESCBC;
@@ -712,12 +712,12 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     else if (XSTRNCMP(tmpAlg, "camellia", 8) == 0) {
     #ifndef HAVE_CAMELLIA
-        WOLFCLU_LOG(WOLFCLU_E0, "CAMELIA not compiled in.");
+        wolfCLU_LogError("CAMELIA not compiled in.");
         return NOT_COMPILED_IN;
     #else
         ret = CAMELLIA_BLOCK_SIZE;
         if (*size != 128 && *size != 192 && *size != 256) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Invalid Camellia pwdKey size");
+            wolfCLU_LogError("Invalid Camellia pwdKey size");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -738,7 +738,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     }
 
     else {
-        WOLFCLU_LOG(WOLFCLU_E0, "Invalid algorithm: %s", tmpAlg);
+        wolfCLU_LogError("Invalid algorithm: %s", tmpAlg);
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -1043,7 +1043,7 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
                    (int)XSTRLEN(argv[i]) == length) {
             ret = i;
             if (argFound == 1) {
-                WOLFCLU_LOG(WOLFCLU_E0, "ERROR: argument found twice: \"%s\"", searchTerm);
+                wolfCLU_LogError("ERROR: argument found twice: \"%s\"", searchTerm);
                 return USER_INPUT_ERROR;
             }
             argFound = 1;
@@ -1140,14 +1140,14 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
     char  tag[5];
 
     if (n == NULL || nSz <= 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unexpected null argument or size with parsing "
+        wolfCLU_LogError("unexpected null argument or size with parsing "
                 "name");
         return NULL;
     }
 
     ret = wolfSSL_X509_NAME_new();
     if (ret == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "error allocating name structure");
+        wolfCLU_LogError("error allocating name structure");
         return NULL;
     }
 
@@ -1156,7 +1156,7 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
             word = strtok_r(NULL, deli, &end)) {
         tagSz = (int)strcspn(word, "=");
         if (tagSz <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "error finding '=' char in name");
+            wolfCLU_LogError("error finding '=' char in name");
             wolfSSL_X509_NAME_free(ret);
             ret = NULL;
             break;
@@ -1164,13 +1164,13 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
 
         tagSz = tagSz + 1; /* include the '=' char */
         if (tagSz + 2 > (int)sizeof(tag)) { /* +2 for '/' and '\0' chars */
-            WOLFCLU_LOG(WOLFCLU_E0, "found a tag that was too large!");
+            wolfCLU_LogError("found a tag that was too large!");
             wolfSSL_X509_NAME_free(ret);
             ret = NULL;
             break;
         }
         else if (tagSz + 1 > nSz) {
-            WOLFCLU_LOG(WOLFCLU_E0, "error, entry would be past buffer end");
+            wolfCLU_LogError("error, entry would be past buffer end");
             wolfSSL_X509_NAME_free(ret);
             ret = NULL;
             break;
@@ -1319,7 +1319,7 @@ int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
     XMEMSET(password, 0, *passwordSz);
     if (XSTRNCMP(arg, "stdin", 5) == 0) {
         if (XFGETS(password, MAX_PASSWORD_SIZE, stdin) == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "error getting password");
+            wolfCLU_LogError("error getting password");
             ret = WOLFCLU_FATAL_ERROR;
         }
         if (ret == WOLFCLU_SUCCESS) {
@@ -1358,7 +1358,7 @@ int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
         }
     }
     else {
-        WOLFCLU_LOG(WOLFCLU_E0, "not supported password in type %s",
+        wolfCLU_LogError("not supported password in type %s",
                 arg);
         ret = WOLFCLU_FATAL_ERROR;
     }

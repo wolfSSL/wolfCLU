@@ -47,7 +47,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
 
     keyFile = XFOPEN(keyPath, "rb");
     if (keyFile == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to open key file %s", keyPath);
+        wolfCLU_LogError("unable to open key file %s", keyPath);
         return BAD_FUNC_ARG;
     }
 
@@ -64,14 +64,14 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
 
     ret = wc_InitRsaKey(&key, NULL);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize RsaKey\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize RsaKey\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
 
     ret = wc_InitRng(&rng);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize rng.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
@@ -79,7 +79,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
     ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
         return ret;
     }
 
@@ -141,14 +141,14 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
 
     certBuf = (byte*) XMALLOC(FOURK_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (certBuf == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize buffer to stort certificate.");
+        wolfCLU_LogError("Failed to initialize buffer to stort certificate.");
         return -1;
     }
     XMEMSET(certBuf, 0, FOURK_SZ);
 
     ret = wc_MakeCert(&newCert, certBuf, FOURK_SZ, &key, NULL, &rng);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to make certificate.");
+        wolfCLU_LogError("Failed to make certificate.");
         return ret;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "MakeCert returned %d", ret);
@@ -156,7 +156,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
     ret = wc_SignCert(newCert.bodySz, newCert.sigType, certBuf, FOURK_SZ, &key, 
                                                                    NULL, &rng);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to sign certificate.");
+        wolfCLU_LogError("Failed to sign certificate.");
         return ret;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "SignCert returned %d", ret);
@@ -168,7 +168,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
                                                                  certOut);
     file = XFOPEN(certOut, "wb");
     if (!file) {
-        WOLFCLU_LOG(WOLFCLU_E0, "failed to open file: %s", certOut);
+        wolfCLU_LogError("failed to open file: %s", certOut);
         return -1;
     }
 
@@ -184,14 +184,14 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
 
     pemBuf = (byte*)XMALLOC(FOURK_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (pemBuf == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize pem buffer.");
+        wolfCLU_LogError("Failed to initialize pem buffer.");
         return -1;
     }
     XMEMSET(pemBuf, 0, FOURK_SZ);
 
     pemBufSz = wc_DerToPem(certBuf, certBufSz, pemBuf, FOURK_SZ, CERT_TYPE);
     if (pemBufSz < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to convert from der to pem.");
+        wolfCLU_LogError("Failed to convert from der to pem.");
         return -1;
     }
 
@@ -199,7 +199,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
 
     pemFile = XFOPEN(certOut, "wb");
     if (!pemFile) {
-        WOLFCLU_LOG(WOLFCLU_E0, "failed to open file: %s", certOut);
+        wolfCLU_LogError("failed to open file: %s", certOut);
         return -1;
     }
     XFWRITE(pemBuf, 1, pemBufSz, pemFile);

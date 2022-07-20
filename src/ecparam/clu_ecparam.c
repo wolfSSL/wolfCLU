@@ -106,7 +106,7 @@ int wolfCLU_ecparam(int argc, char** argv)
             case WOLFCLU_INFILE:
                 in = wolfSSL_BIO_new_file(optarg, "rb");
                 if (in == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Error opening file %s", optarg);
+                    wolfCLU_LogError("Error opening file %s", optarg);
                     ret = USER_INPUT_ERROR;
                 }
                 break;
@@ -114,7 +114,7 @@ int wolfCLU_ecparam(int argc, char** argv)
             case WOLFCLU_OUTFORM:
                 outForm = wolfCLU_checkOutform(optarg);
                 if (outForm < 0) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "bad outform");
+                    wolfCLU_LogError("bad outform");
                     ret = USER_INPUT_ERROR;
                 }
                 break;
@@ -122,7 +122,7 @@ int wolfCLU_ecparam(int argc, char** argv)
             case WOLFCLU_INFORM:
                 inForm = wolfCLU_checkInform(optarg);
                 if (inForm < 0) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "bad inform");
+                    wolfCLU_LogError("bad inform");
                     ret = USER_INPUT_ERROR;
                 }
                 break;
@@ -181,7 +181,7 @@ int wolfCLU_ecparam(int argc, char** argv)
             pkey = wolfSSL_d2i_PrivateKey_bio(in, NULL);
         }
         if (pkey == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error reading key from file");
+            wolfCLU_LogError("Error reading key from file");
             ret = USER_INPUT_ERROR;
         }
 
@@ -199,7 +199,7 @@ int wolfCLU_ecparam(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && key == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Unable to parse or create key information");
+        wolfCLU_LogError("Unable to parse or create key information");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -259,7 +259,7 @@ int wolfCLU_ecparam(int argc, char** argv)
             if (derSz > 0) {
                 if (wolfSSL_BIO_write(bioOut, der, derSz)
                         != derSz) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "issue writing out data");
+                    wolfCLU_LogError("issue writing out data");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
             }

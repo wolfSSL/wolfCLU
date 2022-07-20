@@ -90,7 +90,7 @@ int wolfCLU_CASetup(int argc, char** argv)
             case WOLFCLU_INFILE:
                 reqIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (reqIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open CSR file %s",
+                    wolfCLU_LogError("Unable to open CSR file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -103,7 +103,7 @@ int wolfCLU_CASetup(int argc, char** argv)
             case WOLFCLU_KEY:
                 keyIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (keyIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open private key file %s",
+                    wolfCLU_LogError("Unable to open private key file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -113,7 +113,7 @@ int wolfCLU_CASetup(int argc, char** argv)
                 ca = wolfSSL_X509_load_certificate_file(optarg,
                         WOLFSSL_FILETYPE_PEM);
                 if (ca == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open ca file %s",
+                    wolfCLU_LogError("Unable to open ca file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -122,7 +122,7 @@ int wolfCLU_CASetup(int argc, char** argv)
             case WOLFCLU_MD:
                 hashType = wolfCLU_StringToHashType(optarg);
                 if (hashType == WC_HASH_TYPE_NONE) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Invalid digest name");
+                    wolfCLU_LogError("Invalid digest name");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
@@ -153,7 +153,7 @@ int wolfCLU_CASetup(int argc, char** argv)
 
             case ':':
             case '?':
-                WOLFCLU_LOG(WOLFCLU_E0, "Unexpected argument");
+                wolfCLU_LogError("Unexpected argument");
                 ret = WOLFCLU_FATAL_ERROR;
                 wolfCLU_CAHelp();
                 break;
@@ -165,7 +165,7 @@ int wolfCLU_CASetup(int argc, char** argv)
     }
 
     if (reqIn == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Expecting CSR input");
+        wolfCLU_LogError("Expecting CSR input");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -176,7 +176,7 @@ int wolfCLU_CASetup(int argc, char** argv)
         signer = wolfCLU_CertSignNew();
     }
     if (signer == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Unable to create a signer struct");
+        wolfCLU_LogError("Unable to create a signer struct");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -188,7 +188,7 @@ int wolfCLU_CASetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && keyIn != NULL) {
         pkey = wolfSSL_PEM_read_bio_PrivateKey(keyIn, NULL, NULL, NULL);
         if (pkey == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error reading key from file");
+            wolfCLU_LogError("Error reading key from file");
             ret = USER_INPUT_ERROR;
         }
     }
@@ -209,7 +209,7 @@ int wolfCLU_CASetup(int argc, char** argv)
             wolfSSL_d2i_X509_REQ_bio(reqIn, &x509);
         }
         if (x509 == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Issue creating structure to use");
+            wolfCLU_LogError("Issue creating structure to use");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -228,7 +228,7 @@ int wolfCLU_CASetup(int argc, char** argv)
     /* default to version 3 which supports extensions */
     if (ret == WOLFCLU_SUCCESS &&
            wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Unable to set version 3 for cert");
+        wolfCLU_LogError("Unable to set version 3 for cert");
         ret = WOLFCLU_FATAL_ERROR;
     }
 

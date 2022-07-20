@@ -65,7 +65,7 @@ static int _addClientArg(const char** args, const char* in, int* idx)
     int ret = WOLFCLU_SUCCESS;
 
     if (*idx >= MAX_CLIENT_ARGS) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Too many client args for array");
+        wolfCLU_LogError("Too many client args for array");
         ret = WOLFCLU_FATAL_ERROR;
     }
     else {
@@ -99,7 +99,7 @@ int wolfCLU_Client(int argc, char** argv)
         switch (option) {
             case WOLFCLU_CONNECT:
                 if (XSTRSTR(optarg, ":") == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "connect string does not have ':'");
+                    wolfCLU_LogError("connect string does not have ':'");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
 
@@ -198,6 +198,7 @@ int wolfCLU_Client(int argc, char** argv)
         client_test(&args);
 
         if (args.return_code != 0) {
+            wolfCLU_LogError("s_client failed (%d).", args.return_code);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

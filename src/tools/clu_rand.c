@@ -57,7 +57,7 @@ int wolfCLU_Rand(int argc, char** argv)
     else {
         size = XATOI(argv[argc-1]);
         if (size <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to convert %s to a number",
+            wolfCLU_LogError("Unable to convert %s to a number",
                     argv[argc-1]);
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -75,7 +75,7 @@ int wolfCLU_Rand(int argc, char** argv)
             case WOLFCLU_OUTFILE:
                 bioOut = wolfSSL_BIO_new_file(optarg, "wb");
                 if (bioOut == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
+                    wolfCLU_LogError("Unable to open output file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -106,12 +106,12 @@ int wolfCLU_Rand(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS) {
         WC_RNG rng;
         if (wc_InitRng(&rng) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to initialize RNG");
+            wolfCLU_LogError("Unable to initialize RNG");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
             if (wc_RNG_GenerateBlock(&rng, buf, size) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to generate RNG block");
+                wolfCLU_LogError("Unable to generate RNG block");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             wc_FreeRng(&rng);
@@ -138,18 +138,18 @@ int wolfCLU_Rand(int argc, char** argv)
         word32 base64Sz;
 
         if (Base64_Encode(buf, size, NULL, &base64Sz) != LENGTH_ONLY_E) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error getting size for base64");
+            wolfCLU_LogError("Error getting size for base64");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         base64 = (byte*)XMALLOC(base64Sz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (base64 == NULL) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error malloc'ing for base64");
+            wolfCLU_LogError("Error malloc'ing for base64");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (Base64_Encode(buf, size, base64, &base64Sz) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error base64 encoding");
+            wolfCLU_LogError("Error base64 encoding");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -167,7 +167,7 @@ int wolfCLU_Rand(int argc, char** argv)
     /* write out the results */
     if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_BIO_write(bioOut, buf, size) != size) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error writing out RNG data");
+            wolfCLU_LogError("Error writing out RNG data");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -180,7 +180,7 @@ int wolfCLU_Rand(int argc, char** argv)
 
     return ret;
 #else
-    WOLFCLU_LOG(WOLFCLU_E0, "Recompile wolfSSL with RNG support");
+    wolfCLU_LogError("Recompile wolfSSL with RNG support");
     return WOLFCLU_FATAL_ERROR;
 #endif
 }

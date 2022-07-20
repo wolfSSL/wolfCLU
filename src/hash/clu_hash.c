@@ -55,12 +55,12 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
         XFILE f;
         tmp = bioIn;
         if (wolfSSL_BIO_get_fp(tmp, &f) != WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get raw file pointer");
+            wolfCLU_LogError("Unable to get raw file pointer");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (ret == WOLFCLU_SUCCESS && XFSEEK(f, 0, XSEEK_END) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to seek end of file");
+            wolfCLU_LogError("Unable to seek end of file");
             ret = WOLFCLU_FATAL_ERROR;
         }
 

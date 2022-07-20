@@ -135,7 +135,7 @@ int main(int argc, char** argv)
     ret = wc_InitRng(&rng);
 
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Err %d, update the FIPS hash\n", ret);
+        wolfCLU_LogError("Err %d, update the FIPS hash\n", ret);
         return ret;
     }
 
@@ -160,7 +160,7 @@ int main(int argc, char** argv)
     wolfSSL_Debugging_ON();
 #endif
     if (wolfSSL_Init() != WOLFSSL_SUCCESS) {
-        WOLFCLU_LOG(WOLFCLU_E0, "wolfSSL initialization failed!");
+        wolfCLU_LogError("wolfSSL initialization failed!");
         return -1;
     }
 
@@ -184,7 +184,7 @@ int main(int argc, char** argv)
 
     switch (flag) {
         case 0:
-            WOLFCLU_LOG(WOLFCLU_E0, "No mode provided.");
+            wolfCLU_LogError("No mode provided.");
             ret = 0;
             break;
 
@@ -312,13 +312,13 @@ int main(int argc, char** argv)
             break;
 
         default:
-            WOLFCLU_LOG(WOLFCLU_E0, "Unknown mode");
+            wolfCLU_LogError("Unknown mode");
             wolfCLU_help();
             ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret <= 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Error returned: %d.", ret);
+        wolfCLU_LogError("Error returned: %d.", ret);
         ret = WOLFCLU_FATAL_ERROR;
     }
     wolfSSL_Cleanup();

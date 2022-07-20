@@ -32,7 +32,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
 
     f = XFOPEN(in, "rb");
     if (f == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", in);
+        wolfCLU_LogError("unable to open file %s", in);
         return BAD_FUNC_ARG;
     }
     XFSEEK(f, 0, SEEK_END);
@@ -63,7 +63,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
         break;
 
     default:
-        WOLFCLU_LOG(WOLFCLU_E0, "No valid sign algorithm selected.");
+        wolfCLU_LogError("No valid sign algorithm selected.");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -93,14 +93,14 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
     /* init the RsaKey */
     ret = wc_InitRsaKey(&key, NULL);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize RsaKey\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize RsaKey\nRET: %d", ret);
         return ret;
     }
 
     /* read in and store private key */
     privKeyFile = XFOPEN(privKey, "rb");
     if (privKeyFile == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", privKey);
+        wolfCLU_LogError("unable to open file %s", privKey);
         return BAD_FUNC_ARG;
     }
 
@@ -119,7 +119,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
     ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
         return ret;
     }
 
@@ -133,7 +133,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
 
     ret = wc_InitRng(&rng);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize rng.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
@@ -141,7 +141,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
 #ifdef WC_RSA_BLINDING
     ret = wc_RsaSetRNG(&key, &rng);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize rng.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
         return ret;
@@ -151,7 +151,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
     ret = wc_RsaSSL_Sign(data, dataSz, outBuf, (word32)outBufSz, &key,
             &rng);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to sign data with RSA private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to sign data with RSA private key.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
         wc_FreeRsaKey(&key);
@@ -197,20 +197,20 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey)
     /* init the ecc key */
     ret = wc_ecc_init(&key);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize ecc key\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize ecc key\nRET: %d", ret);
         return ret;
     }
 
     ret = wc_InitRng(&rng);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize rng.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
         return ret;
     }
 
     /* read in and store private key */
     privKeyFile = XFOPEN(privKey, "rb");
     if (privKeyFile == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", privKey);
+        wolfCLU_LogError("unable to open file %s", privKey);
         wc_FreeRng(&rng);
         return BAD_FUNC_ARG;
     }
@@ -230,7 +230,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey)
     ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to decode private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
         wc_FreeRng(&rng);
         return ret;
     }
@@ -248,7 +248,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey)
     /* signing input with ecc priv key to produce signature */
     ret = wc_ecc_sign_hash(data, fSz, outBuf, &outLen, &rng, &key);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to sign data with Ecc private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to sign data with Ecc private key.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
         return ret;
@@ -291,20 +291,20 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey)
     /* init the ED25519 key */
     ret = wc_ed25519_init(&key);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize ed25519 key\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize ed25519 key\nRET: %d", ret);
         return ret;
     }
 
     ret = wc_InitRng(&rng);
     if (ret != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to initialize rng.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
         return ret;
     }
 
     /* read in and store private key */
     privKeyFile = XFOPEN(privKey, "rb");
     if (privKeyFile == NULL) {
-        WOLFCLU_LOG(WOLFCLU_E0, "unable to open file %s", privKey);
+        wolfCLU_LogError("unable to open file %s", privKey);
         wc_FreeRng(&rng);
         return BAD_FUNC_ARG;
     }
@@ -328,7 +328,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey)
                                     ED25519_KEY_SIZE, &key);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to import private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to import private key.\nRET: %d", ret);
         wc_FreeRng(&rng);
         return ret;
     }
@@ -346,7 +346,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey)
     /* signing input with ED25519 priv key to produce signature */
     ret = wc_ed25519_sign_msg(data, fSz, outBuf, &outLen, &key);
     if (ret < 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Failed to sign data with ED25519 private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to sign data with ED25519 private key.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
         return ret;

@@ -81,7 +81,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
             case WOLFCLU_INFILE:
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    WOLFCLU_LOG(WOLFCLU_E0, "Unable to open input file %s",
+                    wolfCLU_LogError("Unable to open input file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
@@ -105,19 +105,19 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 
             case ':':
             case '?':
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
+                wolfCLU_LogError("Bad argument");
                 ret = USER_INPUT_ERROR;
                 break;
 
             default:
-                WOLFCLU_LOG(WOLFCLU_E0, "Bad argument");
+                wolfCLU_LogError("Bad argument");
                 ret = USER_INPUT_ERROR;
         }
     }
 
     /* try initializing both because both get free'd regardless at the end */
     if (wc_InitRng(&rng) != 0 || wc_InitDsaKey(&dsa) != 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Unable to initialize rng and dsa");
+        wolfCLU_LogError("Unable to initialize rng and dsa");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -158,7 +158,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 
             if (ret == WOLFCLU_SUCCESS &&
                     wc_DsaParamsDecode(in, &idx, &dsa, inSz) != 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to decode input params");
+                wolfCLU_LogError("Unable to decode input params");
                 ret = WOLFCLU_FATAL_ERROR;
             }
 
@@ -173,7 +173,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         if (out != NULL) {
             bioOut = wolfSSL_BIO_new_file(out, "wb");
             if (bioOut == NULL) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Unable to open output file %s",
+                wolfCLU_LogError("Unable to open output file %s",
                         optarg);
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -196,7 +196,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
     /* generate the dsa parameters */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
         if (wc_MakeDsaParameters(&rng, modSz, &dsa) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error generating parameters");
+            wolfCLU_LogError("Error generating parameters");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -209,7 +209,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         int pemSz       = 0;
 
         if (wc_DsaKeyToParamsDer_ex(&dsa, NULL, &outBufSz) != LENGTH_ONLY_E) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
+            wolfCLU_LogError("Unable to get output buffer size");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -264,13 +264,13 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         word32 pemSz    = 0;
 
         if (wc_MakeDsaKey(&rng, &dsa) != 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error making DSA key");
+            wolfCLU_LogError("Error making DSA key");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         /* get DER size (param has p,q,g and key has p,q,g,y,x) */
         if (wc_DsaKeyToParamsDer_ex(&dsa, NULL, &outBufSz) != LENGTH_ONLY_E) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Unable to get output buffer size");
+            wolfCLU_LogError("Unable to get output buffer size");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -288,7 +288,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
         if (ret == WOLFCLU_SUCCESS) {
             ret = wc_DsaKeyToDer(&dsa, outBuf, outBufSz);
             if (ret <= 0) {
-                WOLFCLU_LOG(WOLFCLU_E0, "Error converting DSA key to buffer");
+                wolfCLU_LogError("Error converting DSA key to buffer");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
@@ -339,7 +339,7 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 #else
     (void)argc;
     (void)argv;
-    WOLFCLU_LOG(WOLFCLU_E0, "DSA support not compiled into wolfSSL");
+    wolfCLU_LogError("DSA support not compiled into wolfSSL");
     return WOLFCLU_FATAL_ERROR;
 #endif
 }
