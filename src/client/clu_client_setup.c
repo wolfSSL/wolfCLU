@@ -43,13 +43,12 @@ static void wolfCLU_ClientHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_client");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-connect <ip>:<port>");
-#ifdef WOLFSSL_IPV6
     WOLFCLU_LOG(WOLFCLU_L0, "\t-connect <[ipv6]>:<port>");
-#endif
     WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
 }
 
 static const char hostFlag[]       = "-h";
+static const char ipv6Flag[]       = "-6";
 static const char portFlag[]       = "-p";
 static const char noVerifyFlag[]   = "-d";
 static const char caFileFlag[]     = "-A";
@@ -102,7 +101,6 @@ int wolfCLU_Client(int argc, char** argv)
                     &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_CONNECT:
-            #ifdef WOLFSSL_IPV6
                 /* check for [] ipv6 address */
                 ipv6 = XSTRSTR(optarg, "[");
                 if (ipv6 != NULL) {
@@ -129,9 +127,12 @@ int wolfCLU_Client(int argc, char** argv)
                         ret = WOLFCLU_FATAL_ERROR;
                     }
                     idx++; /* increment idx to ':' for getting port next */
+
+                    if (ret == WOLFCLU_SUCCESS) {
+                        ret = _addClientArg(clientArgv, ipv6Flag, &clientArgc);
+                    }
                 }
 
-            #endif
                 if (XSTRSTR(optarg, ":") == NULL) {
                     WOLFCLU_LOG(WOLFCLU_E0, "connect string does not have ':'");
                     ret = WOLFCLU_FATAL_ERROR;
