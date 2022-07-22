@@ -48,15 +48,17 @@ check_cert_signature() {
     # certificate file or to convert DER to PEM.
     openssl x509 -in $1 -out cert_stripped.pem -outform PEM
 
-    # Extract the hex of the signature from the cert.
-    SIGNATURE_HEX=$(openssl x509 -in cert_stripped.pem -text -noout \
+    # Extract the hex of the signature from the cert. OpenSSL 3+ uses
+    # 'Signature Value' for the signature label string
+    openssl x509 -in cert_stripped.pem -text -noout \
                                  -certopt ca_default -certopt no_validity \
                                  -certopt no_serial -certopt no_subject \
                                  -certopt no_extensions -certopt no_signame | \
                                  grep -v 'Signature Algorithm' | \
-                                 tr -d '[:space:]:')
+                                 grep -v 'Signature Value' | \
+                                 tr -d '[:space:]:' > cert_sig_hex.bin
     # Convert hex string to binary file.
-    echo ${SIGNATURE_HEX} | xxd -r -p > cert_sig.bin
+    cat cert_sig_hex.bin | xxd -r -p > cert_sig.bin
     # Write the certificate body to a binary file.
     openssl asn1parse -in cert_stripped.pem -strparse 4 \
                       -out cert_body.bin -noout
@@ -85,13 +87,14 @@ check_cert_signature() {
         fi
     fi
 
-    rm -f cert_sig.bin
-    rm -f cert_body.bin
-    rm -f cert_pub.pem
-
     if [ $FAILED == 1 ]; then
         exit 99
     fi
+
+    rm -f cert_sig.bin
+    rm -f cert_sig_hex.bin
+    rm -f cert_body.bin
+    rm -f cert_pub.pem
 }
 
 run1() {
