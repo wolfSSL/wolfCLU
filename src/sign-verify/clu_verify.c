@@ -65,8 +65,10 @@ static byte* wolfCLU_generate_public_key_rsa(char* privKey, byte* outBuf,
     privFileSz = (int)XFTELL(privKeyFile);
     keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf != NULL) {
-        XFSEEK(privKeyFile, 0, SEEK_SET);
-        XFREAD(keyBuf, 1, privFileSz, privKeyFile);
+        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+            XFCLOSE(privKeyFile);
+            return NULL;
+        }
     }
     XFCLOSE(privKeyFile);
 
@@ -127,7 +129,10 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, byte* outBuf)
 
     /* read in and store private key */
     privKeyFile = XFOPEN(privKey, "rb");
-    XFREAD(privBuf, 1, ED25519_SIG_SIZE, privKeyFile);
+    if ((int)XFREAD(privBuf, 1, ED25519_SIG_SIZE, privKeyFile) != ED25519_SIG_SIZE) {
+        XFCLOSE(privKeyFile);
+        return WOLFCLU_FATAL_ERROR;
+    }
     XFCLOSE(privKeyFile);
 
     /* retrieving private key and storing in the ED25519 */
@@ -184,8 +189,10 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
         XFCLOSE(f);
         return MEMORY_E;
     }
-    XFSEEK(f, 0, SEEK_SET);
-    XFREAD(data, 1, fSz, f);
+    if (XFSEEK(f, 0, SEEK_SET) != 0 || (int)XFREAD(data, 1, fSz, f) != fSz) {
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
     XFCLOSE(f);
 
     switch(keyType) {
@@ -211,8 +218,10 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
                 break;
             }
 
-            XFSEEK(h, 0, SEEK_SET);
-            XFREAD(hash, 1, hSz, h);
+            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
+                XFCLOSE(h);
+                return WOLFCLU_FATAL_ERROR;
+            }
             XFCLOSE(h);
             ret = wolfCLU_verify_signature_ecc(data, fSz, hash, hSz, keyPath,
                                                pubIn);
@@ -237,8 +246,10 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
                 break;
             }
 
-            XFSEEK(h, 0, SEEK_SET);
-            XFREAD(hash, 1, hSz, h);
+            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
+                XFCLOSE(h);
+                return WOLFCLU_FATAL_ERROR;
+            }
             XFCLOSE(h);
             ret = wolfCLU_verify_signature_ed25519(data, fSz, hash, hSz,
                                                    keyPath, pubIn);
@@ -296,8 +307,11 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         keyFileSz = (int)XFTELL(keyPathFile);
         keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf != NULL) {
-            XFSEEK(keyPathFile, 0, SEEK_SET);
-            XFREAD(keyBuf, 1, keyFileSz, keyPathFile);
+            if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 || 
+                   (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+                XFCLOSE(keyPathFile);
+                return WOLFCLU_FATAL_ERROR;
+            }
         }
         XFCLOSE(keyPathFile);
     }
@@ -395,8 +409,11 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     keyFileSz = (int)XFTELL(keyPathFile);
     keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf != NULL) {
-        XFSEEK(keyPathFile, 0, SEEK_SET);
-        XFREAD(keyBuf, 1, keyFileSz, keyPathFile);
+        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 || 
+                   (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+                XFCLOSE(keyPathFile);
+                return WOLFCLU_FATAL_ERROR;
+            }
     }
     XFCLOSE(keyPathFile);
 
@@ -474,7 +491,10 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return BAD_FUNC_ARG;
         }
-        XFREAD(keyBuf, 1, ED25519_KEY_SIZE, keyPathFile);
+        if ((int)XFREAD(keyBuf, 1, ED25519_KEY_SIZE, keyPathFile) != ED25519_KEY_SIZE) {
+            XFCLOSE(keyPathFile);
+            return WOLFCLU_FATAL_ERROR;
+        }
         XFCLOSE(keyPathFile);
 
     }
