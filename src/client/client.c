@@ -101,7 +101,13 @@ static const char *wolfsentry_config_path = NULL;
 #endif
 
 /* IPV6 socket setup */
-#include <netdb.h>
+#ifdef USE_WINDOWS_API
+    #include <ws2tcpip.h>
+    #include <wspiapi.h>
+#else
+    #include <netdb.h>
+#endif
+
 typedef struct sockaddr_in6 SOCKADDR_IN6_T;
 #define AF_INET6_V    AF_INET6
 
