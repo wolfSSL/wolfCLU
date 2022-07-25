@@ -34,10 +34,8 @@
 
 #include <wolfssl/ssl.h>
 
-#ifdef WOLFSSL_IPV6
-    #define HAVE_GETADDRINFO 1
-    #define HAVE_ERRNO_H 1
-#endif
+#define HAVE_GETADDRINFO 1
+#define HAVE_ERRNO_H 1
 
 #ifdef WOLFSSL_WOLFSENTRY_HOOKS
 #include <wolfsentry/wolfsentry.h>
@@ -101,6 +99,279 @@ static const char *wolfsentry_config_path = NULL;
 #else
     #define TEST_STR_TERM
 #endif
+
+/* IPV6 socket setup */
+#ifdef USE_WINDOWS_API
+    #include <ws2tcpip.h>
+    #include <wspiapi.h>
+#else
+    #include <netdb.h>
+#endif
+
+typedef struct sockaddr_in  SOCKADDR_IN4_T;
+typedef struct sockaddr_in6 SOCKADDR_IN6_T;
+#undef  AF_INET_V
+#define AF_INET_V    AF_INET
+
+#define AF_INET6_V    AF_INET6
+
+static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
+        const char* peer, word16 port, int udp, int sctp)
+{
+    int useLookup = 0;
+    (void)useLookup;
+    (void)udp;
+    (void)sctp;
+
+    /* one or the other addr (ipv4) or ipv6 should be set */
+    if ((addr == NULL && ipv6 == NULL) || (addr != NULL && ipv6 != NULL)) {
+        err_sys("invalid argument to build_addr, addr is NULL");
+        return;
+    }
+
+    if (ipv6 == NULL) {
+        XMEMSET(addr, 0, sizeof(SOCKADDR_IN_T));
+
+        /* peer could be in human readable form */
+        if ( ((size_t)peer != INADDR_ANY) && isalpha((int)peer[0])) {
+        #ifdef WOLFSSL_USE_POPEN_HOST
+            char host_ipaddr[4] = { 127, 0, 0, 1 };
+            int found = 1;
+
+            if ((XSTRCMP(peer, "localhost") != 0) &&
+                (XSTRCMP(peer, "127.0.0.1") != 0)) {
+                FILE* fp;
+                char host_out[100];
+                char cmd[100];
+
+                XSTRNCPY(cmd, "host ", 6);
+                XSTRNCAT(cmd, peer, 99 - XSTRLEN(cmd));
+                found = 0;
+                fp = popen(cmd, "r");
+                if (fp != NULL) {
+                    while (fgets(host_out, sizeof(host_out), fp) != NULL) {
+                        int i;
+                        int j = 0;
+                        for (j = 0; host_out[j] != '\0'; j++) {
+                            if ((host_out[j] >= '0') && (host_out[j] <= '9')) {
+                                break;
+                            }
+                        }
+                        found = (host_out[j] >= '0') && (host_out[j] <= '9');
+                        if (!found) {
+                            continue;
+                        }
+
+                        for (i = 0; i < 4; i++) {
+                            host_ipaddr[i] = atoi(host_out + j);
+                            while ((host_out[j] >= '0') && (host_out[j] <= '9')) {
+                                j++;
+                            }
+                            if (host_out[j] == '.') {
+                                j++;
+                                found &= (i != 3);
+                            }
+                            else {
+                                found &= (i == 3);
+                                break;
+                            }
+                        }
+                        if (found) {
+                            break;
+                        }
+                    }
+                    pclose(fp);
+                }
+            }
+            if (found) {
+                XMEMCPY(&addr->sin_addr.s_addr, host_ipaddr, sizeof(host_ipaddr));
+                useLookup = 1;
+            }
+        #elif !defined(WOLFSSL_USE_GETADDRINFO)
+            #if defined(WOLFSSL_MDK_ARM) || defined(WOLFSSL_KEIL_TCP_NET)
+                int err;
+                struct hostent* entry = gethostbyname(peer, &err);
+            #elif defined(WOLFSSL_TIRTOS)
+                struct hostent* entry = DNSGetHostByName(peer);
+            #elif defined(WOLFSSL_VXWORKS)
+                struct hostent* entry = (struct hostent*)hostGetByName((char*)peer);
+            #else
+                struct hostent* entry = gethostbyname(peer);
+            #endif
+
+            if (entry) {
+                XMEMCPY(&addr->sin_addr.s_addr, entry->h_addr_list[0],
+                       entry->h_length);
+                useLookup = 1;
+            }
+        #else
+            struct zsock_addrinfo hints, *addrInfo;
+            char portStr[6];
+            XSNPRINTF(portStr, sizeof(portStr), "%d", port);
+            XMEMSET(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_UNSPEC;
+            hints.ai_socktype = udp ? SOCK_DGRAM : SOCK_STREAM;
+            hints.ai_protocol = udp ? IPPROTO_UDP : IPPROTO_TCP;
+            if (getaddrinfo((char*)peer, portStr, &hints, &addrInfo) == 0) {
+                XMEMCPY(addr, addrInfo->ai_addr, sizeof(*addr));
+                useLookup = 1;
+            }
+        #endif
+            else
+                err_sys("no entry for host");
+        }
+    }
+
+
+    if (ipv6 == NULL) {
+        #if defined(WOLFSSL_MDK_ARM) || defined(WOLFSSL_KEIL_TCP_NET)
+            addr->sin_family = PF_INET;
+        #else
+            addr->sin_family = AF_INET_V;
+        #endif
+        addr->sin_port = XHTONS(port);
+        if ((size_t)peer == INADDR_ANY)
+            addr->sin_addr.s_addr = INADDR_ANY;
+        else {
+            if (!useLookup)
+                addr->sin_addr.s_addr = inet_addr(peer);
+        }
+    }
+    else {
+        XMEMSET(ipv6, 0, sizeof(SOCKADDR_IN6_T));
+
+        ipv6->sin6_family = AF_INET6_V;
+        ipv6->sin6_port = XHTONS(port);
+        if ((size_t)peer == INADDR_ANY) {
+            ipv6->sin6_addr = in6addr_any;
+        }
+        else {
+            #if defined(HAVE_GETADDRINFO)
+                struct addrinfo  hints;
+                struct addrinfo* answer = NULL;
+                int    ret;
+                char   strPort[80];
+
+                XMEMSET(&hints, 0, sizeof(hints));
+
+                hints.ai_family   = AF_INET6_V;
+                if (udp) {
+                    hints.ai_socktype = SOCK_DGRAM;
+                    hints.ai_protocol = IPPROTO_UDP;
+                }
+            #ifdef WOLFSSL_SCTP
+                else if (sctp) {
+                    hints.ai_socktype = SOCK_STREAM;
+                    hints.ai_protocol = IPPROTO_SCTP;
+                }
+            #endif
+                else {
+                    hints.ai_socktype = SOCK_STREAM;
+                    hints.ai_protocol = IPPROTO_TCP;
+                }
+
+                SNPRINTF(strPort, sizeof(strPort), "%d", port);
+                strPort[79] = '\0';
+
+                ret = getaddrinfo(peer, strPort, &hints, &answer);
+                if (ret < 0 || answer == NULL)
+                    err_sys("getaddrinfo failed");
+
+                XMEMCPY(ipv6, answer->ai_addr, answer->ai_addrlen);
+                freeaddrinfo(answer);
+            #else
+                printf("no ipv6 getaddrinfo, loopback only tests/examples\n");
+                ipv6->sin6_addr = in6addr_loopback;
+            #endif
+        }
+    }
+}
+
+static WC_INLINE void clu_tcp_socket(SOCKET_T* sockfd, int udp, int sctp,
+        int isIpv6)
+{
+    (void)sctp;
+
+    if (udp)
+        *sockfd = socket(AF_INET_V, SOCK_DGRAM, IPPROTO_UDP);
+#ifdef WOLFSSL_SCTP
+    else if (sctp)
+        *sockfd = socket(AF_INET_V, SOCK_STREAM, IPPROTO_SCTP);
+#endif
+    else {
+        if (isIpv6) {
+            *sockfd = socket(AF_INET6_V, SOCK_STREAM, IPPROTO_TCP);
+        }
+        else {
+            *sockfd = socket(AF_INET_V, SOCK_STREAM, IPPROTO_TCP);
+        }
+    }
+    if(WOLFSSL_SOCKET_IS_INVALID(*sockfd)) {
+        err_sys_with_errno("socket failed\n");
+    }
+
+#ifndef USE_WINDOWS_API
+#ifdef SO_NOSIGPIPE
+    {
+        int       on = 1;
+        socklen_t len = sizeof(on);
+        int       res = setsockopt(*sockfd, SOL_SOCKET, SO_NOSIGPIPE, &on, len);
+        if (res < 0)
+            err_sys_with_errno("setsockopt SO_NOSIGPIPE failed\n");
+    }
+#elif defined(WOLFSSL_MDK_ARM) || defined (WOLFSSL_TIRTOS) ||\
+                        defined(WOLFSSL_KEIL_TCP_NET) || defined(WOLFSSL_ZEPHYR)
+    /* nothing to define */
+#elif defined(NETOS)
+    /* TODO: signal(SIGPIPE, SIG_IGN); */
+#else  /* no S_NOSIGPIPE */
+    signal(SIGPIPE, SIG_IGN);
+#endif /* S_NOSIGPIPE */
+
+#if defined(TCP_NODELAY)
+    if (!udp && !sctp)
+    {
+        int       on = 1;
+        socklen_t len = sizeof(on);
+        int       res = setsockopt(*sockfd, IPPROTO_TCP, TCP_NODELAY, &on, len);
+        if (res < 0)
+            err_sys_with_errno("setsockopt TCP_NODELAY failed\n");
+    }
+#endif
+#endif  /* USE_WINDOWS_API */
+}
+
+
+static WC_INLINE void clu_tcp_connect(SOCKET_T* sockfd, const char* ip,
+        word16 port, int udp, int sctp, WOLFSSL* ssl, int isIpv6)
+{
+    SOCKADDR_IN6_T ipv6;
+    SOCKADDR_IN4_T  addr;
+
+    if (isIpv6) {
+        clu_build_addr(NULL, &ipv6, ip, port, udp, sctp);
+        clu_tcp_socket(sockfd, udp, sctp, isIpv6);
+        if (!udp) {
+            if (connect(*sockfd, (const struct sockaddr*)&ipv6, sizeof(ipv6))
+                    != 0)
+                err_sys_with_errno("ipv6 tcp connect failed");
+        }
+    }
+    else {
+        clu_build_addr(&addr, NULL, ip, port, udp, sctp);
+        if (udp) {
+            wolfSSL_dtls_set_peer(ssl, &addr, sizeof(addr));
+        }
+        clu_tcp_socket(sockfd, udp, sctp, isIpv6);
+
+        if (!udp) {
+            if (connect(*sockfd, (const struct sockaddr*)&addr, sizeof(addr))
+                    != 0)
+                err_sys_with_errno("tcp connect failed");
+        }
+    }
+}
+
 
 static const char kHelloMsg[] = "hello wolfssl!" TEST_STR_TERM;
 #ifndef NO_SESSION_CACHE
@@ -568,7 +839,7 @@ static const char* client_bench_conmsg[][5] = {
 static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
     int dtlsUDP, int dtlsSCTP, int benchmark, int resumeSession, int useX25519,
     int useX448, int usePqc, char* pqcAlg, int helloRetry, int onlyKeyShare,
-    int version, int earlyData)
+    int version, int earlyData, int isIpv6)
 {
     /* time passed in number of connects give average */
     int times = benchmark, skip = times * 0.1;
@@ -623,8 +894,8 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
             }
         #endif
 
-            tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, ssl);
-
+            clu_tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, ssl,
+                    isIpv6);
             if (wolfSSL_set_fd(ssl, sockfd) != WOLFSSL_SUCCESS) {
                 err_sys("error in setting fd");
             }
@@ -702,7 +973,7 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
 static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
     int dtlsUDP, int dtlsSCTP, int block, size_t throughput, int useX25519,
     int useX448, int usePqc, char* pqcAlg, int exitWithRet, int version,
-    int onlyKeyShare)
+    int onlyKeyShare, int isIpv6)
 {
     double start, conn_time = 0, tx_time = 0, rx_time = 0;
     SOCKET_T sockfd = WOLFSSL_SOCKET_INVALID;
@@ -714,7 +985,7 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
     if (ssl == NULL)
         err_sys("unable to get SSL object");
 
-    tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, ssl);
+    clu_tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, ssl, isIpv6);
     if (wolfSSL_set_fd(ssl, sockfd) != WOLFSSL_SUCCESS) {
         err_sys("error in setting fd");
     }
@@ -1939,6 +2210,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     char* pqcAlg = NULL;
     int exitWithRet = 0;
     int loadCertKeyIntoSSLObj = 0;
+    int isIpv6 = 0;
 
 #ifdef HAVE_ENCRYPT_THEN_MAC
     int disallowETM = 0;
@@ -2485,8 +2757,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 break;
 
             case '6' :
-                nonBlocking = 1;
-                simulateWantWrite = 1;
+                isIpv6 = 1;
                 break;
 
             case '7' :
@@ -3203,7 +3474,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             ClientBenchmarkConnections(ctx, host, port, dtlsUDP, dtlsSCTP,
                                        benchmark, resumeSession, useX25519,
                                        useX448, usePqc, pqcAlg, helloRetry,
-                                       onlyKeyShare, version, earlyData);
+                                       onlyKeyShare, version, earlyData,
+                                       isIpv6);
         wolfSSL_CTX_free(ctx); ctx = NULL;
         XEXIT_T(EXIT_SUCCESS);
     }
@@ -3213,7 +3485,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             ClientBenchmarkThroughput(ctx, host, port, dtlsUDP, dtlsSCTP,
                                       block, throughput, useX25519, useX448,
                                       usePqc, pqcAlg, exitWithRet, version,
-                                      onlyKeyShare);
+                                      onlyKeyShare, isIpv6);
         wolfSSL_CTX_free(ctx); ctx = NULL;
         if (((func_args*)args)->return_code != EXIT_SUCCESS && !exitWithRet)
             XEXIT_T(EXIT_SUCCESS);
@@ -3453,7 +3725,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #endif
 
 
-    tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, ssl);
+    clu_tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, ssl, isIpv6);
     if (wolfSSL_set_fd(ssl, sockfd) != WOLFSSL_SUCCESS) {
         wolfSSL_free(ssl); ssl = NULL;
         wolfSSL_CTX_free(ctx); ctx = NULL;
@@ -3980,7 +4252,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         if (dtlsUDP) {
             TEST_DELAY();
         }
-        tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, sslResume);
+        clu_tcp_connect(&sockfd, host, port, dtlsUDP, dtlsSCTP, sslResume,
+                isIpv6);
         if (wolfSSL_set_fd(sslResume, sockfd) != WOLFSSL_SUCCESS) {
             wolfSSL_free(sslResume); sslResume = NULL;
             wolfSSL_CTX_free(ctx); ctx = NULL;
