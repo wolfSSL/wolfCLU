@@ -108,10 +108,14 @@ static const char *wolfsentry_config_path = NULL;
     #include <netdb.h>
 #endif
 
+typedef struct sockaddr_in  SOCKADDR_IN4_T;
 typedef struct sockaddr_in6 SOCKADDR_IN6_T;
+#undef  AF_INET_V
+#define AF_INET_V    AF_INET
+
 #define AF_INET6_V    AF_INET6
 
-static WC_INLINE void clu_build_addr(SOCKADDR_IN_T* addr, SOCKADDR_IN6_T* ipv6,
+static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
         const char* peer, word16 port, int udp, int sctp)
 {
     int useLookup = 0;
@@ -342,7 +346,7 @@ static WC_INLINE void clu_tcp_connect(SOCKET_T* sockfd, const char* ip,
         word16 port, int udp, int sctp, WOLFSSL* ssl, int isIpv6)
 {
     SOCKADDR_IN6_T ipv6;
-    SOCKADDR_IN_T  addr;
+    SOCKADDR_IN4_T  addr;
 
     if (isIpv6) {
         clu_build_addr(NULL, &ipv6, ip, port, udp, sctp);
