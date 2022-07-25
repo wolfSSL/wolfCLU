@@ -44,6 +44,10 @@ static void wolfCLU_ClientHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_client");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-connect <ip>:<port>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-connect <[ipv6]>:<port>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\ti.e:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\t-connect '[::1]:11111'");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\t-connect '[fe80::63:57c0:9b88:77ca%%en0]:11111'");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\t-connect '[2001:4860:4860::8888]:443'");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
 }
 
