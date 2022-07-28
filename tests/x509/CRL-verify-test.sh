@@ -74,6 +74,15 @@ if [ -f "test.crl.pem" ]; then
     exit 99
 fi
 
+# check the CRL -text arg
+run_success "crl -noout -in ./certs/crl.pem -text"
+echo $RESULT | grep "Certificate Revocation List (CRL):"
+if [ $? != 0 ]; then
+    echo $RESULT
+    echo "Couldn't find expected output"
+    exit 99
+fi
+
 echo "Done"
 exit 0
 
