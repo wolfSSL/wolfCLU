@@ -14,9 +14,13 @@ fi
 
 run() {
     if [ -z "$2" ]; then
-        RESULT=`eval $1`
+        if [ -z "$2" ]; then
+            RESULT=`eval $1`
+        else
+            RESULT=`echo "$2" | ./wolfssl $1`
+        fi
     else
-        RESULT=`echo "$2" | ./wolfssl $1`
+        RESULT=`echo "$3" | echo "$2" | ./wolfssl $1`
     fi
     if [ $? != 0 ]; then
         echo "Failed on test \"./wolfssl $1\""
@@ -44,7 +48,7 @@ fi
 
 run "./wolfssl pkcs12 -nodes -passin pass:\"wolfSSL test\" -passout pass: -in ./certs/test-servercert.p12"
 
-run "pkcs12 -passin stdin -passout pass: -in ./certs/test-servercert.p12 -nocerts" "wolfSSL test"
+run "pkcs12 -passin stdin -passout pass: -in ./certs/test-servercert.p12 -nocerts" "wolfSSL test" "wolfSSL out test password"
 
 echo "Done"
 exit 0
