@@ -65,6 +65,7 @@ static const struct option req_options[] = {
 
 
 #define MAX_WIDTH 80
+#ifdef NO_WOLFSSL_REQ_PRINT
 /* print serial number out
  * return WOLFSSL_SUCCESS on success
  */
@@ -514,6 +515,7 @@ static int wolfSSL_X509_REQ_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509)
 
     return WOLFSSL_SUCCESS;
 }
+#endif /* NO_WOLFSSL_REQ_PRINT */
 #endif
 
 /* return WOLFCLU_SUCCESS on success */
