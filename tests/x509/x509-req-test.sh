@@ -99,9 +99,12 @@ EOF
 run_success "req -new -days 3650 -key ./certs/server-key.pem -subj O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit -out tmp.cert -x509"
 
 SUBJECT=`./wolfssl x509 -in tmp.cert -text | grep Subject:`
-if [ "$SUBJECT" != "        Subject: O=wolfSSL, C=US, ST=WA, L=Seattle, CN=wolfSSL, OU=org-unit" ]
+EXPECTED="        Subject:  O=wolfSSL,C=US,ST=WA,L=Seattle,CN=wolfSSL,OU=org-unit"
+if [ "$SUBJECT" != "$EXPECTED" ]
 then
-    echo "found unexpected $SUBJECT"
+    echo "found unexpected result"
+    echo "Got      : $SUBJECT"
+    echo "Expected : $EXPECTED"
     exit 99
 fi
 rm -f tmp.cert
@@ -137,9 +140,12 @@ rm -f tmp.csr
 
 run_success "req -new -key ./certs/server-key.pem -config ./test.conf -x509 -out tmp.cert"
 SUBJECT=`./wolfssl x509 -in tmp.cert -text | grep Subject:`
-if [ "$SUBJECT" != "        Subject: C=US, ST=Montana, L=Bozeman, O=wolfSSL, CN=testing" ]
+EXPECTED="        Subject:  C=US,ST=Montana,L=Bozeman,O=wolfSSL,CN=testing"
+if [ "$SUBJECT" != "$EXPECTED" ]
 then
-    echo "found unexpected $SUBJECT"
+    echo "found unexpected result"
+    echo "Got      : $SUBJECT"
+    echo "Expected : $EXPECTED"
     exit 99
 fi
 rm -f tmp.cert

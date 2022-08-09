@@ -864,8 +864,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
     }
 
-    /* default to CA:TRUE for req -x509 command */
-    if (ret == WOLFCLU_SUCCESS && !wolfSSL_X509_ext_isSet_by_NID(x509, NID_basic_constraints)) {
+    /* default to CA:TRUE for req -x509 command (self signed certificates) when
+     * a basic constraint is not already set */
+    if (genX509 && ret == WOLFCLU_SUCCESS &&
+            !wolfSSL_X509_ext_isSet_by_NID(x509, NID_basic_constraints)) {
         WOLFSSL_X509_EXTENSION *newExt;
         WOLFSSL_ASN1_OBJECT *obj;
 
@@ -880,7 +882,8 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             ret = wolfSSL_X509_add_ext(x509, newExt, -1);
             if (ret != WOLFSSL_SUCCESS) {
-                WOLFCLU_LOG(WOLFCLU_E0, "error %d adding Basic Constraints extesion", ret);
+                WOLFCLU_LOG(WOLFCLU_E0,
+                        "error %d adding Basic Constraints extesion", ret);
             }
             wolfSSL_X509_EXTENSION_free(newExt);
         }
