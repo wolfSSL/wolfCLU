@@ -99,6 +99,9 @@ AC_CHECK_LIB([wolfssl],[wolfCrypt_Init],,[AC_MSG_ERROR([libwolfssl is required a
 AM_CFLAGS="$AM_CFLAGS -DHAVE_WOLFSSL_OPTIONS"
 
 # check for some conditional functions
+AC_CHECK_FUNC([wolfSSL_X509_CRL_print],
+    [],
+    [AM_CFLAGS="$AM_CFLAGS -DNO_WOLFSSL_CRL_PRINT"])
 AC_CHECK_FUNC([wolfSSL_X509_REQ_print],
     [],
     [AM_CFLAGS="$AM_CFLAGS -DNO_WOLFSSL_REQ_PRINT"])

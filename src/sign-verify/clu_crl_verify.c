@@ -52,7 +52,8 @@ static void wolfCLU_CRLVerifyHelp(void)
             "-outform pem or der out format");
     WOLFCLU_LOG(WOLFCLU_L0,
             "-out output file to write to\n"
-            "-noout do not print output if set");
+            "-noout do not print output if set\n"
+            "-text output human readable text of CRL");
 }
 #endif
 
@@ -219,6 +220,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && text != 0) {
+    #ifndef NO_WOLFSSL_CRL_PRINT
         /* set to stdout if no output is set */
         if (bioOut == NULL) {
             bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
@@ -233,6 +235,10 @@ int wolfCLU_CRLVerify(int argc, char** argv)
             }
         }
         wolfSSL_X509_CRL_print(bioOut, test);
+    #else
+        wolfCLU_LogError("CRL print not available in version of wolfSSL");
+        ret = WOLFCLU_FATAL_ERROR;
+    #endif
     }
 
     if (ret == WOLFCLU_SUCCESS && output != 0) {
