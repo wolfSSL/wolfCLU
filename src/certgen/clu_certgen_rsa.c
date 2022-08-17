@@ -58,8 +58,10 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
         XFCLOSE(keyFile);
         return MEMORY_E;
     }
-    XFSEEK(keyFile, 0, SEEK_SET);
-    XFREAD(keyBuf, 1, keyFileSz, keyFile);
+    if (XFSEEK(keyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
+        XFCLOSE(keyFile);
+        return WOLFCLU_FAILURE;
+    }
     XFCLOSE(keyFile);
 
     ret = wc_InitRsaKey(&key, NULL);
@@ -94,22 +96,38 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
     char daysValid[CTC_NAME_SIZE];
 
     WOLFCLU_LOG(WOLFCLU_L0, "Enter your countries 2 digit code (ex: United States -> US): ");
-    XFGETS(country,CTC_NAME_SIZE, stdin);
+    if (XFGETS(country,CTC_NAME_SIZE, stdin) == NULL) {
+        return WOLFCLU_FAILURE;
+    }
     country[CTC_NAME_SIZE-1] = '\0';
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of the province you are located at: ");
-    XFGETS(province,CTC_NAME_SIZE, stdin);
+    if (XFGETS(province,CTC_NAME_SIZE, stdin) == NULL) {
+        return WOLFCLU_FAILURE;
+    }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of the city you are located at: ");
-    XFGETS(city,CTC_NAME_SIZE, stdin);
+    if (XFGETS(city,CTC_NAME_SIZE, stdin) == NULL) {
+        return WOLFCLU_FAILURE;
+    }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of your orginization: ");
-    XFGETS(org,CTC_NAME_SIZE, stdin);
+    if (XFGETS(org,CTC_NAME_SIZE, stdin) == NULL) {
+        return WOLFCLU_FAILURE;
+    }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of your unit: ");
-    XFGETS(unit,CTC_NAME_SIZE, stdin);
+    if (XFGETS(unit,CTC_NAME_SIZE, stdin) == NULL) {
+        return WOLFCLU_FAILURE;
+    }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the common name of your domain: ");
-    XFGETS(commonName,CTC_NAME_SIZE, stdin);
+    if (XFGETS(commonName,CTC_NAME_SIZE, stdin) == NULL) {
+        return WOLFCLU_FAILURE;
+    }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter your email address: ");
-    XFGETS(email,CTC_NAME_SIZE, stdin);
+    if (XFGETS(email,CTC_NAME_SIZE, stdin) == NULL) {
+        return WOLFCLU_FAILURE;
+    }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the number of days this certificate should be valid: ");
-    XFGETS(daysValid,CTC_NAME_SIZE, stdin);
+    if (XFGETS(daysValid,CTC_NAME_SIZE, stdin) == NULL) {
+        return WOLFCLU_FAILURE;
+    }
 
     XSTRNCPY(newCert.subject.country, country, CTC_NAME_SIZE);
     XSTRNCPY(newCert.subject.state, province, CTC_NAME_SIZE);

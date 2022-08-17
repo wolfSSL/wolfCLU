@@ -103,8 +103,8 @@ if [ $? == 0 ]; then
     rm -f test-enc.der
 
     # now try with -pbkdf2
-    openssl enc -base64 -pbkdf2 -aes-256-cbc -k 'test password' -in certs/crl.der -out test-enc.der &> /dev/null
-    run "enc -base64 -d -pbkdf2 -aes-256-cbc -in test-enc.der -out test-dec.der" "test password"
+    openssl enc -base64 -pbkdf2 -aes-256-cbc -k 'long test password' -in certs/crl.der -out test-enc.der &> /dev/null
+    run "enc -base64 -d -pbkdf2 -aes-256-cbc -in test-enc.der -out test-dec.der" "long test password"
     diff "./certs/crl.der" "./test-dec.der" &> /dev/null
     if [ $? != 0 ]; then
         echo "issue openssl enc and wolfssl dec pbkdf2"
@@ -113,14 +113,14 @@ if [ $? == 0 ]; then
     rm -f test-dec.der
     rm -f test-enc.der
 
-    run "enc -base64 -pbkdf2 -aes-256-cbc -in certs/crl.der -out test-enc.der" "test password"
-    openssl enc -base64 -d -pbkdf2 -aes-256-cbc -k 'test password' -in test-enc.der -out test-dec.der &> /dev/null
+    run "enc -base64 -pbkdf2 -aes-256-cbc -in certs/crl.der -out test-enc.der" "long test password"
+    openssl enc -base64 -d -pbkdf2 -aes-256-cbc -k 'long test password' -in test-enc.der -out test-dec.der &> /dev/null
     diff "./certs/crl.der" "./test-dec.der" &> /dev/null
     if [ $? != 0 ]; then
         echo "issue wolfssl enc and openssl dec pbkdf2"
         exit 99
     fi
-    ./wolfssl enc -base64 -d -pbkdf2 -aes-256-cbc -pass 'pass:test password' -in test-enc.der -out test-dec.der
+    ./wolfssl enc -base64 -d -pbkdf2 -aes-256-cbc -pass 'pass:long test password' -in test-enc.der -out test-dec.der
     if [ $? != 0 ]; then
         echo "issue wolfssl decrypt using -pass"
         exit 99
