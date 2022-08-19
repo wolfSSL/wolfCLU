@@ -341,7 +341,7 @@ extern UART_HandleTypeDef HAL_CONSOLE_UART;
 
 /* When building on FreeRTOS, clu_entry() acts as the entry function and
  * parses the UART-transmitted command. Be sure to rename the main function
- *  above, to clu_main() so the right function is called below */
+ * above, to clu_main() so the right function is called below */
 int clu_entry(const void* argument)
 {
 
@@ -379,8 +379,8 @@ int clu_entry(const void* argument)
     token = strtok(command, " ");
 
     /* split the command string to correspond to separate argv[i] */
-    while (token != NULL) {
-        argv[i] = malloc(XSTRLEN(token)+1);
+    while (token != NULL && i <= MAX_COMMAND_ARGS) {
+        argv[i] = XMALLOC(XSTRLEN(token)+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         XMEMSET(argv[i], 0, XSTRLEN(token)+1);
         XSTRNCPY(argv[i], token, XSTRLEN(token));
         i++;
@@ -393,6 +393,11 @@ int clu_entry(const void* argument)
     }
 
     ret = clu_main(argc, argv);
+
+    /* free malloc'd argv[i] args */
+    for (i = 0; i < argc; i++) {
+        XFREE(argv[i], HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
 
     return ret;
 }
