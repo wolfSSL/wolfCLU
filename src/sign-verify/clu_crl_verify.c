@@ -33,6 +33,7 @@ static const struct option crl_options[] = {
     {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"-outform",   required_argument, 0, WOLFCLU_OUTFORM   },
     {"-CAfile",    required_argument, 0, WOLFCLU_CAFILE    },
+    {"-text",      no_argument,       0, WOLFCLU_TEXT_OUT  },
     {"-noout",     no_argument,       0, WOLFCLU_NOOUT     },
     {"-help",      no_argument,       0, WOLFCLU_HELP      },
     {"-h",         no_argument,       0, WOLFCLU_HELP      },
@@ -51,7 +52,8 @@ static void wolfCLU_CRLVerifyHelp(void)
             "-outform pem or der out format");
     WOLFCLU_LOG(WOLFCLU_L0,
             "-out output file to write to\n"
-            "-noout do not print output if set");
+            "-noout do not print output if set\n"
+            "-text output human readable text of CRL");
 }
 #endif
 
@@ -63,6 +65,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
     int inForm  = PEM_FORM;
     int outForm = PEM_FORM;
     int output = 1;
+    int text   = 0;
     int longIndex = 1;
     int option;
     byte* der   = NULL;
@@ -71,6 +74,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
     char* out = NULL;
     WOLFSSL_BIO* bioIn  = NULL;
     WOLFSSL_BIO* bioOut = NULL;
+    WOLFSSL_X509_CRL* test;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -100,6 +104,10 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
             case WOLFCLU_CAFILE:
                 caCert = optarg;
+                break;
+
+            case WOLFCLU_TEXT_OUT:
+                text = 1;
                 break;
 
             case WOLFCLU_NOOUT:
@@ -175,17 +183,12 @@ int wolfCLU_CRLVerify(int argc, char** argv)
         }
     }
 
+    test = wolfSSL_d2i_X509_CRL(NULL, der, derSz);
     /* sanity check that input is indeed a CRL */
     if (ret == WOLFCLU_SUCCESS) {
-        WOLFSSL_X509_CRL* test;
-
-        test = wolfSSL_d2i_X509_CRL(NULL, der, derSz);
         if (test == NULL) {
             wolfCLU_LogError("Unable to parse CRL file");
             ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            wolfSSL_X509_CRL_free(test);
         }
     }
 
@@ -214,6 +217,28 @@ int wolfCLU_CRLVerify(int argc, char** argv)
                 }
             }
         }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && text != 0) {
+    #ifndef NO_WOLFSSL_CRL_PRINT
+        /* set to stdout if no output is set */
+        if (bioOut == NULL) {
+            bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
+            if (bioOut == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                if (wolfSSL_BIO_set_fp(bioOut, stdout, BIO_NOCLOSE)
+                        != WOLFSSL_SUCCESS) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+        }
+        wolfSSL_X509_CRL_print(bioOut, test);
+    #else
+        wolfCLU_LogError("CRL print not available in version of wolfSSL");
+        ret = WOLFCLU_FATAL_ERROR;
+    #endif
     }
 
     if (ret == WOLFCLU_SUCCESS && output != 0) {
@@ -263,6 +288,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
     if (der != NULL) {
         XFREE(der, HEAP_HINT, DYNAMIC_TYPE_CRL);
     }
+    wolfSSL_X509_CRL_free(test);
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
     return ret;
