@@ -26,6 +26,8 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 static const struct option rsa_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
@@ -54,10 +56,11 @@ static void wolfCLU_RSAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-modulus print out the RSA modulus (n value)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-RSAPublicKey_in expecting a public key input");
 }
-
+#endif /* WOLFCLU_NO_FILESYSTEM */
 
 int wolfCLU_RSA(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     char *pass = NULL;
     char password[MAX_PASSWORD_SIZE];
     int passwordSz = MAX_PASSWORD_SIZE;
@@ -286,5 +289,11 @@ int wolfCLU_RSA(int argc, char** argv)
     wolfSSL_RSA_free(rsa);
 
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
 

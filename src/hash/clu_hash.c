@@ -25,6 +25,8 @@
 
 #define MAX_STDINSZ 8192
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 /*
  * hashing function
  * If bioIn is null then read 8192 max bytes from stdin
@@ -180,3 +182,5 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
     wolfCLU_freeBins(input, output, NULL, NULL, NULL);
     return ret;
 }
+
+#endif

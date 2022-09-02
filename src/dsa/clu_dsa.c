@@ -79,12 +79,17 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
                    dsa_options, &longIndex )) != -1) {
         switch (option) {
             case WOLFCLU_INFILE:
+#ifdef WOLFCLU_NO_FILESYSTEM
+            WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");
+            ret = WOLFCLU_FATAL_ERROR;
+#else
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
                     wolfCLU_LogError("Unable to open input file %s",
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
+#endif
                 break;
 
             case WOLFCLU_OUTFILE:
@@ -171,12 +176,17 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS) {
         if (out != NULL) {
+#ifdef WOLFCLU_NO_FILESYSTEM
+            WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");
+            ret = WOLFCLU_FATAL_ERROR;
+#else
             bioOut = wolfSSL_BIO_new_file(out, "wb");
             if (bioOut == NULL) {
                 wolfCLU_LogError("Unable to open output file %s",
                         optarg);
                 ret = WOLFCLU_FATAL_ERROR;
             }
+#endif
         }
         else {
             /* use stdout by default */

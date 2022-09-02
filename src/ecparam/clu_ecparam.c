@@ -104,11 +104,16 @@ int wolfCLU_ecparam(int argc, char** argv)
                 break;
 
             case WOLFCLU_INFILE:
+#ifdef WOLFCLU_NO_FILESYSTEM
+            WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");
+            ret = WOLFCLU_FATAL_ERROR;
+#else
                 in = wolfSSL_BIO_new_file(optarg, "rb");
                 if (in == NULL) {
                     wolfCLU_LogError("Error opening file %s", optarg);
                     ret = USER_INPUT_ERROR;
                 }
+#endif
                 break;
 
             case WOLFCLU_OUTFORM:
@@ -205,10 +210,15 @@ int wolfCLU_ecparam(int argc, char** argv)
 
     /* print out the key */
     if (ret == WOLFCLU_SUCCESS && out != NULL) {
+#ifdef WOLFCLU_NO_FILESYSTEM
+        WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");
+        ret = WOLFCLU_FATAL_ERROR;
+#else
         bioOut = wolfSSL_BIO_new_file(out, "wb");
         if (bioOut == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
         }
+#endif
     }
 
     if (ret == WOLFCLU_SUCCESS && out == NULL) {

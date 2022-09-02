@@ -65,6 +65,20 @@ AC_CHECK_FUNCS([gettimeofday memset alarm])
 AC_FUNC_MALLOC
 AC_TYPE_INT64_T
 
+# Filesystem Build
+ENABLED_FILESYSTEM_DEFAULT=yes
+AC_ARG_ENABLE([filesystem],
+    [AS_HELP_STRING([--enable-filesystem],[Enable Filesystem support (default: enabled)])],
+    [ ENABLED_FILESYSTEM=$enableval ],
+    [ ENABLED_FILESYSTEM=$ENABLED_FILESYSTEM_DEFAULT ]
+    )
+
+if test "$ENABLED_FILESYSTEM" = "no"
+then
+    AM_CFLAGS="$AM_CFLAGS -DWOLFCLU_NO_FILESYSTEM"
+fi
+
+
 #wolfssl
 AC_MSG_CHECKING([for wolfSSL])
 if test "x$prefix" = "xNONE"

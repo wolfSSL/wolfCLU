@@ -24,6 +24,8 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/genkey/clu_genkey.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 #define MAX_LEN             1024
 
 /* return WOLFCLU_SUCCESS on success */
@@ -264,3 +266,4 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     (void)alg;
     return WOLFCLU_SUCCESS;
 }
+#endif

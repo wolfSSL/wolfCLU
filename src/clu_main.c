@@ -328,3 +328,77 @@ int main(int argc, char** argv)
     return (ret == WOLFCLU_SUCCESS)? 0 : ret;
 }
 
+#ifdef FREERTOS
+
+#ifndef MAX_COMMAND_ARGS
+#define MAX_COMMAND_ARGS 30
+#endif
+
+#ifndef HAL_CONSOLE_UART
+#define HAL_CONSOLE_UART huart4
+#endif
+extern UART_HandleTypeDef HAL_CONSOLE_UART;
+
+/* When building on FreeRTOS, clu_entry() acts as the entry function and
+ * parses the UART-transmitted command. Be sure to rename the main function
+ * above, to clu_main() so the right function is called below */
+int clu_entry(const void* argument)
+{
+
+    HAL_StatusTypeDef halRet;
+    byte buffer[50];
+
+    char* command;
+    char* token;
+
+    char* argv[MAX_COMMAND_ARGS];
+    int argc = 1;
+
+    int i = 0;
+    int ret;
+
+    WOLFCLU_LOG(WOLFCLU_L0, "Please enter a wolfCLU command (wolfssl -h for help)");
+
+    /* Recieve the command from the UART console */
+    do {
+        halRet = HAL_UART_Receive(&HAL_CONSOLE_UART, buffer, sizeof(buffer), 100);
+    } while (halRet != HAL_OK || buffer[0] == '\n' || buffer[0] == '\r');
+
+    WOLFCLU_LOG(WOLFCLU_L0, "Command received.");
+
+    command = (char*)buffer;
+
+    /* Determine the number of supplied arguments */ 
+    for (i = 0; command[i] != '\0' && i < XSTRLEN(command); i++) {
+        if (command[i]==' ') {
+            argc++;
+        }
+    }
+
+    i = 0;
+    token = strtok(command, " ");
+
+    /* split the command string to correspond to separate argv[i] */
+    while (token != NULL && i <= MAX_COMMAND_ARGS) {
+        argv[i] = XMALLOC(XSTRLEN(token)+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        XMEMSET(argv[i], 0, XSTRLEN(token)+1);
+        XSTRNCPY(argv[i], token, XSTRLEN(token));
+        i++;
+        if (i==(argc-1)) {
+            token = strtok(NULL, "\r");
+        }
+        else {
+            token = strtok(NULL, " ");
+        }
+    }
+
+    ret = clu_main(argc, argv);
+
+    /* free malloc'd argv[i] args */
+    for (i = 0; i < argc; i++) {
+        XFREE(argv[i], HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    return ret;
+}
+#endif

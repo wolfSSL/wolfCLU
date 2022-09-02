@@ -27,6 +27,8 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/client.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 static const struct option client_options[] = {
     {"-connect",             required_argument, 0, WOLFCLU_CONNECT            },
     {"-starttls",            required_argument, 0, WOLFCLU_STARTTLS           },
@@ -80,9 +82,11 @@ static int _addClientArg(const char** args, const char* in, int* idx)
     }
     return ret;
 }
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 
 int wolfCLU_Client(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     func_args args;
     int ret     = WOLFCLU_SUCCESS;
     int longIndex = 1;
@@ -264,6 +268,12 @@ int wolfCLU_Client(int argc, char** argv)
     }
 
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
 
 

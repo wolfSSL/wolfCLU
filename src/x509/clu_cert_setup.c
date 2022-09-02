@@ -32,6 +32,7 @@
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_certSetup(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     int idx;
     int ret = WOLFCLU_SUCCESS;
     int textFlag    = 0;   /* does user desire human readable cert info */
@@ -685,5 +686,10 @@ int wolfCLU_certSetup(int argc, char** argv)
     wolfSSL_X509_free(x509);
 
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
-

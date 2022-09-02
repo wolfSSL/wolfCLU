@@ -23,6 +23,8 @@
  * https://github.com/wolfSSL/wolfssl-examples/tree/master/tls
  */
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 #ifdef HAVE_CONFIG_H
         #include <config.h>
 #endif
@@ -4534,3 +4536,5 @@ exit:
     char* myoptarg = NULL;
 
 #endif /* NO_MAIN_DRIVER */
+
+#endif /* !WOLFCLU_NO_FILESYSTEM */

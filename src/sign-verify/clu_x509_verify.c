@@ -25,6 +25,8 @@
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/x509/clu_cert.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 static const struct option verify_options[] = {
     {"-CAfile",        required_argument, 0, WOLFCLU_CAFILE        },
     {"-crl_check",     no_argument,       0, WOLFCLU_CHECK_CRL     },
@@ -41,10 +43,11 @@ static void wolfCLU_x509VerifyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl verify -CAfile <ca file name> "
             "[-crl_check] [-partial_chain] <cert to verify>");
 }
-
+#endif
 
 int wolfCLU_x509Verify(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     int ret    = WOLFCLU_SUCCESS;
     int inForm = PEM_FORM;
     int crlCheck     = 0;
@@ -214,5 +217,10 @@ int wolfCLU_x509Verify(int argc, char** argv)
     wolfSSL_X509_STORE_free(store);
     (void)crlCheck;
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }
-

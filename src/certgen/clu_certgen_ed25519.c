@@ -23,6 +23,8 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/certgen/clu_certgen.h>
 
+#ifndef WOLFCLU_NO_FILESYSTEM 
+
 void free_things_ed25519(byte** a, byte** b, byte** c, ed25519_key* d, ed25519_key* e,
                                                                      WC_RNG* f);
 
@@ -241,3 +243,4 @@ void free_things_ed25519(byte** a, byte** b, byte** c, ed25519_key* d, ed25519_k
     wc_FreeRng(f);
 
 }
+#endif
