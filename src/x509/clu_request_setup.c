@@ -222,7 +222,7 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
                 wolfSSL_OBJ_obj2txt(buf, MAX_WIDTH, obj, 0);
                 XSNPRINTF(scratch, MAX_WIDTH, "%*s", indent + 4, "");
                 XSTRLCAT(scratch, buf, MAX_WIDTH);
-               
+
                 int crit = wolfSSL_X509_EXTENSION_get_critical(ext) ? 1 : 0;
                 XSTRLCAT(scratch, crit ? ": Critical\n" : ":\n", crit ? 11 : 2);
                 (void)crit;
@@ -1039,7 +1039,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 if (!passout) {
                     byte pass[MAX_PASSWORD_SIZE];
                     wolfCLU_GetStdinPassword(pass, (word32*)&passwordSz);
-                    
+
                     if (pass[0] == '\0') {
                         wolfCLU_LogError("Please enter a password");
                         ret = WOLFCLU_FATAL_ERROR;

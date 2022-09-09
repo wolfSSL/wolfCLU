@@ -308,7 +308,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         keyFileSz = (int)XFTELL(keyPathFile);
         keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf != NULL) {
-            if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 || 
+            if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
                    (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
                 XFCLOSE(keyPathFile);
                 return WOLFCLU_FATAL_ERROR;
@@ -410,7 +410,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     keyFileSz = (int)XFTELL(keyPathFile);
     keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf != NULL) {
-        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 || 
+        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
                    (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
                 XFCLOSE(keyPathFile);
                 return WOLFCLU_FATAL_ERROR;

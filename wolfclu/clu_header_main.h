@@ -131,7 +131,7 @@ extern "C" {
 #include <wolfclu/clu_error_codes.h>
 
 #ifdef WOLFCLU_NO_FILESYSTEM
-    #define WOLFCLU_NO_TERM_SUPPORT 
+    #define WOLFCLU_NO_TERM_SUPPORT
 #endif
 
  /* @VERSION

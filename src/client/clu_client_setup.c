@@ -51,6 +51,8 @@ static void wolfCLU_ClientHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t\t-connect '[fe80::63:57c0:9b88:77ca%%en0]:11111'");
     WOLFCLU_LOG(WOLFCLU_L0, "\t\t-connect '[2001:4860:4860::8888]:443'");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-CAfile <ca file name>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-verify_return_error close connection on verification error");
 }
 
 static const char hostFlag[]       = "-h";
@@ -173,9 +175,11 @@ int wolfCLU_Client(int argc, char** argv)
                             XMEMCPY(host, optarg, idx);
                             host[idx] = '\0';
                         }
-                        ret = _addClientArg(clientArgv, hostFlag, &clientArgc);
                         if (ret == WOLFCLU_SUCCESS) {
-                            ret = _addClientArg(clientArgv, host, &clientArgc);
+                            ret = _addClientArg(clientArgv, hostFlag, &clientArgc);
+                            if (ret == WOLFCLU_SUCCESS) {
+                                ret = _addClientArg(clientArgv, host, &clientArgc);
+                            }
                         }
                     }
                 }

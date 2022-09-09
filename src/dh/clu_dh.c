@@ -130,7 +130,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS) {
         int i = 2; // start at 2 because wolfssl & dhparam will be in first and second
-        int found = 0; 
+        int found = 0;
         while (i + 1 <= argc && !found) {
             /* confirm arg is a non '-' option that does not correspond
              * to an '-in' or '-out' file */

@@ -65,7 +65,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 "instead.");
 
         /* use user entered data to encrypt */
-        inputLength = (int) strlen(in);
+        inputLength = (int) XSTRLEN(in);
         userInputBuffer = (char*) XMALLOC(inputLength, HEAP_HINT,
                                                        DYNAMIC_TYPE_TMP_BUFFER);
         if (userInputBuffer == NULL)

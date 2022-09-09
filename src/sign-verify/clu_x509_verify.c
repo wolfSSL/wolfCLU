@@ -93,7 +93,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
                     WOLFCLU_LOG(WOLFCLU_L0, "using CA file %s", optarg);
                     caCert = optarg;
                     break;
-               
+
                 case WOLFCLU_PARTIAL_CHAIN:
                     partialChain = 1;
                     break;
@@ -141,7 +141,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     }
 
     /* Confirm CA file is root CA unless partialChain enabled */
-    if (ret == WOLFCLU_SUCCESS){ 
+    if (ret == WOLFCLU_SUCCESS){
         if (!partialChain && caCert != NULL){
             int error;
 

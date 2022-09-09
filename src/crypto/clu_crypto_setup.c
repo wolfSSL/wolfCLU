@@ -54,7 +54,7 @@ static const struct option crypt_options[] = {
 /* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_setup(int argc, char** argv, char action)
 {
-#ifndef WOLFCLU_NO_FILESYSTEM 
+#ifndef WOLFCLU_NO_FILESYSTEM
     int      ret        =   0;  /* return variable */
     char     outNameEnc[256];     /* default outFile for encrypt */
     char     outNameDec[256];     /* default outfile for decrypt */

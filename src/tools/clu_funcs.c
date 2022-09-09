@@ -31,6 +31,8 @@
 #define SALT_SIZE       8
 #define DES3_BLOCK_SIZE 24
 
+#define MAX_ENTRY_NAME 64
+
 static int loop = 0;
 
 static const struct option crypt_algo_options[] = {
@@ -63,6 +65,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "Only set one of the following.\n");
     WOLFCLU_LOG(WOLFCLU_L0, "ca             Used for signing certificates");
+    WOLFCLU_LOG(WOLFCLU_L0, "crl            Used for parsing CRL files");
     WOLFCLU_LOG(WOLFCLU_L0, "bench          Benchmark one of the algorithms");
     WOLFCLU_LOG(WOLFCLU_L0, "decrypt        Decrypt an encrypted file");
     WOLFCLU_LOG(WOLFCLU_L0, "dgst           Used for verifying a signature");
@@ -73,16 +76,21 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "ed25519        Ed25519 signing and signature verification");
     WOLFCLU_LOG(WOLFCLU_L0, "enc / encrypt  Encrypt a file or some user input");
     WOLFCLU_LOG(WOLFCLU_L0, "hash           Hash a file or input");
-    WOLFCLU_LOG(WOLFCLU_L0, "md5            Creates and MD5 hash");
+    WOLFCLU_LOG(WOLFCLU_L0, "md5            Creates an MD5 hash");
     WOLFCLU_LOG(WOLFCLU_L0, "pkey           Used for key operations");
     WOLFCLU_LOG(WOLFCLU_L0, "req            Request for certificate generation");
     WOLFCLU_LOG(WOLFCLU_L0, "-rsa           Legacy RSA signing and signature verification");
     WOLFCLU_LOG(WOLFCLU_L0, "rsa            RSA key operations");
     WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
     WOLFCLU_LOG(WOLFCLU_L0, "verify         X509 certificate verify");
+    WOLFCLU_LOG(WOLFCLU_L0, "pkcs12         Used for parsing PKCS12 files");
     WOLFCLU_LOG(WOLFCLU_L0, "s_client       Basic TLS client for testing"
                                            " connection");
+    WOLFCLU_LOG(WOLFCLU_L0, "sha256         Creates a SHA256 hash");
+    WOLFCLU_LOG(WOLFCLU_L0, "sha384         Creates a SHA384 hash");
+    WOLFCLU_LOG(WOLFCLU_L0, "sha512         Creates a SHA512 hash");
     WOLFCLU_LOG(WOLFCLU_L0, "rand           Generates random data");
+    WOLFCLU_LOG(WOLFCLU_L0, "version        Print wolfCLU/wolfSSL versions");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
     /*optional flags*/
     WOLFCLU_LOG(WOLFCLU_L0, "Optional Flags.\n");
@@ -397,6 +405,11 @@ void wolfCLU_benchHelp()
 void wolfCLU_certHelp()
 {
     WOLFCLU_LOG(WOLFCLU_L0, "\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "-inform pem or der in format");
+    WOLFCLU_LOG(WOLFCLU_L0, "-in the file to read from");
+    WOLFCLU_LOG(WOLFCLU_L0, "-outform pem or der out format");
+    WOLFCLU_LOG(WOLFCLU_L0, "-out output file to write to");
+    WOLFCLU_LOG(WOLFCLU_L0, "-noout do not print output if set");
     WOLFCLU_LOG(WOLFCLU_L0, "-subject print out the subject name");
     WOLFCLU_LOG(WOLFCLU_L0, "-issuer  print out the issuer name");
     WOLFCLU_LOG(WOLFCLU_L0, "-serial  print out the serial number in hex");
@@ -405,6 +418,9 @@ void wolfCLU_certHelp()
     WOLFCLU_LOG(WOLFCLU_L0, "-fingerprint print out the hash of the certificate in DER form");
     WOLFCLU_LOG(WOLFCLU_L0, "-purpose print out the certificates purpose");
     WOLFCLU_LOG(WOLFCLU_L0, "-hash print out the hash of the certificate subject name");
+    WOLFCLU_LOG(WOLFCLU_L0, "-text print human readable text of X509");
+    WOLFCLU_LOG(WOLFCLU_L0, "-modulus print out the RSA key modulus");
+    WOLFCLU_LOG(WOLFCLU_L0, "-pubkey print out the Public Key");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\nX509 USAGE: wolfssl -x509 -inform <PEM or DER> -in <filename> "
            "-outform <PEM or DER> -out <output file name> \n");
@@ -468,7 +484,7 @@ void wolfCLU_signHelp(int keyType)
         for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
             WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
         }
-        
+
         WOLFCLU_LOG(WOLFCLU_L0, "\n***************************************************************");
         switch(keyType) {
             #ifndef NO_RSA
@@ -515,7 +531,7 @@ void wolfCLU_verifyHelp(int keyType) {
         for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
             WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
         }
-        
+
         WOLFCLU_LOG(WOLFCLU_L0, "\n***************************************************************");
         switch(keyType) {
             #ifndef NO_RSA
@@ -952,7 +968,7 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
  */
 void wolfCLU_append(char* s, char c)
 {
-    int len = (int) strlen(s); /* length of string*/
+    int len = (int) XSTRLEN(s); /* length of string*/
 
     s[len] = c;
     s[len+1] = '\0';
@@ -1214,38 +1230,46 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
     return ret;
 }
 
-size_t wolfCLU_getline(char **lineptr, size_t *len, FILE *fp) {
+size_t wolfCLU_getline(char **lineptr, size_t *len, FILE *fp)
+{
 
-     char line[64];
+    char line[MAX_ENTRY_NAME];
 
-     *len = sizeof(line);
-     *lineptr = malloc(*len);
+    *len = sizeof(line);
 
-     (*lineptr)[0] = '\0';
+    *lineptr = NULL;
+    if ((*lineptr = (char*)XMALLOC(*len, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER))
+            == NULL) {
+        XFREE(*lineptr, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        return 0;
+    }
 
-     while(fgets(line, sizeof(line), fp) != NULL) {
-         size_t len_used = strlen(*lineptr);
-         size_t line_used = strlen(line);
+    (*lineptr)[0] = '\0';
 
-         if(*len - len_used < line_used) {
+    while(fgets(line, sizeof(line), fp) != NULL) {
+        size_t len_used = XSTRLEN(*lineptr);
+        size_t line_used = XSTRLEN(line);
+
+        if(*len - len_used < line_used) {
             *len *= 2;
-             
-            if((*lineptr = realloc(*lineptr, *len)) == NULL) {
+
+            if((*lineptr = XREALLOC(*lineptr, *len, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER)) == NULL) {
                  return -1;
             }
-         }
+        }
 
-         memcpy(*lineptr + len_used, line, line_used);
-         len_used += line_used;
-         (*lineptr)[len_used] = '\0';
+        XMEMCPY(*lineptr + len_used, line, line_used);
+        len_used += line_used;
+        (*lineptr)[len_used] = '\0';
 
-         if((*lineptr)[len_used - 1] == '\n') {
-             (*lineptr)[len_used - 1]='\0';
-             return len_used;
-         }
-     }
+        if((*lineptr)[len_used - 1] == '\n') {
+            (*lineptr)[len_used - 1]='\0';
+            return len_used;
+        }
+    }
 
-     return -1;
+    return -1;
 }
 
 /* returns WOLFCLU_SUCCESS on success */
@@ -1264,50 +1288,50 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
     ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_PRINTABLE, NID_countryName, in);
-        free(in); in = NULL;
     }
+    XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     fprintf(fout, "State or Province [Montana] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_stateOrProvinceName, in);
-        free(in); in = NULL;
     }
+    XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     fprintf(fout, "Locality [Bozeman] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_localityName, in);
-        free(in); in = NULL;
     }
+    XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     fprintf(fout, "Organization Name [wolfSSL] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationName, in);
-        free(in); in = NULL;
     }
+    XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     fprintf(fout, "Organization Unit [engineering] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationalUnitName, in);
-        free(in); in = NULL;
     }
+    XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     fprintf(fout, "Common Name : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_commonName, in);
-        free(in); in = NULL;
     }
+    XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     fprintf(fout, "Email Address : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_emailAddress, in);
-        free(in); in = NULL;
     }
+    XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     return WOLFCLU_SUCCESS;
 }
@@ -1475,24 +1499,22 @@ int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz)
 #endif
 
 /* Not handling options char yet*/
-int wolfCLU_GetOpt(int argc, char** argv, const char *options, 
+int wolfCLU_GetOpt(int argc, char** argv, const char *options,
        const struct option *long_options, int *opt_index)
 {
-    int end   = 0;      /* variable used to exit while loops */ 
     int i     = optind; /* variable to keep track of starting option position */
     int index = 0;      /* index at which option was found */
 
-    while(!end){
+    while (1) {
 
-        /* set end to 1 if last option is reached */ 
+        /* set end to 1 if last option is reached */
         if (long_options[i].name == 0 ) {
-            end = 1;
-            return WOLFCLU_FATAL_ERROR; 
+            return WOLFCLU_FATAL_ERROR;
         }
         else {
 
-            /* check if option is present in argv */ 
-            index = wolfCLU_checkForArg(long_options[i].name, (int)strlen(long_options[i].name), argc, argv); 
+            /* check if option is present in argv */
+            index = wolfCLU_checkForArg(long_options[i].name, (int)XSTRLEN(long_options[i].name), argc, argv);
             optind++;
 
             /* if index matches *opt_index at first position or if index is found */
@@ -1509,6 +1531,6 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
 
     (void) *options;
 
-    return WOLFCLU_FATAL_ERROR; 
+    return WOLFCLU_FATAL_ERROR;
 
 }

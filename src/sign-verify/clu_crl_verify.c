@@ -60,7 +60,7 @@ static void wolfCLU_CRLVerifyHelp(void)
 
 int wolfCLU_CRLVerify(int argc, char** argv)
 {
-#if defined(HAVE_CRL) && !defined(WOLFCLU_NO_FILESYSTEM) 
+#if defined(HAVE_CRL) && !defined(WOLFCLU_NO_FILESYSTEM)
     int ret     = WOLFCLU_SUCCESS;
     int inForm  = PEM_FORM;
     int outForm = PEM_FORM;
@@ -300,7 +300,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 #endif
 #ifdef WOLFCLU_NO_FILESYSTEM
     wolfCLU_LogError("No filesystem support");
-#endif 
+#endif
     return WOLFCLU_FATAL_ERROR;
 #endif
 }

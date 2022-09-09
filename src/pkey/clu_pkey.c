@@ -272,7 +272,7 @@ int wolfCLU_pKeyPEMtoPriKeyEnc(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
                 password, passwordSz);
     }
     if (der != NULL)
-        free(der);
+        XFREE(der, HEAP_HINT, DYNAMIC_TYPE_OPENSSL);
     return ret;
 }
 
@@ -560,7 +560,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 }
             }
             if (der != NULL)
-                free(der);
+                XFREE(der, HEAP_HINT, DYNAMIC_TYPE_OPENSSL);
         }
     }
 
@@ -583,7 +583,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 }
 
                 if (der != NULL) {
-                    free(der);
+                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_OPENSSL);
                 }
             }
 

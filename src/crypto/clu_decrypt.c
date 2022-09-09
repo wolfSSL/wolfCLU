@@ -116,7 +116,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     }
     /* replicates old pwdKey if pwdKeys match */
     if (ret == 0 && keyType == 1) {
-        if (wc_PBKDF2(key, pwdKey, (int) strlen((const char*)pwdKey),
+        if (wc_PBKDF2(key, pwdKey, (int) XSTRLEN((const char*)pwdKey),
                       salt, SALT_SIZE, CLU_4K_TYPE, size,
                       CLU_SHA256) != 0) {
             wolfCLU_LogError("pwdKey set error.");

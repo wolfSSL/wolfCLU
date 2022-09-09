@@ -249,9 +249,9 @@ int wolfCLU_PKCS12(int argc, char** argv)
 #ifndef HAVE_PKCS12
     wolfCLU_LogError("Recompile wolfSSL with PKCS12 support");
 #endif
-#ifdef WOLFCLU_NO_FILESYSTEM 
+#ifdef WOLFCLU_NO_FILESYSTEM
     wolfCLU_LogError("No filesystem support");
-#endif    
+#endif
     return WOLFCLU_FATAL_ERROR;
 #endif
 }
