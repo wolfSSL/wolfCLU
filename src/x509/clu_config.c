@@ -31,20 +31,24 @@
 static int wolfCLU_setAttributes(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             char* sect)
 {
+    const char* current;
+    int currentSz;
 
-    (void)x509;
-    (void)conf;
-    (void)sect;
-#if 0
-    /*
-     * @TODO
-     * [ req_attributes ]
-     * challengePassword               = A challenge password
-     * challengePassword_min           = 4
-     * challengePassword_max           = 20
-     * unstructuredName                = An optional company name
-     */
-#endif
+    currentSz = 0;
+    current = wolfSSL_NCONF_get_string(conf, sect, "challengePassword");
+    if (current != NULL) {
+        currentSz = (int)XSTRLEN(current);
+        wolfSSL_X509_REQ_add1_attr_by_NID(x509, NID_pkcs9_challengePassword,
+                MBSTRING_ASC, (const unsigned char*)current, currentSz);
+    }
+
+    current = wolfSSL_NCONF_get_string(conf, sect, "unstructuredName");
+    if (current != NULL) {
+        currentSz = (int)XSTRLEN(current);
+        wolfSSL_X509_REQ_add1_attr_by_NID(x509, NID_pkcs9_unstructuredName,
+                MBSTRING_ASC, (const unsigned char*)current, currentSz);
+    }
+
     return WOLFCLU_FAILURE;
 }
 
@@ -641,7 +645,35 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                 CTC_UTF8, noPrompt);
     }
 
-    wolfSSL_X509_REQ_set_subject_name(x509, name);
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "name", NID_name,
+                CTC_UTF8, noPrompt);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "surname", NID_surname,
+                CTC_UTF8, noPrompt);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "initials", NID_initials,
+                CTC_UTF8, noPrompt);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "givenName", NID_givenName,
+                CTC_UTF8, noPrompt);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = CheckDisName(conf, sect, name, "dnQualifier", NID_dnQualifier,
+                CTC_UTF8, noPrompt);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfSSL_X509_REQ_set_subject_name(x509, name);
+    }
+
     wolfSSL_X509_NAME_free(name);
     return ret;
 }
