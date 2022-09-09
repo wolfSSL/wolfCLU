@@ -670,7 +670,10 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                 CTC_UTF8, noPrompt);
     }
 
-    ret = wolfSSL_X509_REQ_set_subject_name(x509, name);
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfSSL_X509_REQ_set_subject_name(x509, name);
+    }
+
     wolfSSL_X509_NAME_free(name);
     return ret;
 }
