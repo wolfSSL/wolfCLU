@@ -1,3 +1,31 @@
+# wolfCLU v0.1.0 (Sep 12, 2022)
+### Fixes and Enhancements
+- Fix for buffer issue with s_client
+- Add fsanitize testing with github actions
+- Update dhparam to read mod size from different location in arguments
+- Fix for x509 encoding modifying the cert
+- Fix for supporting more alt names and skipping count
+- Add -CAfile and verify_return_error flags for s_client command
+- Expand testing with additional unit tests and Jenkins nightly test
+- Fix for enc edge cases
+- Fix x509 command to use piped input
+- Support for building on Windows
+- Add -pass flag to enc command
+- Add -partial_chain arg for verify command
+- Add -modulus flag for x509 command
+- Handle additional CSR attribute print outs
+- Add -passout flag to req command
+- Fix for enc with nosalt
+- Update m4 files
+- Fix for parsing basic constraint from conf file
+- Improve error logging
+- IPV6 parsing support for s_client command
+- Support for building with FIPS wolfSSL
+- Add -text flag for crl command
+- Support for building on FreeRTOS
+- Add disable filesystem configure
+- Support for creating req with attributes
+
 # wolfCLU v0.0.8 (Mar 04, 2022)
 ### Commands Added
 - Add rand command

@@ -1,6 +1,6 @@
 # configure.ac
 #
-# Copyright (C) 2006-2020 wolfSSL Inc.
+# Copyright (C) 2006-2022 wolfSSL Inc.
 # All rights reserved.
 #
 # This file is part of wolfssl command line utility.
@@ -10,7 +10,7 @@
 #requires user to have AutoConf version 2.63 or greater.
 AC_PREREQ([2.63])
 
-AC_INIT([wolfclu], [0.0.8], [http://www.wolfssl.com])
+AC_INIT([wolfclu], [0.1.0], [http://www.wolfssl.com])
 
 #a helpful directory to keep clutter out of root
 AC_CONFIG_AUX_DIR([build-aux])
