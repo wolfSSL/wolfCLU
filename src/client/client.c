@@ -132,7 +132,7 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
     }
 
     if (ipv6 == NULL) {
-        XMEMSET(addr, 0, sizeof(SOCKADDR_IN_T));
+        XMEMSET(addr, 0, sizeof(SOCKADDR_IN4_T));
 
         /* peer could be in human readable form */
         if ( ((size_t)peer != INADDR_ANY) && isalpha((int)peer[0])) {
