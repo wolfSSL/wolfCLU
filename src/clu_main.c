@@ -30,10 +30,10 @@
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 #include <wolfclu/sign-verify/clu_verify.h>
 
-#ifdef _WIN32 
+#ifdef _WIN32
 char* optarg;
-int   optind ;
-int   opterr ;
+int   optind;
+int   opterr;
 #endif
 
 
@@ -168,7 +168,7 @@ int main(int argc, char** argv)
 
     /* retain old version of modes where '-' is used. i.e -x509, -req */
     if (argc > 1 && argv[1] != NULL && argv[1][0] == '-') {
-        argv[1] = argv[1] + 1; 
+        argv[1] = argv[1] + 1;
         flag = getMode(argv[1]);
 
         /* if -rsa was used then it is the older sign/verify version of rsa */
@@ -368,7 +368,7 @@ int clu_entry(const void* argument)
 
     command = (char*)buffer;
 
-    /* Determine the number of supplied arguments */ 
+    /* Determine the number of supplied arguments */
     for (i = 0; command[i] != '\0' && i < XSTRLEN(command); i++) {
         if (command[i]==' ') {
             argc++;

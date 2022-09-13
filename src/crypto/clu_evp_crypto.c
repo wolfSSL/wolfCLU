@@ -164,7 +164,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     if (ret == WOLFCLU_SUCCESS) {
         if (pbkVersion == WOLFCLU_PBKDF2) {
         #ifdef HAVE_FIPS
-            if (strlen((const char*)pwdKey) < HMAC_FIPS_MIN_KEY) {
+            if (XSTRLEN((const char*)pwdKey) < HMAC_FIPS_MIN_KEY) {
                 wolfCLU_LogError("For use with FIPS mode key needs to be"
                         " at least %d characters long", HMAC_FIPS_MIN_KEY);
                 ret = WOLFCLU_FATAL_ERROR;
@@ -173,12 +173,12 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             if (ret == WOLFCLU_SUCCESS) {
                 if (noSalt) {
                     ret = wolfSSL_PKCS5_PBKDF2_HMAC((const char*)pwdKey,
-                    (int) strlen((const char*)pwdKey), NULL, 0, iter,
+                    (int) XSTRLEN((const char*)pwdKey), NULL, 0, iter,
                     hashType, keySz + ivSz, pwdKey);
                 }
                 else {
                     ret = wolfSSL_PKCS5_PBKDF2_HMAC((const char*)pwdKey,
-                    (int) strlen((const char*)pwdKey), salt, SALT_SIZE, iter,
+                    (int) XSTRLEN((const char*)pwdKey), salt, SALT_SIZE, iter,
                     hashType, keySz + ivSz, pwdKey);
                 }
                 if (ret != WOLFSSL_SUCCESS) {
@@ -201,11 +201,11 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             iter = 1; /* default value for interop */
             if (noSalt) {
                 ret = wolfSSL_EVP_BytesToKey(cphr, hashType, NULL,
-                    pwdKey, (int)strlen((const char*)pwdKey), iter, key, iv);
+                    pwdKey, (int)XSTRLEN((const char*)pwdKey), iter, key, iv);
             }
             else {
                 ret = wolfSSL_EVP_BytesToKey(cphr, hashType, salt,
-                    pwdKey, (int)strlen((const char*)pwdKey), iter, key, iv);
+                    pwdKey, (int)XSTRLEN((const char*)pwdKey), iter, key, iv);
             }
             if (ret == 0) {
                 wolfCLU_LogError("failed to create key, ret = %d", ret);

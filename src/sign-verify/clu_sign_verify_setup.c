@@ -40,7 +40,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     int     verifyCheck = 0;
     int     pubInCheck  = 0;
 
-    /* checkForArg doesn't look for "-" here, as it would have been 
+    /* checkForArg doesn't look for "-" here, as it would have been
      * removed in clu_main.c if present */
     if (wolfCLU_checkForArg("rsa", 3, argc, argv) > 0) {
         algCheck = RSA_SIG_VER;
@@ -138,7 +138,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
 
     ret = wolfCLU_checkForArg("-sigfile", 8, argc, argv);
     if (ret > 0) {
-        sig = XMALLOC(strlen(argv[ret+1]) + 1, HEAP_HINT,
+        sig = XMALLOC(XSTRLEN(argv[ret+1]) + 1, HEAP_HINT,
                       DYNAMIC_TYPE_TMP_BUFFER);
         if (sig == NULL) {
             if (priv)
@@ -205,7 +205,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         }
         else {
             /* No out needed for ECC verifying */
-            /* ED25519 exceptions will need to be added at a later date */ 
+            /* ED25519 exceptions will need to be added at a later date */
         }
     }
 

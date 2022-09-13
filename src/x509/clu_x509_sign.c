@@ -376,7 +376,7 @@ static int wolfCLU_CertSignLog(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         char* subject;
 
         subject = wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(x509),
-               NULL, 0); 
+               NULL, 0);
         if (wolfSSL_BIO_write(csign->dataBase, subject, (int)XSTRLEN(subject))
                 <= 0) {
             wolfCLU_LogError("Unable to write to data base");

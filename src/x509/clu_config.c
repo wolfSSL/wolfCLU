@@ -614,7 +614,6 @@ static int wolfCLU_setDisNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        i = 0;
         for (i = 0; i < 10; i++) {
             XSNPRINTF(buf, sizeof(buf), "%d.organizationName", i);
             ret = CheckDisName(conf, sect, name, buf, NID_organizationName,

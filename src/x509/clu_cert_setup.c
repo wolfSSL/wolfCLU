@@ -612,13 +612,13 @@ int wolfCLU_certSetup(int argc, char** argv)
                     }
 
                     wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n"));
-            }   
+            }
             else {
                 char info[] = "Wrong Algorithm type";
                 wolfSSL_BIO_write(out, info, (int)XSTRLEN(info));
 
             }
-            wolfSSL_EVP_PKEY_free(pkey); 
+            wolfSSL_EVP_PKEY_free(pkey);
         }
     }
 
