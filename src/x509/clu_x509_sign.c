@@ -546,8 +546,10 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         #ifndef WOLFSSL_NOSHA512_256
             case WC_HASH_TYPE_SHA512_256:
         #endif
-        #ifndef WOLFSSL_NO_SHAKE256
+        #ifdef WOLFSSL_SHAKE128
             case WC_HASH_TYPE_SHAKE128:
+        #endif
+        #ifdef WOLFSSL_SHAKE256
             case WC_HASH_TYPE_SHAKE256:
         #endif
     #endif
