@@ -36,6 +36,8 @@ wolfssl -h
 
 If everything worked, you should see the wolfCLU help message.
 
+For instuctions on how to build windows, see [here](ide/winvs/README.md).
+
 ## Examples
 
 ### Key Generation
