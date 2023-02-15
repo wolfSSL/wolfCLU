@@ -95,15 +95,14 @@ AC_ARG_WITH(wolfssl,
     if test "x$withval" != "xno" ; then
       if test -d "${withval}/lib" && test -d "${withval}/include"; then
         wcpath=${withval}
+        AM_LDFLAGS="$AM_LDFLAGS -L${wcpath}/lib"
+        AM_CPPFLAGS="$AM_CPPFLAGS -I${wcpath}/include"
       else
         AC_MSG_ERROR([wolfSSL path error (${withval}): missing lib and include])
       fi
     fi
   ]
 )
-
-LDFLAGS="$LDFLAGS -L${wcpath}/lib"
-CPPFLAGS="$CPPFLAGS -I${wcpath}/include"
 
 
 # wolfCLU requires libwolfssl.
