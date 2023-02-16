@@ -573,15 +573,27 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         else
         #endif /* end of version check for using named parameters */
     #endif /* have 4096 named parameters */
-        if (wc_DhGenerateParams(&rng, modSz, &dh) != 0) {
-            wolfCLU_LogError("Error generating parameters");
-        #if !defined(HAVE_FFDHE_4096)
-            if (modSz == 4096) {
-                wolfCLU_LogError("HAVE_FFDHE_4096 macro possibly needs defined "
-                        "when building wolfSSL for 4096 params");
+        {
+            #if defined(HAVE_FIPS) && FIPS_VERSION_LE(2,0)
+            /* extra sanity check in FIPS v2 because a clear on sp_int for
+             * unsupported mod size with wc_DhGenerateParams can cause issues */
+            if (modSz != 1024 && modSz != 2048 && modSz != 3072) {
+                wolfCLU_LogError("Unsupported parameters size");
+                ret = WOLFCLU_FATAL_ERROR;
             }
-        #endif
-            ret = WOLFCLU_FATAL_ERROR;
+            #endif
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    wc_DhGenerateParams(&rng, modSz, &dh) != 0) {
+                wolfCLU_LogError("Error generating parameters");
+            #if !defined(HAVE_FFDHE_4096)
+                if (modSz == 4096) {
+                    wolfCLU_LogError("HAVE_FFDHE_4096 macro possibly needs "
+                            "defined when building wolfSSL for 4096 params");
+                }
+            #endif
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 
