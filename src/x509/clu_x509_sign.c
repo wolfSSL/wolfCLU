@@ -574,21 +574,25 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             }
         }
         else {
-            int defaultSerialSz = 20;
             WOLFSSL_BIGNUM* bn;
+            int numBits;
 
-            bn = wolfSSL_BN_new();
-            if (wolfSSL_BN_rand(bn, (defaultSerialSz*WOLFSSL_BIT_SIZE), 0, 0)
+            do {
+                bn = wolfSSL_BN_new();
+                if (wolfSSL_BN_rand(bn, (CTC_GEN_SERIAL_SZ*WOLFSSL_BIT_SIZE),
+                    WOLFSSL_BN_RAND_TOP_ANY, WOLFSSL_BN_RAND_BOTTOM_ODD)
                     != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Creating a random serail number fail");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
+                    wolfCLU_LogError("Creating a random serial number fail");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
 
-            /* make positive */
-            wolfSSL_BN_clear_bit(bn, (defaultSerialSz*WOLFSSL_BIT_SIZE)-1);
-
-            s = wolfSSL_BN_to_ASN1_INTEGER(bn, NULL);
-            wolfSSL_BN_free(bn);
+                /* work around BN_to_ASN1_INTEGER check */
+                numBits = wolfSSL_BN_num_bits(bn);
+                if ((numBits % 8) != 7) {
+                    s = wolfSSL_BN_to_ASN1_INTEGER(bn, NULL);
+                }
+                wolfSSL_BN_free(bn);
+            } while ((numBits % 8) == 7);
         }
         wolfSSL_X509_set_serialNumber(x509, s);
         wolfSSL_ASN1_INTEGER_free(s);
