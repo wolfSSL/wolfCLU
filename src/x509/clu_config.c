@@ -34,7 +34,6 @@ static int wolfCLU_setAttributes(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     const char* current;
     int currentSz;
 
-    currentSz = 0;
     current = wolfSSL_NCONF_get_string(conf, sect, "challengePassword");
     if (current != NULL) {
         currentSz = (int)XSTRLEN(current);

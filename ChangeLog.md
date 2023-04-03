@@ -1,3 +1,11 @@
+# wolfCLU v0.1.2 (Mar 31, 2023)
+### Fixes and Enhancements
+- Fix for DH use with FIPS build and cross compile warning
+- Fix for configure cross compile QA warning with Yocto builds
+- Fix for macro guards on Shake
+- Improve VS build to generate .exe for all platforms
+- Fix for linking to wolfSSL library built with --enable-ipv6
+
 # wolfCLU v0.1.0 (Sep 12, 2022)
 ### Fixes and Enhancements
 - Fix for buffer issue with s_client
