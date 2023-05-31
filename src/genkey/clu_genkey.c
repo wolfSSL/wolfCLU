@@ -474,14 +474,6 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        bioOut = wolfSSL_BIO_new_file(fName, "wb");
-        if (bioOut == NULL) {
-            wolfCLU_LogError("unable to open output file %s", fName);
-            ret = MEMORY_E;
-        }
-    }
-
     /* create buffer for alternate file name use */
     if (ret == WOLFCLU_SUCCESS) {
         fOutNameBuf = (char*)XMALLOC(fNameSz + fExtSz + 1, NULL,
