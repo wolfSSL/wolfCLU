@@ -101,10 +101,10 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
                 if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
-                    ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PUB_ONLY,
+                    ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PUB_ONLY_FILE,
                                                                      formatArg);
                 else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
-                    ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_ONLY,
+                    ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_ONLY_FILE,
                                                                      formatArg);
                 else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
                     ret = wolfCLU_genKey_ED25519(&rng, keyOutFName,

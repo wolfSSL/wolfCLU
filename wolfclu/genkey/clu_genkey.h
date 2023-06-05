@@ -39,8 +39,6 @@
 
 enum {
     ECPARAM,
-    PRIV_ONLY,
-    PUB_ONLY,
     PRIV_ONLY_FILE,
     PUB_ONLY_FILE,
     PRIV_AND_PUB
