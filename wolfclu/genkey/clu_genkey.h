@@ -41,7 +41,7 @@ enum {
     ECPARAM,
     PRIV_ONLY_FILE,
     PUB_ONLY_FILE,
-    PRIV_AND_PUB
+    PRIV_AND_PUB_FILES
 };
 
 /* handles incoming arguments for certificate generation */

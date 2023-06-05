@@ -93,7 +93,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     XMEMCPY(finalOutFNm, fOutNm, fOutNmSz);
 
     switch(directive) {
-        case PRIV_AND_PUB:
+        case PRIV_AND_PUB_FILES:
             flagOutputPub = 1;
             /* Fall through to PRIV_ONLY_FILE */
             FALL_THROUGH;
@@ -484,7 +484,7 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
 
     if (ret == WOLFCLU_SUCCESS) {
         switch(directive) {
-            case PRIV_AND_PUB:
+            case PRIV_AND_PUB_FILES:
                 /* Fall through to PRIV_ONLY_FILE */
                 FALL_THROUGH;
             case PRIV_ONLY_FILE: /* adding .priv to file name */
@@ -517,7 +517,7 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
                 if (ret < 0) {
                     break;
                 }
-                if (directive != PRIV_AND_PUB) {
+                if (directive != PRIV_AND_PUB_FILES) {
                     break;
                 }
                 FALL_THROUGH;
@@ -677,7 +677,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
     if (ret == WOLFCLU_SUCCESS) {
         switch (directive) {
-            case PRIV_AND_PUB:
+            case PRIV_AND_PUB_FILES:
                 /* Fall through to PRIV_ONLY_FILE */
                 FALL_THROUGH;
             case PRIV_ONLY_FILE:
@@ -722,7 +722,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                     XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
                 }
 
-                if (directive != PRIV_AND_PUB) {
+                if (directive != PRIV_AND_PUB_FILES) {
                     break;
                 }
                 FALL_THROUGH;

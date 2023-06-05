@@ -108,13 +108,13 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                                                                      formatArg);
                 else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
                     ret = wolfCLU_genKey_ED25519(&rng, keyOutFName,
-                                                       PRIV_AND_PUB, formatArg);
+                                                       PRIV_AND_PUB_FILES, formatArg);
             }
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
-            ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_AND_PUB,
+            ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_AND_PUB_FILES,
                                                                      formatArg);
         }
     #else
@@ -129,7 +129,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     else if (XSTRNCMP(keyType, "ecc", 3) == 0) {
     #if defined(HAVE_ECC) && defined(WOLFSSL_KEY_GEN)
         /* ECC flags */
-        int directiveArg = PRIV_AND_PUB;
+        int directiveArg = PRIV_AND_PUB_FILES;
 
         WOLFCLU_LOG(WOLFCLU_L0, "generate ECC key");
 
@@ -142,13 +142,13 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                 else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
                     directiveArg = PRIV_ONLY_FILE;
                 else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
-                    directiveArg = PRIV_AND_PUB;
+                    directiveArg = PRIV_AND_PUB_FILES;
             }
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
-            directiveArg = PRIV_AND_PUB;
+            directiveArg = PRIV_AND_PUB_FILES;
         }
 
         /* get the curve name */
@@ -182,7 +182,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     else if (XSTRNCMP(keyType, "rsa", 3) == 0) {
     #if !defined(NO_RSA) && defined(WOLFSSL_KEY_GEN)
         /* RSA flags */
-        int directiveArg = PRIV_AND_PUB;
+        int directiveArg = PRIV_AND_PUB_FILES;
         int sizeArg = 0;
         int expArg  = 0;
 
@@ -197,13 +197,13 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                 else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
                     directiveArg = PRIV_ONLY_FILE;
                 else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
-                    directiveArg = PRIV_AND_PUB;
+                    directiveArg = PRIV_AND_PUB_FILES;
             }
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
-            directiveArg = PRIV_AND_PUB;
+            directiveArg = PRIV_AND_PUB_FILES;
         }
 
         /* get the size argument */
