@@ -145,34 +145,35 @@ rm -f tmp.csr.pem
 rm -f tmp.csr.der
 
 # test passing csr file for x509
-run_fail "x509 -in tmp.csr -days 3650 -out tmp.crt"
-run_fail "x509 -req -in tmp.csr -days 3650 -out tmp.crt"
-run_success "x509 -req -in tmp.csr -days 3650 -signkey ./certs/server-key.pem -out tmp.crt"
-rm -f tmp.crt
+run_fail "x509 -in tmp.csr -days 3650 -out tmp.cert"
+run_fail "x509 -in tmp.csr -days 3650 -signkey ./certs/server-key.pem -out tmp.cert"
+run_fail "x509 -req -in tmp.csr -days 3650 -out tmp.cert"
+run_success "x509 -req -in tmp.csr -days 3650 -signkey ./certs/server-key.pem -out tmp.cert"
+rm -f tmp.cert
 
 
 #testing hash for x509
-run_success "x509 -req -in tmp.csr -days 3650 -md sha -signkey ./certs/server-key.pem -out tmp.crt"
-rm -f tmp.crt
-run_success "x509 -req -in tmp.csr -days 3650 -md sha224 -signkey ./certs/server-key.pem -out tmp.crt"
-rm -f tmp.crt
-run_success "x509 -req -in tmp.csr -days 3650 -md sha256 -signkey ./certs/server-key.pem -out tmp.crt"
-rm -f tmp.crt
-run_success "x509 -req -in tmp.csr -days 3650 -md sha384 -signkey ./certs/server-key.pem -out tmp.crt"
-rm -f tmp.crt
-run_success "x509 -req -in tmp.csr -days 3650 -md sha512 -signkey ./certs/server-key.pem -out tmp.crt"
-rm -f tmp.crt
+run_success "x509 -req -in tmp.csr -days 3650 -sha1 -signkey ./certs/server-key.pem -out tmp.cert"
+rm -f tmp.cert
+run_success "x509 -req -in tmp.csr -days 3650 -sha224 -signkey ./certs/server-key.pem -out tmp.cert"
+rm -f tmp.cert
+run_success "x509 -req -in tmp.csr -days 3650 -sha256 -signkey ./certs/server-key.pem -out tmp.cert"
+rm -f tmp.cert
+run_success "x509 -req -in tmp.csr -days 3650 -sha384 -signkey ./certs/server-key.pem -out tmp.cert"
+rm -f tmp.cert
+run_success "x509 -req -in tmp.csr -days 3650 -sha512 -signkey ./certs/server-key.pem -out tmp.cert"
+rm -f tmp.cert
 
 #testing extensions for x509
-run_success "x509 -req -in tmp.csr -days 3650 -extfile ./test.conf -extensions v3_alt_ca -signkey ./certs/server-key.pem -out tmp.crt"
-run_success "x509 -in tmp.crt -text -noout"
+run_success "x509 -req -in tmp.csr -days 3650 -extfile ./test.conf -extensions v3_alt_ca -signkey ./certs/server-key.pem -out tmp.cert"
+run_success "x509 -in tmp.cert -text -noout"
 echo "$RESULT" | grep "CA:TRUE"
 if [ $? != 0 ]; then
     echo "was expecting alt extensions to have CA set"
     exit 99
 fi
 
-rm -f tmp.crt
+rm -f tmp.cert
 rm -f tmp.csr
 
 run_success "req -new -key ./certs/server-key.pem -config ./test.conf -x509 -out tmp.cert"
