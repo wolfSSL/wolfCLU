@@ -112,7 +112,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             keyIn = wolfSSL_BIO_new_file(argv[idx+1], "rb");
             if (keyIn == NULL) {
                     wolfCLU_LogError("Unable to open private key file %s",
-                            optarg);
+                            argv[idx+1]);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
         }
