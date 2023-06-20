@@ -549,6 +549,11 @@ void wolfCLU_ForceZero(void* mem, unsigned int len);
 int wolfCLU_Client(int argc, char** argv);
 
 /**
+ * @brief example server
+ */
+int wolfCLU_Server(int argc, char** argv);
+
+/**
  * @brief function to get password from input
  */
 int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg);
