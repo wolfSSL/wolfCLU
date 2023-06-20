@@ -383,13 +383,31 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
             }
 
-            if (XSTRNCMP(c->name, "DNS", 3) == 0) {
+            else if (XSTRNCMP(c->name, "DNS", 3) == 0) {
                 type = ASN_DNS_TYPE;
                 s = c->value;
                 sSz = (int)XSTRLEN(c->value);
             }
 
-            if (type == 0) {
+            else if (XSTRNCMP(c->name, "URI", 3) == 0) {
+                type = ASN_URI_TYPE;
+                s = c->value;
+                sSz = (int)XSTRLEN(c->value);
+            }
+
+            else if (XSTRNCMP(c->name, "RID", 3) == 0) {
+                type = ASN_RID_TYPE;
+                s = c->value;
+                sSz = (int)XSTRLEN(c->value);
+            }
+
+            else if (XSTRNCMP(c->name, "email", 5) == 0) {
+                type = ASN_RFC822_TYPE;
+                s = c->value;
+                sSz = (int)XSTRLEN(c->value);
+            }
+
+            else {
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
             }
