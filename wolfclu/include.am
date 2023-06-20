@@ -18,5 +18,6 @@ nobase_include_HEADERS+=wolfclu/version.h \
                         wolfclu/sign-verify/clu_sign.h \
                         wolfclu/sign-verify/clu_verify.h \
                         wolfclu/sign-verify/clu_sign_verify_setup.h \
-                        wolfclu/certgen/clu_certgen.h
+                        wolfclu/certgen/clu_certgen.h \
+                        wolfclu/server.h
 

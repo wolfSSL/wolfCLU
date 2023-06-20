@@ -65,7 +65,7 @@ struct WOLFCLU_CERT_SIGN {
 };
 
 
-WOLFCLU_CERT_SIGN* wolfCLU_CertSignNew()
+WOLFCLU_CERT_SIGN* wolfCLU_CertSignNew(void)
 {
     WOLFCLU_CERT_SIGN* ret;
 
