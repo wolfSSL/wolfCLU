@@ -93,11 +93,11 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     XMEMCPY(finalOutFNm, fOutNm, fOutNmSz);
 
     switch(directive) {
-        case PRIV_AND_PUB:
+        case PRIV_AND_PUB_FILES:
             flagOutputPub = 1;
-            /* Fall through to PRIV_ONLY */
+            /* Fall through to PRIV_ONLY_FILE */
             FALL_THROUGH;
-        case PRIV_ONLY:
+        case PRIV_ONLY_FILE:
             /* add on the final part of the file name ".priv" */
             XMEMCPY(finalOutFNm+fOutNmSz, privAppend, fOutNmAppendSz);
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
@@ -118,9 +118,9 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
             if (flagOutputPub == 0) {
                 break;
-            } /* else fall through to PUB_ONLY if flagOutputPub == 1*/
+            } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1*/
             FALL_THROUGH;
-        case PUB_ONLY:
+        case PUB_ONLY_FILE:
             /* add on the final part of the file name ".pub" */
             XMEMCPY(finalOutFNm+fOutNmSz, pubAppend, fOutNmAppendSz);
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
@@ -451,7 +451,6 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
     char  fExtPub[6]  = ".pub\0\0";
     char* fOutNameBuf = NULL;
 
-    WOLFSSL_BIO *bioOut = NULL;
     WOLFSSL_BIO *bioPub = NULL;
     WOLFSSL_BIO *bioPri = NULL;
     WOLFSSL_EC_KEY   *key;
@@ -474,14 +473,6 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        bioOut = wolfSSL_BIO_new_file(fName, "wb");
-        if (bioOut == NULL) {
-            wolfCLU_LogError("unable to open output file %s", fName);
-            ret = MEMORY_E;
-        }
-    }
-
     /* create buffer for alternate file name use */
     if (ret == WOLFCLU_SUCCESS) {
         fOutNameBuf = (char*)XMALLOC(fNameSz + fExtSz + 1, NULL,
@@ -493,19 +484,9 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
 
     if (ret == WOLFCLU_SUCCESS) {
         switch(directive) {
-            case PUB_ONLY:
-                if (fmt == PEM_FORM) {
-                    if (wolfSSL_PEM_write_bio_EC_PUBKEY(bioOut, key)
-                            != WOLFSSL_SUCCESS) {
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-                }
-                else {
-                    ret = wolfCLU_ECC_write_pub_der(bioOut, key);
-                }
-                break;
-            case PRIV_AND_PUB:
-                /* Fall through to PRIV_ONLY */
+            case PRIV_AND_PUB_FILES:
+                /* Fall through to PRIV_ONLY_FILE */
+                FALL_THROUGH;
             case PRIV_ONLY_FILE: /* adding .priv to file name */
                 if (ret == WOLFCLU_SUCCESS) {
                     XMEMCPY(fOutNameBuf, fName, fNameSz);
@@ -536,7 +517,7 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
                 if (ret < 0) {
                     break;
                 }
-                if (directive != PRIV_AND_PUB) {
+                if (directive != PRIV_AND_PUB_FILES) {
                     break;
                 }
                 FALL_THROUGH;
@@ -574,7 +555,6 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
     }
 
     wolfSSL_EC_KEY_free(key);
-    wolfSSL_BIO_free(bioOut);
     wolfSSL_BIO_free(bioPri);
     wolfSSL_BIO_free(bioPub);
 
@@ -697,8 +677,8 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
     if (ret == WOLFCLU_SUCCESS) {
         switch (directive) {
-            case PRIV_AND_PUB:
-                /* Fall through to PRIV_ONLY */
+            case PRIV_AND_PUB_FILES:
+                /* Fall through to PRIV_ONLY_FILE */
                 FALL_THROUGH;
             case PRIV_ONLY_FILE:
                 /* add on the final part of the file name ".priv" */
@@ -742,7 +722,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                     XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
                 }
 
-                if (directive != PRIV_AND_PUB) {
+                if (directive != PRIV_AND_PUB_FILES) {
                     break;
                 }
                 FALL_THROUGH;
