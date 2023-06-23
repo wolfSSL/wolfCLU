@@ -12,6 +12,7 @@ int wolfCLU_Server(int argc, char** argv){
     func_args args;
     args.argc = argc;
     args.argv = argv;
+    server_test(&args);
     printf("this is clu_server_setup.c\n");
     return 0;
 }
