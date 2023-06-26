@@ -20,8 +20,13 @@
 typedef struct sockaddr_in SOCKADDR_IN4_T;
 typedef struct sockaddr_in6 SOCKADDR_IN6_T;
 
+#define SV_MSG_SZ 32
+
 THREAD_RETURN WOLFSSL_THREAD server_test(void* args){
-    // SOCKET_T sockfd = WOLFSSL_SOCKET_INVALID;
+    SOCKET_T sockfd = WOLFSSL_SOCKET_INVALID;
+    SOCKET_T clientfd = WOLFSSL_SOCKET_INVALID;
+    SOCKADDR_IN_T clientAddr;
+    socklen_t clientLen;
 
     wolfSSL_method_func method = NULL;
     WOLFSSL_CTX*    ctx = NULL;
@@ -31,6 +36,17 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args){
     char**  argv = ((func_args*)args)->argv;
 
     word16 port = wolfSSLPort;
+    int useAnyAddr = 0;
+    int dtlsUDP = 0;
+    int    dtlsSCTP = 0;
+    int    doListen = 1;
+
+    int ret;
+
+    char msg[SV_MSG_SZ];
+    int msgSz = 0;
+    int finish = 0;
+    
 
     // const char* ourCert = NULL;
     // const char* ourKey = NULL;
@@ -77,11 +93,53 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args){
         err_sys("can't load server certificate file");
     }
 
-    ssl = wolfSSL_new(ctx);
-    if(ssl == NULL){
-        wolfSSL_CTX_free(ctx); ctx = NULL;
-        err_sys("unable to get SSL object");
+    while(!finish){
+        ssl = wolfSSL_new(ctx);
+        if(ssl == NULL){
+            wolfSSL_CTX_free(ctx); ctx = NULL;
+            err_sys("unable to get SSL object");
+            break;
+        }
+        // tcp_listen(&sockfd, &port, useAnyAddr, dtlsUDP, dtlsSCTP);
+        tcp_accept(&sockfd, &clientfd, args, port, useAnyAddr, dtlsUDP, dtlsSCTP, 0, 
+            doListen, &clientAddr, &clientLen);
+        // doListen = 0; /* Don't listen next time */
+        
+        if((ret = SSL_set_fd(ssl, clientfd)) != WOLFSSL_SUCCESS){
+            err_sys("error in setting fd");
+            finish = 1;
+            goto sslclose;
+        }
+        if((ret = SSL_accept(ssl)) != WOLFSSL_SUCCESS){
+            err_sys("error in SSL accept");
+            finish = 1;
+            goto sslclose;
+        }
+        
+        memset(msg, 0, SV_MSG_SZ);
+        if((msgSz = wolfSSL_read(ssl, msg, sizeof(msg)-1))==0){
+            err_sys("error in SSL read");
+            finish = 1;
+            goto sslclose;
+        }
+        printf("Message : %s\n",msg);
+        if(wolfSSL_write(ssl, msg, msgSz) != msgSz){
+            err_sys("error in SSL_write");
+            finish = 1;
+            goto sslclose;
+        }
+        if(strcmp(msg,"finish") == 0){
+            finish = 1;
+        }
+sslclose:
+        wolfSSL_shutdown(ssl);
+        wolfSSL_free(ssl);
+        close(clientfd);
     }
+
+    close(sockfd);
+    wolfSSL_CTX_free(ctx);
+    wolfSSL_Cleanup();
 
     if(1==0){
         printf("%d\n",argc);
