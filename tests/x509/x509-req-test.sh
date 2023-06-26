@@ -100,6 +100,12 @@ coutnryName_min = 2
 basicConstraints = critical,CA:true
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
+[alt_names]
+RID.1 = 1.1.1.1
+RID.2 = surname
+email.1 = facts@wolfssl.com
+URI.1 = facts@wolfssl.com
+
 EOF
 
 
@@ -119,8 +125,19 @@ rm -f tmp.cert
 # no parameter -conf
 #run_fail "req -new -key ./certs/server-key.pem -conf ./test.conf -out tmp.csr"
 
-run_success "req -new -key ./certs/server-key.pem -config ./test.conf -out tmp.csr"
+run_success "req -new -key ./certs/server-key.pem -config ./test-prompt.conf -out tmp.csr" "US"
 run_success "req -text -in tmp.csr"
+SUBJECT=`./wolfssl req -in tmp.csr -text | grep -A1 "X509v3 Subject Alternative Name"`
+EXPECTED="        X509v3 Subject Alternative Name: 
+            email:facts@wolfssl.com, Registered ID:surname, URI:facts@wolfssl.com" 
+if [ "$SUBJECT" != "$EXPECTED" ]
+then
+    echo "found unexpected result"
+    echo "Got      : $SUBJECT"
+    echo "Expected : $EXPECTED"
+    exit 99
+fi
+
 
 # fail when extensions can not be found
 run_fail "req -new -extensions v3_alt_ca_not_found -key ./certs/server-key.pem -config ./test.conf -x509 -out alt.crt"
