@@ -354,13 +354,9 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         for (i = 0; i < total; i++) {
             WOLFSSL_CONF_VALUE *c;
             WOLFSSL_ASN1_STRING *ipStr = NULL;
-            char *token, *ptr, *s      = NULL;
-            int   sSz = 0;
-            int   type= 0;
-            byte oid[MAX_OID_SZ];
-            word32 oidSz = MAX_OID_SZ;
-            word32 decodedCount = 0;
-            word16 decoded[MAX_OID_SZ];
+            char  *s   = NULL;
+            int   sSz  = 0;
+            int   type = 0;
 
             c = wolfSSL_sk_CONF_VALUE_value(altNames, i);
             if (c == NULL) {
@@ -400,23 +396,14 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             }
 
             else if (XSTRNCMP(c->name, "RID", 3) == 0) {
-                token = XSTRTOK(c->value, ".", &ptr);
-
-                while (token != NULL) {
-                    decoded[decodedCount] = XATOI(token);
-                    decodedCount++;
-                    token = XSTRTOK(NULL, ".", &ptr);
-                }
-
-                if (EncodeObjectId(decoded, decodedCount, oid, &oidSz) != 0) {
+                if ((s = (char*)wolfSSL_OBJ_txt2oidBuf(c->value, (word32*)&sSz,
+                                oidCsrAttrType)) == NULL) {
                     wolfCLU_LogError("bad RID found %s", c->value);
                     ret = WOLFCLU_FATAL_ERROR;
                     break;
                 }
 
                 type = ASN_RID_TYPE;
-                s = (char*)oid;
-                sSz = (int)oidSz;
             }
 
             else if (XSTRNCMP(c->name, "email", 5) == 0) {
