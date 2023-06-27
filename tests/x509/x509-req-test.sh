@@ -129,7 +129,7 @@ run_success "req -new -key ./certs/server-key.pem -config ./test-prompt.conf -ou
 run_success "req -text -in tmp.csr"
 SUBJECT=`./wolfssl req -in tmp.csr -text | grep -A1 "X509v3 Subject Alternative Name"`
 EXPECTED="        X509v3 Subject Alternative Name: 
-            email:facts@wolfssl.com, Registered ID:surname, URI:facts@wolfssl.com" 
+            email:facts@wolfssl.com, Registered ID:1.1.1.1, Registered ID:surname, URI:facts@wolfssl.com"
 if [ "$SUBJECT" != "$EXPECTED" ]
 then
     echo "found unexpected result"

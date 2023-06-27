@@ -354,9 +354,13 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         for (i = 0; i < total; i++) {
             WOLFSSL_CONF_VALUE *c;
             WOLFSSL_ASN1_STRING *ipStr = NULL;
-            char  *s   = NULL;
+            char  *token, *ptr, *s     = NULL;
             int   sSz  = 0;
             int   type = 0;
+            byte oid[ASN1_OID_DOTTED_MAX_SZ];
+            word32 oidSz = ASN1_OID_DOTTED_MAX_SZ;
+            word32 decodedCount = 0;
+            word16 decoded[ASN1_OID_DOTTED_MAX_SZ];
 
             c = wolfSSL_sk_CONF_VALUE_value(altNames, i);
             if (c == NULL) {
@@ -398,10 +402,43 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             else if (XSTRNCMP(c->name, "RID", 3) == 0) {
                 if ((s = (char*)wolfSSL_OBJ_txt2oidBuf(c->value, (word32*)&sSz,
                                 oidCsrAttrType)) == NULL) {
-                    wolfCLU_LogError("bad RID found %s", c->value);
+            #if defined(HAVE_OID_ENCODING)
+                    /* If RID value is not named OID, manually encode
+                     * dotted OID into byte array */
+                    token = XSTRTOK(c->value, ".", &ptr);
+
+                    while (token != NULL) {
+                        decoded[decodedCount] = XATOI(token);
+                        decodedCount++;
+                        token = XSTRTOK(NULL, ".", &ptr);
+                    }
+
+                    if (EncodeObjectId(decoded, decodedCount, oid, &oidSz)
+                            == 0) {
+                        s   = (char*)oid;
+                        sSz = (int)oidSz;
+                    }
+                    else {
+                        wolfCLU_LogError("bad RID found %s", c->value);
+                        ret = WOLFCLU_FATAL_ERROR;
+                        break;
+                    }
+            #else
+                    (void)token;
+                    (void)ptr;
+                    (void)decoded;
+                    (void)decodedCount;
+                    (void)oid;
+                    (void)oidSz;
+
+                    wolfCLU_LogError("Couldn't encode RID. OID encoding is not"
+                            " compiled in");
                     ret = WOLFCLU_FATAL_ERROR;
                     break;
+
+            #endif
                 }
+
 
                 type = ASN_RID_TYPE;
             }
