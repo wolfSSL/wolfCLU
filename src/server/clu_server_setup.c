@@ -19,7 +19,7 @@ static const char portFlag[]        = "-p";
 static const char keyFileFlag[]     = "-k";
 static const char certFileFlag[]    = "-c";
 
-#define MAX_SERVER_ARGS 4
+#define MAX_SERVER_ARGS 7
 
 /* return WOLFSSL_SUCCESS on success */
 static int _addServerArg(const char** args, const char* in, int* idx)
@@ -83,9 +83,7 @@ int wolfCLU_Server(int argc, char** argv)
                 break;
         }
     }
-    for (int i = 0 ; i<serverArgc; i++){
-        printf("%d\t%s\n", i,serverArgv[i]);
-    }
+
     if (ret == WOLFCLU_SUCCESS) {
         args.argv = (char**)serverArgv;
         args.argc = serverArgc;

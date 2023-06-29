@@ -41,6 +41,8 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
     word16 port = wolfSSLPort;
     const char* ourKey = NULL;
     const char* ourCert = NULL;
+
+    int version = SERVER_DEFAULT_VERSION;
     int useAnyAddr = 0;
     int dtlsUDP = 0;
     int    dtlsSCTP = 0;
@@ -82,7 +84,46 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
         }
     }
 
-    method = wolfTLSv1_3_server_method_ex;
+    switch (version) {
+#ifndef NO_OLD_TLS
+    #ifdef WOLFSSL_ALLOW_SSLV3
+        case 0:
+            method = wolfSSLv3_server_method_ex;
+            break;
+    #endif
+    #ifndef NO_TLS
+        #ifdef WOLFSSL_ALLOW_TLSV10
+        case 1:
+            method = wolfTLSv1_server_method_ex;
+            break;
+        #endif
+
+        case 2:
+            method = wolfTLSv1_1_server_method_ex;
+            break;
+    #endif /* !NO_TLS */
+#endif /* !NO_OLD_TLS */
+
+#ifndef NO_TLS
+    #ifndef WOLFSSL_NO_TLS12
+        case 3:
+            method = wolfTLSv1_2_server_method_ex;
+            break;
+    #endif
+
+    #ifdef WOLFSSL_TLS13
+        case 4:
+            method = wolfTLSv1_3_server_method_ex;
+            break;
+    #endif
+#endif /* !NO_TLS */
+        default:
+            err_sys("Bad SSL version");
+    }
+    
+    if (method == NULL) {
+        err_sys("unable to get method");
+    }
     
     myoptind = 0;
 
