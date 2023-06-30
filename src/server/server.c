@@ -192,16 +192,17 @@ sslclose:
     return 0;
 }
 
-// #define NO_MAIN_DRIVER
 #ifndef NO_MAIN_DRIVER
 int main(int argc, char** argv)
 {
     func_args args;
     args.argc = argc;
     args.argv = argv;
+    args.return_code = 0;
 
     wolfSSL_Init();
-    printf("this is server.c\n");
+    server_test(&args);
+    wolfSSL_Cleanup();
     return 0;
 }
 #endif /* !NO_MAIN_DRIVER */

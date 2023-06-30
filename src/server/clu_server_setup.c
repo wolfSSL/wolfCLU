@@ -1,23 +1,29 @@
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
-#include <wolfclu/sign-verify/clu_verify.h>
-#include <wolfclu/x509/clu_parse.h>
-#include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/server.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
 static const struct option server_options[] = {
-    {"-port",           required_argument, 0, WOLFCLU_PORT},
-    {"-key" ,           required_argument, 0, WOLFCLU_KEYFILE},
-    {"-cert",           required_argument, 0, WOLFCLU_CERTFILE},
+    {"-port",           required_argument, 0, WOLFCLU_PORT                  },
+    {"-key" ,           required_argument, 0, WOLFCLU_KEYFILE               },
+    {"-cert",           required_argument, 0, WOLFCLU_CERTFILE              },
+    {"-help",           no_argument,       0, WOLFCLU_HELP                  },
+    {"-h",              no_argument,       0, WOLFCLU_HELP                  },
     {0,0,0,0}
 };
 
 static const char portFlag[]        = "-p";
 static const char keyFileFlag[]     = "-k";
 static const char certFileFlag[]    = "-c";
+
+static void wolfCLU_ServerHelp(void) {
+    WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_server");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-port <+int>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-key <private key file name>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-cert <cert file name>");
+}
 
 #define MAX_SERVER_ARGS 7
 
@@ -81,6 +87,9 @@ int wolfCLU_Server(int argc, char** argv)
                     }
                 }
                 break;
+            case WOLFCLU_HELP:
+                wolfCLU_ServerHelp();
+                return WOLFCLU_SUCCESS;
         }
     }
 
