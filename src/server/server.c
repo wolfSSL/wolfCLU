@@ -61,9 +61,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
         {0, 0, 0}
     };
 
-    
-
-    // int     version = SERVER_INVALID_VERSION;
     while ((ch = mygetopt_long(argc, argv, "?:"
             "ab:c:defgh:i;jk:l:mnop:q:rstu;v:wxyz"
             "A:B:CDE:F:GH:IJKL:M:NO:PQRS:TUVW:XYZ:"
