@@ -18,7 +18,8 @@ static const char portFlag[]        = "-p";
 static const char keyFileFlag[]     = "-k";
 static const char certFileFlag[]    = "-c";
 
-static void wolfCLU_ServerHelp(void) {
+static void wolfCLU_ServerHelp(void) 
+{
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_server");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-port <+int>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-key <private key file name>");
