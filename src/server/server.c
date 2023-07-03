@@ -55,17 +55,8 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
     int finish = 0;
 
     int ch;
-    
-    static const struct mygetopt_long_config long_options[] = {
-        {"help", 0, 257},
-        {0, 0, 0}
-    };
 
-    while ((ch = mygetopt_long(argc, argv, "?:"
-            "ab:c:defgh:i;jk:l:mnop:q:rstu;v:wxyz"
-            "A:B:CDE:F:GH:IJKL:M:NO:PQRS:TUVW:XYZ:"
-            "01:23:4567:89"
-            "@#", long_options, 0)) != -1) {
+    while ((ch = mygetopt(argc, argv, "c:k:p:")) != -1) {
         switch(ch){
             case 'p': /* port */
                 port = (word16)atoi(myoptarg);
@@ -116,7 +107,7 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
 #endif /* !NO_TLS */
         default:
             err_sys("Bad SSL version");
-    }
+    } /* switch (version) */
     
     if (method == NULL) {
         err_sys("unable to get method");
@@ -147,8 +138,8 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
             err_sys("unable to get SSL object");
             break;
         }
-        tcp_accept(&sockfd, &clientfd, args, port, useAnyAddr, dtlsUDP, dtlsSCTP, 0, 
-            doListen, &clientAddr, &clientLen);
+        tcp_accept(&sockfd, &clientfd, args, port, useAnyAddr, dtlsUDP, 
+            dtlsSCTP, 0, doListen, &clientAddr, &clientLen);
         
         if ((ret = SSL_set_fd(ssl, clientfd)) != WOLFSSL_SUCCESS) {
             err_sys("error in setting fd");
@@ -162,7 +153,7 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
         }
         
         memset(msg, 0, SV_MSG_SZ);
-        if ((msgSz = wolfSSL_read(ssl, msg, sizeof(msg)-1))==0) {
+        if ((msgSz = wolfSSL_read(ssl, msg, sizeof(msg)-1)) == 0) {
             err_sys("error in SSL read");
             finish = 1;
             goto sslclose;
