@@ -9,6 +9,7 @@ static const struct option server_options[] = {
     {"-port",           required_argument, 0, WOLFCLU_PORT                  },
     {"-key" ,           required_argument, 0, WOLFCLU_KEYFILE               },
     {"-cert",           required_argument, 0, WOLFCLU_CERTFILE              },
+    {"-clientcert",     required_argument, 0, WOLFCLU_CA                    },
     {"-help",           no_argument,       0, WOLFCLU_HELP                  },
     {"-h",              no_argument,       0, WOLFCLU_HELP                  },
     {0,0,0,0}
@@ -17,6 +18,7 @@ static const struct option server_options[] = {
 static const char portFlag[]        = "-p";
 static const char keyFileFlag[]     = "-k";
 static const char certFileFlag[]    = "-c";
+static const char clientCertFlag[]  = "-A";
 
 static void wolfCLU_ServerHelp(void) 
 {
@@ -26,7 +28,7 @@ static void wolfCLU_ServerHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-cert <cert file name>");
 }
 
-#define MAX_SERVER_ARGS 7
+#define MAX_SERVER_ARGS 10
 
 /* return WOLFSSL_SUCCESS on success */
 static int _addServerArg(const char** args, const char* in, int* idx)
@@ -91,9 +93,18 @@ int wolfCLU_Server(int argc, char** argv)
             case WOLFCLU_HELP:
                 wolfCLU_ServerHelp();
                 return WOLFCLU_SUCCESS;
+            case WOLFCLU_CA:
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = _addServerArg(serverArgv, clientCertFlag, &serverArgc);
+                    if (ret == WOLFCLU_SUCCESS) {
+                        ret = _addServerArg(serverArgv, optarg, &serverArgc);
+                    }
+                }
         }
     }
-
+    for (int i=0; i<serverArgc; i++) {
+        printf("%d\t%s\n",i,serverArgv[i]);
+    }
     if (ret == WOLFCLU_SUCCESS) {
         args.argv = (char**)serverArgv;
         args.argc = serverArgc;
