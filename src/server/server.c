@@ -44,15 +44,6 @@ static const char *wolfsentry_config_path = NULL;
 #include <wolfclu/clu_log.h>
 #include <wolfclu/server.h>
 
-/* Force enable the compatibility macros for this example */
-// #ifndef OPENSSL_EXTRA_X509_SMALL
-// #define OPENSSL_EXTRA_X509_SMALL
-// #endif
-// #include <wolfssl/openssl/ssl.h>
-
-// #include "examples/server/server.h"
-
-
 #ifndef NO_WOLFSSL_SERVER
 
 #if defined(WOLFSSL_TLS13) && ( \
