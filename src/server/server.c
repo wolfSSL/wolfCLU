@@ -1,5 +1,3 @@
-/* copy from wolfssl/examples/server/server.c */
-
 #ifdef HAVE_CONFIG_H
     #include <config.h>
 #endif

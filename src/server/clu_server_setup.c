@@ -26,6 +26,7 @@ static void wolfCLU_ServerHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-port <+int>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-key <private key file name>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-cert <cert file name>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-clientcert <client cert file name>");
 }
 
 #define MAX_SERVER_ARGS 10
@@ -102,15 +103,13 @@ int wolfCLU_Server(int argc, char** argv)
                 }
         }
     }
-    for (int i=0; i<serverArgc; i++) {
-        printf("%d\t%s\n",i,serverArgv[i]);
-    }
+
     if (ret == WOLFCLU_SUCCESS) {
         args.argv = (char**)serverArgv;
         args.argc = serverArgc;
         server_test(&args);
     }
-    
+
     return ret;
 }
 
