@@ -50,7 +50,7 @@ static void wolfCLU_ServerHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-clientcert <client cert file name>");
 }
 
-#define MAX_SERVER_ARGS 10
+#define MAX_SERVER_ARGS 15
 
 /* return WOLFSSL_SUCCESS on success */
 static int _addServerArg(const char** args, const char* in, int* idx)

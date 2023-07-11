@@ -45,12 +45,6 @@
 static const char *wolfsentry_config_path = NULL;
 #endif
 #endif /* WOLFSSL_WOLFSENTRY_HOOKS */
-#if defined(WOLFSSL_MDK_ARM) || defined(WOLFSSL_KEIL_TCP_NET)
-        #include <stdio.h>
-        #include <string.h>
-        #include "rl_fs.h"
-        #include "rl_net.h"
-#endif
 
 #ifdef NO_FILESYSTEM
     #ifdef NO_RSA
@@ -397,7 +391,7 @@ static int NonBlockingSSL_Accept(SSL* ssl)
 }
 
 /* Echo number of bytes specified by -B arg */
-int ServerEchoData(SSL* ssl, int clientfd, int echoData, int block,
+static int ServerEchoData(SSL* ssl, int clientfd, int echoData, int block,
                    size_t throughput)
 {
     int ret = 0, err;
