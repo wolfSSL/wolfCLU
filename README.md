@@ -120,6 +120,43 @@ wolfssl dgst -sha256 -sign mykey.priv -out readme.sig ./README.md
 wolfssl dgst -sha256 -verify mykey.pub -signature readme.sig ./README.md
 ```
 
+### Creating a Certificate Authority (CA) to sign other certificates using ECC signing/verification
+
+The following demonstrates how to create a root CA and use it to sign other certificates. This example uses ECC, but steps are similar for RSA.
+
+In this scenario there are three entities A, B, and C, where A is meant to function as a root CA. 
+
+The following steps demonstrate how to generate keys and certificates for A, B, and C, where A is self-signed and B and C are signed by A
+
+1. Create private ECC keys for A, B, and C (to create RSA keys instead use `wolfssl -genkey rsa`)
+```
+wolfssl -genkey ecc -out ecc-key-A -output priv -outform PEM
+wolfssl -genkey ecc -out ecc-key-B -output priv -outform PEM
+wolfssl -genkey ecc -out ecc-key-C -output priv -outform PEM
+```
+
+2. Create a self-signed certificate for A, which will function as our CA
+```
+wolfssl req -new -key ecc-key-A.priv -subj O=org-A/C=US/ST=WA/L=Seattle/CN=A/OU=org-unit-A -x509 -out A.cert -outform PEM
+```
+
+3. Create certificates for B and C signed by A
+```
+# first create a certificate signing request (CSR) for B and C
+wolfssl req -new -key ecc-key-B.priv -subj O=org-B/C=US/ST=WA/L=Seattle/CN=B/OU=org-unit-B -out B.csr -outform PEM
+wolfssl req -new -key ecc-key-C.priv -subj O=org-C/C=US/ST=WA/L=Seattle/CN=C/OU=org-unit-C -out C.csr -outform PEM
+
+# now have our CA (A) sign the CSR's of B and C to generate their certificates
+wolfssl ca -in B.csr -keyfile ecc-key-A.priv -cert A.cert -out B.cert
+wolfssl ca -in C.csr -keyfile ecc-key-A.priv -cert A.cert -out C.cert
+```
+
+We can now verify certs B and C using our CA cert A using the following command:
+```
+wolfssl verify -CAfile A.cert B.cert
+wolfssl verify -CAfile A.cert C.cert
+```
+
 ## Contacts
 
 Please contact support@wolfssl.com with any questions or comments.
