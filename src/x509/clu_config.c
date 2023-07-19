@@ -353,8 +353,9 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         total = wolfSSL_sk_CONF_VALUE_num(altNames);
         for (i = 0; i < total; i++) {
             WOLFSSL_CONF_VALUE *c;
-            WOLFSSL_ASN1_STRING *ipStr = NULL;
-            char  *token, *ptr, *s     = NULL;
+            WOLFSSL_ASN1_STRING *ipStr  = NULL;
+            WOLFSSL_ASN1_OBJECT *ridObj = NULL;
+            char  *token, *ptr, *s      = NULL;
             int   sSz  = 0;
             int   type = 0;
             byte oid[ASN1_OID_DOTTED_MAX_SZ];
@@ -400,8 +401,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             }
 
             else if (XSTRNCMP(c->name, "RID", 3) == 0) {
-                if ((s = (char*)wolfSSL_OBJ_txt2oidBuf(c->value, (word32*)&sSz,
-                                oidCsrAttrType)) == NULL) {
+                if ((ridObj = wolfSSL_OBJ_txt2obj(c->value, 0)) == NULL) {
             #if defined(HAVE_OID_ENCODING)
                     /* If RID value is not named OID, manually encode
                      * dotted OID into byte array */
@@ -413,7 +413,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                         token = XSTRTOK(NULL, ".", &ptr);
                     }
 
-                    if (EncodeObjectId(decoded, decodedCount, oid, &oidSz)
+                    if (wc_EncodeObjectId(decoded, decodedCount, oid, &oidSz)
                             == 0) {
                         s   = (char*)oid;
                         sSz = (int)oidSz;
@@ -437,6 +437,10 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                     break;
 
             #endif
+                }
+                else {
+                    s   = (char*)wolfSSL_OBJ_get0_data(ridObj);
+                    sSz = (int)wolfSSL_OBJ_length(ridObj);
                 }
 
 
@@ -465,6 +469,9 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
             if (ipStr != NULL)
                 wolfSSL_ASN1_STRING_free(ipStr);
+
+            if (ridObj != NULL)
+                wolfSSL_ASN1_OBJECT_free(ridObj);
         }
     }
 #endif
