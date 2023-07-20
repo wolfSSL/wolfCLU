@@ -124,7 +124,7 @@ static const struct option crypt_algo_options[] = {
 /*
  * verbose help function
  */
-void wolfCLU_verboseHelp()
+void wolfCLU_verboseHelp(void)
 {
     int i;
 
@@ -273,7 +273,7 @@ void wolfCLU_encryptHelp()
 /*
  * Decrypt Usage
  */
-void wolfCLU_decryptHelp()
+void wolfCLU_decryptHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable En/De crypt Algorithms with current configure "
             "settings.\n");
@@ -301,7 +301,7 @@ void wolfCLU_decryptHelp()
 /*
  * Hash Usage
  */
-void wolfCLU_hashHelp()
+void wolfCLU_hashHelp(void)
 {
     int i;
 
@@ -348,7 +348,7 @@ void wolfCLU_hashHelp()
 /*
  * Benchmark Usage
  */
-void wolfCLU_benchHelp()
+void wolfCLU_benchHelp(void)
 {
     int i;
 
@@ -402,7 +402,7 @@ void wolfCLU_benchHelp()
            " -in encryptedfile.txt -out decryptedfile.txt\n");
 }
 
-void wolfCLU_certHelp()
+void wolfCLU_certHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "\n");
     WOLFCLU_LOG(WOLFCLU_L0, "-inform pem or der in format");
@@ -435,7 +435,7 @@ void wolfCLU_certHelp()
            "\n");
 }
 
-void wolfCLU_genKeyHelp()
+void wolfCLU_genKeyHelp(void)
 {
     int i;
 
@@ -577,7 +577,7 @@ void wolfCLU_verifyHelp(int keyType) {
         }
 }
 
-void wolfCLU_certgenHelp() {
+void wolfCLU_certgenHelp(void) {
     WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
@@ -1051,7 +1051,7 @@ void wolfCLU_stats(double start, int blockSize, int64_t blocks)
 
 
 /* returns WOLFCLU_SUCCESS on success */
-int wolfCLU_version()
+int wolfCLU_version(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "You are using version %s of the wolfssl Command Line Utility."
         , CLUWOLFSSL_VERSION_STRING);
