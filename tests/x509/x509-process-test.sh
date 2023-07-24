@@ -243,7 +243,7 @@ run3() {
     ./wolfssl x509 -inform pem -in certs/ca-cert.pem -outform der -out x509_test.der
     cert_test_case "-inform pem -outform der -in certs/ca-cert.pem -out x509_tmp.der" \
                     x509_test.der x509_tmp.der
-    rm -f x509_test.pem x509_tmp.pem
+    rm -f x509_test.pem x509_tmp.pem x509_test.der x509_tmp.der
     echo "TEST 3.c"
     test_case "-in certs/server-cert.pem -subject -noout"
     EXPECTED="/C=US/ST=Montana/L=Bozeman/O=wolfSSL/OU=Support/CN=www.wolfssl.com/emailAddress=info@wolfssl.com"
@@ -367,6 +367,7 @@ run4
 rm -f out.txt
 rm -f tmp.pem
 rm -f tmp.der
+rm -f cert_stripped.pem
 
 echo "Done"
 exit 0

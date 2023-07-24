@@ -52,6 +52,7 @@ done
 run "dgst -sha256 -verify ./certs/server-keyPub.pem -signature ./tests/dgst/5000-server-key.sig ./large-test.txt"
 run "dgst -sha256 -sign ./certs/server-key.pem -out 5000-server-key.sig ./large-test.txt"
 run "dgst -sha256 -verify ./certs/server-keyPub.pem -signature ./5000-server-key.sig ./large-test.txt"
+rm -rf 5000-server-key.sig
 
 # run some hash tests on large file while available
 run "-hash sha256 -in ./large-test.txt"
