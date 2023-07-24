@@ -402,7 +402,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
             else if (XSTRNCMP(c->name, "RID", 3) == 0) {
                 if ((ridObj = wolfSSL_OBJ_txt2obj(c->value, 0)) == NULL) {
-            #if defined(HAVE_OID_ENCODING)
+            #if defined(HAVE_OID_ENCODING) && !defined(NO_WC_ENCODE_OBJECT_ID)
                     /* If RID value is not named OID, manually encode
                      * dotted OID into byte array */
                     token = XSTRTOK(c->value, ".", &ptr);
