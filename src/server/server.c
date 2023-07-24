@@ -1,6 +1,6 @@
 /* server.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2023 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -820,9 +820,6 @@ static const char* server_usage_msg[][65] = {
         "-o          Perform OCSP lookup on peer certificate\n",        /* 22 */
         "-O <url>    Perform OCSP lookup using <url> as responder\n",   /* 23 */
 #endif
-#ifdef HAVE_PK_CALLBACKS
-        "-P          Public Key Callbacks\n",                           /* 24 */
-#endif
 #ifdef HAVE_ANON
         "-a          Anonymous server\n",                               /* 25 */
 #endif
@@ -839,9 +836,6 @@ static const char* server_usage_msg[][65] = {
 #endif
 #ifdef WOLFSSL_TRUST_PEER_CERT
         "-E <file>   Path to load trusted peer cert\n",                 /* 33 */
-#endif
-#ifdef HAVE_WNR
-        "-q <file>   Whitewood config file,      default",              /* 34 */
 #endif
         "-g          Return basic HTML web page\n",                     /* 35 */
         "-C <num>    The number of connections to accept, default: 1\n",/* 36 */
@@ -1004,9 +998,6 @@ static const char* server_usage_msg[][65] = {
         "-O <url>    OCSPルックアップを、"
                         "<url>を使用し応答者として実施する\n",          /* 23 */
 #endif
-#ifdef HAVE_PK_CALLBACKS
-        "-P          公開鍵コールバック\n",                             /* 24 */
-#endif
 #ifdef HAVE_ANON
         "-a          匿名サーバー\n",                                   /* 25 */
 #endif
@@ -1024,9 +1015,6 @@ static const char* server_usage_msg[][65] = {
 #endif
 #ifdef WOLFSSL_TRUST_PEER_CERT
         "-E <file>   信頼出来るピアの証明書ロードの為のパス\n\n",       /* 33 */
-#endif
-#ifdef HAVE_WNR
-        "-q <file>   Whitewood コンフィグファイル,      既定値",        /* 34 */
 #endif
         "-g          基本的な Web ページを返す\n",                      /* 35 */
         "-C <num>    アクセプト可能な接続数を指定する。既定値: 1\n",    /* 36 */
@@ -1184,9 +1172,6 @@ static void Usage(void)
     printf("%s", msg[++msgId]);     /* -o */
     printf("%s", msg[++msgId]);     /* -O */
 #endif
-#ifdef HAVE_PK_CALLBACKS
-    printf("%s", msg[++msgId]);     /* -P */
-#endif
 #ifdef HAVE_ANON
     printf("%s", msg[++msgId]);     /* -a */
 #endif
@@ -1202,9 +1187,6 @@ static void Usage(void)
 #endif
 #ifdef WOLFSSL_TRUST_PEER_CERT
     printf("%s", msg[++msgId]);     /* -E */
-#endif
-#ifdef HAVE_WNR
-    printf("%s %s\n", msg[++msgId], wnrConfig);  /* -q */
 #endif
     printf("%s", msg[++msgId]);     /* -g */
     printf("%s", msg[++msgId]);     /* -C */
@@ -1432,10 +1414,7 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
     int    nonBlocking  = 0;
     int    simulateWantWrite = 0;
     int    fewerPackets = 0;
-#ifdef HAVE_PK_CALLBACKS
-    int    pkCallbacks  = 0;
-    PkCbInfo pkCbInfo;
-#endif
+
     int    wc_shutdown     = 0;
     int    resume = 0;
     int    resumeCount = 0;
@@ -1483,10 +1462,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
 #ifdef HAVE_OCSP
     int    useOcsp  = 0;
     char*  ocspUrl  = NULL;
-#endif
-
-#ifdef HAVE_WNR
-    const char* wnrConfigFile = wnrConfig;
 #endif
     char buffer[WOLFSSL_MAX_ERROR_SZ];
 #ifdef WOLFSSL_TLS13
@@ -1740,12 +1715,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
                 #endif
                 break;
 
-            case 'P' :
-            #ifdef HAVE_PK_CALLBACKS
-                pkCallbacks = 1;
-            #endif
-                break;
-
             case 'p' :
                 port = (word16)atoi(myoptarg);
                 break;
@@ -1940,13 +1909,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
                  trustCert = myoptarg;
                 break;
             #endif
-
-            case 'q' :
-                #ifdef HAVE_WNR
-                    wnrConfigFile = myoptarg;
-                #endif
-                break;
-
             case 'g' :
                 useWebServerMsg = 1;
                 break;
@@ -2320,12 +2282,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
     }
 #endif
 
-#ifdef HAVE_WNR
-    if (wc_InitNetRandom(wnrConfigFile, NULL, 5000) != 0)
-        err_sys_ex(runWithErrors, "can't load whitewood net random config "
-                   "file");
-#endif
-
 #ifdef HAVE_PQC
     if (usePqc) {
         if (version == SERVER_DOWNGRADE_VERSION ||
@@ -2629,14 +2585,8 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
 #endif
 
 #if !defined(NO_CERTS)
-    #ifdef HAVE_PK_CALLBACKS
-        pkCbInfo.ourKey = ourKey;
-    #endif
     if ((!usePsk || usePskPlus) && !useAnon
         && !(loadCertKeyIntoSSLObj == 1)
-    #if defined(HAVE_PK_CALLBACKS) && defined(TEST_PK_PRIVKEY)
-        && !pkCallbacks
-    #endif /* HAVE_PK_CALLBACKS && TEST_PK_PRIVKEY */
     ) {
     #ifdef NO_FILESYSTEM
         if (wolfSSL_CTX_use_PrivateKey_buffer(ctx, server_key_der_2048,
@@ -2878,11 +2828,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
 #endif
     }
 
-#ifdef HAVE_PK_CALLBACKS
-    if (pkCallbacks)
-        SetupPkCallbacks(ctx);
-#endif
-
     ssl = SSL_new(ctx);
     if (ssl == NULL)
         err_sys_ex(catastrophic, "unable to create an SSL object");
@@ -2912,9 +2857,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
 
     if ((!usePsk || usePskPlus) && !useAnon &&
         loadCertKeyIntoSSLObj
-    #if defined(HAVE_PK_CALLBACKS) && defined(TEST_PK_PRIVKEY)
-        && !pkCallbacks
-    #endif /* HAVE_PK_CALLBACKS && TEST_PK_PRIVKEY */
     ) {
     #if defined(NO_FILESYSTEM)
         if (wolfSSL_use_PrivateKey_buffer(ssl, server_key_der_2048,
@@ -3073,13 +3015,6 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
 #endif /* HAVE_CERTIFICATE_STATUS_REQUEST HAVE_CERTIFICATE_STATUS_REQUEST_V2 */
 #endif /* NO_RSA */
 #endif /* HAVE_OCSP */
-
-    #ifdef HAVE_PK_CALLBACKS
-        /* This must be before SetKeyShare */
-        if (pkCallbacks) {
-            SetupPkCallbackContexts(ssl, &pkCbInfo);
-        }
-    #endif
 
     #if defined(WOLFSSL_TLS13) && defined(HAVE_SUPPORTED_CURVES)
         if (version >= 4 || version == -4) {
@@ -3822,11 +3757,6 @@ exit:
 
         wolfSSL_Cleanup();
         FreeTcpReady(&ready);
-
-#ifdef HAVE_WNR
-    if (wc_FreeNetRandom() < 0)
-        err_sys_ex(runWithErrors, "Failed to free netRandom context");
-#endif /* HAVE_WNR */
 
         return args.return_code;
     }

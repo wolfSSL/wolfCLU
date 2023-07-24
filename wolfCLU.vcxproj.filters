@@ -146,6 +146,9 @@
     <ClInclude Include="wolfclu\clu_optargs.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="wolfclu\server.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="wolfclu\version.h">
       <Filter>Header Files</Filter>
     </ClInclude>

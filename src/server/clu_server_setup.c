@@ -1,6 +1,6 @@
 /* clu_server_setup.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2023 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -30,7 +30,7 @@ static const struct option server_options[] = {
     {"-port",           required_argument, 0, WOLFCLU_PORT                  },
     {"-key" ,           required_argument, 0, WOLFCLU_KEYFILE               },
     {"-cert",           required_argument, 0, WOLFCLU_CERTFILE              },
-    {"-clientcert",     required_argument, 0, WOLFCLU_CA                    },
+    {"-CAfile",     required_argument, 0, WOLFCLU_CA                    },
     {"-help",           no_argument,       0, WOLFCLU_HELP                  },
     {"-h",              no_argument,       0, WOLFCLU_HELP                  },
     {0,0,0,0}
@@ -46,8 +46,11 @@ static void wolfCLU_ServerHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl s_server");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-port <+int>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-key <private key file name>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\tonly PEM can be used.");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-cert <cert file name>");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-clientcert <client cert file name>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\tonly PEM can be used.");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-CAfile <CA cert file name>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\tonly PEM can be used.");
 }
 
 #define MAX_SERVER_ARGS 15
