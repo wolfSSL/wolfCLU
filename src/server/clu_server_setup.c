@@ -30,7 +30,8 @@ static const struct option server_options[] = {
     {"-port",           required_argument, 0, WOLFCLU_PORT                  },
     {"-key" ,           required_argument, 0, WOLFCLU_KEYFILE               },
     {"-cert",           required_argument, 0, WOLFCLU_CERTFILE              },
-    {"-CAfile",     required_argument, 0, WOLFCLU_CA                    },
+    {"-noVerify",       no_argument,       0, WOLFCLU_VERIFY                },
+    {"-CAfile",         required_argument, 0, WOLFCLU_CA                    },
     {"-help",           no_argument,       0, WOLFCLU_HELP                  },
     {"-h",              no_argument,       0, WOLFCLU_HELP                  },
     {0,0,0,0}
@@ -39,6 +40,7 @@ static const struct option server_options[] = {
 static const char portFlag[]        = "-p";
 static const char keyFileFlag[]     = "-k";
 static const char certFileFlag[]    = "-c";
+static const char verifyFlag[]      = "-d";
 static const char clientCertFlag[]  = "-A";
 
 static void wolfCLU_ServerHelp(void) 
@@ -49,6 +51,8 @@ static void wolfCLU_ServerHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t\tonly PEM can be used.");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-cert <cert file name>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t\tonly PEM can be used.");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-noVerify");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\tDisable client cert check.");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-CAfile <CA cert file name>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t\tonly PEM can be used.");
 }
@@ -105,6 +109,11 @@ int wolfCLU_Server(int argc, char** argv)
                     if (ret == WOLFCLU_SUCCESS) {
                         ret = _addServerArg(serverArgv, optarg, &serverArgc);
                     }
+                }
+                break;
+            case WOLFCLU_VERIFY:
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = _addServerArg(serverArgv, verifyFlag, &serverArgc);
                 }
                 break;
             case WOLFCLU_CERTFILE:

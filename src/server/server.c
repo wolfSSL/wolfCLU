@@ -172,6 +172,11 @@ static int lng_index = 0;
     }
 #endif
 
+// static void err_sys(char* msg)
+// {
+//     return;
+// }
+
 static void err_sys_ex(int out, const char* msg)
 {
     if (out == 1) { /* if server is running w/ -x flag, print error w/o exit */
@@ -3287,6 +3292,7 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
 
         showPeerEx(ssl, lng_index);
         if (SSL_state(ssl) != 0) {
+            SSL_shutdown(ssl);
             err_sys_ex(runWithErrors, "SSL in error state");
         }
 
