@@ -353,10 +353,15 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         total = wolfSSL_sk_CONF_VALUE_num(altNames);
         for (i = 0; i < total; i++) {
             WOLFSSL_CONF_VALUE *c;
-            WOLFSSL_ASN1_STRING *ipStr = NULL;
-            char *s   = NULL;
-            int   sSz = 0;
-            int   type= 0;
+            WOLFSSL_ASN1_STRING *ipStr  = NULL;
+            WOLFSSL_ASN1_OBJECT *ridObj = NULL;
+            char  *token, *ptr, *s      = NULL;
+            int   sSz  = 0;
+            int   type = 0;
+            byte oid[ASN1_OID_DOTTED_MAX_SZ];
+            word32 oidSz = ASN1_OID_DOTTED_MAX_SZ;
+            word32 decodedCount = 0;
+            word16 decoded[ASN1_OID_DOTTED_MAX_SZ];
 
             c = wolfSSL_sk_CONF_VALUE_value(altNames, i);
             if (c == NULL) {
@@ -383,13 +388,72 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
             }
 
-            if (XSTRNCMP(c->name, "DNS", 3) == 0) {
+            else if (XSTRNCMP(c->name, "DNS", 3) == 0) {
                 type = ASN_DNS_TYPE;
                 s = c->value;
                 sSz = (int)XSTRLEN(c->value);
             }
 
-            if (type == 0) {
+            else if (XSTRNCMP(c->name, "URI", 3) == 0) {
+                type = ASN_URI_TYPE;
+                s = c->value;
+                sSz = (int)XSTRLEN(c->value);
+            }
+
+            else if (XSTRNCMP(c->name, "RID", 3) == 0) {
+                if ((ridObj = wolfSSL_OBJ_txt2obj(c->value, 0)) == NULL) {
+            #if defined(HAVE_OID_ENCODING) && !defined(NO_WC_ENCODE_OBJECT_ID)
+                    /* If RID value is not named OID, manually encode
+                     * dotted OID into byte array */
+                    token = XSTRTOK(c->value, ".", &ptr);
+
+                    while (token != NULL) {
+                        decoded[decodedCount] = XATOI(token);
+                        decodedCount++;
+                        token = XSTRTOK(NULL, ".", &ptr);
+                    }
+
+                    if (wc_EncodeObjectId(decoded, decodedCount, oid, &oidSz)
+                            == 0) {
+                        s   = (char*)oid;
+                        sSz = (int)oidSz;
+                    }
+                    else {
+                        wolfCLU_LogError("bad RID found %s", c->value);
+                        ret = WOLFCLU_FATAL_ERROR;
+                        break;
+                    }
+            #else
+                    (void)token;
+                    (void)ptr;
+                    (void)decoded;
+                    (void)decodedCount;
+                    (void)oid;
+                    (void)oidSz;
+
+                    wolfCLU_LogError("Couldn't encode RID. OID encoding is not"
+                            " compiled in");
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+
+            #endif
+                }
+                else {
+                    s   = (char*)wolfSSL_OBJ_get0_data(ridObj);
+                    sSz = (int)wolfSSL_OBJ_length(ridObj);
+                }
+
+
+                type = ASN_RID_TYPE;
+            }
+
+            else if (XSTRNCMP(c->name, "email", 5) == 0) {
+                type = ASN_RFC822_TYPE;
+                s = c->value;
+                sSz = (int)XSTRLEN(c->value);
+            }
+
+            else {
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
             }
@@ -405,6 +469,9 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 
             if (ipStr != NULL)
                 wolfSSL_ASN1_STRING_free(ipStr);
+
+            if (ridObj != NULL)
+                wolfSSL_ASN1_OBJECT_free(ridObj);
         }
     }
 #endif

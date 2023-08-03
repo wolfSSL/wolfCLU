@@ -120,6 +120,9 @@ AC_CHECK_FUNC([wolfSSL_X509_CRL_print],
 AC_CHECK_FUNC([wolfSSL_X509_REQ_print],
     [],
     [AM_CFLAGS="$AM_CFLAGS -DNO_WOLFSSL_REQ_PRINT"])
+AC_CHECK_FUNC([wc_EncodeObjectId],
+    [],
+    [AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
 
 
 ###############################################

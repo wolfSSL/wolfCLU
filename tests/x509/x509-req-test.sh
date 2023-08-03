@@ -100,6 +100,12 @@ coutnryName_min = 2
 basicConstraints = critical,CA:true
 keyUsage = nonRepudiation, digitalSignature, keyEncipherment
 subjectAltName = @alt_names
+[alt_names]
+RID.1 = 1.1.1.1
+RID.2 = surname
+email.1 = facts@wolfssl.com
+URI.1 = facts@wolfssl.com
+
 EOF
 
 
@@ -119,8 +125,21 @@ rm -f tmp.cert
 # no parameter -conf
 #run_fail "req -new -key ./certs/server-key.pem -conf ./test.conf -out tmp.csr"
 
-run_success "req -new -key ./certs/server-key.pem -config ./test.conf -out tmp.csr"
+run_success "req -new -key ./certs/server-key.pem -config ./test-prompt.conf -out tmp.csr" "US"
 run_success "req -text -in tmp.csr"
+SUBJECT=`./wolfssl req -in tmp.csr -text | grep -A1 "X509v3 Subject Alternative Name"`
+EXPECTED="        X509v3 Subject Alternative Name: 
+            email:facts@wolfssl.com, Registered ID:1.1.1.1, Registered ID:surname, URI:facts@wolfssl.com"
+if [ "$SUBJECT" != "$EXPECTED" ]
+then
+    echo "found unexpected result"
+    echo "Got      : $SUBJECT"
+    echo "Expected : $EXPECTED"
+    exit 99
+fi
+
+run_success "req -new -key ./certs/server-key.pem -config ./test.conf -out tmp.csr" "US"
+
 
 # fail when extensions can not be found
 run_fail "req -new -extensions v3_alt_ca_not_found -key ./certs/server-key.pem -config ./test.conf -x509 -out alt.crt"
@@ -175,6 +194,7 @@ fi
 
 rm -f tmp.cert
 rm -f tmp.csr
+rm -f alt.crt
 
 run_success "req -new -key ./certs/server-key.pem -config ./test.conf -x509 -out tmp.cert"
 SUBJECT=`./wolfssl x509 -in tmp.cert -text | grep Subject:`
@@ -236,11 +256,10 @@ fi
 run_success "req -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -out tmp.cert -passout pass:123456789wolfssl -outform pem -sha256"
 run_success "rsa -in new-key.pem -passin pass:123456789wolfssl"
 
-rm -f tmp.cert
-
 run_success "req -new -x509 -key ./certs/ca-key.pem -config ./test-prompt.conf -out tmp.cert" "AA"
 run_fail "req -new -x509 -key ./certs/ca-key.pem -config ./test-prompt.conf -out tmp.cert" "LONG"
 
+rm -f tmp.cert
 rm -f new-key.pem
 rm -f test.conf
 rm -f test-prompt.conf

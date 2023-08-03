@@ -57,9 +57,9 @@ run "ecparam -in certs/ecc-key.pem -out ecc-key.der -outform der"
 
 # not yet supported reading only parameters with no key
 run_fail "ecparam -in ecc-key.der -inform der -out ecc-key.pem -outform pem"
-rm -f ecc-key.der
 
 run "ecparam -genkey -out ecc-key.der -outform der"
+rm -f ecc-key.der
 
 run_fail "ecparam -in certs/ca-key.pem -text"
 

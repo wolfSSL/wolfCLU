@@ -197,7 +197,6 @@ run_success "verify -CAfile ./certs/ca-cert.pem test_ca.pem"
 
 # override almost all info from config file
 run_success "ca -config ca.conf -in tmp-ca.csr -out test_ca.pem -extensions usr_cert -md sha512 -days 3650 -cert ./certs/ca-ecc-cert.pem -keyfile ./certs/ca-ecc-key.pem"
-rm -f test_ca.pem
 
 # test key missmatch
 run_fail "ca -config ca.conf -in tmp-ca.csr -out test_ca.pem -keyfile ./certs/ecc-key.pem"
@@ -260,7 +259,8 @@ run_success "ca -config ca.conf -in tmp-ca.csr -out tmp.pem -md sha256 -keyfile 
 run_success "req -key ./certs/server-key.pem -subj O=Sawtooth/CN=www.wolfclu.com/C=US/ST=MT/L=Bozeman/OU=org-unit -out tmp-ca.csr"
 run_fail "ca -config ca-match.conf -in tmp-ca.csr -out tmp.pem -md sha256 -keyfile ./certs/ca-key.pem"
 
-rm -f tmp.pm
+rm -f test_ca.pem
+rm -f tmp.pem
 rm -f rand-file-test
 rm -f serial-file-test
 rm -f tmp-ca.csr
