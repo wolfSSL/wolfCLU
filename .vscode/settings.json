@@ -1,0 +1,8 @@
+{
+	"editor.insertSpaces": true,
+	"editor.tabSize": 4,
+	"files.associations": {
+		"clu_log.h": "c",
+		"clu_optargs.h": "c"
+	}
+}

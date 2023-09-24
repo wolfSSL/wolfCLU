@@ -32,6 +32,7 @@ static const struct option server_options[] = {
     {"-cert",           required_argument, 0, WOLFCLU_CERTFILE              },
     {"-noVerify",       no_argument,       0, WOLFCLU_VERIFY                },
     {"-CAfile",         required_argument, 0, WOLFCLU_CA                    },
+    {"-readyFile",      required_argument, 0, WOLFCLU_READY_FILE            },
     {"-help",           no_argument,       0, WOLFCLU_HELP                  },
     {"-h",              no_argument,       0, WOLFCLU_HELP                  },
     {0,0,0,0}
@@ -42,6 +43,7 @@ static const char keyFileFlag[]     = "-k";
 static const char certFileFlag[]    = "-c";
 static const char verifyFlag[]      = "-d";
 static const char clientCertFlag[]  = "-A";
+static const char readyFileFlag[]   = "-R";
 
 static void wolfCLU_ServerHelp(void) 
 {
@@ -87,6 +89,9 @@ int wolfCLU_Server(int argc, char** argv)
     int serverArgc = 0;
     const char* serverArgv[MAX_SERVER_ARGS];
 
+    tcp_ready ready;
+    InitTcpReady(&ready);
+
     ret = _addServerArg(serverArgv, "wolfclu", &serverArgc);
 
     opterr = 0;
@@ -124,6 +129,15 @@ int wolfCLU_Server(int argc, char** argv)
                     }
                 }
                 break;
+            case WOLFCLU_READY_FILE:
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = _addServerArg(serverArgv, readyFileFlag, &serverArgc);
+                    if (ret == WOLFCLU_SUCCESS) {
+                        ret = _addServerArg(serverArgv, optarg, &serverArgc);
+                    }
+                }
+                args.signal = &ready;
+                break;
             case WOLFCLU_HELP:
                 wolfCLU_ServerHelp();
                 return WOLFCLU_SUCCESS;
@@ -142,6 +156,8 @@ int wolfCLU_Server(int argc, char** argv)
         args.argc = serverArgc;
         server_test(&args);
     }
+
+    FreeTcpReady(&ready);
 
     return ret;
 }
