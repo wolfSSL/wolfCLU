@@ -94,7 +94,7 @@ req_extensions = v3_req
 countryName = 2 Letter Country Name
 countryName_default = US
 countryName_max = 2
-coutnryName_min = 2
+countryName_min = 2
 [ req_attributes ]
 [ v3_req ]
 basicConstraints = critical,CA:true
