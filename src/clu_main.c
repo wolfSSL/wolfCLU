@@ -1,6 +1,6 @@
 /* clu_main.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2023 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -65,6 +65,7 @@ static const struct option mode_options[] = {
     {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12      },
     {"crl",       no_argument,       0, WOLFCLU_CRL         },
     {"s_client",  no_argument,       0, WOLFCLU_CLIENT      },
+    {"s_server",  no_argument,       0, WOLFCLU_SERVER      },
     {"rand",      no_argument,       0, WOLFCLU_RAND        },
     {"dsaparam",  no_argument,       0, WOLFCLU_DSA         },
     {"dhparam",   no_argument,       0, WOLFCLU_DH          },
@@ -283,6 +284,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_CLIENT:
             ret = wolfCLU_Client(argc, argv);
+            break;
+
+        case WOLFCLU_SERVER:
+            ret = wolfCLU_Server(argc, argv);
             break;
 
         case WOLFCLU_RAND:

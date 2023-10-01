@@ -1,6 +1,6 @@
 /* clu_header_main.h
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2023 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -547,6 +547,11 @@ void wolfCLU_ForceZero(void* mem, unsigned int len);
  * @brief example client
  */
 int wolfCLU_Client(int argc, char** argv);
+
+/**
+ * @brief example server
+ */
+int wolfCLU_Server(int argc, char** argv);
 
 /**
  * @brief function to get password from input
