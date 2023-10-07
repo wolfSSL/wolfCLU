@@ -657,9 +657,10 @@ static int SetKeyShare(WOLFSSL* ssl, int onlyKeyShare, int useX25519,
                 else if (ret == WC_PENDING_E)
                     wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
             #endif
-                else
+                else {
                     fprintf(stderr, "unable to use curve x25519\n");
                     return ret;
+                }
             } while (ret == WC_PENDING_E);
     #endif
         }
@@ -673,9 +674,10 @@ static int SetKeyShare(WOLFSSL* ssl, int onlyKeyShare, int useX25519,
                 else if (ret == WC_PENDING_E)
                     wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
             #endif
-                else
+                else {
                     fprintf(stderr, "unable to use curve x448\n");
                     return ret;
+                }
             } while (ret == WC_PENDING_E);
     #endif
         }
@@ -729,9 +731,10 @@ static int SetKeyShare(WOLFSSL* ssl, int onlyKeyShare, int useX25519,
                 else if (ret == WC_PENDING_E)
                     wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
             #endif
-                else
+                else {
                     fprintf(stderr, "unable to use curve secp256r1\n");
                     return ret;
+                }
             } while (ret == WC_PENDING_E);
         #endif
     #endif
@@ -747,19 +750,22 @@ static int SetKeyShare(WOLFSSL* ssl, int onlyKeyShare, int useX25519,
             else if (ret == WC_PENDING_E)
                 wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
         #endif
-            else
+            else {
                 fprintf(stderr, "unable to use DH 2048-bit parameters\n");
                 return ret;
+            }
         } while (ret == WC_PENDING_E);
     #endif
     }
-    if (count >= MAX_GROUP_NUMBER)
+    if (count >= MAX_GROUP_NUMBER) {
         fprintf(stderr, "example group array size error\n");
         return SSL_FATAL_ERROR;
+    }
     if (count > 0) {
-        if (wolfSSL_set_groups(ssl, groups, count) != WOLFSSL_SUCCESS)
+        if (wolfSSL_set_groups(ssl, groups, count) != WOLFSSL_SUCCESS) {
             fprintf(stderr, "unable to set groups");
             return SSL_FATAL_ERROR;
+        }
     }
     WOLFSSL_END(WC_FUNC_CLIENT_KEY_EXCHANGE_SEND);
 
@@ -2600,9 +2606,10 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
             fprintf(stderr, "can't load server private key buffer\n");
     #elif !defined(TEST_LOAD_BUFFER)
         if (SSL_CTX_use_PrivateKey_file(ctx, ourKey, WOLFSSL_FILETYPE_PEM)
-                                         != WOLFSSL_SUCCESS)
+                                         != WOLFSSL_SUCCESS) {
             fprintf(stderr, "can't load server private key file, "
                        "check file and run from wolfSSL home dir\n");
+        }
     #else
         /* loads private key file using buffer API */
         load_buffer(ctx, ourKey, WOLFSSL_KEY);
@@ -2824,10 +2831,11 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
 #ifdef WOLFSSL_MULTICAST
         wolfSSL_CTX_mcast_set_member_id(ctx, mcastID);
         if ((ret = wolfSSL_CTX_set_cipher_list(ctx, "WDM-NULL-SHA256"))
-            != WOLFSSL_SUCCESS)
+            != WOLFSSL_SUCCESS) {
             release(ctx, ssl, "Couldn't set multicast cipher list.");
             ((func_args*)args)->return_code = ret;
             goto exit;
+        }
 #endif
     }
 
@@ -3226,10 +3234,11 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
         }
         ret = wolfSSL_dtls_cid_set(ssl, (byte*)dtlsCID,
             (word32)XSTRLEN(dtlsCID));
-        if (ret != WOLFSSL_SUCCESS)
+        if (ret != WOLFSSL_SUCCESS) {
             release(ctx, ssl, "Can't set DTLS ConnectionID");
             ((func_args*)args)->return_code = ret;
             goto exit;
+        }
     }
 #endif /* WOLFSSL_DTLS_CID */
 
@@ -3420,10 +3429,11 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
         if (receivedCIDSz > 0) {
             ret = wolfSSL_dtls_cid_get_tx(ssl, receivedCID,
                 DTLS_CID_BUFFER_SIZE - 1);
-            if (ret != WOLFSSL_SUCCESS)
+            if (ret != WOLFSSL_SUCCESS) {
                 release(ctx, ssl, "Can't get negotiated DTLS CID");
                 ((func_args*)args)->return_code = ret;
                 goto exit;
+            }
 
             printf("Sending CID is ");
             printBuffer(receivedCID, receivedCIDSz);

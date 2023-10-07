@@ -34,6 +34,7 @@ static const struct option client_options[] = {
     {"-starttls",            required_argument, 0, WOLFCLU_STARTTLS           },
     {"-CAfile",              required_argument, 0, WOLFCLU_CAFILE             },
     {"-verify_return_error", no_argument,       0, WOLFCLU_VERIFY_RETURN_ERROR},
+    {"-disable_stdin_check", no_argument,       0, WOLFCLU_DISABLE_STDINCHK   },
     {"-help",                no_argument,       0, WOLFCLU_HELP               },
     {"-h",                   no_argument,       0, WOLFCLU_HELP               },
 
@@ -217,6 +218,12 @@ int wolfCLU_Client(int argc, char** argv)
                 }
                 break;
 
+            case WOLFCLU_DISABLE_STDINCHK:
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = _addClientArg(clientArgv, "--disable_stdin_check",
+                        &clientArgc);
+                }
+                break;
             case WOLFCLU_HELP:
                 wolfCLU_ClientHelp();
                 return WOLFCLU_SUCCESS;

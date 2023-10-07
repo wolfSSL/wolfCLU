@@ -35,8 +35,8 @@ if [ "$counter" -eq 100 ]; then
     exit 99
 fi
 
-echo `ps | grep wolfssl`
-./wolfssl s_client -connect 127.0.0.1:11111 -CAfile ./certs/ca-cert.pem
+./wolfssl s_client -connect 127.0.0.1:11111 -CAfile ./certs/ca-cert.pem\
+    -verify_return_error -disable_stdin_check
 if [ $? != 0 ] ; then
     echo "test communication failed."
     exit 99
