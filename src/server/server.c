@@ -2715,6 +2715,7 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
             if (store == NULL) {
                 release(ctx, ssl, "can't get WOLFSSL_X509_STORE");
                 ((func_args*)args)->return_code = SSL_ERROR_SSL;
+                goto exit;
             }
             lookup = wolfSSL_X509_STORE_add_lookup(store, X509_LOOKUP_hash_dir());
             if (lookup == NULL) {
@@ -2722,18 +2723,20 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
                 ((func_args*)args)->return_code = SSL_ERROR_SSL;
                 goto exit;
             }
-            if (wolfSSL_X509_LOOKUP_ctrl(lookup, WOLFSSL_X509_L_ADD_DIR, caCertFolder,
-                            X509_FILETYPE_PEM, NULL) != WOLFSSL_SUCCESS) {
+            if ((ret = wolfSSL_X509_LOOKUP_ctrl(lookup, WOLFSSL_X509_L_ADD_DIR, caCertFolder,
+                            X509_FILETYPE_PEM, NULL)) != WOLFSSL_SUCCESS) {
                 release(ctx, ssl, "X509_LOOKUP_ctrl w/ L_ADD_DIR failed");
-                ((func_args*)args)->return_code = SSL_ERROR_SSL;
+                ((func_args*)args)->return_code = ret;
                 goto exit;
             }
         } else {
     #endif
-        if (wolfSSL_CTX_load_verify_locations_ex(ctx, verifyCert, 0,
-            verify_flags) != WOLFSSL_SUCCESS) {
-            fprintf(stderr, "can't load ca file, "
-                "Please run from wolfSSL home dir\n");
+        if ((ret = wolfSSL_CTX_load_verify_locations_ex(ctx, verifyCert, 0,
+            verify_flags)) != WOLFSSL_SUCCESS) {
+            release(ctx, ssl, "can't load ca file, "
+                "Please run from wolfSSL home dir");
+            ((func_args*)args)->return_code = ret;
+            goto exit;
         }
         #ifdef WOLFSSL_TRUST_PEER_CERT
         if (trustCert) {
@@ -2953,11 +2956,14 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
             verify_flags |= WOLFSSL_LOAD_FLAG_DATE_ERR_OKAY;
         #endif
 
-            if (wolfSSL_CTX_load_verify_locations_ex(ctx, verifyCert, 0,
-                                                     verify_flags)
+            if ((ret = wolfSSL_CTX_load_verify_locations_ex(ctx, verifyCert, 0,
+                                                     verify_flags))
                                                      != WOLFSSL_SUCCESS) {
-                fprintf(stderr, "can't load ca file, Please run from "
-                                          "wolfSSL home dir\n");
+                release(ctx, ssl, "can't load ca file, "
+                "Please run from wolfSSL home dir");
+                ((func_args*)args)->return_code = ret;
+                goto exit;
+
             }
             #ifdef WOLFSSL_TRUST_PEER_CERT
             if (trustCert) {
@@ -3497,6 +3503,7 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
                                         "APP DATA should be present "
                                         "but error returned");
                                     ((func_args*)args)->return_code = ret;
+                                    goto exit;
                                 }
                                 printf("Received message: %s\n", input);
                             }

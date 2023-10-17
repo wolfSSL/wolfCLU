@@ -72,9 +72,10 @@ static void wolfCLU_ServerHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-www");
     WOLFCLU_LOG(WOLFCLU_L0, "\t\tThe response is in HTML format.");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-readyFile <readyFile name>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\tCreate Ready file for external monitor.");
 }
 
-#define MAX_SERVER_ARGS 15
+#define MAX_SERVER_ARGS 20
 
 /* return WOLFSSL_SUCCESS on success */
 static int _addServerArg(const char** args, const char* in, int* idx)
@@ -106,6 +107,7 @@ int wolfCLU_Server(int argc, char** argv)
 
     tcp_ready ready;
     InitTcpReady(&ready);
+    args.signal = &ready;
 
     ret = _addServerArg(serverArgv, "wolfclu", &serverArgc);
 
@@ -180,7 +182,6 @@ int wolfCLU_Server(int argc, char** argv)
                         ret = _addServerArg(serverArgv, optarg, &serverArgc);
                     }
                 }
-                args.signal = &ready;
                 break;
             case WOLFCLU_HELP:
                 wolfCLU_ServerHelp();

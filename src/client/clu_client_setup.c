@@ -1,6 +1,6 @@
 /* clu_client_setup.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2023 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -54,6 +54,7 @@ static void wolfCLU_ClientHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-CAfile <ca file name>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-verify_return_error close connection on verification error");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-disable_stdin_check ")
 }
 
 static const char hostFlag[]       = "-h";
