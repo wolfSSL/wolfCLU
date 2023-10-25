@@ -111,7 +111,9 @@ extern "C" {
 #endif
 #define MAX_TERM_WIDTH 80
 #define MAX_THREADS 64
-#define MAX_FILENAME_SZ 256
+#ifndef MAX_FILENAME_SZ
+    #define MAX_FILENAME_SZ 256
+#endif
 #define CLU_4K_TYPE 4096
 #if LIBWOLFSSL_VERSION_HEX >= 50413568 /* int val of hex 0x0301400 = 50413568 */
     #define CLU_SHA256 WC_SHA256
