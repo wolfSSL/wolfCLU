@@ -786,13 +786,15 @@ int wolfCLU_certSetup(int argc, char** argv)
     /* write out certificate */
     if (ret == WOLFCLU_SUCCESS && !nooutFlag) {
         byte* derBuf   = inBuf;
+        byte* pt; /* use pt with i2d to handle potential pointer increment */
         int   derBufSz = inBufSz;
 
         /* if inform is PEM we convert to DER for excluding input that is not
          * part of the certificate */
         if (inForm == PEM_FORM) {
             if (reqFlag) {
-                derBufSz = wolfSSL_i2d_X509(x509, &derBuf);
+                pt = derBuf;
+                derBufSz = wolfSSL_i2d_X509(x509, &pt);
             }
             else {
                 derBuf   = derObj->buffer;
