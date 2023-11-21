@@ -1,3 +1,12 @@
+# wolfCLU v0.1.4 (Nov 21, 2023)
+- Removed erroneous file generation on ecc keygen
+- Added options -req, -signkey, -extfile, -extensions and -md for x509 command
+- Use void with func prototype
+- Add ability to set more subjectAltName attributes
+- Check for defined MAX_FILENAME_SZ before defining it locally
+- Handle potential pointer increment in wolfSSL_i2d_X509
+
+
 # wolfCLU v0.1.2 (Mar 31, 2023)
 ### Fixes and Enhancements
 - Fix for DH use with FIPS build and cross compile warning
