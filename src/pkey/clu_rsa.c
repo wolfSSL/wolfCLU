@@ -170,7 +170,7 @@ int wolfCLU_RSA(int argc, char** argv)
                         pp = (const unsigned char**)&der;
                         rsa = wolfSSL_d2i_RSAPublicKey(NULL, pp, derSz);
                     }
-                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_PUBLICKEY);
+                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_PUBLIC_KEY);
                 }
             }
             else {
