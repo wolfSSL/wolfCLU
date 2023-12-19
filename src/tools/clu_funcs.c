@@ -59,7 +59,7 @@ static const struct option crypt_algo_options[] = {
 /*
  * generic help function
  */
- void wolfCLU_help()
+ void wolfCLU_help(void)
  {  WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "-help           Help, print out this help menu");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
@@ -227,7 +227,7 @@ void wolfCLU_verboseHelp(void)
 /*
  * Encrypt Usage
  */
-void wolfCLU_encryptHelp()
+void wolfCLU_encryptHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable En/De crypt Algorithms with current configure "
             "settings.\n");
