@@ -599,25 +599,23 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
     }
 
     /* set extensions */
-    if (csign->ext != NULL) {
+    if (ret == WOLFCLU_SUCCESS && csign->ext != NULL) {
         wolfCLU_setExtensions(x509, csign->config, csign->ext);
     }
 
     /* sign the certificate */
-    if (csign->keyType == RSAk || csign->keyType == ECDSAk) {
-        if (ret == WOLFCLU_SUCCESS) {
-            if (wolfSSL_X509_check_private_key(csign->ca, csign->caKey.pkey) !=
-                    WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Private key does not match with CA");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
+    if (ret == WOLFCLU_SUCCESS &&
+            (csign->keyType == RSAk || csign->keyType == ECDSAk)) {
+        if (wolfSSL_X509_check_private_key(csign->ca, csign->caKey.pkey) !=
+                WOLFSSL_SUCCESS) {
+            wolfCLU_LogError("Private key does not match with CA");
+            ret = WOLFCLU_FATAL_ERROR;
         }
 
-        if (ret == WOLFCLU_SUCCESS) {
-            if (wolfSSL_X509_sign(x509, csign->caKey.pkey, md) <= 0) {
-                wolfCLU_LogError("Error signing certificate");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_X509_sign(x509, csign->caKey.pkey, md) <= 0) {
+            wolfCLU_LogError("Error signing certificate");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     } /* @TODO else case here could get the tbs buffer or just the der of the
        * x509 struct and use a different method for signing and creating the

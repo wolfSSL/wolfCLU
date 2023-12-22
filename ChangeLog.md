@@ -1,3 +1,7 @@
+# wolfCLU v0.1.5 (Dec 22, 2023)
+- Fix memory type typo in clu_rsa.c
+- Add missing void arg to functions in clu_funcs.c
+
 # wolfCLU v0.1.4 (Nov 21, 2023)
 - Removed erroneous file generation on ecc keygen
 - Added options -req, -signkey, -extfile, -extensions and -md for x509 command
