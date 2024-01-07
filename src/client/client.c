@@ -2104,6 +2104,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 #if defined(HAVE_PQC)
         { "pqc", 1, 259 },
 #endif
+        { "disable_stdin_check", 0, 260 },
         { 0, 0, 0 }
     };
 #endif
@@ -2213,6 +2214,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     int exitWithRet = 0;
     int loadCertKeyIntoSSLObj = 0;
     int isIpv6 = 0;
+    int disable_stdin_chk = 0;
 
 #ifdef HAVE_ENCRYPT_THEN_MAC
     int disallowETM = 0;
@@ -2275,6 +2277,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     (void)loadCertKeyIntoSSLObj;
     (void)usePqc;
     (void)pqcAlg;
+    (void)disable_stdin_chk;
     StackTrap();
 
     /* Reinitialize the global myVerifyAction. */
@@ -2307,6 +2310,10 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 lng_index = 1;
                 Usage();
                 XEXIT_T(EXIT_SUCCESS);
+
+            case 260 :
+                disable_stdin_chk = 1;
+                break;
 
             case 'g' :
                 sendGET = 1;
@@ -4155,12 +4162,14 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     }
 
 #ifndef USE_WINDOWS_API
-    int stop = checkStdin();
+    if (!disable_stdin_chk) {
+        int stop = checkStdin();
 
-    if(stop){
-        wolfSSL_free(ssl); ssl = NULL;
-        wolfSSL_CTX_free(ctx); ctx = NULL;
-        goto exit;
+        if(stop){
+            wolfSSL_free(ssl); ssl = NULL;
+            wolfSSL_CTX_free(ctx); ctx = NULL;
+            goto exit;
+        }
     }
 #endif
 
