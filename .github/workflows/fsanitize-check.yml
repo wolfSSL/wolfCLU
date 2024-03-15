@@ -41,14 +41,14 @@ jobs:
     - name: set_exit_onerror
       run: export LSAN_OPTIONS=exitcode=0
     - name: configure
-      timeout-seconds: 30
+      timeout-minutes: 1
       run: ./configure CC="gcc-11 -fsanitize=address"
     - name: print_configlog
       if: always()
       run:  tail -100 config.log
     - name: configure
       if: always()
-      timeout-seconds: 30
+      timeout-minutes: 1
       run: ./configure CC="gcc-10 -fsanitize=address"
     - name: print_configlog
       if: always()
