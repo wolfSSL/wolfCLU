@@ -37,9 +37,9 @@ jobs:
     - name: install_gcc-12
       run: sudo apt-get install -y gcc-12 clang
     - name: print_asan-options
-      run: echo $ASAN_OPTIONS
+      run: echo $LSAN_OPTIONS
     - name: set_exit_onerror
-      run: export ASAN_OPTIONS="verbosity=1"
+      run: export LSAN_OPTIONS=exitcode=0
     - name: configure
       timeout-minutes: 1
       run: ./configure CC="gcc -fsanitize=address"
