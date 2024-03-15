@@ -42,7 +42,7 @@ jobs:
       run: export ASAN_OPTIONS="verbosity=1"
     - name: configure
       timeout-minutes: 1
-      run: ./configure CC="clang -fsanitize=address"
+      run: ./configure CC="gcc -fsanitize=address"
     - name: print_configlog
       if: always()
       run:  tail -100 config.log
