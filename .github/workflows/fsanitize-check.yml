@@ -35,7 +35,11 @@ jobs:
     - name: autogen
       run: ./autogen.sh
     - name: configure
+      timeout-minutes: 2
       run: ./configure CC="gcc -fsanitize=address"
+    - name: print_configlog
+      if: always()
+      run:  cat config.log
     - name: make
       run: make
     - name: make check
