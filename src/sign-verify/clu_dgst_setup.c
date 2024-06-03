@@ -357,7 +357,13 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     /* get type of key and size of structure */
     if (ret == WOLFCLU_SUCCESS && signing == 0) {
-        pkey = wolfSSL_PEM_read_bio_PUBKEY(pubKeyBio, NULL, NULL, NULL);
+        if (inForm == PEM_FORM) {
+            pkey = wolfSSL_PEM_read_bio_PUBKEY(pubKeyBio, NULL, NULL, NULL);
+        }
+        else {
+            pkey = wolfSSL_d2i_PUBKEY_bio(pubKeyBio, NULL);
+        }
+
         if (pkey == NULL) {
             wolfCLU_LogError("Unable to decode public key");
             ret = WOLFCLU_FATAL_ERROR;
@@ -372,7 +378,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             pkey = wolfSSL_d2i_PrivateKey_bio(pubKeyBio, NULL);
         }
         if (pkey == NULL) {
-            wolfCLU_LogError("Unable to decode public key");
+            wolfCLU_LogError("Unable to decode private key");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
