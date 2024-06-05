@@ -26,6 +26,7 @@
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 #include <wolfclu/pkey/clu_pkey.h>
+#include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -38,6 +39,7 @@ static const struct option dgst_options[] = {
     {"-sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
     {"-sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
 
+    {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"-out",       required_argument, 0, WOLFCLU_INFILE    },
     {"-signature", required_argument, 0, WOLFCLU_INFILE    },
     {"-verify",    required_argument, 0, WOLFCLU_VERIFY    },
@@ -61,6 +63,7 @@ static void wolfCLU_dgstHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sha512");
     WOLFCLU_LOG(WOLFCLU_L0, "Parameters:");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-signature file containing the signature");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inform pem or der in format");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-verify key used to verify the signature");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sign   private key used to create the signature");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out    output file for signature");
@@ -175,6 +178,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     int option;
     int longIndex = 2;
     byte signing = 0;
+    int inForm = PEM_FORM;
 
     enum wc_HashType      hashType = WC_HASH_TYPE_NONE;
     enum wc_SignatureType sigType  = WC_SIGNATURE_TYPE_NONE;
@@ -238,6 +242,14 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
             case WOLFCLU_INFILE:
                 sigFile = optarg;
+                break;
+
+            case WOLFCLU_INFORM:
+                inForm = wolfCLU_checkInform(optarg);
+                if (inForm < 0) {
+                    wolfCLU_LogError("bad inform");
+                    ret = USER_INPUT_ERROR;
+                }
                 break;
 
             case WOLFCLU_HELP:
@@ -345,7 +357,13 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     /* get type of key and size of structure */
     if (ret == WOLFCLU_SUCCESS && signing == 0) {
-        pkey = wolfSSL_PEM_read_bio_PUBKEY(pubKeyBio, NULL, NULL, NULL);
+        if (inForm == PEM_FORM) {
+            pkey = wolfSSL_PEM_read_bio_PUBKEY(pubKeyBio, NULL, NULL, NULL);
+        }
+        else {
+            pkey = wolfSSL_d2i_PUBKEY_bio(pubKeyBio, NULL);
+        }
+
         if (pkey == NULL) {
             wolfCLU_LogError("Unable to decode public key");
             ret = WOLFCLU_FATAL_ERROR;
@@ -353,9 +371,14 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && signing == 1) {
-        pkey = wolfSSL_PEM_read_bio_PrivateKey(pubKeyBio, NULL, NULL, NULL);
+        if (inForm == PEM_FORM) {
+            pkey = wolfSSL_PEM_read_bio_PrivateKey(pubKeyBio, NULL, NULL, NULL);
+        }
+        else {
+            pkey = wolfSSL_d2i_PrivateKey_bio(pubKeyBio, NULL);
+        }
         if (pkey == NULL) {
-            wolfCLU_LogError("Unable to decode public key");
+            wolfCLU_LogError("Unable to decode private key");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
