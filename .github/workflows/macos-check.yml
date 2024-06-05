@@ -28,7 +28,7 @@ jobs:
       run: make
     - name: wolfssl make install
       working-directory: ./wolfssl
-      run: make install
+      run: sudo make install
     - uses: actions/checkout@master
     - name: autogen
       run: ./autogen.sh
