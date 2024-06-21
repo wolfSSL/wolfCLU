@@ -84,6 +84,8 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
     WOLFCLU_LOG(WOLFCLU_L0, "verify         X509 certificate verify");
     WOLFCLU_LOG(WOLFCLU_L0, "pkcs12         Used for parsing PKCS12 files");
+    WOLFCLU_LOG(WOLFCLU_L0, "s_server       Basic TLS server for testing"
+                                           " connection");
     WOLFCLU_LOG(WOLFCLU_L0, "s_client       Basic TLS client for testing"
                                            " connection");
     WOLFCLU_LOG(WOLFCLU_L0, "sha256         Creates a SHA256 hash");
