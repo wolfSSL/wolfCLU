@@ -37,6 +37,8 @@ static const struct option rsa_options[] = {
     {"-noout",     no_argument,       0, WOLFCLU_NOOUT     },
     {"-modulus",   no_argument,       0, WOLFCLU_MODULUS   },
     {"-RSAPublicKey_in", no_argument, 0, WOLFCLU_RSAPUBIN  },
+    {"-pubin",     no_argument,       0, WOLFCLU_RSAPUBIN  },
+    {"-pubout",    no_argument,       0, WOLFCLU_RSAPUBOUT },
     {"-help",      no_argument,       0, WOLFCLU_HELP      },
     {"-h",         no_argument,       0, WOLFCLU_HELP      },
 
@@ -55,6 +57,8 @@ static void wolfCLU_RSAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-noout do not print the key out when set");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-modulus print out the RSA modulus (n value)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-RSAPublicKey_in expecting a public key input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pubin expecting a public key input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pubout output a public key");
 }
 #endif /* WOLFCLU_NO_FILESYSTEM */
 
@@ -69,6 +73,7 @@ int wolfCLU_RSA(int argc, char** argv)
     int outForm = PEM_FORM;
     int printModulus = 0;
     int pubOnly = 0;
+    int pubOut = 0;
     int noOut = 0;
     int option;
     int longIndex = 1;
@@ -119,6 +124,10 @@ int wolfCLU_RSA(int argc, char** argv)
 
             case WOLFCLU_RSAPUBIN:
                 pubOnly = 1;
+                break;
+
+            case WOLFCLU_RSAPUBOUT:
+                pubOut = 1;
                 break;
 
             case WOLFCLU_NOOUT:
@@ -207,7 +216,7 @@ int wolfCLU_RSA(int argc, char** argv)
         int pemType;
         int heapType;
 
-        if (pubOnly) {
+        if (pubOnly || pubOut) {
             heapType = DYNAMIC_TYPE_PUBLIC_KEY;
             pemType  = PUBLICKEY_TYPE;
 
