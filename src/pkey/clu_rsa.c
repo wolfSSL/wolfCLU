@@ -129,6 +129,7 @@ int wolfCLU_RSA(int argc, char** argv)
 
             case WOLFCLU_PUBIN:
                 pubIn = 1;
+                pubOut = 1;
                 break;
 
             case WOLFCLU_PUBOUT:
@@ -156,7 +157,7 @@ int wolfCLU_RSA(int argc, char** argv)
     /* read in the RSA key */
     if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
         if (inForm == PEM_FORM) {
-            if (pubOnly) {
+            if (pubOnly || pubIn) {
                 rsa = wolfSSL_PEM_read_bio_RSA_PUBKEY(bioIn, NULL, NULL, pass);
             }
             else {
@@ -164,7 +165,7 @@ int wolfCLU_RSA(int argc, char** argv)
             }
         }
         else {
-            if (pubOnly || pubIn || pubOut) {
+            if (pubOnly || pubIn) {
                 unsigned char *der;
                 const unsigned char **pp;
                 long derSz;
@@ -221,7 +222,7 @@ int wolfCLU_RSA(int argc, char** argv)
         int pemType;
         int heapType;
 
-        if (pubOnly) {
+        if (pubOnly || pubOut) {
             heapType = DYNAMIC_TYPE_PUBLIC_KEY;
             pemType  = PUBLICKEY_TYPE;
 
