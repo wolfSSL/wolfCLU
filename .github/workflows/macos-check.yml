@@ -22,18 +22,36 @@ jobs:
       run: ./autogen.sh
     - name: wolfssl configure
       working-directory: ./wolfssl 
-      run: ./configure --enable-wolfclu --enable-crl --enable-dsa
+      run: ./configure --enable-wolfclu --enable-crl --enable-dsa  --prefix=$GITHUB_WORKSPACE/build-dir
     - name: wolfssl make
       working-directory: ./wolfssl
       run: make
     - name: wolfssl make install
       working-directory: ./wolfssl
-      run: sudo make install
+      run: make install
+
+    - name: Upload built lib
+      uses: actions/upload-artifact@v3
+      with:
+        name: wolf-install-wolfCLU
+        path: build-dir
+        retention-days: 1
+
+
     - uses: actions/checkout@master
+
+    - name: Download lib
+      uses: actions/download-artifact@v3
+      with:
+        name: wolf-install-wolfCLU
+        path: build-dir
+    - name: Check wolfSSL install dir
+      run: ls $GITHUB_WORKSPACE/build-dir
+
     - name: autogen
       run: ./autogen.sh
     - name: configure
-      run: ./configure
+      run: ./configure --with-wolfssl=$GITHUB_WORKSPACE/build-dir
     - name: make
       run: make
     - name: make check
