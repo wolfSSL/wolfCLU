@@ -10,41 +10,29 @@ jobs:
   build:
 
     runs-on: macos-latest
+    timeout-minutes: 10
     steps:
+    - uses: actions/checkout@master
     - uses: actions/checkout@master
       with:
         repository: wolfssl/wolfssl
-        path: wolfssl
+        path: wolfssl_src
     - name: brew
-      run: brew install automake libtool  
+      run: brew install automake libtool
+
     - name: wolfssl autogen
-      working-directory: ./wolfssl        
+      working-directory: ./wolfssl_src
       run: ./autogen.sh
     - name: wolfssl configure
-      working-directory: ./wolfssl 
-      run: ./configure --enable-wolfclu --enable-crl --enable-dsa  --prefix=$GITHUB_WORKSPACE/build-dir
+      working-directory: ./wolfssl_src
+      run: ./configure --enable-wolfclu --enable-crl --enable-dsa --prefix=$GITHUB_WORKSPACE/build-dir
     - name: wolfssl make
-      working-directory: ./wolfssl
+      working-directory: ./wolfssl_src
       run: make
     - name: wolfssl make install
-      working-directory: ./wolfssl
+      working-directory: ./wolfssl_src
       run: make install
 
-    - name: Upload built lib
-      uses: actions/upload-artifact@v3
-      with:
-        name: wolf-install-wolfCLU
-        path: build-dir
-        retention-days: 1
-
-
-    - uses: actions/checkout@master
-
-    - name: Download lib
-      uses: actions/download-artifact@v3
-      with:
-        name: wolf-install-wolfCLU
-        path: build-dir
     - name: Check wolfSSL install dir
       run: ls $GITHUB_WORKSPACE/build-dir
 
