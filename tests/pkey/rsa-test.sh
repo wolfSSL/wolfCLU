@@ -53,9 +53,9 @@ fi
 rm -f test-rsa.der
 
 run_fail "rsa -in ./certs/server-cert.pem"
-run_fail "rsa -in ./certs/server-key.pem -RSAPublicKey_in"
+run_fail "rsa -in ./certs/server-key.pem -pubin"
 
-run "rsa -in ./certs/server-keyPub.pem -RSAPublicKey_in"
+run "rsa -in ./certs/server-keyPub.pem -pubin"
 run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123"
 run_fail "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl12"
 
@@ -75,7 +75,7 @@ if [ $? == 0 ]; then
     exit 99
 fi
 
-run "rsa -in ./certs/server-keyPub.pem -RSAPublicKey_in"
+run "rsa -in ./certs/server-keyPub.pem -pubin"
 EXPECTED="-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwJUI4VdB8nFtt9JFQScB
 ZcZFrvK8JDC4lc4vTtb2HIi8fJ/7qGd//lycUXX3isoH5zUvj+G9e8AvfKtkqBf8
