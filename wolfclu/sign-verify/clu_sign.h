@@ -39,11 +39,11 @@ enum {
     ED25519_SIG_VER,
 };
 
-int wolfCLU_sign_data(char*, char*, char*, int);
+int wolfCLU_sign_data(char*, char*, char*, int, int);
 
 
 int wolfCLU_sign_data_rsa(byte*, char*, word32, char*);
-int wolfCLU_sign_data_ecc(byte*, char*, word32, char*);
+int wolfCLU_sign_data_ecc(byte*, char*, word32, char*, int);
 int wolfCLU_sign_data_ed25519(byte*, char*, word32, char*);
 
 

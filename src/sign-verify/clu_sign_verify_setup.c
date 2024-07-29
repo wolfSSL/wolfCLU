@@ -24,6 +24,7 @@
 #include <wolfclu/sign-verify/clu_sign.h>
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
+#include <wolfclu/x509/clu_cert.h>
 
 int wolfCLU_sign_verify_setup(int argc, char** argv)
 {
@@ -39,6 +40,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     int     signCheck   = 0;
     int     verifyCheck = 0;
     int     pubInCheck  = 0;
+    int     inForm  = DER_FORM; /* the key input format */
 
     /* checkForArg doesn't look for "-" here, as it would have been
      * removed in clu_main.c if present */
@@ -105,6 +107,17 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         wolfCLU_signHelp(algCheck);
         wolfCLU_verifyHelp(algCheck);
         return ret;
+    }
+
+    ret = wolfCLU_checkForArg("-inform", 7, argc, argv);
+    if (ret > 0) {
+        inForm = wolfCLU_checkInform(argv[ret+1]);
+        if (inForm == USER_INPUT_ERROR) {
+            ret = WOLFCLU_FATAL_ERROR;
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            return ret;
+        }
     }
 
     ret = wolfCLU_checkForArg("-pubin", 6, argc, argv);
@@ -226,7 +239,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     }
 
     if (signCheck == 1) {
-        ret = wolfCLU_sign_data(in, out, priv, algCheck);
+        ret = wolfCLU_sign_data(in, out, priv, algCheck, inForm);
     }
     else if (verifyCheck == 1) {
         ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck);

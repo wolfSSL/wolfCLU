@@ -22,10 +22,12 @@
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/sign-verify/clu_sign.h>
+#include <wolfclu/x509/clu_cert.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
-int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
+int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
+        int inForm)
 {
     int ret;
     int fSz;
@@ -59,7 +61,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType)
         break;
 
     case ECC_SIG_VER:
-        ret = wolfCLU_sign_data_ecc(data, out, fSz, privKey);
+        ret = wolfCLU_sign_data_ecc(data, out, fSz, privKey, inForm);
         break;
 
     case ED25519_SIG_VER:
@@ -180,7 +182,8 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey)
 #endif
 }
 
-int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey)
+int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
+        int inForm)
 {
 #ifdef HAVE_ECC
     int ret;
@@ -233,6 +236,42 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey)
         return WOLFCLU_FATAL_ERROR;
     }
     XFCLOSE(privKeyFile);
+
+    if (inForm == PEM_FORM) {
+        byte* der = NULL;
+        int derSz = wc_KeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), NULL,
+                        0, NULL);
+        if (derSz > 0) {
+            der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (der == NULL) {
+                ret = MEMORY_E;
+            }
+            else {
+                ret = wc_KeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf),
+                        der, derSz, NULL);
+                if (ret > 0) {
+                    XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    keyBuf = der;
+                    ret = 0;
+                }
+                else {
+                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                }
+            }
+        }
+        else {
+            ret = derSz;
+        }
+
+        if (ret != 0) {
+            if (der)
+                XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (keyBuf)
+                XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            wc_FreeRng(&rng);
+            return ret;
+        }
+    }
 
     /* retrieving private key and storing in the Ecc Key */
     ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
