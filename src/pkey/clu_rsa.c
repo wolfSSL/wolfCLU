@@ -36,6 +36,7 @@ static const struct option rsa_options[] = {
     {"-passin",    required_argument, 0, WOLFCLU_PASSWORD  },
     {"-noout",     no_argument,       0, WOLFCLU_NOOUT     },
     {"-modulus",   no_argument,       0, WOLFCLU_MODULUS   },
+    {"-RSAPublicKey_in", no_argument, 0, WOLFCLU_PUBIN     },
     {"-pubin",     no_argument,       0, WOLFCLU_PUBIN     },
     {"-pubout",    no_argument,       0, WOLFCLU_PUBOUT    },
     {"-help",      no_argument,       0, WOLFCLU_HELP      },
@@ -55,6 +56,7 @@ static void wolfCLU_RSAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-passin password for PEM encrypted files");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-noout do not print the key out when set");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-modulus print out the RSA modulus (n value)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-RSAPublicKey_in expecting a public key input");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-pubin expecting a public key input");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-pubout expecting a public key output");
 }
