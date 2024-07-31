@@ -36,6 +36,7 @@ run_fail() {
     fi
 }
 
+# Test PEM to PEM conversion
 run "rsa -in ./certs/server-key.pem -outform PEM -out test-rsa.pem"
 diff "./certs/server-key.pem" "test-rsa.pem" &> /dev/null
 if [ $? == 1 ]; then
@@ -44,6 +45,7 @@ if [ $? == 1 ]; then
 fi
 rm -f test-rsa.pem
 
+# Test PEM to DER conversion
 run "rsa -in ./certs/server-key.pem -outform DER -out test-rsa.der"
 diff "./certs/server-key.der" "test-rsa.der" &> /dev/null
 if [ $? == 1 ]; then
@@ -52,29 +54,46 @@ if [ $? == 1 ]; then
 fi
 rm -f test-rsa.der
 
+# Test failures
 run_fail "rsa -in ./certs/server-cert.pem"
+
+# Test failures for -RSAPublicKey_in
+run_fail "rsa -in ./certs/server-cert.pem -RSAPublicKey_in"
 run_fail "rsa -in ./certs/server-key.pem -RSAPublicKey_in"
 
+# Test failures for -pubin
+run_fail "rsa -in ./certs/server-cert.pem -pubin"
+run_fail "rsa -in ./certs/server-key.pem -pubin"
+
+# Test success cases for -RSAPublicKey_in
 run "rsa -in ./certs/server-keyPub.pem -RSAPublicKey_in"
 run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123"
 run_fail "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl12"
 
 run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123 -noout -modulus"
 
-#check that modulus was printed
+# Test success cases for -pubin
+run "rsa -in ./certs/server-keyPub.pem -pubin"
+run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123"
+run_fail "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl12"
+
+run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123 -noout -modulus"
+
+# Check that modulus was printed
 echo $RESULT | grep "Modulus"
 if [ $? != 0 ]; then
     echo "ERROR with -modulus option"
     exit 99
 fi
 
-#check that key was not printed
+# Check that key was not printed
 echo $RESULT | grep "BEGIN"
 if [ $? == 0 ]; then
     echo "ERROR found a key with -modulus option"
     exit 99
 fi
 
+# Expexted result -RSAPublicKey_in
 run "rsa -in ./certs/server-keyPub.pem -RSAPublicKey_in"
 EXPECTED="-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwJUI4VdB8nFtt9JFQScB
@@ -86,7 +105,24 @@ oXe6E9KXc+JdJclqDcM5YKS0sGlCQgnp2Ai8MyCzWCKnquvE4eZhg8XSlt/Z0E+t
 1wIDAQAB
 -----END PUBLIC KEY-----"
 if [ "$RESULT" != "$EXPECTED" ]; then
-    echo "unexpected text output found"
+    echo "unexpected text output found for -RSAPublicKey_in"
+    echo "$RESULT"
+    exit 99
+fi
+
+# Expexted result -pubin
+run "rsa -in ./certs/server-keyPub.pem -pubin"
+EXPECTED1="-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwJUI4VdB8nFtt9JFQScB
+ZcZFrvK8JDC4lc4vTtb2HIi8fJ/7qGd//lycUXX3isoH5zUvj+G9e8AvfKtkqBf8
+yl17uuAh5XIuby6G2JVz2qwbU7lfP9cZDSVP4WNjUYsLZD+tQ7ilHFw0s64AoGPF
+9n8LWWh4c6aMGKkCba/DGQEuuBDjxsxAtGmjRjNph27Euxem8+jdrXO8ey8htf1m
+UQy9VLPhbV8cvCNz0QkDiRTSELlkwyrQoZZKvOHUGlvHoMDBY3gPRDcwMpaAMiOV
+oXe6E9KXc+JdJclqDcM5YKS0sGlCQgnp2Ai8MyCzWCKnquvE4eZhg8XSlt/Z0E+t
+1wIDAQAB
+-----END PUBLIC KEY-----"
+if [ "$RESULT" != "$EXPECTED1" ]; then
+    echo "unexpected text output found for -pubin"
     echo "$RESULT"
     exit 99
 fi
