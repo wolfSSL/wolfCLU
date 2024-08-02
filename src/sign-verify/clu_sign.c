@@ -81,12 +81,6 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pubIn) {
         }
     }
 
-    if (ret != 0) {
-        if (der)
-            XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return ret;
-    }
-
     return ret;
 }
 
@@ -161,14 +155,32 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     XMEMSET(&rng, 0, sizeof(rng));
     XMEMSET(&key, 0, sizeof(key));
 
-    /* init the RsaKey */
+    /* initialize the RSA key */
     ret = wc_InitRsaKey(&key, NULL);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize RsaKey\nRET: %d", ret);
         return ret;
     }
 
-    /* read in and store private key */
+    /* initialize RNG */
+    ret = wc_InitRng(&rng);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
+        return ret;
+    }
+
+ /* initialize RNG RSA_BLINDING */
+#ifdef WC_RSA_BLINDING
+    ret = wc_RsaSetRNG(&key, &rng);
+    if (ret < 0) {
+        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
+        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        wc_FreeRng(&rng);
+        return ret;
+    }
+#endif
+
+    /* open, read, and store RSA key */
     privKeyFile = XFOPEN(privKey, "rb");
     if (privKeyFile == NULL) {
         wolfCLU_LogError("unable to open file %s", privKey);
@@ -182,7 +194,9 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
         XFCLOSE(privKeyFile);
         return MEMORY_E;
     }
-    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+
+    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+        (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
         XFCLOSE(privKeyFile);
         return WOLFCLU_FATAL_ERROR;
     }
@@ -194,6 +208,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
         if (ret != 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            wc_FreeRsaKey(&key);
             wc_FreeRng(&rng);
             return ret;
         }
@@ -204,55 +219,46 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
         wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
+        wc_FreeRsaKey(&key);
+        wc_FreeRng(&rng);
         return ret;
     }
 
     /* setting up output buffer based on key size */
-    outBufSz = wc_RsaEncryptSize(&key);
-    outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (outBuf == NULL) {
-        return MEMORY_E;
+    if (ret == 0) {
+        outBufSz = wc_RsaEncryptSize(&key);
+        outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (outBuf == NULL) {
+            wc_FreeRsaKey(&key);
+            wc_FreeRng(&rng);
+            return MEMORY_E;
+        }
     }
-    XMEMSET(outBuf, 0, outBufSz);
+    if (ret == 0) {
+        XMEMSET(outBuf, 0, outBufSz);
 
-    ret = wc_InitRng(&rng);
-    if (ret != 0) {
-        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
+        /* signing input with RSA priv key to produce signature */
+        ret = wc_RsaSSL_Sign(data, dataSz, outBuf, (word32)outBufSz, &key, &rng);
+        if (ret >= 0) {
+            XFILE s;
+            s = XFOPEN(out, "wb");
+            XFWRITE(outBuf, 1, outBufSz, s);
+            XFCLOSE(s);
+        }
+        else {
+            wolfCLU_LogError("Failed to sign data with RSA private key.\nRET: %d", ret);
+        }
+    }
+
+    /* cleanup allocated resources */
+    if (outBuf!= NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return ret;
     }
-
-#ifdef WC_RSA_BLINDING
-    ret = wc_RsaSetRNG(&key, &rng);
-    if (ret < 0) {
-        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
-        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        wc_FreeRng(&rng);
-        return ret;
-    }
-#endif
-
-    ret = wc_RsaSSL_Sign(data, dataSz, outBuf, (word32)outBufSz, &key,
-            &rng);
-    if (ret < 0) {
-        wolfCLU_LogError("Failed to sign data with RSA private key.\nRET: %d", ret);
-        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        wc_FreeRng(&rng);
-        wc_FreeRsaKey(&key);
-        return ret;
-    }
-    else {
-        XFILE s;
-        s = XFOPEN(out, "wb");
-        XFWRITE(outBuf, 1, outBufSz, s);
-        XFCLOSE(s);
-    }
-
-    XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    wc_FreeRng(&rng);
     wc_FreeRsaKey(&key);
-    (void)index;
-    return WOLFCLU_SUCCESS;
+    wc_FreeRng(&rng);
+
+    /* expected ret == WOLFCLU_SUCCESS */
+    return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 #else
     return NOT_COMPILED_IN;
 #endif
@@ -307,7 +313,8 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
         wc_FreeRng(&rng);
         return MEMORY_E;
     }
-    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+        (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
         XFCLOSE(privKeyFile);
         return WOLFCLU_FATAL_ERROR;
     }
@@ -418,7 +425,8 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
         return MEMORY_E;
     }
 
-    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+        (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
         XFCLOSE(privKeyFile);
         return WOLFCLU_FATAL_ERROR;
     }
@@ -448,8 +456,9 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     else {
         wolfCLU_LogError("Failed to import private key.\nRET: %d", ret);
     }
+
+    /* setting up output buffer based on key size */
     if (ret == 0) {
-        /* setting up output buffer based on key size */
         outBufSz = ED25519_SIG_SIZE;
         outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (outBuf == NULL) {
