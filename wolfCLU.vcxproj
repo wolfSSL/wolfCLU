@@ -162,6 +162,8 @@
     <ClCompile Include="src\pkcs\clu_pkcs12.c" />
     <ClCompile Include="src\pkey\clu_pkey.c" />
     <ClCompile Include="src\pkey\clu_rsa.c" />
+    <ClCompile Include="src\server\clu_server_setup.c" />
+    <ClCompile Include="src\server\server.c" />
     <ClCompile Include="src\sign-verify\clu_crl_verify.c" />
     <ClCompile Include="src\sign-verify\clu_dgst_setup.c" />
     <ClCompile Include="src\sign-verify\clu_sign.c" />
@@ -189,6 +191,7 @@
     <ClInclude Include="wolfclu\genkey\clu_genkey.h" />
     <ClInclude Include="wolfclu\pkey\clu_pkey.h" />
     <ClInclude Include="wolfclu\sign-verify\clu_sign.h" />
+    <ClInclude Include="wolfclu\server.h" />
     <ClInclude Include="wolfclu\sign-verify\clu_sign_verify_setup.h" />
     <ClInclude Include="wolfclu\sign-verify\clu_verify.h" />
     <ClInclude Include="wolfclu\version.h" />
