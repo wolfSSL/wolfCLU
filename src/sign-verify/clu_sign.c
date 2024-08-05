@@ -33,51 +33,49 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pubIn) {
     const unsigned char* keyBuf = *pkeyBuf;
 
     if (pubIn == 0) {
-        int derSz = wc_KeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), NULL,
-                        0, NULL);
-        if (derSz > 0) {
+        ret = wc_KeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), NULL, 0, NULL);
+        if (ret > 0) {
+            int derSz = ret;
             der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (der == NULL) {
                 ret = MEMORY_E;
             }
             else {
-                ret = wc_KeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf),
-                        der, derSz, NULL);
+                ret = wc_KeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), der,
+                                     derSz, NULL);
                 if (ret > 0) {
+                    /* replace incoming pkeyBuf with new der buf */
                     XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     *pkeyBuf = der;
-                    ret = 0;
                 }
                 else {
+                    /* failure, so cleanup */
                     XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 }
             }
-        }
-        else {
-            ret = derSz;
         }
     }
     else {
-        int derSz = wc_PubKeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), NULL, 0);
-        if (derSz > 0) {
+        ret = wc_PubKeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), NULL, 0);
+        if (ret > 0) {
+            int derSz = ret;
             der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (der == NULL) {
                 ret = MEMORY_E;
             }
             else {
-                ret = wc_PubKeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), der, derSz);
+                ret = wc_PubKeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf),
+                                        der, derSz);
                 if (ret > 0) {
+                    /* replace incoming pkeyBuf with new der buf */
                     XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     *pkeyBuf = der;
-                    ret = 0;
                 }
                 else {
+                    /* failure, so cleanup */
                     XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 }
             }
-        }
-        else {
-            ret = derSz;
         }
     }
 
@@ -205,12 +203,16 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, 0);
-        if (ret != 0) {
+        if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             wc_FreeRsaKey(&key);
             wc_FreeRng(&rng);
             return ret;
+        }
+        else {
+            privFileSz = ret;
+            ret = 0;
         }
     }
 
@@ -285,20 +287,21 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     XMEMSET(&rng, 0, sizeof(rng));
     XMEMSET(&key, 0, sizeof(key));
 
-    /* init the ecc key */
+    /* initialize ecc key */
     ret = wc_ecc_init(&key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize ecc key\nRET: %d", ret);
         return ret;
     }
 
+    /* initialize RNG */
     ret = wc_InitRng(&rng);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
         return ret;
     }
 
-    /* read in and store private key */
+    /* open, read, and store ecc key */
     privKeyFile = XFOPEN(privKey, "rb");
     if (privKeyFile == NULL) {
         wolfCLU_LogError("unable to open file %s", privKey);
@@ -323,11 +326,16 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, 0);
-        if (ret != 0) {
+        if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            wc_ecc_free(&key);
             wc_FreeRng(&rng);
             return ret;
+        }
+        else {
+            privFileSz = ret;
+            ret = 0;
         }
     }
 
@@ -335,40 +343,48 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
-        wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to decode Ecc private key.\nRET: %d", ret);
         wc_FreeRng(&rng);
         return ret;
     }
 
     /* setting up output buffer based on key size */
-    outBufSz = wc_ecc_sig_size(&key);
-    outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (outBuf == NULL) {
-        wc_FreeRng(&rng);
-        return MEMORY_E;
+    if (ret == 0) {
+        outBufSz = wc_ecc_sig_size(&key);
+        outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (outBuf == NULL) {
+            wc_ecc_free(&key);
+            wc_FreeRng(&rng);
+            return MEMORY_E;
+        }
     }
-    XMEMSET(outBuf, 0, outBufSz);
-    outLen = (word32)outBufSz;
+    if (ret == 0) {
+        XMEMSET(outBuf, 0, outBufSz);
 
-    /* signing input with ecc priv key to produce signature */
-    ret = wc_ecc_sign_hash(data, fSz, outBuf, &outLen, &rng, &key);
-    if (ret < 0) {
-        wolfCLU_LogError("Failed to sign data with Ecc private key.\nRET: %d", ret);
+        /* signing input with ecc priv key to produce signature */
+        outLen = (word32)outBufSz;
+        ret = wc_ecc_sign_hash(data, fSz, outBuf, &outLen, &rng, &key);
+        if (ret >= 0) {
+            XFILE s;
+            s = XFOPEN(out, "wb");
+            XFWRITE(outBuf, 1, outLen, s);
+            XFCLOSE(s);
+        }
+        else {
+            wolfCLU_LogError("Failed to sign data with Ecc private key.\nRET: %d", ret);
+        }
+    }
+
+    /* cleanup allocated resources */
+    if (outBuf!= NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        wc_FreeRng(&rng);
-        return ret;
     }
-    else {
-        XFILE s;
-        s = XFOPEN(out, "wb");
-        XFWRITE(outBuf, 1, outLen, s);
-        XFCLOSE(s);
-    }
-    XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+
+    wc_ecc_free(&key);
     wc_FreeRng(&rng);
 
-    (void)index;
-    return WOLFCLU_SUCCESS;
+    /* expected ret == WOLFCLU_SUCCESS */
+    return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 #else
     return NOT_COMPILED_IN;
 #endif
@@ -435,12 +451,16 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, 0);
-        if (ret != 0) {
+        if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             wc_ed25519_free(&key);
             wc_FreeRng(&rng);
             return ret;
+        }
+        else {
+            privFileSz = ret;
+            ret = 0;
         }
     }
 
@@ -496,7 +516,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     wc_ed25519_free(&key);
     wc_FreeRng(&rng);
 
-    /* expected ret == 1 */
+    /* expected ret == WOLFCLU_SUCCESS */
     return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 #else
     return NOT_COMPILED_IN;

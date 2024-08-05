@@ -60,17 +60,17 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fOutNm);
     fOutNmSz = (int)XSTRLEN(fOutNm);
 
-    /*--------------- INIT ---------------------*/
+    /* init ed25519 key */
     ret = wc_ed25519_init(&edKeyOut);
     if (ret != 0)
         return ret;
-    /*--------------- MAKE KEY ---------------------*/
+    /* make ed25519 key */
     ret = wc_ed25519_make_key(rng, ED25519_KEY_SIZE, &edKeyOut);
     if (ret != 0)
         return ret;
 
 #if 0
-    /*--------------- GET KEY SIZES ---------------------*/
+    /* get key size */
     privKeySz = wc_ed25519_priv_size(&edKeyOut);
     if (privKeySz <= 0)
         return WC_KEY_SIZE_E;
@@ -79,14 +79,14 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     if (pubKeySz <= 0)
         return WC_KEY_SIZE_E;
 
-    /*--------------- EXPORT KEYS TO BUFFERS ---------------------*/
+    /* export keys to buffers */
     ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz, pubKeyBuf,
                                                                      &pubKeySz);
     if (ret != 0)
         return ret;
 #endif
 
-    /*--------------- OUTPUT KEYS TO FILE(S) ---------------------*/
+    /* set up the file name output buffer */
     finalOutFNm = (char*) XMALLOC( (fOutNmSz + fOutNmAppendSz), HEAP_HINT,
                                                DYNAMIC_TYPE_TMP_BUFFER);
     if (finalOutFNm == NULL)
@@ -178,7 +178,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             FALL_THROUGH;
         case PUB_ONLY_FILE:
             /* add on the final part of the file name ".pub" */
-            XMEMCPY(finalOutFNm+fOutNmSz, pubAppend, fOutNmAppendSz);
+            XMEMCPY(finalOutFNm + fOutNmSz, pubAppend, fOutNmAppendSz);
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
             /* open the file for writing the public key */
@@ -743,24 +743,19 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     RsaKey key;                         /* the RSA key structure */
     XFILE  file = NULL;                 /* file stream */
     int    ret = WOLFCLU_SUCCESS;       /* return value */
-
     int   fNameSz;                       /* file name without append */
     int   fExtSz      = 6;               /* # of bytes to append to file name */
     char  fExtPriv[6] = ".priv\0";       /* last part of the priv file name */
     char  fExtPub[6]  = ".pub\0\0";      /* last part of the pub file name*/
     char* fOutNameBuf = NULL;            /* file name + fExt */
     int flagOutputPub = 0;               /* set if outputting both priv/pub */
-
-    #ifdef NO_AES
-    /* use 16 bytes for AES block size */
-    size_t maxDerBufSz = 4 * keySz * 16;
-    #else
-    size_t maxDerBufSz = 4 * keySz * AES_BLOCK_SIZE;
-    #endif
     byte*  derBuf      = NULL;           /* buffer for DER format */
     byte*  pemBuf      = NULL;           /* buffer for PEM format */
     int    derBufSz    = -1;             /* size of DER buffer */
     int    pemBufSz    = 0;              /* size of PEM buffer */
+
+    WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fName);
+    fNameSz = (int)XSTRLEN(fName);
 
     if (rng == NULL || fName == NULL)
         return BAD_FUNC_ARG;
@@ -776,25 +771,14 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     }
 
     /* set up the file name output buffer */
-    if (ret == WOLFCLU_SUCCESS) {
-        fNameSz     = (int)XSTRLEN(fName);
-        fOutNameBuf = (char*)XMALLOC(fNameSz + fExtSz, HEAP_HINT,
-                                 DYNAMIC_TYPE_TMP_BUFFER);
-        if (fOutNameBuf == NULL)
-            ret = MEMORY_E;
-    }
+    fOutNameBuf = (char*) XMALLOC( (fNameSz + fExtSz), HEAP_HINT,
+                                    DYNAMIC_TYPE_TMP_BUFFER);
+    if (fOutNameBuf == NULL)
+        return MEMORY_E;
 
     /* get the first part of the file name setup */
-    if (ret == WOLFCLU_SUCCESS) {
-        XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
-        XMEMCPY(fOutNameBuf, fName, fNameSz);
-
-        derBuf = (byte*) XMALLOC(maxDerBufSz, HEAP_HINT,
-                DYNAMIC_TYPE_TMP_BUFFER);
-        if (derBuf == NULL) {
-            ret = MEMORY_E;
-        }
-    }
+    XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
+    XMEMCPY(fOutNameBuf, fName, fNameSz);
 
     switch (directive) {
         case PRIV_AND_PUB_FILES:
@@ -875,7 +859,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                 break;
             }
             if (flagOutputPub == 0) {
-            break;
+                break;
             } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1 */
             FALL_THROUGH;
         case PUB_ONLY_FILE:
@@ -920,7 +904,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             if (fmt == PEM_FORM) {
                 if (ret == WOLFCLU_SUCCESS) {
                     pemBufSz = wolfCLU_KeyDerToPem(derBuf, derBufSz, &pemBuf,
-                            PRIVATEKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
+                            PUBLICKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
                     if (pemBufSz < 0) {
                         ret = pemBufSz;
                     }
