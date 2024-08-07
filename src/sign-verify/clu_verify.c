@@ -35,60 +35,45 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, int inForm, byte* 
     int privFileSz;
     word32 index = 0;
 
-    XFILE privKeyFile;
+    XFILE privKeyFile = NULL;
     byte* keyBuf = NULL;
     ed25519_key key;
-    WC_RNG rng;
 
     XMEMSET(&key, 0, sizeof(key));
-    XMEMSET(&rng, 0, sizeof(rng));
 
     /* initialize ED25519 key */
     ret = wc_ed25519_init(&key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize ed25519 key\nRET: %d", ret);
-        return ret;
     }
 
-    /* initialize RNG */
-    ret = wc_InitRng(&rng);
-    if (ret != 0) {
-        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
-        return ret;
+    /* open, read, and store ED25519 key */
+    if (ret == 0) {
+        privKeyFile = XFOPEN(privKey, "rb");
+        if (privKeyFile == NULL) {
+            wolfCLU_LogError("unable to open file %s", privKey);
+            ret = BAD_FUNC_ARG;
+        }
     }
-
-    /* read in and store private key */
-    privKeyFile = XFOPEN(privKey, "rb");
-    if (privKeyFile == NULL) {
-        wolfCLU_LogError("unable to open file %s", privKey);
-        wc_ed25519_free(&key);
-        wc_FreeRng(&rng);
-        return BAD_FUNC_ARG;
+    if (ret == 0) {
+        XFSEEK(privKeyFile, 0, SEEK_END);
+        privFileSz = (int)XFTELL(privKeyFile);
+        keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (keyBuf == NULL) {
+            ret = MEMORY_E;
+        }
+        else if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+            (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+            XFCLOSE(privKeyFile);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
-
-    XFSEEK(privKeyFile, 0, SEEK_END);
-    privFileSz = (int)XFTELL(privKeyFile);
-    keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (keyBuf == NULL) {
-        XFCLOSE(privKeyFile);
-        wc_ed25519_free(&key);
-        wc_FreeRng(&rng);
-        return MEMORY_E;
-    }
-    if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
-        (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
-        XFCLOSE(privKeyFile);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    XFCLOSE(privKeyFile);
 
     /* convert PEM to DER if necessary */
-    if (inForm == PEM_FORM) {
+    if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, 0);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return ret;
         }
         else {
             privFileSz = ret;
@@ -97,16 +82,18 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, int inForm, byte* 
     }
 
     /* decode the private key from the DER-encoded input */
-    ret = wc_Ed25519PrivateKeyDecode(keyBuf, &index, &key, privFileSz);
     if (ret == 0) {
-        /* Calculate the public key */
-        ret = wc_ed25519_make_public(&key, key.p, ED25519_PUB_KEY_SIZE);
+        ret = wc_Ed25519PrivateKeyDecode(keyBuf, &index, &key, privFileSz);
         if (ret == 0) {
-            key.pubKeySet = 1;
+            /* Calculate the public key */
+            ret = wc_ed25519_make_public(&key, key.p, ED25519_PUB_KEY_SIZE);
+            if (ret == 0) {
+                key.pubKeySet = 1;
+            }
         }
-    }
-    else {
-        wolfCLU_LogError("Failed to import private key.\nRET: %d", ret);
+        else {
+            wolfCLU_LogError("Failed to import private key.\nRET: %d", ret);
+        }
     }
 
     /* export public key */
@@ -126,12 +113,13 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, int inForm, byte* 
     }
 
     /* cleanup allocated resources */
-     if (keyBuf != NULL) {
+    XFCLOSE(privKeyFile);
+
+    if (keyBuf!= NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     wc_ed25519_free(&key);
-    wc_FreeRng(&rng);
 
     /* expected ret == WOLFCLU_SUCCESS */
     return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
@@ -273,39 +261,34 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     ret = wc_InitRsaKey(&key, NULL);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize RsaKey.\nRet: %d", ret);
-        XFREE(&key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return ret;
     }
 
     /* open, read, and store RSA key  */
-    keyPathFile = XFOPEN(keyPath, "rb");
-    if (keyPathFile == NULL) {
-        wolfCLU_LogError("unable to open file %s", keyPath);
-        return BAD_FUNC_ARG;
+    if (ret == 0) {
+        keyPathFile = XFOPEN(keyPath, "rb");
+        if (keyPathFile == NULL) {
+            wolfCLU_LogError("unable to open file %s", keyPath);
+            ret = BAD_FUNC_ARG;
+        }
     }
-
-    XFSEEK(keyPathFile, 0, SEEK_END);
-    keyFileSz = (int)XFTELL(keyPathFile);
-    keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (keyBuf == NULL) {
-        XFCLOSE(keyPathFile);
-        return MEMORY_E;
+    if (ret == 0) {
+        XFSEEK(keyPathFile, 0, SEEK_END);
+        keyFileSz = (int)XFTELL(keyPathFile);
+        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (keyBuf == NULL) {
+            ret = MEMORY_E;
+        }
+        else if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
+            (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
-
-    if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
-        (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
-        XFCLOSE(keyPathFile);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    XFCLOSE(keyPathFile);
 
     /* convert PEM to DER if necessary */
-    if (inForm == PEM_FORM) {
+    if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, pubIn);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return ret;
         }
         else {
             keyFileSz = ret;
@@ -315,58 +298,61 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
     if (pubIn == 1) {
         /* decode public key from DER-encoded input */
-        ret = wc_RsaPublicKeyDecode(keyBuf, &index, &key, keyFileSz);
-        if (ret != 0) {
-            wolfCLU_LogError("Failed to decode public key from DER.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return ret;
+        if (ret == 0) {
+            ret = wc_RsaPublicKeyDecode(keyBuf, &index, &key, keyFileSz);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to decode public key from DER.\nRET: %d", ret);
+            }
         }
     }
     else {
         /* retrieve private key and store in the RsaKey */
-        ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
-        if (ret != 0) {
-            wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
+        if (ret == 0) {
+            ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
+            }
         }
     }
 
     /* set up output buffer based on key size */
-    outBufSz = wc_RsaEncryptSize(&key);
-    if (outBufSz <= 0) {
-        wolfCLU_LogError("Invalid output buffer size: %d", outBufSz);
-        wc_FreeRsaKey(&key);
-        return WOLFCLU_FATAL_ERROR;
+    if (ret == 0) {
+        outBufSz = wc_RsaEncryptSize(&key);
+        if (outBufSz <= 0) {
+            wolfCLU_LogError("Invalid output buffer size: %d", outBufSz);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
+    if (ret == 0) {
+        outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (outBuf == NULL) {
+            ret = MEMORY_E;
+        }
+    }
+    if (ret == 0) {
+        XMEMSET(outBuf, 0, outBufSz);
 
-    outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (outBuf == NULL) {
-        wolfCLU_LogError("Failed to malloc output buffer");
-        wc_FreeRsaKey(&key);
-        return MEMORY_E;
-    }
-    XMEMSET(outBuf, 0, outBufSz);
+        /* verify the RSA signature */
+        ret = wc_RsaSSL_Verify(sig, sigSz, outBuf, (word32)outBufSz, &key);
+        if (ret < 0) {
+            wolfCLU_LogError("Failed to verify data with pub key.\nRET: %d", ret);
+        }
 
-    /* verify the RSA signature */
-    ret = wc_RsaSSL_Verify(sig, sigSz, outBuf, (word32)outBufSz, &key);
-    if (ret < 0) {
-        wolfCLU_LogError("Failed to verify data with RSA public key.\nRET: %d", ret);
-        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        wc_FreeRsaKey(&key);
-        return ret;
-    }
-
-    /* write the output to the specified file */
-    XFILE s = XFOPEN(out, "wb");
-    if (s == NULL) {
-        wolfCLU_LogError("Unable to open file %s", out);
-        ret = BAD_FUNC_ARG;
-    }
-    else {
-        XFWRITE(outBuf, 1, ret, s);
-        XFCLOSE(s);
+        /* write the output to the specified file */
+        XFILE s = XFOPEN(out, "wb");
+        if (s == NULL) {
+            wolfCLU_LogError("Unable to open file %s", out);
+            ret = BAD_FUNC_ARG;
+        }
+        else {
+            XFWRITE(outBuf, 1, ret, s);
+            XFCLOSE(s);
+        }
     }
 
     /* Cleanup allocated resources */
+    XFCLOSE(keyPathFile);
+
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
@@ -393,7 +379,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     int stat = 0;
     word32 index = 0;
 
-    XFILE   keyPathFile;
+    XFILE keyPathFile = NULL;
     ecc_key key;
     byte* keyBuf = NULL;
     byte* outBuf = NULL;
@@ -405,39 +391,34 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     ret = wc_ecc_init(&key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize ecc key.\nRet: %d", ret);
-        XFREE(&key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return ret;
     }
 
     /* open, read, and store Ecc key  */
-    keyPathFile = XFOPEN(keyPath, "rb");
-    if (keyPathFile == NULL) {
-        wolfCLU_LogError("unable to open file %s", keyPath);
-        return BAD_FUNC_ARG;
+    if (ret == 0) {
+        keyPathFile = XFOPEN(keyPath, "rb");
+        if (keyPathFile == NULL) {
+            wolfCLU_LogError("unable to open file %s", keyPath);
+            ret = BAD_FUNC_ARG;
+        }
     }
-
-    XFSEEK(keyPathFile, 0, SEEK_END);
-    keyFileSz = (int)XFTELL(keyPathFile);
-    keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (keyBuf == NULL) {
-        XFCLOSE(keyPathFile);
-        return MEMORY_E;
+    if (ret == 0) {
+        XFSEEK(keyPathFile, 0, SEEK_END);
+        keyFileSz = (int)XFTELL(keyPathFile);
+        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (keyBuf == NULL) {
+            ret = MEMORY_E;
+        }
+        else if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
+            (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
-
-    if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
-        (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
-        XFCLOSE(keyPathFile);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    XFCLOSE(keyPathFile);
 
     /* convert PEM to DER if necessary */
-    if (inForm == PEM_FORM) {
+    if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, pubIn);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return ret;
         }
         else {
             keyFileSz = ret;
@@ -447,59 +428,64 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
 
     if (pubIn == 1) {
         /* retrieve public key and store in the Ecc key */
-        ret = wc_EccPublicKeyDecode(keyBuf, &index, &key, keyFileSz);
-        if (ret < 0 ) {
-            wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return ret;
+        if (ret == 0) {
+            ret = wc_EccPublicKeyDecode(keyBuf, &index, &key, keyFileSz);
+            if (ret < 0 ) {
+                wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
+            }
         }
-
     }
     else {
         /* retrieve private key and store in the Ecc Key */
-        ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
-        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (ret != 0 ) {
-            wolfCLU_LogError("Failed to decode Ecc private key.\nRET: %d", ret);
-            wc_ecc_free(&key);
-            return ret;
+        if (ret == 0) {
+            ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
+            if (ret != 0 ) {
+                wolfCLU_LogError("Failed to decode Ecc private key.\nRET: %d", ret);
+            }
         }
     }
 
     /* setting up output buffer based on key size */
-    outBufSz = wc_ecc_sig_size(&key);
-    if (outBufSz <= 0) {
-        wolfCLU_LogError("Invalid output buffer size: %d", outBufSz);
-        wc_ecc_free(&key);
-        return WOLFCLU_FATAL_ERROR;
+    if (ret == 0) {
+        outBufSz = wc_ecc_sig_size(&key);
+        if (outBufSz <= 0) {
+            wolfCLU_LogError("Invalid output buffer size: %d", outBufSz);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
-    outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (outBuf == NULL) {
-        wolfCLU_LogError("Failed to malloc output buffer");
-        wc_ecc_free(&key);
-        return MEMORY_E;
+    if (ret == 0) {
+        outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (outBuf == NULL) {
+            ret = MEMORY_E;
+        }
     }
-    XMEMSET(outBuf, 0, outBufSz);
+    if (ret == 0) {
+        XMEMSET(outBuf, 0, outBufSz);
 
-    /* verify data with Ecc public key */
-    ret = wc_ecc_verify_hash(sig, sigSz, hash, hashSz, &stat, &key);
-    if (ret < 0) {
-        wolfCLU_LogError("Failed to verify data with Ecc public key.\nRET: %d", ret);
-        return ret;
-    }
-    else if (stat == 1) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
-    }
-    else {
-        wolfCLU_LogError("Invalid Signature.");
+        /* verify data with Ecc public key */
+        ret = wc_ecc_verify_hash(sig, sigSz, hash, hashSz, &stat, &key);
+        if (ret < 0) {
+            wolfCLU_LogError("Failed to verify data with pub key.\nRET: %d", ret);
+        }
+        else if (stat == 1) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
+        }
+        else {
+            wolfCLU_LogError("Invalid Signature.");
+        }
     }
 
-    /* Cleanup allocated resources */
+    /* cleanup allocated resources */
+    XFCLOSE(keyPathFile);
+
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
+    if (keyBuf != NULL) {
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
 
-     wc_ecc_free(&key);
+    wc_ecc_free(&key);
 
     /* expected ret == WOLFCLU_SUCCESS */
     return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
@@ -517,13 +503,13 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     word32 index = 0;
     int keyFileSz = 0;
 
-    XFILE keyPathFile;
+    XFILE keyPathFile = NULL;
     ed25519_key key;
     byte* keyBuf = (byte*)XMALLOC(ED25519_KEY_SIZE, HEAP_HINT,
             DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf == NULL) {
         wolfCLU_LogError("malloc failed");
-        return MEMORY_E;
+        ret = MEMORY_E;
     }
 
     XMEMSET(&key, 0, sizeof(key));
@@ -533,41 +519,34 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     ret = wc_ed25519_init(&key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize ED25519 key.\nRet: %d", ret);
-        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return ret;
     }
 
     /* open, read, and store ED25519 key */
-    keyPathFile = XFOPEN(keyPath, "rb");
-    if (keyPathFile == NULL) {
-        wolfCLU_LogError("unable to open file %s", keyPath);
-        return BAD_FUNC_ARG;
+    if (ret == 0) {
+        keyPathFile = XFOPEN(keyPath, "rb");
+        if (keyPathFile == NULL) {
+            wolfCLU_LogError("unable to open file %s", keyPath);
+            ret = BAD_FUNC_ARG;
+        }
     }
-
-    XFSEEK(keyPathFile, 0, SEEK_END);
-    keyFileSz = (int)XFTELL(keyPathFile);
-    XFSEEK(keyPathFile, 0, SEEK_SET);
-
-    keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (keyBuf == NULL) {
-        XFCLOSE(keyPathFile);
-        return MEMORY_E;
+    if (ret == 0) {
+        XFSEEK(keyPathFile, 0, SEEK_END);
+        keyFileSz = (int)XFTELL(keyPathFile);
+        XFSEEK(keyPathFile, 0, SEEK_SET);
+        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (keyBuf == NULL) {
+            ret = MEMORY_E;
+        }
+        else if ((int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
-
-    if ((int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
-        XFCLOSE(keyPathFile);
-        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    XFCLOSE(keyPathFile);
 
     /* convert PEM to DER if necessary */
-    if (inForm == PEM_FORM) {
+    if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, pubIn);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return ret;
         }
         else {
             keyFileSz = ret;
@@ -577,11 +556,11 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 
     if (pubIn == 1) {
         /* decode public key from DER-encoded input */
-        ret = wc_Ed25519PublicKeyDecode(keyBuf, &index, &key, keyFileSz);
-        if (ret != 0) {
-            wolfCLU_LogError("Failed to decode public key from DER.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return ret;
+        if (ret == 0) {
+            ret = wc_Ed25519PublicKeyDecode(keyBuf, &index, &key, keyFileSz);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to decode public key from DER.\nRET: %d", ret);
+            }
         }
     }
     else {
@@ -593,35 +572,40 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
                ret = 0;
             }
             else {
-                wolfCLU_LogError("Failed to verify data with ed25519 public key.\nRET: %d", ret);
-                return ret;
+                wolfCLU_LogError("Failed to verify data with pub key.\nRET: %d", ret);
             }
         }
 
         /* decode public key */
-        ret = wc_ed25519_import_public(keyBuf, ED25519_KEY_SIZE, &key);
-        if (ret != 0) {
-            wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return ret;
+        if (ret == 0) {
+            ret = wc_ed25519_import_public(keyBuf, ED25519_KEY_SIZE, &key);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
+            }
         }
     }
 
     /* verify data with ED25519 public key */
-    ret = wc_ed25519_verify_msg(sig, sigSz, hash, hashSz, &stat, &key);
-    if (ret < 0) {
-        wolfCLU_LogError("Failed to verify data with ED25519 public key.\nRET: %d", ret);
-        return ret;
-    }
-    else if (stat == 1) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
-    }
-    else {
-        wolfCLU_LogError("Invalid Signature.");
+    if (ret == 0) {
+        ret = wc_ed25519_verify_msg(sig, sigSz, hash, hashSz, &stat, &key);
+        if (ret < 0) {
+            wolfCLU_LogError("Failed to verify data with ED25519 public key.\nRET: %d", ret);
+        }
+        else if (stat == 1) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
+        }
+        else {
+            wolfCLU_LogError("Invalid Signature.");
+        }
     }
 
-    /* Cleanup allocated resources */
-    XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    /* cleanup allocated resources */
+    XFCLOSE(keyPathFile);
+
+    if (keyBuf != NULL) {
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
     wc_ed25519_free(&key);
 
     /* expected ret == WOLFCLU_SUCCESS */

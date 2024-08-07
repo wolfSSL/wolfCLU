@@ -60,14 +60,19 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fOutNm);
     fOutNmSz = (int)XSTRLEN(fOutNm);
 
-    /* init ed25519 key */
+    /* initialize ed25519 key */
     ret = wc_ed25519_init(&edKeyOut);
-    if (ret != 0)
-        return ret;
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize ed25519 key.\nRET: %d", ret);
+    }
+
     /* make ed25519 key */
-    ret = wc_ed25519_make_key(rng, ED25519_KEY_SIZE, &edKeyOut);
-    if (ret != 0)
-        return ret;
+    if (ret == 0) {
+        ret = wc_ed25519_make_key(rng, ED25519_KEY_SIZE, &edKeyOut);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to make ed25519 key.\nRET: %d", ret);
+        }
+    }
 
 #if 0
     /* get key size */
@@ -81,20 +86,23 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
     /* export keys to buffers */
     ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz, pubKeyBuf,
-                                                                     &pubKeySz);
+                                &pubKeySz);
     if (ret != 0)
         return ret;
 #endif
 
     /* set up the file name output buffer */
-    finalOutFNm = (char*) XMALLOC( (fOutNmSz + fOutNmAppendSz), HEAP_HINT,
-                                               DYNAMIC_TYPE_TMP_BUFFER);
-    if (finalOutFNm == NULL)
-        return MEMORY_E;
+    if (ret == 0) {
+        finalOutFNm = (char*) XMALLOC( (fOutNmSz + fOutNmAppendSz), HEAP_HINT,
+                                                DYNAMIC_TYPE_TMP_BUFFER);
+        if (finalOutFNm == NULL) {
+            ret = MEMORY_E;
+        }
 
-    /* get the first part of the file name setup */
-    XMEMSET(finalOutFNm, 0, fOutNmSz + fOutNmAppendSz);
-    XMEMCPY(finalOutFNm, fOutNm, fOutNmSz);
+        /* get the first part of the file name setup */
+        XMEMSET(finalOutFNm, 0, fOutNmSz + fOutNmAppendSz);
+        XMEMCPY(finalOutFNm, fOutNm, fOutNmSz);
+    }
 
     switch(directive) {
         case PRIV_AND_PUB_FILES:
@@ -108,16 +116,19 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
             /* open the file for writing the private key */
-            file = XFOPEN(finalOutFNm, "wb");
-            if (!file) {
-                XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return OUTPUT_FILE_ERROR;
+            if (ret == 0) {
+                file = XFOPEN(finalOutFNm, "wb");
+                if (!file) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
             }
 
             /* determine size for buffer */
-            derSz = wc_Ed25519PrivateKeyToDer(&edKeyOut, NULL, 0);
-            if (derSz <= 0) {
-                ret = MEMORY_E;
+            if (ret == 0) {
+                derSz = wc_Ed25519PrivateKeyToDer(&edKeyOut, NULL, 0);
+                if (derSz <= 0) {
+                    ret = MEMORY_E;
+                }
             }
 
             /* allocate DER buffer */
@@ -153,7 +164,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
                         ret = OUTPUT_FILE_ERROR;
                     }
                     else {
-                        ret = 0; /* reset ret to 0 if success */
+                        ret = 0;
                     }
                 }
             }
@@ -165,7 +176,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
                         ret = OUTPUT_FILE_ERROR;
                     }
                     else {
-                        ret = 0; /* reset ret to 0 if success */
+                        ret = 0;
                     }
                 }
             }
@@ -182,16 +193,19 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
             /* open the file for writing the public key */
-            file = XFOPEN(finalOutFNm, "wb");
-            if (!file) {
-                XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return OUTPUT_FILE_ERROR;
+            if (ret == 0) {
+                file = XFOPEN(finalOutFNm, "wb");
+                if (!file) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
             }
 
             /* determine size for buffer */
-            derSz = wc_Ed25519PublicKeyToDer(&edKeyOut, NULL, 0, 1);
-            if (derSz <= 0) {
-                ret = MEMORY_E;
+            if (ret == 0) {
+                derSz = wc_Ed25519PublicKeyToDer(&edKeyOut, NULL, 0, 1);
+                if (derSz <= 0) {
+                    ret = MEMORY_E;
+                }
             }
 
             /* allocate DER buffer */
@@ -225,7 +239,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
                     if (ret != pemSz) {
                         ret = OUTPUT_FILE_ERROR;
                     } else {
-                        ret = 0; /* reset ret to 0 if success */
+                        ret = 0;
                     }
                 }
             }
@@ -237,28 +251,26 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
                         ret = OUTPUT_FILE_ERROR;
                     }
                     else {
-                        ret = 0; /* reset ret to 0 if success */
+                        ret = 0;
                     }
                 }
             }
 
             if (ret != 0) {
-                XFCLOSE(file);
-                XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return OUTPUT_FILE_ERROR;
+                ret = OUTPUT_FILE_ERROR;
             }
             XFCLOSE(file);
             break;
         default:
             wolfCLU_LogError("Invalid directive");
-            XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return BAD_FUNC_ARG;
+            ret = BAD_FUNC_ARG;
     }
 
     /* cleanup allocated resources */
-    if (file != NULL)
+    if (file != NULL) {
         XFCLOSE(file);
         XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
     if (derBuf != NULL) {
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
@@ -266,12 +278,8 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
         XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
-    if (ret >= 0) {
-        /* ret >= 0 indicates a successful file write, set to zero for return */
-        ret = WOLFCLU_SUCCESS;
-    }
-
-    return ret;
+    /* expected ret == WOLFCLU_SUCCESS */
+    return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 }
 #endif /* HAVE_ED25519 */
 
@@ -740,19 +748,19 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                        keySz, long exp)
 {
 #ifndef NO_RSA
-    RsaKey key;                         /* the RSA key structure */
-    XFILE  file = NULL;                 /* file stream */
-    int    ret = WOLFCLU_SUCCESS;       /* return value */
-    int   fNameSz;                       /* file name without append */
-    int   fExtSz      = 6;               /* # of bytes to append to file name */
-    char  fExtPriv[6] = ".priv\0";       /* last part of the priv file name */
-    char  fExtPub[6]  = ".pub\0\0";      /* last part of the pub file name*/
-    char* fOutNameBuf = NULL;            /* file name + fExt */
-    int flagOutputPub = 0;               /* set if outputting both priv/pub */
-    byte*  derBuf      = NULL;           /* buffer for DER format */
-    byte*  pemBuf      = NULL;           /* buffer for PEM format */
-    int    derBufSz    = -1;             /* size of DER buffer */
-    int    pemBufSz    = 0;              /* size of PEM buffer */
+    RsaKey key;                       /* the RSA key structure */
+    XFILE file = NULL;                /* file stream */
+    int ret = WOLFCLU_SUCCESS;        /* return value */
+    int fNameSz;                      /* file name without append */
+    int fExtSz = 6;                   /* # of bytes to append to file name */
+    char fExtPriv[6] = ".priv\0";     /* last part of the priv file name */
+    char fExtPub[6]  = ".pub\0\0";    /* last part of the pub file name*/
+    char* fOutNameBuf = NULL;         /* file name + fExt */
+    int flagOutputPub = 0;            /* set if outputting both priv/pub */
+    byte* derBuf = NULL;              /* buffer for DER format */
+    byte* pemBuf = NULL;              /* buffer for PEM format */
+    int derBufSz = -1;                /* size of DER buffer */
+    int pemBufSz = 0;                 /* size of PEM buffer */
 
     WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fName);
     fNameSz = (int)XSTRLEN(fName);
@@ -767,14 +775,17 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
     /* make RSA key */
     if (wc_MakeRsaKey(&key, keySz, exp, rng) != 0) {
-        ret = WOLFCLU_FAILURE;
+        wc_FreeRsaKey(&key);
+        return WOLFCLU_FAILURE;
     }
 
     /* set up the file name output buffer */
     fOutNameBuf = (char*) XMALLOC( (fNameSz + fExtSz), HEAP_HINT,
                                     DYNAMIC_TYPE_TMP_BUFFER);
-    if (fOutNameBuf == NULL)
+    if (fOutNameBuf == NULL) {
+        wc_FreeRsaKey(&key);
         return MEMORY_E;
+    }
 
     /* get the first part of the file name setup */
     XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
@@ -795,15 +806,16 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             if (ret == WOLFCLU_SUCCESS) {
                 file = XFOPEN(fOutNameBuf, "wb");
                 if (!file) {
-                    XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     ret = OUTPUT_FILE_ERROR;
                 }
             }
 
-                /* determine size for buffer */
-            derBufSz = wc_RsaKeyToDer(&key, NULL, 0);
-            if (derBufSz < 0) {
-                ret = MEMORY_E;
+            /* determine size for buffer */
+            if (ret == WOLFCLU_SUCCESS) {
+                derBufSz = wc_RsaKeyToDer(&key, NULL, 0);
+                if (derBufSz < 0) {
+                    ret = MEMORY_E;
+                }
             }
 
             /* allocate DER buffer */
@@ -839,7 +851,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                         ret = OUTPUT_FILE_ERROR;
                     }
                     else {
-                        ret = WOLFCLU_SUCCESS; /* reset ret to WOLFCLU_SUCCESS */
+                        ret = WOLFCLU_SUCCESS;
                     }
                 }
             }
@@ -851,7 +863,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                         ret = OUTPUT_FILE_ERROR;
                     }
                     else {
-                        ret = WOLFCLU_SUCCESS; /* reset ret to WOLFCLU_SUCCESS */
+                        ret = WOLFCLU_SUCCESS;
                     }
                 }
             }
@@ -871,15 +883,16 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             if (ret == WOLFCLU_SUCCESS) {
                 file = XFOPEN(fOutNameBuf, "wb");
                 if (!file) {
-                    XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     ret = OUTPUT_FILE_ERROR;
                 }
             }
 
             /* determine size for buffer */
-            derBufSz = wc_RsaKeyToPublicDer(&key, NULL, 0);
-            if (derBufSz < 0) {
-                ret = MEMORY_E;
+            if (ret == WOLFCLU_SUCCESS) {
+                derBufSz = wc_RsaKeyToPublicDer(&key, NULL, 0);
+                if (derBufSz < 0) {
+                    ret = MEMORY_E;
+                }
             }
 
             /* allocate DER buffer */
@@ -915,7 +928,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                         ret = OUTPUT_FILE_ERROR;
                     }
                     else {
-                        ret = WOLFCLU_SUCCESS; /* reset ret to WOLFCLU_SUCCESS */
+                        ret = WOLFCLU_SUCCESS;
                     }
                 }
             }
@@ -927,27 +940,25 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                         ret = OUTPUT_FILE_ERROR;
                     }
                     else {
-                        ret = WOLFCLU_SUCCESS; /* reset ret to WOLFCLU_SUCCESS */
+                        ret = WOLFCLU_SUCCESS;
                     }
                 }
             }
 
             if (ret != WOLFCLU_SUCCESS) {
-                XFCLOSE(file);
-                XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return OUTPUT_FILE_ERROR;
+                ret = OUTPUT_FILE_ERROR;
             }
             XFCLOSE(file);
             break;
         default:
             wolfCLU_LogError("Invalid directive");
-            XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return BAD_FUNC_ARG;
+            ret = BAD_FUNC_ARG;
     }
 
-    if (file != NULL)
+    if (file != NULL) {
         XFCLOSE(file);
         XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
     if (derBuf != NULL) {
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
