@@ -49,7 +49,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     word32 pubKeySz;                     /* size of public key */
 #endif
     ed25519_key edKeyOut;                /* the ed25519 key structure */
-    char* finalOutFNm;                   /* file name + append */
+    char* finalOutFNm = NULL;            /* file name + append */
     XFILE file = NULL;                   /* file stream */
     byte* derBuf = NULL;                 /* buffer for DER format */
     byte* pemBuf = NULL;                 /* buffer for PEM format */
@@ -748,19 +748,19 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                        keySz, long exp)
 {
 #ifndef NO_RSA
-    RsaKey key;                       /* the RSA key structure */
-    XFILE file = NULL;                /* file stream */
-    int ret = WOLFCLU_SUCCESS;        /* return value */
-    int fNameSz;                      /* file name without append */
-    int fExtSz = 6;                   /* # of bytes to append to file name */
-    char fExtPriv[6] = ".priv\0";     /* last part of the priv file name */
-    char fExtPub[6]  = ".pub\0\0";    /* last part of the pub file name*/
-    char* fOutNameBuf = NULL;         /* file name + fExt */
-    int flagOutputPub = 0;            /* set if outputting both priv/pub */
-    byte* derBuf = NULL;              /* buffer for DER format */
-    byte* pemBuf = NULL;              /* buffer for PEM format */
-    int derBufSz = -1;                /* size of DER buffer */
-    int pemBufSz = 0;                 /* size of PEM buffer */
+    RsaKey key;                        /* the RSA key structure */
+    XFILE file = NULL;                 /* file stream */
+    int   ret = WOLFCLU_SUCCESS;       /* return value */
+    int   fNameSz;                     /* file name without append */
+    int   fExtSz       = 6;            /* # of bytes to append to file name */
+    char  fExtPriv[6]  = ".priv\0";    /* last part of the priv file name */
+    char  fExtPub[6]   = ".pub\0\0";   /* last part of the pub file name*/
+    char* fOutNameBuf  = NULL;         /* file name + fExt */
+    int   flagOutputPub = 0;           /* set if outputting both priv/pub */
+    byte* derBuf       = NULL;         /* buffer for DER format */
+    byte* pemBuf       = NULL;         /* buffer for PEM format */
+    int   derBufSz     = -1;           /* size of DER buffer */
+    int   pemBufSz     = 0;            /* size of PEM buffer */
 
     WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fName);
     fNameSz = (int)XSTRLEN(fName);
