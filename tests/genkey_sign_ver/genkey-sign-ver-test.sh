@@ -156,23 +156,23 @@ VERIFYOUTNAME="rsa-sigout"
 gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${VERIFYOUTNAME}
 
 # TODO - raw support
-ALGORITHM="ed25519"
-KEYFILENAME="edkey"
-SIGOUTNAME="ed-signed.sig"
-DERPEMRAW="raw"
+# ALGORITHM="ed25519"
+# KEYFILENAME="edkey"
+# SIGOUTNAME="ed-signed.sig"
+# DERPEMRAW="raw"
 # gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
 
-ALGORITHM="ecc"
-KEYFILENAME="ecckey"
-SIGOUTNAME="ecc-signed.sig"
-DERPEMRAW="raw"
+# ALGORITHM="ecc"
+# KEYFILENAME="ecckey"
+# SIGOUTNAME="ecc-signed.sig"
+# DERPEMRAW="raw"
 # gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
 
-ALGORITHM="rsa"
-KEYFILENAME="rsakey"
-SIGOUTNAME="rsa-signed.sig"
-DERPEMRAW="raw"
-VERIFYOUTNAME="rsa-sigout"
+# ALGORITHM="rsa"
+# KEYFILENAME="rsakey"
+# SIGOUTNAME="rsa-signed.sig"
+# DERPEMRAW="raw"
+# VERIFYOUTNAME="rsa-sigout"
 # gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${VERIFYOUTNAME}
 
 
