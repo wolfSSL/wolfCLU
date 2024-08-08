@@ -42,12 +42,10 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     int flagOutputPub = 0;               /* set if outputting both priv/pub */
     char privAppend[6] = ".priv\0";      /* last part of the priv file name */
     char pubAppend[6] = ".pub\0\0";      /* last part of the pub file name*/
-#if 0
     byte privKeyBuf[ED25519_KEY_SIZE*2]; /* will hold public & private parts */
     byte pubKeyBuf[ED25519_KEY_SIZE];    /* holds just the public key part */
     word32 privKeySz;                    /* size of private key */
     word32 pubKeySz;                     /* size of public key */
-#endif
     ed25519_key edKeyOut;                /* the ed25519 key structure */
     char* finalOutFNm = NULL;            /* file name + append */
     XFILE file = NULL;                   /* file stream */
@@ -80,22 +78,20 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
         }
     }
 
-#if 0
-    /* get key size */
-    privKeySz = wc_ed25519_priv_size(&edKeyOut);
-    if (privKeySz <= 0)
-        return WC_KEY_SIZE_E;
+    if (format == RAW_FORM && ret == 0) {
+        /* get key size */
+        privKeySz = wc_ed25519_priv_size(&edKeyOut);
+        if (privKeySz <= 0)
+            ret = WC_KEY_SIZE_E;
 
-    pubKeySz = wc_ed25519_pub_size(&edKeyOut);
-    if (pubKeySz <= 0)
-        return WC_KEY_SIZE_E;
+        pubKeySz = wc_ed25519_pub_size(&edKeyOut);
+        if (pubKeySz <= 0)
+            ret = WC_KEY_SIZE_E;
 
-    /* export keys to buffers */
-    ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz, pubKeyBuf,
-                                &pubKeySz);
-    if (ret != 0)
-        return ret;
-#endif
+        /* export keys to buffers */
+        ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz,
+                                    pubKeyBuf, &pubKeySz);
+    }
 
     /* set up the file name output buffer */
     if (ret == 0) {
@@ -130,60 +126,70 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
                 }
             }
 
-            /* determine size for buffer */
-            if (ret == 0) {
-                derSz = wc_Ed25519PrivateKeyToDer(&edKeyOut, NULL, 0);
-                if (derSz <= 0) {
-                    ret = MEMORY_E;
+            /* write RAW format to the file */
+            if (format == RAW_FORM && ret == 0) {
+                if (XFWRITE(privKeyBuf, 1, privKeySz, file) != privKeySz) {
+                    ret = OUTPUT_FILE_ERROR;
                 }
             }
-
-            /* allocate DER buffer */
-            if (ret == 0) {
-                derBuf = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                if (derBuf == NULL) {
-                    ret = MEMORY_E;
-                }
-            }
-
-            /* convert Key to DER */
-            if (ret == 0) {
-                derSz = wc_Ed25519PrivateKeyToDer(&edKeyOut, derBuf, derSz);
-                if (derSz < 0) {
-                    ret = derSz;
-                }
-            }
-            if (ret != 0)
-                break;
-
-            /* convert DER to PEM if necessary */
-            if (format == PEM_FORM) {
+            else { /* DER and PEM */
+                /* determine size for buffer */
                 if (ret == 0) {
-                    pemSz = wolfCLU_KeyDerToPem(derBuf, derSz, &pemBuf, PRIVATEKEY_TYPE,
-                                                DYNAMIC_TYPE_TMP_BUFFER);
-                    if (pemSz < 0) {
-                        ret = pemSz;
+                    derSz = wc_Ed25519PrivateKeyToDer(&edKeyOut, NULL, 0);
+                    if (derSz <= 0) {
+                        ret = MEMORY_E;
                     }
                 }
+
+                /* allocate DER buffer */
                 if (ret == 0) {
-                    ret = (int)XFWRITE(pemBuf, 1, pemSz, file);
-                    if (ret != pemSz) {
-                        ret = OUTPUT_FILE_ERROR;
-                    }
-                    else {
-                        ret = 0;
+                    derBuf = (byte*)XMALLOC(derSz, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (derBuf == NULL) {
+                        ret = MEMORY_E;
                     }
                 }
-            }
-            else {
-                /* write DER format to the file */
+
+                /* convert Key to DER */
                 if (ret == 0) {
-                    ret = (int)XFWRITE(derBuf, 1, derSz, file);
-                    if (ret != derSz) {
-                        ret = OUTPUT_FILE_ERROR;
+                    derSz = wc_Ed25519PrivateKeyToDer(&edKeyOut, derBuf, derSz);
+                    if (derSz < 0) {
+                        ret = derSz;
                     }
-                    else {
-                        ret = 0;
+                }
+                if (ret != 0)
+                    break;
+
+                /* convert DER to PEM if necessary */
+                if (format == PEM_FORM) {
+                    if (ret == 0) {
+                        pemSz = wolfCLU_KeyDerToPem(derBuf, derSz, &pemBuf,
+                                PRIVATEKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
+                        if (pemSz < 0) {
+                            ret = pemSz;
+                        }
+                    }
+                    /* write PEM format to the file */
+                    if (ret == 0) {
+                        ret = (int)XFWRITE(pemBuf, 1, pemSz, file);
+                        if (ret != pemSz) {
+                            ret = OUTPUT_FILE_ERROR;
+                        }
+                        else {
+                            ret = 0;
+                        }
+                    }
+                }
+                else {
+                    /* write DER format to the file */
+                    if (ret == 0) {
+                        ret = (int)XFWRITE(derBuf, 1, derSz, file);
+                        if (ret != derSz) {
+                            ret = OUTPUT_FILE_ERROR;
+                        }
+                        else {
+                            ret = 0;
+                        }
                     }
                 }
             }
@@ -215,60 +221,70 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
                 }
             }
 
-            /* determine size for buffer */
-            if (ret == 0) {
-                derSz = wc_Ed25519PublicKeyToDer(&edKeyOut, NULL, 0, 1);
-                if (derSz <= 0) {
-                    ret = MEMORY_E;
+            /* write RAW format to the file */
+            if (format == RAW_FORM && ret == 0) {
+                if (XFWRITE(pubKeyBuf, 1, pubKeySz, file) != pubKeySz) {
+                    ret = OUTPUT_FILE_ERROR;
                 }
             }
-
-            /* allocate DER buffer */
-            if (ret == 0) {
-                derBuf = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                if (derBuf == NULL) {
-                    ret = MEMORY_E;
-                }
-            }
-
-            /* convert Key to DER */
-            if (ret == 0) {
-                derSz = wc_Ed25519PublicKeyToDer(&edKeyOut, derBuf, derSz, 1);
-                if (derSz < 0) {
-                    ret = derSz;
-                }
-            }
-
-            if (ret != 0)
-                break;
-
-            /* convert DER to PEM if necessary */
-            if (format == PEM_FORM) {
+            else { /* DER and PEM */
+                /* determine size for buffer */
                 if (ret == 0) {
-                    pemSz = wolfCLU_KeyDerToPem(derBuf, derSz, &pemBuf, PUBLICKEY_TYPE,
-                                                DYNAMIC_TYPE_TMP_BUFFER);
-                    if (pemSz < 0) {
-                        ret = pemSz;
+                    derSz = wc_Ed25519PublicKeyToDer(&edKeyOut, NULL, 0, 1);
+                    if (derSz <= 0) {
+                        ret = MEMORY_E;
                     }
                 }
+
+                /* allocate DER buffer */
                 if (ret == 0) {
-                    ret = (int)XFWRITE(pemBuf, 1, pemSz, file);
-                    if (ret != pemSz) {
-                        ret = OUTPUT_FILE_ERROR;
-                    } else {
-                        ret = 0;
+                    derBuf = (byte*)XMALLOC(derSz, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (derBuf == NULL) {
+                        ret = MEMORY_E;
                     }
                 }
-            }
-            else {
-                /* write DER format to the file */
+
+                /* convert Key to DER */
                 if (ret == 0) {
-                    ret = (int)XFWRITE(derBuf, 1, derSz, file);
-                    if (ret != derSz) {
-                        ret = OUTPUT_FILE_ERROR;
+                    derSz = wc_Ed25519PublicKeyToDer(&edKeyOut, derBuf, derSz, 1);
+                    if (derSz < 0) {
+                        ret = derSz;
                     }
-                    else {
-                        ret = 0;
+                }
+
+                if (ret != 0)
+                    break;
+
+                /* convert DER to PEM if necessary */
+                if (format == PEM_FORM) {
+                    if (ret == 0) {
+                        pemSz = wolfCLU_KeyDerToPem(derBuf, derSz, &pemBuf,
+                                PUBLICKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
+                        if (pemSz < 0) {
+                            ret = pemSz;
+                        }
+                    }
+                    /* write PEM format to the file */
+                    if (ret == 0) {
+                        ret = (int)XFWRITE(pemBuf, 1, pemSz, file);
+                        if (ret != pemSz) {
+                            ret = OUTPUT_FILE_ERROR;
+                        } else {
+                            ret = 0;
+                        }
+                    }
+                }
+                else {
+                    /* write DER format to the file */
+                    if (ret == 0) {
+                        ret = (int)XFWRITE(derBuf, 1, derSz, file);
+                        if (ret != derSz) {
+                            ret = OUTPUT_FILE_ERROR;
+                        }
+                        else {
+                            ret = 0;
+                        }
                     }
                 }
             }

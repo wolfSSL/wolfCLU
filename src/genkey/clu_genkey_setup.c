@@ -79,8 +79,12 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         format = argv[ret+1];
     }
     ret = wolfCLU_checkOutform(format);
-    if (ret == PEM_FORM || ret == DER_FORM) {
-        WOLFCLU_LOG(WOLFCLU_L0, "OUTPUT A %s FILE", (ret == PEM_FORM)? "PEM": "DER");
+    if (ret == PEM_FORM || ret == DER_FORM || ret == RAW_FORM) {
+        const char* formatStr = (ret == PEM_FORM) ? "PEM" :
+                                (ret == DER_FORM) ? "DER" :
+                                "RAW";
+
+        WOLFCLU_LOG(WOLFCLU_L0, "OUTPUT A %s FILE", formatStr);
         formatArg = ret;
     }
     else {

@@ -23,8 +23,6 @@
 #/
 #
 
-set -x
-
 # Skip test if filesystem disabled
 FILESYSTEM=`cat config.log | grep "disable\-filesystem"`
 if [ "$FILESYSTEM" != "" ]
@@ -155,25 +153,10 @@ DERPEMRAW="pem"
 VERIFYOUTNAME="rsa-sigout"
 gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${VERIFYOUTNAME}
 
-# TODO - raw support
-# ALGORITHM="ed25519"
-# KEYFILENAME="edkey"
-# SIGOUTNAME="ed-signed.sig"
-# DERPEMRAW="raw"
-# gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
-
-# ALGORITHM="ecc"
-# KEYFILENAME="ecckey"
-# SIGOUTNAME="ecc-signed.sig"
-# DERPEMRAW="raw"
-# gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
-
-# ALGORITHM="rsa"
-# KEYFILENAME="rsakey"
-# SIGOUTNAME="rsa-signed.sig"
-# DERPEMRAW="raw"
-# VERIFYOUTNAME="rsa-sigout"
-# gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${VERIFYOUTNAME}
-
+ALGORITHM="ed25519"
+KEYFILENAME="edkey"
+SIGOUTNAME="ed-signed.sig"
+DERPEMRAW="raw"
+gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
 
 exit 0

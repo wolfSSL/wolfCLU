@@ -27,6 +27,7 @@
                                            * and ED25519_SIG_VER */
 #ifndef WOLFCLU_NO_FILESYSTEM
 
+# if 0
 static int wolfCLU_generate_public_key_ed25519(char* privKey, int inForm, byte* outBuf,
                                                word32 outLen)
 {
@@ -129,7 +130,7 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, int inForm, byte* 
     return NOT_COMPILED_IN;
 #endif
 }
-
+#endif
 
 int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
                              char* keyPath, int keyType, int pubIn,
@@ -559,33 +560,45 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
         }
     }
 
-    if (pubIn == 1) {
+    if (pubIn == 1 && ret == 0) {
+        /* decode public key from RAW-encoded input */
+        if (inForm == RAW_FORM) {
+            ret = wc_ed25519_import_public(keyBuf, ED25519_KEY_SIZE, &key);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to import raw public key.\nRET: %d", ret);
+            }
+        }
         /* decode public key from DER-encoded input */
-        if (ret == 0) {
+        else {
             ret = wc_Ed25519PublicKeyDecode(keyBuf, &index, &key, keyFileSz);
             if (ret != 0) {
                 wolfCLU_LogError("Failed to decode public key from DER.\nRET: %d", ret);
             }
         }
     }
-    else {
-        /* derive public key from private key */
-        if (ret == 0) {
-            ret = wolfCLU_generate_public_key_ed25519(keyPath, inForm, keyBuf,
-                                                      ED25519_KEY_SIZE);
-            if (ret == WOLFCLU_SUCCESS) {
-               ret = 0;
+    else if (ret == 0) {
+        /* handle private key decoding and public key derivation */
+        if (inForm == RAW_FORM) {
+            ret = wc_ed25519_import_private_key(keyBuf,
+                                                ED25519_KEY_SIZE,
+                                                keyBuf + ED25519_KEY_SIZE,
+                                                ED25519_KEY_SIZE, &key);
+            if (ret < 0) {
+                wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
             }
-            else {
-                wolfCLU_LogError("Failed to verify data with pub key.\nRET: %d", ret);
+        }
+        else {
+            ret = wc_Ed25519PrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to import private key.\nRET: %d", ret);
             }
         }
 
-        /* decode public key */
+        /* calculate the public key */
         if (ret == 0) {
-            ret = wc_ed25519_import_public(keyBuf, ED25519_KEY_SIZE, &key);
-            if (ret != 0) {
-                wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
+            ret = wc_ed25519_make_public(&key, key.p, ED25519_PUB_KEY_SIZE);
+            if (ret == 0) {
+                key.pubKeySet = 1;
             }
         }
     }

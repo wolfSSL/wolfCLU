@@ -465,18 +465,30 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
         }
     }
 
-    /* decode the private key from the DER-encoded input */
-    if (ret == 0) {
-        ret = wc_Ed25519PrivateKeyDecode(keyBuf, &index, &key, privFileSz);
-        if (ret == 0) {
-            /* Calculate the public key */
-            ret = wc_ed25519_make_public(&key, key.p, ED25519_PUB_KEY_SIZE);
-            if (ret == 0) {
-                key.pubKeySet = 1;
-            }
+    /* retrieve RAW private key and store in the ED25519 Key */
+    if (inForm == RAW_FORM && ret == 0) {
+        ret = wc_ed25519_import_private_key(keyBuf,
+                                        ED25519_KEY_SIZE,
+                                        keyBuf + ED25519_KEY_SIZE,
+                                        ED25519_KEY_SIZE, &key);
+        if (ret != 0 ) {
+            wolfCLU_LogError("Failed to import RAW private key.\nRET: %d", ret);
         }
-        else {
-            wolfCLU_LogError("Failed to import private key.\nRET: %d", ret);
+    }
+    else {
+        /* decode the private key from the DER-encoded input */
+        if (ret == 0) {
+            ret = wc_Ed25519PrivateKeyDecode(keyBuf, &index, &key, privFileSz);
+            if (ret == 0) {
+                /* Calculate the public key */
+                ret = wc_ed25519_make_public(&key, key.p, ED25519_PUB_KEY_SIZE);
+                if (ret == 0) {
+                    key.pubKeySet = 1;
+                }
+            }
+            else {
+                wolfCLU_LogError("Failed to import private key.\nRET: %d", ret);
+            }
         }
     }
 
