@@ -26,14 +26,13 @@
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
-int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pubIn) {
+int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
     int ret = 0;
     byte* der = NULL;
-
     const unsigned char* keyBuf = *pkeyBuf;
 
     if (pubIn == 0) {
-        ret = wc_KeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), NULL, 0, NULL);
+        ret = wc_KeyPemToDer(keyBuf, pkeySz, NULL, 0, NULL);
         if (ret > 0) {
             int derSz = ret;
             der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -41,8 +40,7 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pubIn) {
                 ret = MEMORY_E;
             }
             else {
-                ret = wc_KeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), der,
-                                     derSz, NULL);
+                ret = wc_KeyPemToDer(keyBuf, pkeySz, der, derSz, NULL);
                 if (ret > 0) {
                     /* replace incoming pkeyBuf with new der buf */
                     XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -56,7 +54,7 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pubIn) {
         }
     }
     else {
-        ret = wc_PubKeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf), NULL, 0);
+        ret = wc_PubKeyPemToDer(keyBuf, pkeySz, NULL, 0);
         if (ret > 0) {
             int derSz = ret;
             der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -64,8 +62,7 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pubIn) {
                 ret = MEMORY_E;
             }
             else {
-                ret = wc_PubKeyPemToDer(keyBuf, (int)XSTRLEN((char*)keyBuf),
-                                        der, derSz);
+                ret = wc_PubKeyPemToDer(keyBuf, pkeySz, der, derSz);
                 if (ret > 0) {
                     /* replace incoming pkeyBuf with new der buf */
                     XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -188,11 +185,14 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     if (ret == 0) {
         XFSEEK(privKeyFile, 0, SEEK_END);
         privFileSz = (int)XFTELL(privKeyFile);
-        keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf == NULL) {
             ret = MEMORY_E;
         }
-        else if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+    }
+    if (ret == 0) {
+        XMEMSET(keyBuf, 0, privFileSz+1);
+        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
             (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -200,7 +200,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
 
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, 0);
+        ret = wolfCLU_KeyPemToDer(&keyBuf, privFileSz, 0);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
         }
@@ -316,11 +316,14 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     if (ret == 0) {
         XFSEEK(privKeyFile, 0, SEEK_END);
         privFileSz = (int)XFTELL(privKeyFile);
-        keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf == NULL) {
             ret = MEMORY_E;
         }
-        else if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+    }
+    if (ret == 0) {
+        XMEMSET(keyBuf, 0, privFileSz+1);
+        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
             (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -328,7 +331,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
 
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, 0);
+        ret = wolfCLU_KeyPemToDer(&keyBuf, privFileSz, 0);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
         }
@@ -437,11 +440,14 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     if (ret == 0) {
         XFSEEK(privKeyFile, 0, SEEK_END);
         privFileSz = (int)XFTELL(privKeyFile);
-        keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf == NULL) {
             ret = MEMORY_E;
         }
-        else if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+    }
+    if (ret == 0) {
+        XMEMSET(keyBuf, 0, privFileSz+1);
+        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
             (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -449,7 +455,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
 
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, 0);
+        ret = wolfCLU_KeyPemToDer(&keyBuf, privFileSz, 0);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
         }

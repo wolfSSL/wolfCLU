@@ -46,5 +46,5 @@ int wolfCLU_sign_data_rsa(byte*, char*, word32, char*, int);
 int wolfCLU_sign_data_ecc(byte*, char*, word32, char*, int);
 int wolfCLU_sign_data_ed25519(byte*, char*, word32, char*, int);
 
-int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pubIn);
+int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn);
 

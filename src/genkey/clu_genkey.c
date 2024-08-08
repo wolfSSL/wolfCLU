@@ -193,6 +193,14 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             if (flagOutputPub == 0) {
                 break;
             } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1 */
+
+            XFCLOSE(file);
+            file = NULL;
+            XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            derBuf = NULL;
+            XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            pemBuf = NULL;
+
             FALL_THROUGH;
         case PUB_ONLY_FILE:
             /* add on the final part of the file name ".pub" */
@@ -268,7 +276,6 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             if (ret != 0) {
                 ret = OUTPUT_FILE_ERROR;
             }
-            XFCLOSE(file);
             break;
         default:
             wolfCLU_LogError("Invalid directive");
@@ -277,15 +284,19 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     }
 
     /* cleanup allocated resources */
-    if (file != NULL) {
-        XFCLOSE(file);
+    if (finalOutFNm != NULL) {
         XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        finalOutFNm = NULL;
     }
     if (derBuf != NULL) {
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (pemBuf != NULL) {
         XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (file != NULL) {
+        XFCLOSE(file);
+        file = NULL;
     }
 
     /* expected ret == WOLFCLU_SUCCESS */
@@ -886,6 +897,14 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             if (flagOutputPub == 0) {
                 break;
             } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1 */
+
+            XFCLOSE(file);
+            file = NULL;
+            XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            derBuf = NULL;
+            XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            pemBuf = NULL;
+
             FALL_THROUGH;
         case PUB_ONLY_FILE:
             /* add on the final part of the file name ".pub" */
@@ -961,7 +980,6 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
             if (ret != WOLFCLU_SUCCESS) {
                 ret = OUTPUT_FILE_ERROR;
             }
-            XFCLOSE(file);
             break;
         default:
             wolfCLU_LogError("Invalid directive");
@@ -969,9 +987,10 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
         } /* switch */
     }
 
-    if (file != NULL) {
-        XFCLOSE(file);
+    /* cleanup allocated resources */
+    if (fOutNameBuf != NULL) {
         XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        fOutNameBuf = NULL;
     }
     if (derBuf != NULL) {
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -979,6 +998,11 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     if (pemBuf != NULL) {
         XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
+     if (file != NULL) {
+        XFCLOSE(file);
+        file = NULL;
+    }
+
     wc_FreeRsaKey(&key);
 
     return ret;

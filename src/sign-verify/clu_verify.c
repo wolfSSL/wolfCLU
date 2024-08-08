@@ -58,20 +58,22 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, int inForm, byte* 
     if (ret == 0) {
         XFSEEK(privKeyFile, 0, SEEK_END);
         privFileSz = (int)XFTELL(privKeyFile);
-        keyBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf == NULL) {
             ret = MEMORY_E;
         }
-        else if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+    }
+    if (ret == 0) {
+        XMEMSET(keyBuf, 0, privFileSz+1);
+        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
             (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
-            XFCLOSE(privKeyFile);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, 0);
+        ret = wolfCLU_KeyPemToDer(&keyBuf, privFileSz, 0);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
         }
@@ -274,11 +276,14 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     if (ret == 0) {
         XFSEEK(keyPathFile, 0, SEEK_END);
         keyFileSz = (int)XFTELL(keyPathFile);
-        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        keyBuf = (byte*)XMALLOC(keyFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf == NULL) {
             ret = MEMORY_E;
         }
-        else if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
+    }
+    if (ret == 0) {
+        XMEMSET(keyBuf, 0, keyFileSz+1);
+        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
             (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -286,7 +291,7 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, pubIn);
+        ret = wolfCLU_KeyPemToDer(&keyBuf, keyFileSz, pubIn);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
         }
@@ -404,11 +409,14 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     if (ret == 0) {
         XFSEEK(keyPathFile, 0, SEEK_END);
         keyFileSz = (int)XFTELL(keyPathFile);
-        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        keyBuf = (byte*)XMALLOC(keyFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf == NULL) {
             ret = MEMORY_E;
         }
-        else if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
+    }
+    if (ret == 0) {
+        XMEMSET(keyBuf, 0, keyFileSz+1);
+        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
             (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -416,7 +424,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
 
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, pubIn);
+        ret = wolfCLU_KeyPemToDer(&keyBuf, keyFileSz, pubIn);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
         }
@@ -505,15 +513,9 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 
     XFILE keyPathFile = NULL;
     ed25519_key key;
-    byte* keyBuf = (byte*)XMALLOC(ED25519_KEY_SIZE, HEAP_HINT,
-            DYNAMIC_TYPE_TMP_BUFFER);
-    if (keyBuf == NULL) {
-        wolfCLU_LogError("malloc failed");
-        ret = MEMORY_E;
-    }
+    byte* keyBuf = NULL;
 
     XMEMSET(&key, 0, sizeof(key));
-    XMEMSET(keyBuf, 0, ED25519_KEY_SIZE);
 
     /* initialize ED25519 key */
     ret = wc_ed25519_init(&key);
@@ -532,19 +534,22 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     if (ret == 0) {
         XFSEEK(keyPathFile, 0, SEEK_END);
         keyFileSz = (int)XFTELL(keyPathFile);
-        XFSEEK(keyPathFile, 0, SEEK_SET);
-        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        keyBuf = (byte*)XMALLOC(keyFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (keyBuf == NULL) {
             ret = MEMORY_E;
         }
-        else if ((int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+    }
+    if (ret == 0) {
+        XMEMSET(keyBuf, 0, keyFileSz+1);
+        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
+            (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, pubIn);
+        ret = wolfCLU_KeyPemToDer(&keyBuf, keyFileSz, pubIn);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
         }
