@@ -57,6 +57,7 @@ include tests/genkey_sign_ver/include.am
 include tests/hash/include.am
 include tests/bench/include.am
 include tests/client/include.am
+include tests/server/include.am
 include ide/include.am
 #####include data/include.am
 
