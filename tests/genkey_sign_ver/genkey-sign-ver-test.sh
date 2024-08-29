@@ -66,7 +66,7 @@ rsa_compare_decrypted(){
 gen_key_sign_ver_test(){
 
     # generate a key pair for signing
-    ./wolfssl -genkey $1 -out $2 -outform der KEYPAIR
+    ./wolfssl -genkey $1 -out $2 -outform $4 KEYPAIR
     RESULT=$?
     printf '%s\n' "genkey RESULT - $RESULT"
     [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 genkey" && \
@@ -74,40 +74,40 @@ gen_key_sign_ver_test(){
     printf '%s\n' "--enable-keygen" && exit -1
 
     # test signing with priv key
-    ./wolfssl -$1 -sign -inkey $2.priv -in sign-this.txt -out $3
+    ./wolfssl -$1 -sign -inkey $2.priv -inform $4 -in sign-this.txt -out $3
     RESULT=$?
     printf '%s\n' "sign RESULT - $RESULT"
     [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 sign" && exit -1
 
     # test verifying with priv key
     if [ "${1}" = "rsa" ]; then
-        ./wolfssl -$1 -verify -inkey $2.priv -sigfile $3 -in sign-this.txt \
-                  -out $4.private_result
+        ./wolfssl -$1 -verify -inkey $2.priv -inform $4 -sigfile $3 -in sign-this.txt \
+                  -out $5.private_result
     else
-        ./wolfssl -$1 -verify -inkey $2.priv -sigfile $3 -in sign-this.txt
+        ./wolfssl -$1 -verify -inkey $2.priv -inform $4 -sigfile $3 -in sign-this.txt
     fi
     RESULT=$?
     printf '%s\n' "private verify RESULT - $RESULT"
-    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 sign" && exit -1
+    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 private verify" && exit -1
 
     # test verifying with pub key
     if [ "${1}" = "rsa" ]; then
-        ./wolfssl -$1 -verify -inkey $2.pub -sigfile $3 -in sign-this.txt \
-                  -out $4.public_result -pubin
+        ./wolfssl -$1 -verify -inkey $2.pub -inform $4 -sigfile $3 -in sign-this.txt \
+                  -out $5.public_result -pubin
     else
-        ./wolfssl -$1 -verify -inkey $2.pub -sigfile $3 -in sign-this.txt -pubin
+        ./wolfssl -$1 -verify -inkey $2.pub -inform $4 -sigfile $3 -in sign-this.txt -pubin
     fi
     RESULT=$?
     printf '%s\n' "public verify RESULT - $RESULT"
-    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 sign" && exit -1
+    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 public verify " && exit -1
 
     if [ $1 = "rsa" ]; then
         ORIGINAL=`cat -A sign-this.txt`
 
-        DECRYPTED=`cat -A $4.private_result`
+        DECRYPTED=`cat -A $5.private_result`
         rsa_compare_decrypted "${DECRYPTED}" "${ORIGINAL}"
 
-        DECRYPTED=`cat -A $4.public_result`
+        DECRYPTED=`cat -A $5.public_result`
         rsa_compare_decrypted "${DECRYPTED}" "${ORIGINAL}"
     fi
 
@@ -118,17 +118,45 @@ create_sign_data_file
 ALGORITHM="ed25519"
 KEYFILENAME="edkey"
 SIGOUTNAME="ed-signed.sig"
-gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME}
+DERPEMRAW="der"
+gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
 
 ALGORITHM="ecc"
 KEYFILENAME="ecckey"
 SIGOUTNAME="ecc-signed.sig"
-gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME}
+DERPEMRAW="der"
+gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
 
 ALGORITHM="rsa"
 KEYFILENAME="rsakey"
 SIGOUTNAME="rsa-signed.sig"
+DERPEMRAW="der"
 VERIFYOUTNAME="rsa-sigout"
-gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${VERIFYOUTNAME}
+gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${VERIFYOUTNAME}
+
+ALGORITHM="ed25519"
+KEYFILENAME="edkey"
+SIGOUTNAME="ed-signed.sig"
+DERPEMRAW="pem"
+gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
+
+ALGORITHM="ecc"
+KEYFILENAME="ecckey"
+SIGOUTNAME="ecc-signed.sig"
+DERPEMRAW="pem"
+gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
+
+ALGORITHM="rsa"
+KEYFILENAME="rsakey"
+SIGOUTNAME="rsa-signed.sig"
+DERPEMRAW="pem"
+VERIFYOUTNAME="rsa-sigout"
+gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${VERIFYOUTNAME}
+
+ALGORITHM="ed25519"
+KEYFILENAME="edkey"
+SIGOUTNAME="ed-signed.sig"
+DERPEMRAW="raw"
+gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
 
 exit 0

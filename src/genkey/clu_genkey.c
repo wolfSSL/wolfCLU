@@ -39,7 +39,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     int ret;                             /* return value */
     int fOutNmSz;                        /* file name without append */
     int fOutNmAppendSz = 6;              /* # of bytes to append to file name */
-    int flagOutputPub = 0;              /* set if outputting both priv/pub */
+    int flagOutputPub = 0;               /* set if outputting both priv/pub */
     char privAppend[6] = ".priv\0";      /* last part of the priv file name */
     char pubAppend[6] = ".pub\0\0";      /* last part of the pub file name*/
     byte privKeyBuf[ED25519_KEY_SIZE*2]; /* will hold public & private parts */
@@ -47,112 +47,276 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     word32 privKeySz;                    /* size of private key */
     word32 pubKeySz;                     /* size of public key */
     ed25519_key edKeyOut;                /* the ed25519 key structure */
-    char* finalOutFNm;                   /* file name + append */
-    XFILE file;                          /* file stream */
+    char* finalOutFNm = NULL;            /* file name + append */
+    XFILE file = NULL;                   /* file stream */
+    byte* derBuf = NULL;                 /* buffer for DER format */
+    byte* pemBuf = NULL;                 /* buffer for PEM format */
+    int derSz;                           /* size of DER buffer */
+    int pemSz;                           /* size of PEM buffer */
 
-
-    WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fOutNm);
-    fOutNmSz = (int)XSTRLEN(fOutNm);
-
-    /*--------------- INIT ---------------------*/
+    /* initialize ed25519 key */
     ret = wc_ed25519_init(&edKeyOut);
-    if (ret != 0)
-        return ret;
-    /*--------------- MAKE KEY ---------------------*/
-    ret = wc_ed25519_make_key(rng, ED25519_KEY_SIZE, &edKeyOut);
-    if (ret != 0)
-        return ret;
-    /*--------------- GET KEY SIZES ---------------------*/
-    privKeySz = wc_ed25519_priv_size(&edKeyOut);
-    if (privKeySz <= 0)
-        return WC_KEY_SIZE_E;
-
-    pubKeySz = wc_ed25519_pub_size(&edKeyOut);
-    if (pubKeySz <= 0)
-        return WC_KEY_SIZE_E;
-    /*--------------- EXPORT KEYS TO BUFFERS ---------------------*/
-    ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz, pubKeyBuf,
-                                                                     &pubKeySz);
-    if (ret != 0)
-        return ret;
-
-    /*--------------- CONVERT TO PEM IF APPLICABLE  ---------------------*/
-    if (format == PEM_FORM) {
-        wolfCLU_LogError("Der to Pem for ed25519 key not yet implemented");
-        WOLFCLU_LOG(WOLFCLU_L0, "FEATURE COMING SOON!");
-        return FEATURE_COMING_SOON;
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize ed25519 key.\nRET: %d", ret);
     }
-    /*--------------- OUTPUT KEYS TO FILE(S) ---------------------*/
-    finalOutFNm = (char*) XMALLOC( (fOutNmSz + fOutNmAppendSz), HEAP_HINT,
-                                               DYNAMIC_TYPE_TMP_BUFFER);
-    if (finalOutFNm == NULL)
-        return MEMORY_E;
 
-    /* get the first part of the file name setup */
-    XMEMSET(finalOutFNm, 0, fOutNmSz + fOutNmAppendSz);
-    XMEMCPY(finalOutFNm, fOutNm, fOutNmSz);
+    /* make ed25519 key */
+    if (ret == 0) {
+        ret = wc_ed25519_make_key(rng, ED25519_KEY_SIZE, &edKeyOut);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to make ed25519 key.\nRET: %d", ret);
+        }
+    }
 
-    switch(directive) {
+    if (ret == 0) {
+        if (fOutNm == NULL) {
+            ret = BAD_FUNC_ARG;
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fOutNm);
+            fOutNmSz = (int)XSTRLEN(fOutNm);
+        }
+    }
+
+    if (format == RAW_FORM && ret == 0) {
+        /* get key size */
+        privKeySz = wc_ed25519_priv_size(&edKeyOut);
+        if (privKeySz <= 0)
+            ret = WC_KEY_SIZE_E;
+
+        pubKeySz = wc_ed25519_pub_size(&edKeyOut);
+        if (pubKeySz <= 0)
+            ret = WC_KEY_SIZE_E;
+
+        /* export keys to buffers */
+        ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz,
+                                    pubKeyBuf, &pubKeySz);
+    }
+
+    /* set up the file name output buffer */
+    if (ret == 0) {
+        finalOutFNm = (char*) XMALLOC( (fOutNmSz + fOutNmAppendSz), HEAP_HINT,
+                                                DYNAMIC_TYPE_TMP_BUFFER);
+        if (finalOutFNm == NULL) {
+            ret = MEMORY_E;
+        } else {
+            /* get the first part of the file name setup */
+            XMEMSET(finalOutFNm, 0, fOutNmSz + fOutNmAppendSz);
+            XMEMCPY(finalOutFNm, fOutNm, fOutNmSz);
+        }
+    }
+
+    if (ret == 0) {
+        switch(directive) {
         case PRIV_AND_PUB_FILES:
             flagOutputPub = 1;
-            /* Fall through to PRIV_ONLY_FILE */
+
+            /* fall through to PRIV_ONLY_FILE */
             FALL_THROUGH;
         case PRIV_ONLY_FILE:
             /* add on the final part of the file name ".priv" */
-            XMEMCPY(finalOutFNm+fOutNmSz, privAppend, fOutNmAppendSz);
+            XMEMCPY(finalOutFNm + fOutNmSz, privAppend, fOutNmAppendSz);
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
-            file = XFOPEN(finalOutFNm, "wb");
-            if (!file) {
-                XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return OUTPUT_FILE_ERROR;
+            /* open the file for writing the private key */
+            if (ret == 0) {
+                file = XFOPEN(finalOutFNm, "wb");
+                if (!file) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
             }
 
-            ret = (int)XFWRITE(privKeyBuf, 1, privKeySz, file);
-            if (ret <= 0) {
-                XFCLOSE(file);
-                XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return OUTPUT_FILE_ERROR;
+            /* write RAW format to the file */
+            if (format == RAW_FORM && ret == 0) {
+                if (XFWRITE(privKeyBuf, 1, privKeySz, file) != privKeySz) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
             }
-            fclose(file);
+            else { /* DER and PEM */
+                /* determine size for buffer */
+                if (ret == 0) {
+                    derSz = wc_Ed25519PrivateKeyToDer(&edKeyOut, NULL, 0);
+                    if (derSz <= 0) {
+                        ret = MEMORY_E;
+                    }
+                }
 
+                /* allocate DER buffer */
+                if (ret == 0) {
+                    derBuf = (byte*)XMALLOC(derSz, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (derBuf == NULL) {
+                        ret = MEMORY_E;
+                    }
+                }
+
+                /* convert Key to DER */
+                if (ret == 0) {
+                    derSz = wc_Ed25519PrivateKeyToDer(&edKeyOut, derBuf, derSz);
+                    if (derSz < 0) {
+                        ret = derSz;
+                    }
+                }
+                if (ret != 0)
+                    break;
+
+                /* convert DER to PEM if necessary */
+                if (format == PEM_FORM) {
+                    if (ret == 0) {
+                        pemSz = wolfCLU_KeyDerToPem(derBuf, derSz, &pemBuf,
+                                PRIVATEKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
+                        if (pemSz < 0) {
+                            ret = pemSz;
+                        }
+                    }
+                    /* write PEM format to the file */
+                    if (ret == 0) {
+                        ret = (int)XFWRITE(pemBuf, 1, pemSz, file);
+                        if (ret != pemSz) {
+                            ret = OUTPUT_FILE_ERROR;
+                        }
+                        else {
+                            ret = 0;
+                        }
+                    }
+                }
+                else {
+                    /* write DER format to the file */
+                    if (ret == 0) {
+                        ret = (int)XFWRITE(derBuf, 1, derSz, file);
+                        if (ret != derSz) {
+                            ret = OUTPUT_FILE_ERROR;
+                        }
+                        else {
+                            ret = 0;
+                        }
+                    }
+                }
+            }
+            if (ret != 0) {
+                break;
+            }
             if (flagOutputPub == 0) {
                 break;
-            } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1*/
+            } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1 */
+
+            XFCLOSE(file);
+            file = NULL;
+            XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            derBuf = NULL;
+            XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            pemBuf = NULL;
+
             FALL_THROUGH;
         case PUB_ONLY_FILE:
             /* add on the final part of the file name ".pub" */
-            XMEMCPY(finalOutFNm+fOutNmSz, pubAppend, fOutNmAppendSz);
+            XMEMCPY(finalOutFNm + fOutNmSz, pubAppend, fOutNmAppendSz);
             WOLFCLU_LOG(WOLFCLU_L0, "finalOutFNm = %s", finalOutFNm);
 
-            file = XFOPEN(finalOutFNm, "wb");
-            if (!file) {
-                XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return OUTPUT_FILE_ERROR;
+            /* open the file for writing the public key */
+            if (ret == 0) {
+                file = XFOPEN(finalOutFNm, "wb");
+                if (!file) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
             }
 
-            ret = (int)XFWRITE(pubKeyBuf, 1, pubKeySz, file);
-            if (ret <= 0) {
-                XFCLOSE(file);
-                XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return OUTPUT_FILE_ERROR;
+            /* write RAW format to the file */
+            if (format == RAW_FORM && ret == 0) {
+                if (XFWRITE(pubKeyBuf, 1, pubKeySz, file) != pubKeySz) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
             }
-            XFCLOSE(file);
+            else { /* DER and PEM */
+                /* determine size for buffer */
+                if (ret == 0) {
+                    derSz = wc_Ed25519PublicKeyToDer(&edKeyOut, NULL, 0, 1);
+                    if (derSz <= 0) {
+                        ret = MEMORY_E;
+                    }
+                }
+
+                /* allocate DER buffer */
+                if (ret == 0) {
+                    derBuf = (byte*)XMALLOC(derSz, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (derBuf == NULL) {
+                        ret = MEMORY_E;
+                    }
+                }
+
+                /* convert Key to DER */
+                if (ret == 0) {
+                    derSz = wc_Ed25519PublicKeyToDer(&edKeyOut, derBuf, derSz, 1);
+                    if (derSz < 0) {
+                        ret = derSz;
+                    }
+                }
+
+                if (ret != 0)
+                    break;
+
+                /* convert DER to PEM if necessary */
+                if (format == PEM_FORM) {
+                    if (ret == 0) {
+                        pemSz = wolfCLU_KeyDerToPem(derBuf, derSz, &pemBuf,
+                                PUBLICKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
+                        if (pemSz < 0) {
+                            ret = pemSz;
+                        }
+                    }
+                    /* write PEM format to the file */
+                    if (ret == 0) {
+                        ret = (int)XFWRITE(pemBuf, 1, pemSz, file);
+                        if (ret != pemSz) {
+                            ret = OUTPUT_FILE_ERROR;
+                        } else {
+                            ret = 0;
+                        }
+                    }
+                }
+                else {
+                    /* write DER format to the file */
+                    if (ret == 0) {
+                        ret = (int)XFWRITE(derBuf, 1, derSz, file);
+                        if (ret != derSz) {
+                            ret = OUTPUT_FILE_ERROR;
+                        }
+                        else {
+                            ret = 0;
+                        }
+                    }
+                }
+            }
+
+            if (ret != 0) {
+                ret = OUTPUT_FILE_ERROR;
+            }
             break;
         default:
             wolfCLU_LogError("Invalid directive");
-            XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            return BAD_FUNC_ARG;
+            ret = BAD_FUNC_ARG;
+        } /* switch */
     }
 
-    XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-
-    if (ret > 0) {
-        /* ret > 0 indicates a successful file write, set to zero for return */
-        ret = WOLFCLU_SUCCESS;
+    /* cleanup allocated resources */
+    if (finalOutFNm != NULL) {
+        XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        finalOutFNm = NULL;
+    }
+    if (derBuf != NULL) {
+        XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (pemBuf != NULL) {
+        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (file != NULL) {
+        XFCLOSE(file);
+        file = NULL;
     }
 
-    return ret;
+    /* expected ret == WOLFCLU_SUCCESS */
+    return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 }
 #endif /* HAVE_ED25519 */
 
@@ -579,7 +743,7 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
 }
 
 
-#ifndef NO_RSA
+#if !defined(NO_RSA) || defined(HAVE_ED25519)
 /* helper function to convert a key to PEM format. Creates new 'out' buffer on
  * success.
  * returns size of PEM buffer created on success
@@ -613,7 +777,7 @@ int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
     *out = pemBuf;
     return pemBufSz;
 }
-#endif /* !NO_RSA */
+#endif /* !NO_RSA || HAVE_ED25519*/
 
 
 /* return WOLFCLU_SUCCESS on success */
@@ -621,169 +785,240 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                        keySz, long exp)
 {
 #ifndef NO_RSA
-    RsaKey key;
-    XFILE  file;
-    int    ret = WOLFCLU_SUCCESS;
-
-    int   fNameSz;
-    int   fExtSz      = 6;
-    char  fExtPriv[6] = ".priv\0";
-    char  fExtPub[6]  = ".pub\0\0";
-    char* fOutNameBuf = NULL;
-
-    #ifdef NO_AES
-    /* use 16 bytes for AES block size */
-    size_t maxDerBufSz = 4 * keySz * 16;
-    #else
-    size_t maxDerBufSz = 4 * keySz * AES_BLOCK_SIZE;
-    #endif
-    byte*  derBuf      = NULL;
-    byte*  pemBuf      = NULL;
-    byte*  outBuf      = NULL;
-    int    derBufSz    = -1;
-    int    pemBufSz    = 0;
-    int    outBufSz    = 0;
+    RsaKey key;                        /* the RSA key structure */
+    XFILE file = NULL;                 /* file stream */
+    int   ret = WOLFCLU_SUCCESS;       /* return value */
+    int   fNameSz;                     /* file name without append */
+    int   fExtSz       = 6;            /* number of bytes to append to file name */
+    char  fExtPriv[6]  = ".priv\0";    /* last part of the priv file name */
+    char  fExtPub[6]   = ".pub\0\0";   /* last part of the pub file name*/
+    char* fOutNameBuf  = NULL;         /* file name + fExt */
+    int   flagOutputPub = 0;           /* set if outputting both priv/pub */
+    byte* derBuf       = NULL;         /* buffer for DER format */
+    byte* pemBuf       = NULL;         /* buffer for PEM format */
+    int   derBufSz     = -1;           /* size of DER buffer */
+    int   pemBufSz     = 0;            /* size of PEM buffer */
 
     if (rng == NULL || fName == NULL)
         return BAD_FUNC_ARG;
 
+    WOLFCLU_LOG(WOLFCLU_L0, "fOutNm = %s", fName);
+    fNameSz = (int)XSTRLEN(fName);
+
+    /* init RSA key */
     if (wc_InitRsaKey(&key, HEAP_HINT) != 0) {
         return WOLFCLU_FAILURE;
     }
 
+    /* make RSA key */
     if (wc_MakeRsaKey(&key, keySz, exp, rng) != 0) {
-        ret = WOLFCLU_FAILURE;
+        wc_FreeRsaKey(&key);
+        return WOLFCLU_FAILURE;
     }
 
     /* set up the file name output buffer */
-    if (ret == WOLFCLU_SUCCESS) {
-        fNameSz     = (int)XSTRLEN(fName);
-        fOutNameBuf = (char*)XMALLOC(fNameSz + fExtSz, HEAP_HINT,
-                                 DYNAMIC_TYPE_TMP_BUFFER);
-        if (fOutNameBuf == NULL)
-            ret = MEMORY_E;
+    fOutNameBuf = (char*) XMALLOC( (fNameSz + fExtSz), HEAP_HINT,
+                                    DYNAMIC_TYPE_TMP_BUFFER);
+    if (fOutNameBuf == NULL) {
+        wc_FreeRsaKey(&key);
+        return MEMORY_E;
     }
-
-    if (ret == WOLFCLU_SUCCESS) {
+    else {
+        /* get the first part of the file name setup */
         XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
         XMEMCPY(fOutNameBuf, fName, fNameSz);
 
-        derBuf = (byte*) XMALLOC(maxDerBufSz, HEAP_HINT,
-                DYNAMIC_TYPE_TMP_BUFFER);
-        if (derBuf == NULL) {
-            ret = MEMORY_E;
-        }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
         switch (directive) {
-            case PRIV_AND_PUB_FILES:
-                /* Fall through to PRIV_ONLY_FILE */
-                FALL_THROUGH;
-            case PRIV_ONLY_FILE:
-                /* add on the final part of the file name ".priv" */
-                XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
-                WOLFCLU_LOG(WOLFCLU_L0, "fOutNameBuf = %s", fOutNameBuf);
+        case PRIV_AND_PUB_FILES:
+            flagOutputPub = 1;
 
-                derBufSz = wc_RsaKeyToDer(&key, derBuf, (word32)maxDerBufSz);
+            /* Fall through to PRIV_ONLY_FILE */
+            FALL_THROUGH;
+        case PRIV_ONLY_FILE:
+            /* add on the final part of the file name ".priv" */
+            XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
+            WOLFCLU_LOG(WOLFCLU_L0, "fOutNameBuf = %s", fOutNameBuf);
+
+            /* open the file for writing the private key */
+            if (ret == WOLFCLU_SUCCESS) {
+                file = XFOPEN(fOutNameBuf, "wb");
+                if (!file) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
+            }
+
+            /* determine size for buffer */
+            if (ret == WOLFCLU_SUCCESS) {
+                derBufSz = wc_RsaKeyToDer(&key, NULL, 0);
+                if (derBufSz < 0) {
+                    ret = MEMORY_E;
+                }
+            }
+
+            /* allocate DER buffer */
+            if (ret == WOLFCLU_SUCCESS) {
+                derBuf = (byte*)XMALLOC(derBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                if (derBuf == NULL) {
+                    ret = MEMORY_E;
+                }
+            }
+
+            /* convert Key to DER */
+            if (ret == WOLFCLU_SUCCESS) {
+                derBufSz = wc_RsaKeyToDer(&key, derBuf, derBufSz);
                 if (derBufSz < 0) {
                     ret = derBufSz;
                 }
-                outBuf   = derBuf;
-                outBufSz = derBufSz;
-
-                /* check if should convert to PEM format */
-                if (ret == WOLFCLU_SUCCESS && fmt == PEM_FORM) {
-                    pemBufSz = wolfCLU_KeyDerToPem(derBuf, derBufSz, &pemBuf,
-                            PRIVATEKEY_TYPE, DYNAMIC_TYPE_PRIVATE_KEY);
-                    if (pemBufSz <= 0 || pemBuf == NULL) {
-                        ret =  WOLFCLU_FAILURE;
-                    }
-                    outBuf   = pemBuf;
-                    outBufSz = pemBufSz;
-                }
-
-                if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        ret = OUTPUT_FILE_ERROR;
-                    }
-                }
-
-                if (ret == WOLFCLU_SUCCESS) {
-                    if ((int)XFWRITE(outBuf, 1, outBufSz, file) <= 0) {
-                        ret = OUTPUT_FILE_ERROR;
-                    }
-                    XFCLOSE(file);
-                }
-
-                if (pemBuf != NULL) {
-                    wolfCLU_ForceZero(pemBuf, pemBufSz);
-                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
-                }
-
-                if (directive != PRIV_AND_PUB_FILES) {
-                    break;
-                }
-                FALL_THROUGH;
-            case PUB_ONLY_FILE:
-                /* add on the final part of the file name ".pub" */
-                if (ret == WOLFCLU_SUCCESS) {
-                    XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
-                    WOLFCLU_LOG(WOLFCLU_L0, "fOutNameBuf = %s", fOutNameBuf);
-
-                    derBufSz = wc_RsaKeyToPublicDer(&key, derBuf,
-                            (word32)maxDerBufSz);
-                    if (derBufSz < 0) {
-                        ret = derBufSz;
-                    }
-                    outBuf   = derBuf;
-                    outBufSz = derBufSz;
-                }
-
-                /* check if should convert to PEM format */
-                if (ret == WOLFCLU_SUCCESS && fmt == PEM_FORM) {
-                    pemBufSz = wolfCLU_KeyDerToPem(derBuf, derBufSz, &pemBuf,
-                            PUBLICKEY_TYPE, DYNAMIC_TYPE_PUBLIC_KEY);
-                    if (pemBufSz <= 0 || pemBuf == NULL) {
-                        ret =  WOLFCLU_FAILURE;
-                    }
-                    outBuf   = pemBuf;
-                    outBufSz = pemBufSz;
-                }
-
-                if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        ret = OUTPUT_FILE_ERROR;
-                    }
-                }
-
-                if (ret == WOLFCLU_SUCCESS) {
-                    if ((int)XFWRITE(outBuf, 1, outBufSz, file) <= 0) {
-                        ret = OUTPUT_FILE_ERROR;
-                    }
-                    XFCLOSE(file);
-                }
-
-                if (pemBuf != NULL) {
-                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PUBLIC_KEY);
-                }
-
+            }
+            if (ret != WOLFCLU_SUCCESS)
                 break;
-            default:
-                wolfCLU_LogError("Invalid directive");
-                ret = BAD_FUNC_ARG;
-        }
+
+            /* convert DER to PEM if necessary */
+            if (fmt == PEM_FORM) {
+                if (ret == WOLFCLU_SUCCESS) {
+                    pemBufSz = wolfCLU_KeyDerToPem(derBuf, derBufSz, &pemBuf,
+                            PRIVATEKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
+                    if (pemBufSz < 0) {
+                        ret = pemBufSz;
+                    }
+                }
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = (int)XFWRITE(pemBuf, 1, pemBufSz, file);
+                    if (ret != pemBufSz) {
+                        ret = OUTPUT_FILE_ERROR;
+                    }
+                    else {
+                        ret = WOLFCLU_SUCCESS;
+                    }
+                }
+            }
+            else {
+                /* write DER format to the file */
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = (int)XFWRITE(derBuf, 1, derBufSz, file);
+                    if (ret != derBufSz) {
+                        ret = OUTPUT_FILE_ERROR;
+                    }
+                    else {
+                        ret = WOLFCLU_SUCCESS;
+                    }
+                }
+            }
+            if (ret != WOLFCLU_SUCCESS) {
+                break;
+            }
+            if (flagOutputPub == 0) {
+                break;
+            } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1 */
+
+            XFCLOSE(file);
+            file = NULL;
+            XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            derBuf = NULL;
+            XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            pemBuf = NULL;
+
+            FALL_THROUGH;
+        case PUB_ONLY_FILE:
+            /* add on the final part of the file name ".pub" */
+            XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
+            WOLFCLU_LOG(WOLFCLU_L0, "fOutNameBuf = %s", fOutNameBuf);
+
+            /* open the file for writing the public key */
+            if (ret == WOLFCLU_SUCCESS) {
+                file = XFOPEN(fOutNameBuf, "wb");
+                if (!file) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
+            }
+
+            /* determine size for buffer */
+            if (ret == WOLFCLU_SUCCESS) {
+                derBufSz = wc_RsaKeyToPublicDer(&key, NULL, 0);
+                if (derBufSz < 0) {
+                    ret = MEMORY_E;
+                }
+            }
+
+            /* allocate DER buffer */
+            if (ret == WOLFCLU_SUCCESS) {
+                derBuf = (byte*)XMALLOC(derBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                if (derBuf == NULL) {
+                    ret = MEMORY_E;
+                }
+            }
+
+            /* convert Key to DER */
+            if (ret == WOLFCLU_SUCCESS) {
+                derBufSz = wc_RsaKeyToPublicDer(&key, derBuf, derBufSz);
+                if (derBufSz < 0) {
+                    ret = derBufSz;
+                }
+            }
+            if (ret != WOLFCLU_SUCCESS)
+                break;
+
+            /* convert DER to PEM if necessary */
+            if (fmt == PEM_FORM) {
+                if (ret == WOLFCLU_SUCCESS) {
+                    pemBufSz = wolfCLU_KeyDerToPem(derBuf, derBufSz, &pemBuf,
+                            PUBLICKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
+                    if (pemBufSz < 0) {
+                        ret = pemBufSz;
+                    }
+                }
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = (int)XFWRITE(pemBuf, 1, pemBufSz, file);
+                    if (ret != pemBufSz) {
+                        ret = OUTPUT_FILE_ERROR;
+                    }
+                    else {
+                        ret = WOLFCLU_SUCCESS;
+                    }
+                }
+            }
+            else {
+                /* write DER format to the file */
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = (int)XFWRITE(derBuf, 1, derBufSz, file);
+                    if (ret != derBufSz) {
+                        ret = OUTPUT_FILE_ERROR;
+                    }
+                    else {
+                        ret = WOLFCLU_SUCCESS;
+                    }
+                }
+            }
+
+            if (ret != WOLFCLU_SUCCESS) {
+                ret = OUTPUT_FILE_ERROR;
+            }
+            break;
+        default:
+            wolfCLU_LogError("Invalid directive");
+            ret = BAD_FUNC_ARG;
+        } /* switch */
     }
 
-    if (derBuf != NULL) {
-        wolfCLU_ForceZero(derBuf, (unsigned int)maxDerBufSz);
-        XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    }
+    /* cleanup allocated resources */
     if (fOutNameBuf != NULL) {
         XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        fOutNameBuf = NULL;
     }
+    if (derBuf != NULL) {
+        XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (pemBuf != NULL) {
+        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+     if (file != NULL) {
+        XFCLOSE(file);
+        file = NULL;
+    }
+
     wc_FreeRsaKey(&key);
 
     return ret;

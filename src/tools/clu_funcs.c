@@ -1100,7 +1100,7 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
 int wolfCLU_checkOutform(char* outform)
 {
     if (outform == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -outform [PEM/DER]");
+        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -outform [PEM/DER/RAW]");
         WOLFCLU_LOG(WOLFCLU_L0, "missing outform required argument");
         return USER_INPUT_ERROR;
     }
@@ -1112,8 +1112,11 @@ int wolfCLU_checkOutform(char* outform)
     else if (XSTRNCMP(outform, "der", 3) == 0) {
         return DER_FORM;
     }
+    else if (XSTRNCMP(outform, "raw", 3) == 0) {
+        return RAW_FORM;
+    }
     else {
-        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -outform [PEM/DER]");
+        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -outform [PEM/DER/RAW]");
         WOLFCLU_LOG(WOLFCLU_L0, "\"%s\" is not a valid output format", outform);
     }
     return USER_INPUT_ERROR;
@@ -1122,7 +1125,7 @@ int wolfCLU_checkOutform(char* outform)
 int wolfCLU_checkInform(char* inform)
 {
     if (inform == NULL) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -inform [PEM/DER]");
+        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -inform [PEM/DER/RAW]");
         WOLFCLU_LOG(WOLFCLU_L0, "missing inform required argument");
         return USER_INPUT_ERROR;
     }
@@ -1134,8 +1137,11 @@ int wolfCLU_checkInform(char* inform)
     else if (XSTRNCMP(inform, "der", 3) == 0) {
         return DER_FORM;
     }
+    else if (XSTRNCMP(inform, "raw", 3) == 0) {
+        return RAW_FORM;
+    }
     else {
-        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -inform [PEM/DER]");
+        WOLFCLU_LOG(WOLFCLU_L0, "Usage: -inform [PEM/DER/RAW]");
         WOLFCLU_LOG(WOLFCLU_L0, "\"%s\" is not a valid input format", inform);
     }
     return USER_INPUT_ERROR;

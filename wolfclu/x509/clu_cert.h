@@ -24,6 +24,7 @@
 
 #define PEM_FORM 1
 #define DER_FORM 2
+#define RAW_FORM 3
 
 /* handles incoming arguments for certificate generation */
 int wolfCLU_certSetup(int argc, char** argv);
