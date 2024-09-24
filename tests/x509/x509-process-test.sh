@@ -176,7 +176,7 @@ run1() {
         exit 99
     fi
 
-    MODULUS=`./wolfssl x509 -in certs/server-cert.pem -modulus -noout`
+    MODULUS=`cat tests/x509/expect-modulus.txt`
     if [ "$MODULUS" != "Modulus=C09508E15741F2716DB7D24541270165C645AEF2BC2430B895CE2F4ED6F61C88BC7C9FFBA8677FFE5C9C5175F78ACA07E7352F8FE1BD7BC02F7CAB64A817FCCA5D7BBAE021E5722E6F2E86D89573DAAC1B53B95F3FD7190D254FE16363518B0B643FAD43B8A51C5C34B3AE00A063C5F67F0B59687873A68C18A9026DAFC319012EB810E3C6CC40B469A3463369876EC4BB17A6F3E8DDAD73BC7B2F21B5FD66510CBD54B3E16D5F1CBC2373D109038914D210B964C32AD0A1964ABCE1D41A5BC7A0C0C163780F443730329680322395A177BA13D29773E25D25C96A0DC33960A4B4B069424209E9D808BC3320B35822A7AAEBC4E1E66183C5D296DFD9D04FADD7" ]
     then
         echo "found unexpected Modulus : $MODULUS"
@@ -246,7 +246,7 @@ run3() {
     rm -f x509_test.pem x509_tmp.pem x509_test.der x509_tmp.der
     echo "TEST 3.c"
     test_case "-in certs/server-cert.pem -subject -noout"
-    EXPECTED="/C=US/ST=Montana/L=Bozeman/O=wolfSSL/OU=Support/CN=www.wolfssl.com/emailAddress=info@wolfssl.com"
+    EXPECTED=`cat tests/x509/expect-subject.txt`
     if [ "$OUTPUT" != "$EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
@@ -254,7 +254,7 @@ run3() {
     fi
     echo "TEST 3.d"
     test_case "-in certs/server-cert.pem -issuer -noout"
-    EXPECTED="/C=US/ST=Montana/L=Bozeman/O=Sawtooth/OU=Consulting/CN=www.wolfssl.com/emailAddress=info@wolfssl.com"
+    EXPECTED=`cat tests/x509/expect-issuer.txt`
     if [ "$OUTPUT" != "$EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
@@ -262,7 +262,7 @@ run3() {
     fi
     echo "TEST 3.e"
     test_case "-in certs/ca-cert.pem -serial -noout"
-    EXPECTED="serial=7D947088BA07428DAAAF4FBEC21A48F0D140E642"
+    EXPECTED=`cat tests/x509/expect-ca-serial.txt`
     if [ "$OUTPUT" != "$EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
@@ -270,7 +270,7 @@ run3() {
     fi
     echo "TEST 3.f"
     test_case "-in certs/server-cert.pem -serial -noout"
-    EXPECTED="serial=01"
+    EXPECTED=`cat tests/x509/expect-server-serial.txt`
     if [ "$OUTPUT" != "$EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
@@ -278,8 +278,7 @@ run3() {
     fi
     echo "TEST 3.g"
     test_case "-in certs/server-cert.pem -dates -noout"
-    EXPECTED="notBefore=Dec 20 23:07:25 2021 GMT
-notAfter=Sep 15 23:07:25 2024 GMT"
+    EXPECTED=`cat tests/x509/expect-dates.txt`
     if [ "$OUTPUT" != "$EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
@@ -287,7 +286,7 @@ notAfter=Sep 15 23:07:25 2024 GMT"
     fi
     echo "TEST 3.h"
     test_case "-in certs/server-cert.pem -email -noout"
-    EXPECTED="info@wolfssl.com"
+    EXPECTED=`cat tests/x509/expect-email.txt`
     if [ "$OUTPUT" != "$EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
@@ -295,7 +294,8 @@ notAfter=Sep 15 23:07:25 2024 GMT"
     fi
     echo "TEST 3.i"
     test_case "-in certs/server-cert.pem -fingerprint -noout"
-    EXPECTED="SHA1 of cert. DER : 52686B24F54652F04B0D87BA9F591B393C86C407"
+    EXPECTED=`cat tests/x509/expect-fingerprint.txt`
+    OUTPUT=`echo $OUTPUT | sed 's/^SHA1 of cert. DER : //'`
     if [ "$OUTPUT" != "$EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
@@ -303,13 +303,7 @@ notAfter=Sep 15 23:07:25 2024 GMT"
     fi
     echo "TEST 3.j"
     test_case "-in certs/server-cert.pem -purpose -noout"
-    EXPECTED="Certificate Purpose:
-Any Extended Key Usage : YES
-TLS Web Server Authentication : YES
-TLS Web Client Authentication : NO
-OCSP Signing : YES
-Email Protect : YES
-Time Stamp Signing : YES"
+    EXPECTED=`cat tests/x509/expect-purpose.txt`
     if [ "$OUTPUT" != "$EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
         echo "expected $EXPECTED"
@@ -317,7 +311,7 @@ Time Stamp Signing : YES"
     fi
     echo "TEST 3.k"
     test_case "-in certs/server-cert.pem -hash -noout"
-    EXPECTED="137dc03f"
+    EXPECTED=`cat tests/x509/expect-hash.txt`
     OLD_EXPECTED="f6cf410e" #was fixed to match OpenSSL after release 5.1.1
     if [ "$OUTPUT" != "$EXPECTED" ] && [ "$OUTPUT" != "$OLD_EXPECTED" ]; then
         echo "found unexpected $OUTPUT"
