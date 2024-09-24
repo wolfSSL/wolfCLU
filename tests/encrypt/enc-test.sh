@@ -32,7 +32,7 @@ run_fail() {
 run "enc -d -aes-256-cbc -nosalt -in certs/crl.der.enc -out test-dec.der" ""
 diff "./certs/crl.der" "./test-dec.der" &> /dev/null
 if [ $? != 0 ]; then
-    echo "issue with decryption"
+    echo "issue with decryption 1"
     exit 99
 fi
 rm -f test-dec.der
@@ -40,7 +40,7 @@ rm -f test-dec.der
 run "enc -base64 -d -aes-256-cbc -nosalt -in certs/crl.der.enc.base64 -out test-dec.der" ""
 diff "./certs/crl.der" "./test-dec.der" &> /dev/null
 if [ $? != 0 ]; then
-    echo "issue with decryption"
+    echo "issue with decryption 2"
     exit 99
 fi
 rm -f test-dec.der
@@ -56,7 +56,7 @@ run_fail "enc -base64 -d -aes-256-cbc -in test-enc.der -out test-dec.der" "bad p
 run "enc -base64 -d -aes-256-cbc -in test-enc.der -out test-dec.der" "test password"
 diff "./certs/crl.der" "./test-dec.der" &> /dev/null
 if [ $? != 0 ]; then
-    echo "issue with decryption"
+    echo "issue with decryption 3"
     exit 99
 fi
 rm -f test-dec.der

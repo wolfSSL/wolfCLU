@@ -29,31 +29,31 @@ run_fail() {
 }
 
 run_success "-hash sha -in certs/ca-cert.pem -base64enc"
-EXPECTED="46060ebc47f6f5486addd5658a7a2eb5ef7a9913"
+EXPECTED=`cat tests/hash/sha-expect.hex`
 if [ "$RESULT" != "$EXPECTED" ]
 then
-    echo "found unexpected output"
+    echo "found unexpected output 1"
     exit 99
 fi
 
 run_success "-hash sha256 -in certs/ca-cert.pem"
-EXPECTED="c68d5b8d17f551e3a9881968c2fe281bf8af9e6a16a1ecc97740a76d23858053"
+EXPECTED=`cat tests/hash/sha256-expect.hex`
 if [ "$RESULT" != "$EXPECTED" ]
 then
-    echo "found unexpected output"
+    echo "found unexpected output 2"
     exit 99
 fi
 
 run_success "-hash sha384 -in certs/ca-cert.pem"
-EXPECTED="55c6dabf204a2795a71b4b62594ed89348333821a87b160a08a5ed47ddc52373038792d605aa365762e4028d51c11972"
+EXPECTED=`cat tests/hash/sha384-expect.hex`
 if [ "$RESULT" != "$EXPECTED" ]
 then
-    echo "found unexpected output"
+    echo "found unexpected output 3"
     exit 99
 fi
 
 run_success "-hash sha512 -in certs/ca-cert.pem"
-EXPECTED="4eb961036db9c181d9e48f5bc0ff631e4753eac74209d6a199f99305fb614483a1e1a55922d54c17fac1b472eac6a7ffe2eb9be48dd87670be6264d25aa4493a"
+EXPECTED=`cat tests/hash/sha512-expect.hex`
 if [ "$RESULT" != "$EXPECTED" ]
 then
     echo "found unexpected output"
@@ -62,7 +62,7 @@ fi
 
 
 run_success "md5 certs/ca-cert.pem"
-EXPECTED="21ea0398596253752e6cd2195e7abf3c"
+EXPECTED=`cat tests/hash/md5-expect.hex`
 if [ "$RESULT" != "$EXPECTED" ]
 then
     echo "found unexpected output"
@@ -70,7 +70,7 @@ then
 fi
 
 run_success "sha256 certs/ca-cert.pem"
-EXPECTED="c68d5b8d17f551e3a9881968c2fe281bf8af9e6a16a1ecc97740a76d23858053"
+EXPECTED=`cat tests/hash/sha256-expect.hex`
 if [ "$RESULT" != "$EXPECTED" ]
 then
     echo "found unexpected output"
@@ -78,7 +78,7 @@ then
 fi
 
 run_success "sha384 certs/ca-cert.pem"
-EXPECTED="55c6dabf204a2795a71b4b62594ed89348333821a87b160a08a5ed47ddc52373038792d605aa365762e4028d51c11972"
+EXPECTED=`cat tests/hash/sha384-expect.hex`
 if [ "$RESULT" != "$EXPECTED" ]
 then
     echo "found unexpected output"
@@ -86,7 +86,7 @@ then
 fi
 
 run_success "sha512 certs/ca-cert.pem"
-EXPECTED="4eb961036db9c181d9e48f5bc0ff631e4753eac74209d6a199f99305fb614483a1e1a55922d54c17fac1b472eac6a7ffe2eb9be48dd87670be6264d25aa4493a"
+EXPECTED=`cat tests/hash/sha512-expect.hex`
 if [ "$RESULT" != "$EXPECTED" ]
 then
     echo "found unexpected output"
