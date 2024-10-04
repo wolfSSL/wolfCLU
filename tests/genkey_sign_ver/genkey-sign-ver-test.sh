@@ -38,11 +38,14 @@ cleanup_genkey_sign_ver(){
     rm edkey.pub
     rm rsakey.priv
     rm rsakey.pub
+    rm mldsakey.priv
+    rm mldsakey.pub
     rm ecc-signed.sig
     rm ed-signed.sig
     rm rsa-signed.sig
     rm rsa-sigout.private_result
     rm rsa-sigout.public_result
+    rm mldsa-signed.sig
     rm sign-this.txt
 }
 trap cleanup_genkey_sign_ver INT TERM EXIT
@@ -66,7 +69,11 @@ rsa_compare_decrypted(){
 gen_key_sign_ver_test(){
 
     # generate a key pair for signing
-    ./wolfssl -genkey $1 -out $2 -outform $4 KEYPAIR
+    if [ $1 = "dilithium" ]; then
+        ./wolfssl -genkey $1 -level $5 -out $2 -outform $4 -output KEYPAIR
+    else
+        ./wolfssl -genkey $1 -out $2 -outform $4 KEYPAIR
+    fi
     RESULT=$?
     printf '%s\n' "genkey RESULT - $RESULT"
     [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 genkey" && \
@@ -74,7 +81,11 @@ gen_key_sign_ver_test(){
     printf '%s\n' "--enable-keygen" && exit -1
 
     # test signing with priv key
-    ./wolfssl -$1 -sign -inkey $2.priv -inform $4 -in sign-this.txt -out $3
+    if [ $1 = "dilithium" ]; then
+        ./wolfssl -$1 -sign -level $5 -inkey $2.priv -inform $4 -in sign-this.txt -out $3
+    else
+        ./wolfssl -$1 -sign -inkey $2.priv -inform $4 -in sign-this.txt -out $3
+    fi
     RESULT=$?
     printf '%s\n' "sign RESULT - $RESULT"
     [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 sign" && exit -1
@@ -83,6 +94,10 @@ gen_key_sign_ver_test(){
     if [ "${1}" = "rsa" ]; then
         ./wolfssl -$1 -verify -inkey $2.priv -inform $4 -sigfile $3 -in sign-this.txt \
                   -out $5.private_result
+    elif [ "${1}" = "dilithium" ]; then
+        # ./wolfssl -$1 -verify -inkey $2.priv -inform $4 -sigfile $3 -in sign-this.txt
+        # pass
+        :
     else
         ./wolfssl -$1 -verify -inkey $2.priv -inform $4 -sigfile $3 -in sign-this.txt
     fi
@@ -94,6 +109,8 @@ gen_key_sign_ver_test(){
     if [ "${1}" = "rsa" ]; then
         ./wolfssl -$1 -verify -inkey $2.pub -inform $4 -sigfile $3 -in sign-this.txt \
                   -out $5.public_result -pubin
+    elif [ $1 = "dilithium"  ]; then
+        ./wolfssl -$1 -verify -level $5 -inkey $2.pub -inform $4 -sigfile $3 -in sign-this.txt -pubin
     else
         ./wolfssl -$1 -verify -inkey $2.pub -inform $4 -sigfile $3 -in sign-this.txt -pubin
     fi
@@ -158,5 +175,14 @@ KEYFILENAME="edkey"
 SIGOUTNAME="ed-signed.sig"
 DERPEMRAW="raw"
 gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
+
+ALGORITHM="dilithium"
+KEYFILENAME="mldsakey"
+SIGOUTNAME="mldsa-signed.sig"
+DERPEMRAW="der"
+for level in 2 3 5
+do
+    gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
+done
 
 exit 0

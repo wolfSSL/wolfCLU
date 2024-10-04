@@ -34,6 +34,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     char*   out  = NULL; /* output variable */
     char*   priv = NULL; /* private key variable */
     char*   sig  = NULL;
+    int     level = 0;   /* security level */
 
     int     algCheck;           /* acceptable algorithm check */
     int     inCheck     = 0;    /* input check */
@@ -52,6 +53,9 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     }
     else if (wolfCLU_checkForArg("ecc", 3, argc, argv) > 0) {
         algCheck = ECC_SIG_VER;
+    }
+    else if (wolfCLU_checkForArg("dilithium", 9, argc, argv) > 0) {
+        algCheck = DILITHIUM_SIG_VER;
     }
     else {
         return WOLFCLU_FATAL_ERROR;
@@ -83,6 +87,16 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             wolfCLU_verifyHelp(algCheck);
         }
         return 0;
+    }
+
+    ret = wolfCLU_checkForArg("-level", 6, argc, argv);
+    if (ret > 0) {
+        level = atoi(argv[ret+1]);
+
+        if (level <= 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid level. Please specify a level > 0.");
+            return WOLFCLU_FATAL_ERROR;
+        }
     }
 
     ret = wolfCLU_checkForArg("-inkey", 6, argc, argv);
@@ -216,6 +230,18 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
                 XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return ret;
         }
+        else if (algCheck == DILITHIUM_SIG_VER && verifyCheck == 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
+                    "signing with Dilithium.");
+            wolfCLU_signHelp(algCheck);
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (in)
+                XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (sig)
+                XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            return ret;
+        }
         else {
             /* No out needed for ECC verifying */
             /* ED25519 exceptions will need to be added at a later date */
@@ -239,10 +265,10 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     }
 
     if (signCheck == 1) {
-        ret = wolfCLU_sign_data(in, out, priv, algCheck, inForm);
+        ret = wolfCLU_sign_data(in, out, priv, algCheck, inForm, level);
     }
     else if (verifyCheck == 1) {
-        ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck, inForm);
+        ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck, inForm, level);
     }
 
     if (priv)

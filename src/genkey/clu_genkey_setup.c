@@ -278,6 +278,77 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         return NOT_COMPILED_IN;
     #endif /* NO_RSA */
     }
+    else if (XSTRNCMP(keyType, "dilithium", 9) == 0) {
+    #if defined(HAVE_DILITHIUM) && defined(WOLFSSL_KEY_GEN)
+        int directiveArg = PRIV_AND_PUB_FILES;
+        int keySz = DILITHIUM_LEVEL2_PRV_KEY_SIZE;
+        int level = 2;
+        int withAlg = DILITHIUM_LEVEL2k;
+        int dilithiumType = DILITHIUM_LEVEL2_TYPE;
+
+        WOLFCLU_LOG(WOLFCLU_L0, "Generate Dilithium Key");
+
+        /* get the level argument */
+        ret = wolfCLU_checkForArg("-level", 6, argc, argv);
+        if (ret > 0) {
+            level = XATOI(argv[ret+1]);
+            switch (level) {
+                case 2:
+                    keySz = DILITHIUM_LEVEL2_PRV_KEY_SIZE;
+                    withAlg = DILITHIUM_LEVEL2k;
+                    dilithiumType = DILITHIUM_LEVEL2_TYPE;
+                    break;
+                case 3:
+                    keySz = DILITHIUM_LEVEL3_PRV_KEY_SIZE;
+                    withAlg = DILITHIUM_LEVEL3k;
+                    dilithiumType = DILITHIUM_LEVEL3_TYPE;
+                    break;
+                case 5:
+                    keySz = DILITHIUM_LEVEL5_PRV_KEY_SIZE;
+                    withAlg = DILITHIUM_LEVEL5k;
+                    dilithiumType = DILITHIUM_LEVEL5_TYPE;
+                    break;
+                default:
+                    WOLFCLU_LOG(WOLFCLU_L0, "Invalid -level (%s), using level%d",
+                                argv[ret+1], level);
+                    break;
+            }
+        }
+        else {
+            /* no option -level */
+            WOLFCLU_LOG(WOLFCLU_L0, "No -level [ 2 | 3 | 5 ]");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use Level %d", level);
+        }
+
+        /* get the directive argument */
+        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
+        if (ret > 0) {
+            if (argv[ret+1] != NULL) {
+                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                    directiveArg = PUB_ONLY_FILE;
+                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                    directiveArg = PRIV_ONLY_FILE;
+                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                    directiveArg = PRIV_AND_PUB_FILES;
+            }
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
+        }
+
+        WOLFCLU_LOG(WOLFCLU_L0, "using Dilithium%d", level);
+        ret = wolfCLU_genKey_Dilithium(&rng, keyOutFName, directiveArg, formatArg,
+                                        keySz, level, withAlg, dilithiumType);
+        
+    #else
+        wolfCLU_LogError("Invalid option, Dithium not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-dilithium, "
+                "--enable-experimental and try again");
+        wc_FreeRng(&rng);
+        return NOT_COMPILED_IN;
+    #endif  /* HAVE_DILITHIUM */
+    }
     else {
         wolfCLU_LogError("\"%s\" is an invalid key type, or not compiled in", keyType);
         wc_FreeRng(&rng);

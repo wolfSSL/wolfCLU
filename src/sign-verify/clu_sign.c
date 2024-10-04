@@ -80,7 +80,7 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
 }
 
 int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
-                      int inForm)
+                      int inForm, int level)
 {
     int ret;
     int fSz;
@@ -119,6 +119,10 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
 
     case ED25519_SIG_VER:
         ret = wolfCLU_sign_data_ed25519(data, out, fSz, privKey, inForm);
+        break;
+
+    case DILITHIUM_SIG_VER:
+        ret = wolfCLU_sign_data_dilithium(data, out, fSz, privKey, level);
         break;
 
     default:
@@ -536,4 +540,122 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     return NOT_COMPILED_IN;
 #endif
 }
+
+int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* privKey, int level)
+{
+#ifdef HAVE_DILITHIUM
+    int ret = 0;
+    XFILE privKeyFile = NULL;
+    byte* privBuf = NULL;
+    int privFileSz = 0;
+    word32 privBufSz = 0;
+    word32 index = 0;
+    byte* outBuf = NULL;
+    word32 outBufSz = 0;
+
+    WC_RNG rng;
+    dilithium_key key;
+
+    XMEMSET(&rng, 0, sizeof(rng));
+    XMEMSET(&key, 0, sizeof(key));
+
+    /* init Dilithium key */
+    ret = wc_dilithium_init(&key);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
+        return ret;
+    }
+
+    ret = wc_InitRng(&rng);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
+        return ret;
+    }
+
+    /* check and set Dilithium level */
+    if (level != 2 && level != 3 && level != 5) {
+        wolfCLU_LogError("Please specify a level when signing with Dilithium.");
+        wc_FreeRng(&rng);
+        return BAD_FUNC_ARG;
+    }
+    else {
+        ret = wc_dilithium_set_level(&key, level);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set level.\nRET: %d", ret);
+            wc_FreeRng(&rng);
+            return BAD_FUNC_ARG;
+        }
+    }
+
+    /* open and read private key */
+    privKeyFile = XFOPEN(privKey, "rb");
+    if (privKeyFile == NULL) {
+        wolfCLU_LogError("Faild to open Private key FILE.");
+        return ret;
+    }
+
+    XFSEEK(privKeyFile, 0, SEEK_END);
+    privFileSz = (int)XFTELL(privKeyFile);
+    privBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (privBuf == NULL) {
+        XFCLOSE(privKeyFile);
+        wc_FreeRng(&rng);
+        return MEMORY_E;
+    }
+
+    privBufSz = privFileSz;
+    XFSEEK(privKeyFile, 0, SEEK_SET);
+    if (XFREAD(privBuf, 1, privBufSz, privKeyFile) != privBufSz) {
+        wolfCLU_Log(WOLFCLU_L0, "incorecct size: %d", privFileSz);
+        return ret;
+    }
+    XFCLOSE(privKeyFile);
+
+    /* retrieving private key and staoring in the Dilithium key */
+    ret = wc_Dilithium_PrivateKeyDecode(privBuf, &index, &key, privBufSz);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
+        XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        wc_FreeRng(&rng);
+        return ret;
+    }
+
+    /* malloc signature buffer */
+    outBufSz = wc_dilithium_sig_size(&key);
+    outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (outBuf == NULL) {
+        XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        wc_FreeRng(&rng);
+        wc_dilithium_free(&key);
+
+        return MEMORY_E;
+    }
+    
+    /* sign the message usign Dilithium private key */
+    ret = wc_dilithium_sign_msg(data, dataSz, outBuf, &outBufSz, &key, &rng);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to sign data with Dilithium private key.\nRET: %d", ret);
+        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        wc_FreeRng(&rng);
+        wc_dilithium_free(&key);
+
+        return ret;
+    }
+    else {
+        XFILE outFile;
+        outFile = XFOPEN(out, "wb");
+        XFWRITE(outBuf, 1, outBufSz, outFile);
+        XFCLOSE(outFile);
+    }
+
+    XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    wc_FreeRng(&rng);
+    wc_dilithium_free(&key);
+
+    return WOLFCLU_SUCCESS;
+#else
+    return NOT_COMPILED_IN;
+#endif
+}
+
 #endif /* !WOLFCLU_NO_FILESYSTEM */
