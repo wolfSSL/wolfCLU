@@ -1048,20 +1048,13 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
     char  fExtPub[6]  = ".pub\0\0";
     char* fOutNameBuf = NULL;
 
-// #ifdef WOLFSSL_SMALL_STACK
-//     dilithium_key* key;
-// #else
-//     dilithium_key key[1];
-// #endif
-
-    dilithium_key key;
-
     #ifdef NO_AES
     /* use 16 bytes for AES block size */
     size_t maxDerBufSz = 4 * keySz * 16;
     #else
     size_t maxDerBufSz = 4 * keySz * AES_BLOCK_SIZE;
     #endif  /* NO_AES */
+
     byte*  derBuf      = NULL;
     byte*  pemBuf      = NULL;
     byte*  outBuf      = NULL;
@@ -1069,22 +1062,46 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
     int    pemBufSz    = 0;
     int    outBufSz    = 0;
 
+#ifdef WOLFSSL_SMALL_STACK
+    dilithium_key* key;
+    WOLFCLU_LOG(WOLFCLU_L0, "Using small stack");
+    key = (dilithium_key*)XMALLOC(sizeof(dilithium_key), HEAP_HINT,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (key == NULL) {
+        return MEMORY_E;
+    }
+#else
+    dilithium_key key[1];
+    WOLFCLU_LOG(WOLFCLU_L0, "Not using small stack");
+#endif
+
     if (rng == NULL || fName == NULL) {
         return BAD_FUNC_ARG;
     }
 
-    /* initialize the dilithium key */
-    if (wc_dilithium_init(&key) != 0) {
-        return WOLFCLU_FAILURE;
+    /* init the dilithium key */
+    if (wc_dilithium_init(key) != 0) {
+        wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
+        return ret;
     }
+    XMEMSET(key, 0, sizeof(dilithium_key));
 
     /* set the level of the dilithium key */
-    if (wc_dilithium_set_level(&key, level) != 0) {
+    if (wc_dilithium_set_level(key, level) != 0) {
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return WOLFCLU_FAILURE;
     }
 
     /* make the dilithium key */
-    if (wc_dilithium_make_key(&key, rng) != 0) {
+    if (wc_dilithium_make_key(key, rng) != 0) {
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return WOLFCLU_FAILURE;
     }
 
@@ -1119,7 +1136,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                 WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
 
                 /* Private key to der */
-                derBufSz = wc_Dilithium_PrivateKeyToDer(&key,
+                derBufSz = wc_Dilithium_PrivateKeyToDer(key,
                                         derBuf, (word32)maxDerBufSz);
                 if (derBufSz < 0) {
                     ret = derBufSz;
@@ -1171,7 +1188,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                 WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
-                derBufSz = wc_Dilithium_PublicKeyToDer(&key, derBuf,
+                derBufSz = wc_Dilithium_PublicKeyToDer(key, derBuf,
                                                 (word32)maxDerBufSz, withAlg);
                 if (derBufSz < 0) {
                     ret = derBufSz;
@@ -1231,7 +1248,9 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
         XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
-    wc_dilithium_free(&key);
+#ifdef WOLFSSL_SMALL_STACK
+    wc_dilithium_free(key);
+#endif
 
     return ret;
 #else

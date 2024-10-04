@@ -668,7 +668,6 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 msgLen, char* keyPath, int level)
 {
 #ifdef HAVE_DILITHIUM
-    dilithium_key key;
     int ret = 0;
 
     XFILE keyFile = NULL;
@@ -678,23 +677,45 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
     word32 index = 0;
     int res = 0;
 
+#ifdef WOLFSSL_SMALL_STACK
+    dilithium_key* key;
+    WOLFCLU_LOG(WOLFCLU_L0, "Using small stack");
+    key = (dilithium_key*)XMALLOC(sizeof(dilithium_key), HEAP_HINT,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (key == NULL) {
+        return MEMORY_E;
+    }
+#else
+    dilithium_key key[1];
+    WOLFCLU_LOG(WOLFCLU_L0, "Not using small stack");
+#endif
+
     /* init the dilithium key */
-    XMEMSET(&key, 0, sizeof(key));
-    ret = wc_dilithium_init(&key);
+    ret = wc_dilithium_init(key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return ret;
     }
+    XMEMSET(key, 0, sizeof(dilithium_key));
 
     /* check and set Dilithium level */
     if (level != 2 && level != 3 && level != 5) {
         wolfCLU_LogError("Please specify a level when verifying with Dilithium.");
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return BAD_FUNC_ARG;
     }
     else {
-        ret = wc_dilithium_set_level(&key, level);
+        ret = wc_dilithium_set_level(key, level);
         if (ret != 0) {
             wolfCLU_LogError("Failed to set level.\nRET: %d", ret);
+        #ifdef WOLFSSL_SMALL_STACK
+            wc_dilithium_free(key);
+        #endif
             return BAD_FUNC_ARG;
         }
     }
@@ -703,6 +724,9 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
     keyFile = XFOPEN(keyPath, "rb");
     if (keyFile == NULL) {
         wolfCLU_LogError("Faild to open Private key FILE.");
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return BAD_FUNC_ARG;
     }
 
@@ -712,6 +736,9 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
     if (keyBuf == NULL) {
         wolfCLU_LogError("Failed to malloc key buffer.");
         XFCLOSE(keyFile);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return MEMORY_E;
     }
     XMEMSET(keyBuf, 0, keyFileSz);
@@ -719,25 +746,33 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
     if (XFSEEK(keyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
         wolfCLU_LogError("Failed to read public key.\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return WOLFCLU_FATAL_ERROR;
     }
     keyBufSz = (word32)keyFileSz;
     XFCLOSE(keyFile);
 
     /* retrieving public key and storing in the dilithium key */
-    ret = wc_Dilithium_PublicKeyDecode(keyBuf, &index, &key, keyBufSz);
+    ret = wc_Dilithium_PublicKeyDecode(keyBuf, &index, key, keyBufSz);
     if (ret != 0) {
         wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return ret;
     }
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     /* verify the massage using the dilithium public key */
-    ret = wc_dilithium_verify_msg(sig, sigSz, msg, msgLen, &res, &key);
+    ret = wc_dilithium_verify_msg(sig, sigSz, msg, msgLen, &res, key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to verify data with Dilithium public key.\nRET: %d", ret);
-        wc_dilithium_free(&key);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
         return ret;
     }
     else if(res == 1) {
@@ -747,7 +782,9 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
         wolfCLU_LogError("Invalid Signature.");
     }
 
-    wc_dilithium_free(&key);
+#ifdef WOLFSSL_SMALL_STACK
+    wc_dilithium_free(key);
+#endif
 
     return WOLFCLU_SUCCESS;
 #else
