@@ -114,11 +114,10 @@ int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
  * @param fmt       output format (PEM/DER)
  * @param level     the dilithium level 2, 3 or 5
  * @param withAlg   Whether to use SubjectPublicKeyInfo format
- * @param keyType   the dilithium key type
  *
  * return WOLFCLU_SUCCESS on success
 */
 int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
-                            int keySz, int level, int withAlg, int keyType);
+                            int keySz, int level, int withAlg);
 
 #endif /* CLU_GENKEY_H */

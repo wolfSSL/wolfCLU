@@ -284,7 +284,6 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         int keySz = DILITHIUM_LEVEL2_PRV_KEY_SIZE;
         int level = 2;
         int withAlg = DILITHIUM_LEVEL2k;
-        int dilithiumType = DILITHIUM_LEVEL2_TYPE;
 
         WOLFCLU_LOG(WOLFCLU_L0, "Generate Dilithium Key");
 
@@ -296,17 +295,14 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                 case 2:
                     keySz = DILITHIUM_LEVEL2_PRV_KEY_SIZE;
                     withAlg = DILITHIUM_LEVEL2k;
-                    dilithiumType = DILITHIUM_LEVEL2_TYPE;
                     break;
                 case 3:
                     keySz = DILITHIUM_LEVEL3_PRV_KEY_SIZE;
                     withAlg = DILITHIUM_LEVEL3k;
-                    dilithiumType = DILITHIUM_LEVEL3_TYPE;
                     break;
                 case 5:
                     keySz = DILITHIUM_LEVEL5_PRV_KEY_SIZE;
                     withAlg = DILITHIUM_LEVEL5k;
-                    dilithiumType = DILITHIUM_LEVEL5_TYPE;
                     break;
                 default:
                     WOLFCLU_LOG(WOLFCLU_L0, "Invalid -level (%s), using level%d",
@@ -339,7 +335,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
         WOLFCLU_LOG(WOLFCLU_L0, "using Dilithium%d", level);
         ret = wolfCLU_genKey_Dilithium(&rng, keyOutFName, directiveArg, formatArg,
-                                        keySz, level, withAlg, dilithiumType);
+                                        keySz, level, withAlg);
         
     #else
         wolfCLU_LogError("Invalid option, Dithium not enabled.");

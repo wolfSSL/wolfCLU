@@ -185,4 +185,13 @@ do
     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
 done
 
+ALGORITHM="dilithium"
+KEYFILENAME="mldsakey"
+SIGOUTNAME="mldsa-signed.sig"
+DERPEMRAW="pem"
+for level in 2 3 5
+do
+    gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
+done
+
 exit 0

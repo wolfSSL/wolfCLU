@@ -258,7 +258,7 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
             }
             XFCLOSE(h);
 
-            ret = wolfCLU_verify_signature_dilithium(data, fSz, hash, hSz, keyPath, level);
+            ret = wolfCLU_verify_signature_dilithium(data, fSz, hash, hSz, keyPath, level, inForm);
         #endif
             break;
 
@@ -665,7 +665,8 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 #endif  /* HAVE_ED25519 */
 }
 
-int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 msgLen, char* keyPath, int level)
+int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
+                    word32 msgLen, char* keyPath, int level, int inForm)
 {
 #ifdef HAVE_DILITHIUM
     int ret = 0;
@@ -679,7 +680,6 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
 
 #ifdef WOLFSSL_SMALL_STACK
     dilithium_key* key;
-    WOLFCLU_LOG(WOLFCLU_L0, "Using small stack");
     key = (dilithium_key*)XMALLOC(sizeof(dilithium_key), HEAP_HINT,
             DYNAMIC_TYPE_TMP_BUFFER);
     if (key == NULL) {
@@ -687,7 +687,6 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
     }
 #else
     dilithium_key key[1];
-    WOLFCLU_LOG(WOLFCLU_L0, "Not using small stack");
 #endif
 
     /* init the dilithium key */
@@ -743,7 +742,8 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
     }
     XMEMSET(keyBuf, 0, keyFileSz);
 
-    if (XFSEEK(keyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
+    if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
+        (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
         wolfCLU_LogError("Failed to read public key.\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #ifdef WOLFSSL_SMALL_STACK
@@ -753,6 +753,22 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
     }
     keyBufSz = (word32)keyFileSz;
     XFCLOSE(keyFile);
+
+    /* convert PEM to DER if necessary */
+    if (inForm == PEM_FORM) {
+        ret = wolfCLU_KeyPemToDer(&keyBuf, keyFileSz, 1);
+        if (ret < 0) {
+            wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        #ifdef WOLFSSL_SMALL_STACK
+            wc_dilithium_free(key);
+        #endif
+            return ret;
+        }
+        else {
+            keyBufSz = ret;
+        }
+    }
 
     /* retrieving public key and storing in the dilithium key */
     ret = wc_Dilithium_PublicKeyDecode(keyBuf, &index, key, keyBufSz);
@@ -769,7 +785,8 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg, word32 m
     /* verify the massage using the dilithium public key */
     ret = wc_dilithium_verify_msg(sig, sigSz, msg, msgLen, &res, key);
     if (ret != 0) {
-        wolfCLU_LogError("Failed to verify data with Dilithium public key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to verify data with Dilithium public key.\n"
+                        "RET: %d", ret);
     #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
     #endif

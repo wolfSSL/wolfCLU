@@ -49,7 +49,7 @@ int wolfCLU_sign_data(char*, char*, char*, int, int, int);
 int wolfCLU_sign_data_rsa(byte*, char*, word32, char*, int);
 int wolfCLU_sign_data_ecc(byte*, char*, word32, char*, int);
 int wolfCLU_sign_data_ed25519(byte*, char*, word32, char*, int);
-int wolfCLU_sign_data_dilithium (byte*, char*, word32, char*, int);
+int wolfCLU_sign_data_dilithium (byte*, char*, word32, char*, int, int);
 
 int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn);
 

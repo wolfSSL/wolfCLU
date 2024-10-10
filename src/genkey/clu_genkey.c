@@ -1036,7 +1036,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
 
 int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
-                            int keySz, int level, int withAlg, int keyType)
+                            int keySz, int level, int withAlg)
 {
 #ifdef HAVE_DILITHIUM    
     int    ret = WOLFCLU_SUCCESS;
@@ -1064,15 +1064,13 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
 #ifdef WOLFSSL_SMALL_STACK
     dilithium_key* key;
-    WOLFCLU_LOG(WOLFCLU_L0, "Using small stack");
-    key = (dilithium_key*)XMALLOC(sizeof(dilithium_key), HEAP_HINT,
-            DYNAMIC_TYPE_TMP_BUFFER);
+    key = (dilithium_key*)XMALLOC(sizeof(dilithium_key), key.HEAP_HINT,
+            DYNAMIC_TYPE_DILITHIUM);
     if (key == NULL) {
         return MEMORY_E;
     }
 #else
     dilithium_key key[1];
-    WOLFCLU_LOG(WOLFCLU_L0, "Not using small stack");
 #endif
 
     if (rng == NULL || fName == NULL) {
@@ -1118,7 +1116,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
         XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
         XMEMCPY(fOutNameBuf, fName, fNameSz);
 
-        derBuf = (byte*) XMALLOC(maxDerBufSz, HEAP_HINT,
+        derBuf = (byte*)XMALLOC(maxDerBufSz, HEAP_HINT,
                 DYNAMIC_TYPE_TMP_BUFFER);
         if (derBuf == NULL) {
             ret = MEMORY_E;
@@ -1147,7 +1145,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                 /* check if should convert to PEM format */
                 if (ret == WOLFCLU_SUCCESS && fmt == PEM_FORM) {
                     pemBufSz = wolfCLU_KeyDerToPem(derBuf, derBufSz, &pemBuf,
-                            keyType, DYNAMIC_TYPE_PRIVATE_KEY);
+                            PRIVATEKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
                     if (pemBufSz <= 0 || pemBuf == NULL) {
                         ret =  WOLFCLU_FAILURE;
                     }
@@ -1171,22 +1169,28 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                     }
                 }
 
-                XFCLOSE(file);
-
-                if (pemBuf != NULL) {
-                    wolfCLU_ForceZero(pemBuf, pemBufSz);
-                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
-                }         
-
                 if (directive != PRIV_AND_PUB_FILES) {
                     break;
                 }
+
+                XFCLOSE(file);
+                file = NULL;
+                XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                derBuf = NULL;
+                XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+                pemBuf = NULL;
 
                 FALL_THROUGH;
             case PUB_ONLY_FILE:
                 /* add on the final part of the file name ".priv" */
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                 WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
+
+                derBuf = (byte*)XMALLOC(maxDerBufSz, HEAP_HINT,
+                                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (derBuf == NULL) {
+                    ret = MEMORY_E;
+                }
 
                 derBufSz = wc_Dilithium_PublicKeyToDer(key, derBuf,
                                                 (word32)maxDerBufSz, withAlg);
@@ -1201,7 +1205,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                 /* check if should convert to PEM format */
                 if (ret == WOLFCLU_SUCCESS && fmt == PEM_FORM) {
                     pemBufSz = wolfCLU_KeyDerToPem(derBuf, derBufSz, &pemBuf,
-                            PUBLICKEY_TYPE, DYNAMIC_TYPE_PRIVATE_KEY);
+                            PUBLICKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
                     if (pemBufSz <= 0 || pemBuf == NULL) {
                         ret =  WOLFCLU_FAILURE;
                     }
@@ -1225,13 +1229,6 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                     }
                 }
 
-                XFCLOSE(file);
-
-                if (pemBuf != NULL) {
-                    wolfCLU_ForceZero(pemBuf, pemBufSz);
-                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
-                }
-
                 break;
             default:
                 wolfCLU_LogError("Invalid directive");
@@ -1239,9 +1236,16 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
         }
     }
 
+    XFCLOSE(file);
+
     if (derBuf != NULL) {
         wolfCLU_ForceZero(derBuf, (unsigned int)maxDerBufSz);
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    if (pemBuf != NULL) {
+        wolfCLU_ForceZero(pemBuf, pemBufSz);
+        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
     }
 
     if (fOutNameBuf != NULL) {

@@ -268,7 +268,8 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         ret = wolfCLU_sign_data(in, out, priv, algCheck, inForm, level);
     }
     else if (verifyCheck == 1) {
-        ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck, inForm, level);
+        ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck, inForm,
+                                        level);
     }
 
     if (priv)

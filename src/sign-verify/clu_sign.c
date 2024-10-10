@@ -34,24 +34,29 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
     if (pubIn == 0) {
         ret = wc_KeyPemToDer(keyBuf, pkeySz, NULL, 0, NULL);
         if (ret > 0) {
+            wolfCLU_Log(WOLFCLU_L0, "DER size: %d", ret);
             int derSz = ret;
             der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (der == NULL) {
+                wolfCLU_Log(WOLFCLU_L0, "Failed to allocate memory for DER");
                 ret = MEMORY_E;
             }
             else {
                 ret = wc_KeyPemToDer(keyBuf, pkeySz, der, derSz, NULL);
                 if (ret > 0) {
+                    wolfCLU_Log(WOLFCLU_L0, "DER size2: %d", ret);
                     /* replace incoming pkeyBuf with new der buf */
                     XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     *pkeyBuf = der;
                 }
                 else {
+                    wolfCLU_Log(WOLFCLU_L0, "Failed to convert PEM to DER");
                     /* failure, so cleanup */
                     XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 }
             }
         }
+        wolfCLU_Log(WOLFCLU_L0, "DER size3: %d", ret);
     }
     else {
         ret = wc_PubKeyPemToDer(keyBuf, pkeySz, NULL, 0);
@@ -122,7 +127,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
         break;
 
     case DILITHIUM_SIG_VER:
-        ret = wolfCLU_sign_data_dilithium(data, out, fSz, privKey, level);
+        ret = wolfCLU_sign_data_dilithium(data, out, fSz, privKey, level, inForm);
         break;
 
     default:
@@ -541,7 +546,8 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
 #endif
 }
 
-int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* privKey, int level)
+int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* privKey,
+                                int level, int inForm)
 {
 #ifdef HAVE_DILITHIUM
     int ret = 0;
@@ -558,7 +564,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
 #ifdef WOLFSSL_SMALL_STACK
     dilithium_key* key;
-    WOLFCLU_LOG(WOLFCLU_L0, "Using small stack");
     key = (dilithium_key*)XMALLOC(sizeof(dilithium_key), HEAP_HINT,
             DYNAMIC_TYPE_TMP_BUFFER);
     if (key == NULL) {
@@ -566,7 +571,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     }
 #else
     dilithium_key key[1];
-    WOLFCLU_LOG(WOLFCLU_L0, "Not using small stack");
 #endif
 
     /* init the dilithium key */
@@ -621,7 +625,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
     XFSEEK(privKeyFile, 0, SEEK_END);
     privFileSz = (int)XFTELL(privKeyFile);
-    privBuf = (byte*)XMALLOC(privFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    privBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (privBuf == NULL) {
         XFCLOSE(privKeyFile);
         wc_FreeRng(&rng);
@@ -631,6 +635,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         return MEMORY_E;
     }
 
+    XMEMSET(privBuf, 0, privFileSz+1);
     privBufSz = privFileSz;
     XFSEEK(privKeyFile, 0, SEEK_SET);
     if (XFREAD(privBuf, 1, privBufSz, privKeyFile) != privBufSz) {
@@ -643,6 +648,23 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         return ret;
     }
     XFCLOSE(privKeyFile);
+
+    /* convert PEM to DER if necessary */
+    if (inForm == PEM_FORM) {
+        ret = wolfCLU_KeyPemToDer(&privBuf, privFileSz, 0);
+        if (ret < 0) {
+            wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            wc_FreeRng(&rng);
+        #ifdef WOLFSSL_SMALL_STACK
+            wc_dilithium_free(key);
+        #endif
+            return ret;
+        }
+        else {
+            privFileSz = ret;
+        }
+    }
 
     /* retrieving private key and staoring in the Dilithium key */
     ret = wc_Dilithium_PrivateKeyDecode(privBuf, &index, key, privBufSz);
