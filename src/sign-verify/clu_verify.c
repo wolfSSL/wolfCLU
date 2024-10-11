@@ -805,6 +805,14 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
 
     return WOLFCLU_SUCCESS;
 #else
+    (void)sig;
+    (void)sigSz;
+    (void)msg;
+    (void)msgLen;
+    (void)keyPath;
+    (void)level;
+    (void)inForm;
+
     return NOT_COMPILED_IN;
 #endif  /* HAVE_DILITHIUM */
 }

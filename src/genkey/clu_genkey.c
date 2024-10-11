@@ -1262,7 +1262,10 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
     (void)fName;
     (void)directive;
     (void)fmt;
-    (void)level; 
+    (void)keySz;
+    (void)level;
+    (void)withAlg;
+    
     return NOT_COMPILED_IN;
 #endif /* HAVE_DILITHIUM */
 }

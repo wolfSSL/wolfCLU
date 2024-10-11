@@ -717,6 +717,13 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
     return WOLFCLU_SUCCESS;
 #else
+    (void)data;
+    (void)out;
+    (void)fSz;
+    (void)privKey;
+    (void)level;
+    (void)inForm;
+
     return NOT_COMPILED_IN;
 #endif
 }
