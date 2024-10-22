@@ -75,6 +75,9 @@
     <ClCompile Include="src\hash\clu_alg_hash.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\pkcs\clu_pkcs7.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\pkcs\clu_pkcs12.c">
       <Filter>Source Files</Filter>
     </ClCompile>

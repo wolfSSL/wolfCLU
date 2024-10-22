@@ -159,6 +159,7 @@
     <ClCompile Include="src\hash\clu_hash.c" />
     <ClCompile Include="src\hash\clu_hash_setup.c" />
     <ClCompile Include="src\hash\clu_alg_hash.c" />
+    <ClCompile Include="src\pkcs\clu_pkcs7.c" />
     <ClCompile Include="src\pkcs\clu_pkcs12.c" />
     <ClCompile Include="src\pkey\clu_pkey.c" />
     <ClCompile Include="src\pkey\clu_rsa.c" />

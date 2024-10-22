@@ -26,7 +26,7 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
 
-#ifndef WOLFCLU_NO_FILESYSTEM
+#if defined(HAVE_PKCS7) && !defined(WOLFCLU_NO_FILESYSTEM)
 
 static const struct option pkcs7_options[] = {
     {"-print_certs",  no_argument,       0, WOLFCLU_CERTFILE  },
