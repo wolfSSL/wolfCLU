@@ -1041,7 +1041,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 #ifdef HAVE_DILITHIUM    
     int    ret = WOLFCLU_SUCCESS;
 
-    XFILE  file;
+    XFILE  file = NULL;
     int   fNameSz     = 0;
     int   fExtSz      = 6;  // size of ".priv\0" or ".pub\0\0"
     char  fExtPriv[6] = ".priv\0";
@@ -1236,7 +1236,8 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
         }
     }
 
-    XFCLOSE(file);
+    if (file != NULL)
+        XFCLOSE(file);
 
     if (derBuf != NULL) {
         wolfCLU_ForceZero(derBuf, (unsigned int)maxDerBufSz);

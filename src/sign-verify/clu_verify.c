@@ -136,9 +136,13 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
                              char* keyPath, int keyType, int pubIn,
                              int inForm, int level)
 {
+#ifndef HAVE_DILITHIUM
+    (void) level;
+#endif
+
     int hSz = 0;
     int fSz;
-    int ret;
+    int ret = WOLFCLU_FATAL_ERROR;
 
     byte* hash = NULL;
     byte* data = NULL;
@@ -230,8 +234,8 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
         #endif
             break;
 
+#ifdef HAVE_DILITHIUM
         case DILITHIUM_SIG_VER:
-        #ifdef HAVE_DILITHIUM
             /* hashFIle means msgFile */
             h = XFOPEN(hashFile, "rb");
             if (h == NULL) {
@@ -259,8 +263,8 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
             XFCLOSE(h);
 
             ret = wolfCLU_verify_signature_dilithium(data, fSz, hash, hSz, keyPath, level, inForm);
-        #endif
             break;
+#endif
 
         default:
             wolfCLU_LogError("No valid verify algorithm selected.");

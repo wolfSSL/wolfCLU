@@ -87,6 +87,9 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
 int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
                       int inForm, int level)
 {
+#ifndef HAVE_DILITHIUM
+    (void)level;
+#endif
     int ret;
     int fSz;
     XFILE f;
@@ -126,9 +129,11 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
         ret = wolfCLU_sign_data_ed25519(data, out, fSz, privKey, inForm);
         break;
 
+#ifdef HAVE_DILITHIUM
     case DILITHIUM_SIG_VER:
         ret = wolfCLU_sign_data_dilithium(data, out, fSz, privKey, level, inForm);
         break;
+#endif
 
     default:
         wolfCLU_LogError("No valid sign algorithm selected.");
@@ -719,8 +724,8 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 #else
     (void)data;
     (void)out;
-    (void)fSz;
-    (void)privKey;
+    (void)dataSz;
+    (void) privKey;
     (void)level;
     (void)inForm;
 
