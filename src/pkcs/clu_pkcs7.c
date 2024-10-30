@@ -69,6 +69,7 @@ int wolfCLU_PKCS7(int argc, char** argv)
     byte* derContent = NULL;
     int   bufSz;
     int   derContentSz;
+    int   freePkcs7 = 0;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -142,6 +143,8 @@ int wolfCLU_PKCS7(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 else {
+                    freePkcs7 = 1;
+
                     if (wc_PKCS7_Init(&pkcs7, HEAP_HINT, INVALID_DEVID)) {
                         wolfCLU_LogError("Error on pkcs init");
                         ret = WOLFCLU_FATAL_ERROR;
@@ -221,7 +224,9 @@ int wolfCLU_PKCS7(int argc, char** argv)
 
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
-    wc_PKCS7_Free(&pkcs7);
+
+    if (freePkcs7)
+        wc_PKCS7_Free(&pkcs7);
 
     if (derObj != NULL)
         wc_FreeDer(&derObj);
