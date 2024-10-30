@@ -12,7 +12,7 @@ then
     exit 77
 fi
 
-RESULT=`./wolfssl pkcs7 -inform DER -in certs/signed.p7b`
+RESULT=`./wolfssl pkcs7 -inform DER -in certs/signed.p7b 2>&1`
 echo "$RESULT" | grep "Recompile wolfSSL with PKCS7 support"
 if [ $? == 0 ]; then
     #return 77 to indicate to automake that the test was skipped
