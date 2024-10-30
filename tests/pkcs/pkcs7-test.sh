@@ -12,7 +12,7 @@ then
     exit 77
 fi
 
-RESULT=`./wolfssl pkcs7 -inform DER -in signed.p7b`
+RESULT=`./wolfssl pkcs7 -inform DER -in certs/signed.p7b`
 echo "$RESULT" | grep "Recompile wolfSSL with PKCS7 support"
 if [ $? == 0 ]; then
     #return 77 to indicate to automake that the test was skipped
@@ -28,7 +28,7 @@ run() {
     fi
 }
 
-run "pkcs7 -inform DER -print_certs -in signed.p7b"
+run "pkcs7 -inform DER -print_certs -in certs/signed.p7b"
 
 #check that certs were printed
 echo $RESULT | grep "CERTIFICATE"
@@ -38,7 +38,7 @@ if [ $? != 0 ]; then
 fi
 
 #check der to pem
-run "pkcs7 -inform DER -in signed.p7b -outform PEM"
+run "pkcs7 -inform DER -in certs/signed.p7b -outform PEM"
 
 echo $RESULT | grep "BEGIN PKCS7"
 if [ $? != 0 ]; then
@@ -47,7 +47,7 @@ if [ $? != 0 ]; then
 fi
 
 #check pem to der
-run "pkcs7 -inform PEM -in signed.p7s -outform DER"
+run "pkcs7 -inform PEM -in certs/signed.p7s -outform DER"
 
 echo "Done"
 exit 0
