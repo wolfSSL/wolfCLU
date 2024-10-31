@@ -62,6 +62,7 @@ static const struct option mode_options[] = {
     {"ed25519",   no_argument,       0, WOLFCLU_ED25519     },
     {"dgst",      no_argument,       0, WOLFCLU_DGST        },
     {"verify",    no_argument,       0, WOLFCLU_VERIFY      },
+    {"pkcs7",     no_argument,       0, WOLFCLU_PKCS7       },
     {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12      },
     {"crl",       no_argument,       0, WOLFCLU_CRL         },
     {"s_client",  no_argument,       0, WOLFCLU_CLIENT      },
@@ -276,6 +277,10 @@ int main(int argc, char** argv)
         case WOLFCLU_ECC:
         case WOLFCLU_ED25519:
             ret = wolfCLU_sign_verify_setup(argc, argv);
+            break;
+
+        case WOLFCLU_PKCS7:
+            ret = wolfCLU_PKCS7(argc, argv);
             break;
 
         case WOLFCLU_PKCS12:

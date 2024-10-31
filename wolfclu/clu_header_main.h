@@ -534,6 +534,11 @@ int wolfCLU_GetTypeFromPKEY(WOLFSSL_EVP_PKEY* key);
  */
 void wolfCLU_convertToLower(char* s, int sSz);
 
+/**
+ * @brief handles PKCS7 command
+ */
+int wolfCLU_PKCS7(int argc, char** argv);
+
 
 /**
  * @brief handles PKCS12 command

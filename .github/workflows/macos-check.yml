@@ -25,7 +25,7 @@ jobs:
       run: ./autogen.sh
     - name: wolfssl configure
       working-directory: ./wolfssl_src
-      run: ./configure --enable-wolfclu --enable-crl --enable-dsa --prefix=$GITHUB_WORKSPACE/build-dir
+      run: ./configure --enable-wolfclu --enable-crl --enable-dsa --enable-pkcs7 --prefix=$GITHUB_WORKSPACE/build-dir
     - name: wolfssl make
       working-directory: ./wolfssl_src
       run: make
