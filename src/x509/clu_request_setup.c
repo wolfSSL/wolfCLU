@@ -424,17 +424,24 @@ static int _X509_name_print(WOLFSSL_BIO* bio, WOLFSSL_X509_NAME* name,
 }
 
 
-/* human readable print out of x509 version
+/* human readable print out of x509 or CSR version
  * return WOLFSSL_SUCCESS on success
  */
 static int _wolfSSL_X509_version_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
-        int indent)
+                                       int indent, byte isCSR)
 {
     int version;
+    byte version_value;
     char scratch[MAX_WIDTH];
 
     if ((version = wolfSSL_X509_version(x509)) < 0) {
         return WOLFSSL_FAILURE;
+    }
+
+    if (isCSR) {
+        version_value = (byte)wolfSSL_X509_REQ_get_version(x509);
+    } else {
+        version_value = (byte)wolfSSL_X509_get_version(x509);
     }
 
     XSNPRINTF(scratch, MAX_WIDTH, "%*s%s", indent, "", "Version:");
@@ -442,20 +449,20 @@ static int _wolfSSL_X509_version_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
         return WOLFSSL_FAILURE;
     }
 
-    XSNPRINTF(scratch, MAX_WIDTH, " %d (0x%x)\n", version, (byte)version-1);
+    XSNPRINTF(scratch, MAX_WIDTH, " %d (0x%x)\n", version, version_value);
     if (wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch)) <= 0) {
         return WOLFSSL_FAILURE;
     }
     return WOLFSSL_SUCCESS;
 }
 
-
 /* This should work its way into wolfSSL master @TODO
  * For now placing the implementation here so that wolfCLU can be used with
  * the current wolfSSL release.
  * return WOLFSSL_SUCCESS on success
  */
-static int wolfSSL_X509_REQ_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509)
+static int wolfSSL_X509_REQ_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
+                                  byte isCSR)
 {
     char subjType[] = "Subject: ";
 
@@ -474,7 +481,7 @@ static int wolfSSL_X509_REQ_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509)
     }
 
     /* print version of cert */
-    if (_wolfSSL_X509_version_print(bio, x509, 8) != WOLFSSL_SUCCESS) {
+    if (_wolfSSL_X509_version_print(bio, x509, 8, isCSR) != WOLFSSL_SUCCESS) {
         return WOLFSSL_FAILURE;
     }
 
@@ -569,7 +576,9 @@ int wolfCLU_requestSetup(int argc, char** argv)
     byte reSign    = 0; /* flag for if resigning req is needed */
     byte noOut     = 0;
     byte useDes    = 1;
-
+#ifdef NO_WOLFSSL_REQ_PRINT
+    byte isCSR     = 1;
+#endif
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "", req_options,
@@ -897,7 +906,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
     /* default to version 1 when generating CSR */
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V1) !=
+        if (wolfSSL_X509_REQ_set_version(x509, WOLFSSL_X509_V1) !=
                 WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Error setting CSR version");
             ret = WOLFCLU_FATAL_ERROR;
@@ -933,6 +942,9 @@ int wolfCLU_requestSetup(int argc, char** argv)
     /* sign the req/cert */
     if (ret == WOLFCLU_SUCCESS && (reqIn == NULL || reSign)) {
         if (genX509) {
+#ifdef NO_WOLFSSL_REQ_PRINT
+            isCSR = 0;
+#endif
             /* default to version 3 which supports extensions */
             if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) !=
                     WOLFSSL_SUCCESS) {
@@ -982,7 +994,11 @@ int wolfCLU_requestSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && doTextOut) {
+#ifdef NO_WOLFSSL_REQ_PRINT
+        wolfSSL_X509_REQ_print(bioOut, x509, isCSR);
+#else
         wolfSSL_X509_REQ_print(bioOut, x509);
+#endif
     }
 
     if (ret == WOLFCLU_SUCCESS && !noOut) {
