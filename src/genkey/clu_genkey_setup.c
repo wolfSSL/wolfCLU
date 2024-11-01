@@ -334,13 +334,12 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         WOLFCLU_LOG(WOLFCLU_L0, "using Dilithium%d", level);
-        ret = wolfCLU_genKey_Dilithium(&rng, keyOutFName, directiveArg, formatArg,
-                                        keySz, level, withAlg);
-        
+        ret = wolfCLU_genKey_Dilithium(&rng, keyOutFName, directiveArg,
+            formatArg, keySz, level, withAlg);
     #else
         wolfCLU_LogError("Invalid option, Dithium not enabled.");
-        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-dilithium, "
-                "--enable-experimental and try again");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "
+                "--enable-dilithium, --enable-experimental and try again");
         wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
     #endif  /* HAVE_DILITHIUM */
