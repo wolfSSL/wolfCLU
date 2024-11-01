@@ -176,14 +176,15 @@ SIGOUTNAME="ed-signed.sig"
 DERPEMRAW="raw"
 gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
 
-ALGORITHM="dilithium"
-KEYFILENAME="mldsakey"
-SIGOUTNAME="mldsa-signed.sig"
-DERPEMRAW="der"
-for level in 2 3 5
-do
-    gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
-done
+if grep -q "#define HAVE_DILITHIUM" /usr/local/include/wolfssl/options.h; then
+    ALGORITHM="dilithium"
+    KEYFILENAME="mldsakey"
+    SIGOUTNAME="mldsa-signed.sig"
+    DERPEMRAW="der"
+    for level in 2 3 5
+    do
+        gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
+    done
 
 ALGORITHM="dilithium"
 KEYFILENAME="mldsakey"
@@ -193,5 +194,6 @@ for level in 2 3 5
 do
     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
 done
+fi
 
 exit 0
