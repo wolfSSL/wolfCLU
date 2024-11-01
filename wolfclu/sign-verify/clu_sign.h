@@ -32,19 +32,24 @@
     #include <wolfssl/wolfcrypt/ecc.h>
     #include <wolfssl/wolfcrypt/asn_public.h>
 #endif
+#ifdef HAVE_DILITHIUM
+    #include <wolfssl/wolfcrypt/dilithium.h>
+#endif
 
 enum {
     RSA_SIG_VER,
     ECC_SIG_VER,
     ED25519_SIG_VER,
+    DILITHIUM_SIG_VER,
 };
 
-int wolfCLU_sign_data(char*, char*, char*, int, int);
+int wolfCLU_sign_data(char*, char*, char*, int, int, int);
 
 
 int wolfCLU_sign_data_rsa(byte*, char*, word32, char*, int);
 int wolfCLU_sign_data_ecc(byte*, char*, word32, char*, int);
 int wolfCLU_sign_data_ed25519(byte*, char*, word32, char*, int);
+int wolfCLU_sign_data_dilithium (byte*, char*, word32, char*, int, int);
 
 int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn);
 

@@ -60,6 +60,7 @@ static const struct option mode_options[] = {
     {"rsa",       no_argument,       0, WOLFCLU_RSA         },
     {"ecc",       no_argument,       0, WOLFCLU_ECC         },
     {"ed25519",   no_argument,       0, WOLFCLU_ED25519     },
+    {"dilithium", no_argument,       0, WOLFCLU_DILITHIUM   },
     {"dgst",      no_argument,       0, WOLFCLU_DGST        },
     {"verify",    no_argument,       0, WOLFCLU_VERIFY      },
     {"pkcs7",     no_argument,       0, WOLFCLU_PKCS7       },
@@ -276,6 +277,7 @@ int main(int argc, char** argv)
         case WOLFCLU_RSALEGACY:
         case WOLFCLU_ECC:
         case WOLFCLU_ED25519:
+        case WOLFCLU_DILITHIUM:
             ret = wolfCLU_sign_verify_setup(argc, argv);
             break;
 

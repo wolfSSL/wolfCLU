@@ -134,11 +134,15 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, int inForm, byte* 
 
 int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
                              char* keyPath, int keyType, int pubIn,
-                             int inForm)
+                             int inForm, int level)
 {
+#ifndef HAVE_DILITHIUM
+    (void) level;
+#endif
+
     int hSz = 0;
     int fSz;
-    int ret;
+    int ret = WOLFCLU_FATAL_ERROR;
 
     byte* hash = NULL;
     byte* data = NULL;
@@ -229,6 +233,38 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
                                                    keyPath, pubIn, inForm);
         #endif
             break;
+
+#ifdef HAVE_DILITHIUM
+        case DILITHIUM_SIG_VER:
+            /* hashFIle means msgFile */
+            h = XFOPEN(hashFile, "rb");
+            if (h == NULL) {
+                wolfCLU_LogError("unable to open file %s", hashFile);
+                ret = BAD_FUNC_ARG;
+                break;
+            }
+
+            /* hSz means msgLen */
+            XFSEEK(h, 0, SEEK_END);
+            hSz = (int)XFTELL(h);
+
+            /* hash means msg */
+            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (hash == NULL) {
+                ret = MEMORY_E;
+                XFCLOSE(h);
+                break;
+            }
+
+            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
+                XFCLOSE(h);
+                return WOLFCLU_FATAL_ERROR;
+            }
+            XFCLOSE(h);
+
+            ret = wolfCLU_verify_signature_dilithium(data, fSz, hash, hSz, keyPath, level, inForm);
+            break;
+#endif
 
         default:
             wolfCLU_LogError("No valid verify algorithm selected.");
@@ -630,6 +666,159 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 #else
     return NOT_COMPILED_IN;
-#endif
+#endif  /* HAVE_ED25519 */
 }
+
+int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
+                    word32 msgLen, char* keyPath, int level, int inForm)
+{
+#ifdef HAVE_DILITHIUM
+    int ret = 0;
+
+    XFILE keyFile = NULL;
+    byte* keyBuf = NULL;
+    int keyFileSz = 0;
+    word32 keyBufSz = 0;
+    word32 index = 0;
+    int res = 0;
+
+#ifdef WOLFSSL_SMALL_STACK
+    dilithium_key* key;
+    key = (dilithium_key*)XMALLOC(sizeof(dilithium_key), HEAP_HINT,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (key == NULL) {
+        return MEMORY_E;
+    }
+#else
+    dilithium_key key[1];
+#endif
+
+    /* init the dilithium key */
+    ret = wc_dilithium_init(key);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
+        return ret;
+    }
+    XMEMSET(key, 0, sizeof(dilithium_key));
+
+    /* check and set Dilithium level */
+    if (level != 2 && level != 3 && level != 5) {
+        wolfCLU_LogError("Please specify a level when verifying with Dilithium.");
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
+        return BAD_FUNC_ARG;
+    }
+    else {
+        ret = wc_dilithium_set_level(key, level);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set level.\nRET: %d", ret);
+        #ifdef WOLFSSL_SMALL_STACK
+            wc_dilithium_free(key);
+        #endif
+            return BAD_FUNC_ARG;
+        }
+    }
+
+    /* open and read public key */
+    keyFile = XFOPEN(keyPath, "rb");
+    if (keyFile == NULL) {
+        wolfCLU_LogError("Faild to open Private key FILE.");
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
+        return BAD_FUNC_ARG;
+    }
+
+    XFSEEK(keyFile, 0, SEEK_END);
+    keyFileSz = (int)XFTELL(keyFile);
+    keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (keyBuf == NULL) {
+        wolfCLU_LogError("Failed to malloc key buffer.");
+        XFCLOSE(keyFile);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
+        return MEMORY_E;
+    }
+    XMEMSET(keyBuf, 0, keyFileSz);
+
+    if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
+        (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
+        wolfCLU_LogError("Failed to read public key.\nRET: %d", ret);
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
+        return WOLFCLU_FATAL_ERROR;
+    }
+    keyBufSz = (word32)keyFileSz;
+    XFCLOSE(keyFile);
+
+    /* convert PEM to DER if necessary */
+    if (inForm == PEM_FORM) {
+        ret = wolfCLU_KeyPemToDer(&keyBuf, keyFileSz, 1);
+        if (ret < 0) {
+            wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        #ifdef WOLFSSL_SMALL_STACK
+            wc_dilithium_free(key);
+        #endif
+            return ret;
+        }
+        else {
+            keyBufSz = ret;
+        }
+    }
+
+    /* retrieving public key and storing in the dilithium key */
+    ret = wc_Dilithium_PublicKeyDecode(keyBuf, &index, key, keyBufSz);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
+        return ret;
+    }
+    XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+
+    /* verify the massage using the dilithium public key */
+    ret = wc_dilithium_verify_msg(sig, sigSz, msg, msgLen, &res, key);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to verify data with Dilithium public key.\n"
+                        "RET: %d", ret);
+    #ifdef WOLFSSL_SMALL_STACK
+        wc_dilithium_free(key);
+    #endif
+        return ret;
+    }
+    else if(res == 1) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
+    }
+    else {
+        wolfCLU_LogError("Invalid Signature.");
+    }
+
+#ifdef WOLFSSL_SMALL_STACK
+    wc_dilithium_free(key);
+#endif
+
+    return WOLFCLU_SUCCESS;
+#else
+    (void)sig;
+    (void)sigSz;
+    (void)msg;
+    (void)msgLen;
+    (void)keyPath;
+    (void)level;
+    (void)inForm;
+
+    return NOT_COMPILED_IN;
+#endif  /* HAVE_DILITHIUM */
+}
+
 #endif /* WOLFCLU_NO_FILESYSTEM */

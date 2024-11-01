@@ -34,6 +34,9 @@
 #ifdef HAVE_ECC
     #include <wolfssl/wolfcrypt/ecc.h>
 #endif
+#ifdef HAVE_DILITHIUM
+    #include <wolfssl/wolfcrypt/dilithium.h>
+#endif
 
 #define SALT_SIZE       8
 
@@ -101,4 +104,20 @@ WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name);
 
 int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
         int heapType);
+
+/**
+ * generate a Dilithium key
+ *
+ * @param rng       the randam number generator
+ * @param fName     name of the file to write to
+ * @param directive which key to output, public or private, maybe both
+ * @param fmt       output format (PEM/DER)
+ * @param level     the dilithium level 2, 3 or 5
+ * @param withAlg   Whether to use SubjectPublicKeyInfo format
+ *
+ * return WOLFCLU_SUCCESS on success
+*/
+int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
+                            int keySz, int level, int withAlg);
+
 #endif /* CLU_GENKEY_H */
