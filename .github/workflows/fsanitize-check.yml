@@ -76,4 +76,4 @@ jobs:
           check: true
       - name: display log
         if: always()
-        run: cat test-suite.log
+        run: if [ -f test-suite.log ]; then cat test-suite.log; else echo "No test log"; fi
