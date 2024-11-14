@@ -10,11 +10,11 @@
 #requires user to have AutoConf version 2.63 or greater.
 AC_PREREQ([2.63])
 
-AC_INIT([wolfclu], [0.1.5], [http://www.wolfssl.com])
+AC_INIT([wolfclu], [0.1.6], [http://www.wolfssl.com])
 
 #a helpful directory to keep clutter out of root
 AC_CONFIG_AUX_DIR([build-aux])
-AC_CONFIG_HEADER([src/config.h])
+AC_CONFIG_HEADERS([src/config.h])
 AC_CANONICAL_HOST
 AC_CANONICAL_BUILD
 
@@ -57,7 +57,6 @@ AC_PROG_MAKE_SET
 AM_PROG_CC_C_O
 
 # Checks for headers/libraries
-AC_HEADER_STDC
 AC_CHECK_HEADERS([sys/time.h string.h termios.h unistd.h])
 AC_CHECK_SIZEOF(long long, 8)
 AC_CHECK_SIZEOF(long, 4)

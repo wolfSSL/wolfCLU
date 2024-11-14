@@ -1,3 +1,14 @@
+# wolfCLU v0.1.6 (Nov 11, 2024)
+- Expanded continuous integration tests with more GitHub actions added (PR 142,
+ 146, 147)
+- Added support for option -inform with command dgst (PR 141)
+- Added support for -pubout and -pubin with command rsa (PR 145)
+- Added initial support for s_server command (PR 133)
+- Sign and Verify Support with PEM format key ED25519, RSA, and ECC (PR 148)
+- Extend renew script to regenerate expected values based on new certs (PR 151)
+- Supporting PKCS7 command for parsing (PR 152)
+- Add Dilithium to genkey, sign-verify and gen-sig-ver (PR 150,153)
+
 # wolfCLU v0.1.5 (Dec 22, 2023)
 - Fix memory type typo in clu_rsa.c
 - Add missing void arg to functions in clu_funcs.c
