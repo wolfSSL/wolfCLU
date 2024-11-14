@@ -68,7 +68,7 @@ int wolfCLU_PKCS7(int argc, char** argv)
     byte* buf = NULL;
     byte* derContent = NULL;
     int   bufSz;
-    int   derContentSz;
+    int   derContentSz = 0;
     int   freePkcs7 = 0;
 
     opterr = 0; /* do not display unrecognized options */

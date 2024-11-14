@@ -83,6 +83,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "rsa            RSA key operations");
     WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
     WOLFCLU_LOG(WOLFCLU_L0, "verify         X509 certificate verify");
+    WOLFCLU_LOG(WOLFCLU_L0, "pkcs7          Used for parsing PKCS7 files");
     WOLFCLU_LOG(WOLFCLU_L0, "pkcs12         Used for parsing PKCS12 files");
     WOLFCLU_LOG(WOLFCLU_L0, "s_server       Basic TLS server for testing"
                                            " connection");
@@ -452,6 +453,9 @@ void wolfCLU_genKeyHelp(void)
     #ifdef HAVE_ECC
         ,"ecc"
     #endif
+    #ifdef HAVE_DILITHIUM
+        ,"dilithium"
+    #endif
         };
 
         WOLFCLU_LOG(WOLFCLU_L0, "Available keys with current configure settings:");
@@ -464,7 +468,12 @@ void wolfCLU_genKeyHelp(void)
            "-out <filename> -outform <PEM or DER> -output <PUB/PRIV/KEYPAIR> \n");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -genkey rsa -size 2048 -out mykey -outform der "
-           " -output KEYPAIR"
+           " -output KEYPAIR");
+#ifdef HAVE_DILITHIUM
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
+           "[2|3|5] -out mykey -outform der -output KEYPAIR");
+#endif
+    WOLFCLU_LOG(WOLFCLU_L0,
            "\n\nThe above command would output the files: mykey.priv "
            " and mykey.pub\nChanging the -output option to just PRIV would only"
            "\noutput the mykey.priv and using just PUB would only output"
