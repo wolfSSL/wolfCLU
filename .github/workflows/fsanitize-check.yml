@@ -15,6 +15,7 @@ jobs:
         config: [
           # Add new configs here and make wolfclu matrix match
           '--enable-wolfclu',
+          '--enable-wolfclu --enable-crl --enable-dsa --enable-pkcs7',
           '--enable-wolfclu --enable-smallstack',
           '--enable-wolfclu --enable-experimental --enable-dilithium',
           '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium',
@@ -50,6 +51,7 @@ jobs:
         os: [ ubuntu-latest ]
         config: [
           '--enable-wolfclu',
+          '--enable-wolfclu --enable-crl --enable-dsa --enable-pkcs7',
           '--enable-wolfclu --enable-smallstack',
           '--enable-wolfclu --enable-experimental --enable-dilithium',
           '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium',
