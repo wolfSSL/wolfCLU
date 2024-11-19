@@ -292,7 +292,31 @@ if [ $? -eq 0 ]; then
         echo "no surname attribute found"
         exit 99
     fi
+
 fi
+
+# test csr version
+run_success "req -new -key ./certs/server-key.pem -config ./test.conf -out tmp.csr"
+RESULT=`./wolfssl req -text -noout -in tmp.csr`
+if [ $? -eq 0 ]; then
+    # also check that the version is fine.
+    echo $RESULT | grep "Version" | grep "1" | grep "0x0"
+    if [ $? -ne 0 ]; then
+        echo "Printing wrong version number"
+        exit 99
+    fi
+fi
+
+# now make sure that openssl also sees what we see.
+RESULT=`openssl req -text -noout -in tmp.csr`
+if [ $? -eq 0 ]; then
+    echo $RESULT | grep "Version" | grep "1" | grep "0x0"
+    if [ $? -ne 0 ]; then
+        echo "Printing wrong version number"
+        exit 99
+    fi
+fi
+rm -f tmp.cert
 
 echo "Done"
 exit 0
