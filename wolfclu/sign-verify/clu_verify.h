@@ -39,9 +39,9 @@
 int wolfCLU_x509Verify(int argc, char** argv);
 int wolfCLU_CRLVerify(int argc, char** argv);
 
-int wolfCLU_verify_signature(char* , char*, char*, char*, int, int, int, int);
+int wolfCLU_verify_signature(char* , char*, char*, char*, int, int, int);
 
 int wolfCLU_verify_signature_rsa(byte* , char*, int, char*, int, int);
 int wolfCLU_verify_signature_ecc(byte*, int, byte*, int, char*, int, int);
 int wolfCLU_verify_signature_ed25519(byte*, int, byte*, int, char*, int, int);
-int wolfCLU_verify_signature_dilithium(byte*, int, byte*, word32, char*, int, int);
+int wolfCLU_verify_signature_dilithium(byte*, int, byte*, word32, char*, int);

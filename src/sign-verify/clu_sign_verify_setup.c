@@ -34,7 +34,6 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     char*   out  = NULL; /* output variable */
     char*   priv = NULL; /* private key variable */
     char*   sig  = NULL;
-    int     level = 0;   /* security level */
 
     int     algCheck;           /* acceptable algorithm check */
     int     inCheck     = 0;    /* input check */
@@ -87,16 +86,6 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             wolfCLU_verifyHelp(algCheck);
         }
         return 0;
-    }
-
-    ret = wolfCLU_checkForArg("-level", 6, argc, argv);
-    if (ret > 0) {
-        level = atoi(argv[ret+1]);
-
-        if (level <= 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Invalid level. Please specify a level > 0.");
-            return WOLFCLU_FATAL_ERROR;
-        }
     }
 
     ret = wolfCLU_checkForArg("-inkey", 6, argc, argv);
@@ -265,11 +254,10 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     }
 
     if (signCheck == 1) {
-        ret = wolfCLU_sign_data(in, out, priv, algCheck, inForm, level);
+        ret = wolfCLU_sign_data(in, out, priv, algCheck, inForm);
     }
     else if (verifyCheck == 1) {
-        ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck, inForm,
-                                        level);
+        ret = wolfCLU_verify_signature(sig, in, out, priv, algCheck, pubInCheck, inForm);
     }
 
     if (priv)

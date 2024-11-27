@@ -81,11 +81,7 @@ gen_key_sign_ver_test(){
     printf '%s\n' "--enable-keygen" && exit -1
 
     # test signing with priv key
-    if [ $1 = "dilithium" ]; then
-        ./wolfssl -$1 -sign -level $5 -inkey $2.priv -inform $4 -in sign-this.txt -out $3
-    else
-        ./wolfssl -$1 -sign -inkey $2.priv -inform $4 -in sign-this.txt -out $3
-    fi
+    ./wolfssl -$1 -sign -inkey $2.priv -inform $4 -in sign-this.txt -out $3
     RESULT=$?
     printf '%s\n' "sign RESULT - $RESULT"
     [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 sign" && exit -1
@@ -109,8 +105,6 @@ gen_key_sign_ver_test(){
     if [ "${1}" = "rsa" ]; then
         ./wolfssl -$1 -verify -inkey $2.pub -inform $4 -sigfile $3 -in sign-this.txt \
                   -out $5.public_result -pubin
-    elif [ $1 = "dilithium"  ]; then
-        ./wolfssl -$1 -verify -level $5 -inkey $2.pub -inform $4 -sigfile $3 -in sign-this.txt -pubin
     else
         ./wolfssl -$1 -verify -inkey $2.pub -inform $4 -sigfile $3 -in sign-this.txt -pubin
     fi
