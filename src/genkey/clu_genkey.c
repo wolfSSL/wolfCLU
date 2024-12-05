@@ -1147,7 +1147,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                 /* check if should convert to PEM format */
                 if (ret == WOLFCLU_SUCCESS && fmt == PEM_FORM) {
                     pemBufSz = wolfCLU_KeyDerToPem(derBuf, derBufSz, &pemBuf,
-                            PRIVATEKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
+                            PKCS8_PRIVATEKEY_TYPE, DYNAMIC_TYPE_TMP_BUFFER);
                     if (pemBufSz <= 0 || pemBuf == NULL) {
                         ret =  WOLFCLU_FAILURE;
                     }

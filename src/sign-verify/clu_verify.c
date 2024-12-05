@@ -134,12 +134,8 @@ static int wolfCLU_generate_public_key_ed25519(char* privKey, int inForm, byte* 
 
 int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
                              char* keyPath, int keyType, int pubIn,
-                             int inForm, int level)
+                             int inForm)
 {
-#ifndef HAVE_DILITHIUM
-    (void) level;
-#endif
-
     int hSz = 0;
     int fSz;
     int ret = WOLFCLU_FATAL_ERROR;
@@ -262,7 +258,7 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
             }
             XFCLOSE(h);
 
-            ret = wolfCLU_verify_signature_dilithium(data, fSz, hash, hSz, keyPath, level, inForm);
+            ret = wolfCLU_verify_signature_dilithium(data, fSz, hash, hSz, keyPath, inForm);
             break;
 #endif
 
@@ -670,7 +666,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
 }
 
 int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
-                    word32 msgLen, char* keyPath, int level, int inForm)
+                    word32 msgLen, char* keyPath, int inForm)
 {
 #ifdef HAVE_DILITHIUM
     int ret = 0;
@@ -703,25 +699,6 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
         return ret;
     }
     XMEMSET(key, 0, sizeof(dilithium_key));
-
-    /* check and set Dilithium level */
-    if (level != 2 && level != 3 && level != 5) {
-        wolfCLU_LogError("Please specify a level when verifying with Dilithium.");
-    #ifdef WOLFSSL_SMALL_STACK
-        wc_dilithium_free(key);
-    #endif
-        return BAD_FUNC_ARG;
-    }
-    else {
-        ret = wc_dilithium_set_level(key, level);
-        if (ret != 0) {
-            wolfCLU_LogError("Failed to set level.\nRET: %d", ret);
-        #ifdef WOLFSSL_SMALL_STACK
-            wc_dilithium_free(key);
-        #endif
-            return BAD_FUNC_ARG;
-        }
-    }
 
     /* open and read public key */
     keyFile = XFOPEN(keyPath, "rb");
@@ -814,7 +791,6 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     (void)msg;
     (void)msgLen;
     (void)keyPath;
-    (void)level;
     (void)inForm;
 
     return NOT_COMPILED_IN;

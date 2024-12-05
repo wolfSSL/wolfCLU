@@ -85,11 +85,8 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
 }
 
 int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
-                      int inForm, int level)
+                      int inForm)
 {
-#ifndef HAVE_DILITHIUM
-    (void)level;
-#endif
     int ret;
     int fSz;
     XFILE f;
@@ -131,7 +128,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
 
 #ifdef HAVE_DILITHIUM
     case DILITHIUM_SIG_VER:
-        ret = wolfCLU_sign_data_dilithium(data, out, fSz, privKey, level, inForm);
+        ret = wolfCLU_sign_data_dilithium(data, out, fSz, privKey, inForm);
         break;
 #endif
 
@@ -552,7 +549,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
 }
 
 int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* privKey,
-                                int level, int inForm)
+                                int inForm)
 {
 #ifdef HAVE_DILITHIUM
     int ret = 0;
@@ -594,27 +591,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         wc_dilithium_free(key);
     #endif
         return WOLFCLU_FAILURE;
-    }
-
-    /* check and set Dilithium level */
-    if (level != 2 && level != 3 && level != 5) {
-        wolfCLU_LogError("Please specify a level when signing with Dilithium.");
-        wc_FreeRng(&rng);
-    #ifdef WOLFSSL_SMALL_STACK
-        wc_dilithium_free(key);
-    #endif
-        return BAD_FUNC_ARG;
-    }
-    else {
-        ret = wc_dilithium_set_level(key, level);
-        if (ret != 0) {
-            wolfCLU_LogError("Failed to set level.\nRET: %d", ret);
-            wc_FreeRng(&rng);
-        #ifdef WOLFSSL_SMALL_STACK
-            wc_dilithium_free(key);
-        #endif
-            return BAD_FUNC_ARG;
-        }
     }
 
     /* open and read private key */
@@ -726,7 +702,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     (void)out;
     (void)dataSz;
     (void) privKey;
-    (void)level;
     (void)inForm;
 
     return NOT_COMPILED_IN;
