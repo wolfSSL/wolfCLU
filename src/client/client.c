@@ -2448,7 +2448,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 }
                 else if (XSTRNCMP(myoptarg, "verifyInfo", 10) == 0) {
                     printf("Verify should not override error\n");
-                    myVerifyAction = VERIFY_USE_PREVERFIY;
+                    myVerifyAction = VERIFY_USE_PREVERIFY;
                 }
                 else if (XSTRNCMP(myoptarg, "useSupCurve", 11) == 0) {
                     printf("Attempting to test use supported curve\n");
@@ -3369,7 +3369,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     #endif
     }
     if (useVerifyCb || myVerifyAction == VERIFY_FORCE_FAIL ||
-            myVerifyAction == VERIFY_USE_PREVERFIY) {
+            myVerifyAction == VERIFY_USE_PREVERIFY) {
         wolfSSL_CTX_set_verify(ctx, WOLFSSL_VERIFY_PEER, myVerify);
     }
     else if (!usePsk && !useAnon && doPeerCheck == 0) {
