@@ -56,8 +56,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     int option;
     char* caCert     = NULL;
     char* verifyCert = NULL;
-    WOLFSSL_X509_STORE*  store = NULL;
-    WOLFSSL_X509_LOOKUP* lookup = NULL;
+    WOLFSSL_CERT_MANAGER* cm = NULL;
 
     /* last parameter is the certificate to verify */
     if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
@@ -118,13 +117,6 @@ int wolfCLU_x509Verify(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        store = wolfSSL_X509_STORE_new();
-        if (store == NULL) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-
-    if (ret == WOLFCLU_SUCCESS) {
         if (inForm != PEM_FORM) {
             wolfCLU_LogError("Only handling PEM CA files");
             ret = WOLFCLU_FATAL_ERROR;
@@ -132,22 +124,18 @@ int wolfCLU_x509Verify(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        lookup = wolfSSL_X509_STORE_add_lookup(store,
-                wolfSSL_X509_LOOKUP_file());
-        if (lookup == NULL) {
-            wolfCLU_LogError("Failed to setup lookup");
+        cm = wolfSSL_CertManagerNew();
+        if (cm == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
     /* Confirm CA file is root CA unless partialChain enabled */
-    if (ret == WOLFCLU_SUCCESS){
-        if (!partialChain && caCert != NULL){
+    if (ret == WOLFCLU_SUCCESS) {
+        if (!partialChain && caCert != NULL) {
             int error;
 
-            error = wolfSSL_CertManagerVerify(store->cm, caCert,
-                    WOLFSSL_FILETYPE_PEM);
-
+            error = wolfSSL_CertManagerVerify(cm, caCert, WOLFSSL_FILETYPE_PEM);
             if (error != ASN_SELF_SIGNED_E) {
                 wolfCLU_LogError("CA file is not root CA");
                 ret = WOLFCLU_FATAL_ERROR;
@@ -168,8 +156,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
-        if (wolfSSL_X509_LOOKUP_load_file(lookup, caCert, X509_FILETYPE_PEM)
-                != WOLFSSL_SUCCESS) {
+        if (wolfSSL_CertManagerLoadCA(cm, caCert, NULL) != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Failed to load CA file");
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -179,14 +166,14 @@ int wolfCLU_x509Verify(int argc, char** argv)
 #ifdef HAVE_CRL
     if (ret == WOLFCLU_SUCCESS) {
         if (crlCheck) {
-            if (wolfSSL_CertManagerEnableCRL(store->cm, WOLFSSL_CRL_CHECKALL)
+            if (wolfSSL_CertManagerEnableCRL(cm, WOLFSSL_CRL_CHECKALL)
                     != WOLFSSL_SUCCESS) {
                 wolfCLU_LogError("Failed to enable CRL use");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         else {
-            if (wolfSSL_CertManagerDisableCRL(store->cm) != WOLFSSL_SUCCESS) {
+            if (wolfSSL_CertManagerDisableCRL(cm) != WOLFSSL_SUCCESS) {
                 wolfCLU_LogError("Failed to disable CRL use");
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -197,11 +184,10 @@ int wolfCLU_x509Verify(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS) {
         int err;
 
-        err = wolfSSL_CertManagerVerify(store->cm, verifyCert,
-                WOLFSSL_FILETYPE_PEM);
+        err = wolfSSL_CertManagerVerify(cm, verifyCert, WOLFSSL_FILETYPE_PEM);
         if (err == ASN_NO_PEM_HEADER) {
             /* most likely the file was DER if PEM header not found */
-            err = wolfSSL_CertManagerVerify(store->cm, verifyCert,
+            err = wolfSSL_CertManagerVerify(cm, verifyCert,
                     WOLFSSL_FILETYPE_ASN1);
         }
         if (err != WOLFSSL_SUCCESS) {
@@ -214,7 +200,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    wolfSSL_X509_STORE_free(store);
+    wolfSSL_CertManagerFree(cm);
     (void)crlCheck;
     return ret;
 #else
