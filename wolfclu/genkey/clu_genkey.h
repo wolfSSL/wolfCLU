@@ -37,6 +37,9 @@
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
 #endif
+#ifdef WOLFSSL_HAVE_XMSS
+    #include <wolfssl/wolfcrypt/wc_xmss.h>
+#endif
 
 #define SALT_SIZE       8
 
@@ -119,5 +122,31 @@ int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
 */
 int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                             int keySz, int level, int withAlg);
+
+/**
+ * call back function of read/write a XMSS private key
+ *
+ * @param priv      the private key
+ * @param privSz    the size of the private key
+ * @param context   the context
+ *
+ * return WOLFCLU_SUCCESS on success
+*/
+#ifdef WOLFSSL_HAVE_XMSS
+enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte* priv, word32 privSz, void* context);
+enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte* priv, word32 privSz, void* context);
+#endif
+
+/**
+ * generate a XMSS key
+ *
+ * @param rng       the randam number generator 
+ * @param fName     name of the file to write to
+ * @param directive which key to output, public or private, maybe both
+ * @param paramStr  the XMSS parameter
+ *
+ * return WOLFCLU_SUCCESS on success
+*/
+int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName, int directive, const char* paramStr);
 
 #endif /* CLU_GENKEY_H */

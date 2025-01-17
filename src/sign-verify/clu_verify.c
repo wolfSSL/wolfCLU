@@ -262,6 +262,67 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
             break;
 #endif
 
+#ifdef WOLFSSL_HAVE_XMSS
+        case XMSS_SIG_VER:
+            /* hashFIle means msgFile */
+            h = XFOPEN(hashFile, "rb");
+            if (h == NULL) {
+                wolfCLU_LogError("unable to open file %s", hashFile);
+                ret = BAD_FUNC_ARG;
+                break;
+            }
+
+            /* hSz means msgLen */
+            XFSEEK(h, 0, SEEK_END);
+            hSz = (int)XFTELL(h);
+
+            /* hash means msg */
+            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (hash == NULL) {
+                ret = MEMORY_E;
+                XFCLOSE(h);
+                break;
+            }
+
+            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
+                XFCLOSE(h);
+                return WOLFCLU_FATAL_ERROR;
+            }
+            XFCLOSE(h);
+
+            ret = wolfCLU_verify_signature_xmss(data, fSz, hash, hSz, keyPath);
+            break;
+
+        case XMSSMT_SIG_VER:
+            /* hashFIle means msgFile */
+            h = XFOPEN(hashFile, "rb");
+            if (h == NULL) {
+                wolfCLU_LogError("unable to open file %s", hashFile);
+                ret = BAD_FUNC_ARG;
+                break;
+            }
+
+            /* hSz means msgLen */
+            XFSEEK(h, 0, SEEK_END);
+            hSz = (int)XFTELL(h);
+
+            /* hash means msg */
+            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (hash == NULL) {
+                ret = MEMORY_E;
+                XFCLOSE(h);
+                break;
+            }
+
+            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
+                XFCLOSE(h);
+                return WOLFCLU_FATAL_ERROR;
+            }
+            XFCLOSE(h);
+
+            ret = wolfCLU_verify_signature_xmssmt(data, fSz, hash, hSz, keyPath);
+            break;
+#endif
         default:
             wolfCLU_LogError("No valid verify algorithm selected.");
             ret = -1;
@@ -795,6 +856,332 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
 
     return NOT_COMPILED_IN;
 #endif  /* HAVE_DILITHIUM */
+}
+
+int wolfCLU_verify_signature_xmss(byte* sig, int sigSz,
+                                  byte* msg, int msgLen, char* pubKey)
+{
+#ifdef WOLFSSL_HAVE_XMSS
+    int ret        = 0;
+    XFILE keyFile  = NULL;               /* public key file              */
+    byte* keyBuf   = NULL;               /* public key buffer            */
+    int keyFileSz  = 0;                  /* public key buffer size       */
+    word32 oid     = 0x0;                /* OID of the XMSS parameter    */
+    char* paramStr = NULL;               /* XMSS parameter string        */
+    int paramLen   = XMSS_NAME_LEN + 1;  /* XMSS parameter string length */
+
+#ifdef WOLFSSL_SMALL_STACK
+    XmssKey *key = (XmssKey*)XMALLOC(sizeof(XmssKey),
+                                     HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (key == NULL) {
+        wolfCLU_LogError("Failed to malloc key buffer.");
+        return MEMORY_E;
+    }
+#else
+    XmssKey key[1];
+#endif
+
+    /* init the xmss key */
+    XMEMSET(key, 0, sizeof(XmssKey));
+    ret = wc_XmssKey_Init(key, HEAP_HINT, 0);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize XMSS Key.\nRET: %d", ret);
+    }
+
+    /* open and read public key */
+    if (ret == 0) {
+        keyFile = XFOPEN(pubKey, "rb");
+        if (keyFile == NULL) {
+            ret = OUTPUT_FILE_ERROR;
+            wolfCLU_LogError("Faild to open Public key FILE.");
+        }
+    }
+
+    if (ret == 0) {
+        XFSEEK(keyFile, 0, SEEK_END);
+        keyFileSz = (int)XFTELL(keyFile);
+        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (keyBuf == NULL) {
+            ret = MEMORY_E;
+            wolfCLU_LogError("Failed to malloc key buffer.\nRET: %d", ret);
+        }
+        else {
+            XMEMSET(keyBuf, 0, keyFileSz);
+        }
+    }
+
+    if (ret == 0) {
+        if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
+            (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
+            ret = WOLFCLU_FATAL_ERROR;
+            wolfCLU_LogError("Failed to read public key."
+                             "\nRET: %d", ret);
+        }
+        else {
+            XFCLOSE(keyFile);
+            keyFile = NULL;
+        }
+    }
+
+    /* get the parameter from OID */
+    if (ret == 0) {
+        paramStr = XMALLOC(paramLen , HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (paramStr == NULL) {
+            ret = MEMORY_E;
+            wolfCLU_LogError("Failed to malloc parameter string."
+                             "\nRET: %d", ret);
+        }
+        else {
+            XMEMSET(paramStr, 0, paramLen);
+        }
+    }
+
+    if (ret == 0) {
+        for (int i = 0; i < XMSS_OID_LEN; i++) {
+            oid = (oid << 8) | keyBuf[i];
+        }
+        
+        switch (oid) {
+            case WC_XMSS_OID_SHA2_10_256:
+                XMEMCPY(paramStr, "XMSS-SHA2_10_256\0", paramLen);
+                break;
+            case WC_XMSS_OID_SHA2_16_256:
+                XMEMCPY(paramStr, "XMSS-SHA2_16_256\0", paramLen);
+                break;
+            case WC_XMSS_OID_SHA2_20_256:
+                XMEMCPY(paramStr, "XMSS-SHA2_20_256\0", paramLen);
+                break;
+            default:
+                wolfCLU_LogError("Invalid XMSS OID.\nRET: %d", ret);
+                ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    /* set the parameter string */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetParamStr(key, paramStr);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set parameter string."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* import the public key */
+    if (ret == 0) {
+        ret = wc_XmssKey_ImportPubRaw(key, keyBuf, keyFileSz);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to decode public key."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* verify message with XMSS/XMSS^MT public key */
+    if (ret == 0) {
+        ret = wc_XmssKey_Verify(key, sig, sigSz, msg, msgLen);
+        if (ret != 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Invaild Signature.");
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
+        }
+    }
+
+    /* cleanup allocated resources */
+    if (keyFile != NULL) {
+        XFCLOSE(keyFile);
+    }
+    if (keyBuf != NULL) {
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (paramStr != NULL) {
+        XFREE(paramStr, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    wc_XmssKey_Free(key);
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
+
+    return (ret == 0) ? WOLFCLU_SUCCESS : ret;
+#else
+    (void)sig;
+    (void)sigSz;
+    (void)msg;
+    (void)msgLen;
+    (void)pubKey;
+
+    return NOT_COMPILED_IN;
+#endif  /* WOLFSSL_HAVE_XMSS */
+}
+
+int wolfCLU_verify_signature_xmssmt(byte* sig, int sigSz,
+                                    byte* msg, int msgLen, char* pubKey)
+{
+#ifdef WOLFSSL_HAVE_XMSS
+    int ret        = 0;
+    XFILE keyFile  = NULL;                     /* public key file              */
+    byte* keyBuf   = NULL;                     /* public key buffer            */
+    int keyFileSz  = 0;                        /* public key buffer size       */
+    word32 oid     = 0x0;                      /* OID of the XMSS parameter    */
+    char* paramStr = NULL;                     /* XMSS parameter string        */
+    int paramLen   = XMSSMT_NAME_MAX_LEN + 1;  /* XMSS parameter string length */
+
+#ifdef WOLFSSL_SMALL_STACK
+    XmssKey *key = (XmssKey*)XMALLOC(sizeof(XmssKey),
+                                     HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (key == NULL) {
+        wolfCLU_LogError("Failed to malloc key buffer.");
+        return MEMORY_E;
+    }
+#else
+    XmssKey key[1];
+#endif
+
+    /* init the xmss key */
+    XMEMSET(key, 0, sizeof(XmssKey));
+    ret = wc_XmssKey_Init(key, HEAP_HINT, 0);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize XMSS Key.\nRET: %d", ret);
+    }
+
+    /* open and read public key */
+    if (ret == 0) {
+        keyFile = XFOPEN(pubKey, "rb");
+        if (keyFile == NULL) {
+            ret = OUTPUT_FILE_ERROR;
+            wolfCLU_LogError("Faild to open Public key FILE.");
+        }
+    }
+
+    if (ret == 0) {
+        XFSEEK(keyFile, 0, SEEK_END);
+        keyFileSz = (int)XFTELL(keyFile);
+        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (keyBuf == NULL) {
+            ret = MEMORY_E;
+            wolfCLU_LogError("Failed to malloc key buffer.\nRET: %d", ret);
+        }
+        else {
+            XMEMSET(keyBuf, 0, keyFileSz);
+        }
+    }
+
+    if (ret == 0) {
+        if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
+            (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
+            ret = WOLFCLU_FATAL_ERROR;
+            wolfCLU_LogError("Failed to read public key.\nRET: %d", ret);
+        }
+        else {
+            XFCLOSE(keyFile);
+            keyFile = NULL;
+        }
+    }
+
+    /* get the parameter from OID */
+    if (ret == 0) {
+        paramStr = XMALLOC(paramLen , HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (paramStr == NULL) {
+            ret = MEMORY_E;
+            wolfCLU_LogError("Failed to malloc parameter string."
+                             "\nRET: %d", ret);
+        }
+        else {
+            XMEMSET(paramStr, 0, paramLen);
+        }
+    }
+
+    if (ret == 0) {
+        for (int i = 0; i < XMSS_OID_LEN; i++) {
+            oid = (oid << 8) | keyBuf[i];
+        }
+        
+        switch (oid) {
+            case WC_XMSSMT_OID_SHA2_20_2_256:
+                XMEMCPY(paramStr, "XMSSMT-SHA2_20/2_256\0\0", paramLen);
+                break;
+            case WC_XMSSMT_OID_SHA2_20_4_256:
+                XMEMCPY(paramStr, "XMSSMT-SHA2_20/4_256\0\0", paramLen);
+                break;
+            case WC_XMSSMT_OID_SHA2_40_2_256:
+                XMEMCPY(paramStr, "XMSSMT-SHA2_40/2_256\0\0", paramLen);
+                break;
+            case WC_XMSSMT_OID_SHA2_40_4_256:
+                XMEMCPY(paramStr, "XMSSMT-SHA2_40/4_256\0\0", paramLen);
+                break;
+            case WC_XMSSMT_OID_SHA2_40_8_256:
+                XMEMCPY(paramStr, "XMSSMT-SHA2_40/8_256\0\0", paramLen);
+                break;
+            case WC_XMSSMT_OID_SHA2_60_3_256:
+                XMEMCPY(paramStr, "XMSSMT-SHA2_60/3_256\0\0", paramLen);
+                break;
+            case WC_XMSSMT_OID_SHA2_60_6_256:
+                XMEMCPY(paramStr, "XMSSMT-SHA2_60/6_256\0\0", paramLen);
+                break;
+            case WC_XMSSMT_OID_SHA2_60_12_256:
+                XMEMCPY(paramStr, "XMSSMT-SHA2_60/12_256\0", paramLen);
+                break;
+            default:
+                wolfCLU_LogError("Invalid XMSS OID.\nRET: %d", ret);
+                ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    /* set the parameter string */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetParamStr(key, paramStr);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set parameter string."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* import the public key */
+    if (ret == 0) {
+        ret = wc_XmssKey_ImportPubRaw(key, keyBuf, keyFileSz);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to decode public key."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* verify message with XMSS/XMSS^MT public key */
+    if (ret == 0) {
+        ret = wc_XmssKey_Verify(key, sig, sigSz, msg, msgLen);
+        if (ret != 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Invaild Signature.");
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
+        }
+    }
+
+    /* cleanup allocated resources */
+    if (keyFile != NULL) {
+        XFCLOSE(keyFile);
+    }
+    if (keyBuf != NULL) {
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (paramStr != NULL) {
+        XFREE(paramStr, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    wc_XmssKey_Free(key);
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
+
+    return (ret == 0) ? WOLFCLU_SUCCESS : ret;
+#else
+    (void)sig;
+    (void)sigSz;
+    (void)msg;
+    (void)msgLen;
+    (void)pubKey;
+
+    return NOT_COMPILED_IN;
+#endif  /* WOLFSSL_HAVE_XMSS */
 }
 
 #endif /* WOLFCLU_NO_FILESYSTEM */

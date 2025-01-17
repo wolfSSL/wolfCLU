@@ -46,7 +46,34 @@ cleanup_genkey_sign_ver(){
     rm rsa-sigout.private_result
     rm rsa-sigout.public_result
     rm mldsa-signed.sig
+    rm xmss-signed.sig
+    # rm xmssmt-signed.sig
     rm sign-this.txt
+
+    # XMSS/XMSS^MT key files
+    rm XMSS-SHA2_10_256.priv
+    rm XMSS-SHA2_10_256.pub
+    # rm XMSS-SHA2_16_256.priv
+    # rm XMSS-SHA2_16_256.pub
+    # rm XMSS-SHA2_20_256.priv
+    # rm XMSS-SHA2_20_256.pub
+
+    # rm XMSSMT-SHA2_20-2_256.priv
+    # rm XMSSMT-SHA2_20-2_256.pub
+    # rm XMSSMT-SHA2_20-4_256.priv
+    # rm XMSSMT-SHA2_20-4_256.pub
+    # rm XMSSMT-SHA2_40-2_256.priv
+    # rm XMSSMT-SHA2_40-2_256.pub
+    # rm XMSSMT-SHA2_40-4_256.priv
+    # rm XMSSMT-SHA2_40-4_256.pub
+    # rm XMSSMT-SHA2_40-8_256.priv
+    # rm XMSSMT-SHA2_40-8_256.pub
+    # rm XMSSMT-SHA2_60-3_256.priv
+    # rm XMSSMT-SHA2_60-3_256.pub
+    # rm XMSSMT-SHA2_60-6_256.priv
+    # rm XMSSMT-SHA2_60-6_256.pub
+    # rm XMSSMT-SHA2_60-12_256.priv
+    # rm XMSSMT-SHA2_60-12_256.pub
 }
 trap cleanup_genkey_sign_ver INT TERM EXIT
 
@@ -71,6 +98,10 @@ gen_key_sign_ver_test(){
     # generate a key pair for signing
     if [ $1 = "dilithium" ]; then
         ./wolfssl -genkey $1 -level $5 -out $2 -outform $4 -output KEYPAIR
+    elif [ $1 = "xmss" ]; then
+        ./wolfssl -genkey $1 -height $5 -out $2 -outform $4 -output KEYPAIR
+    elif [ $1 = "xmssmt" ]; then
+        ./wolfssl -genkey $1 -height $5 -layer $6 -out $2 -outform $4 -output KEYPAIR
     else
         ./wolfssl -genkey $1 -out $2 -outform $4 KEYPAIR
     fi
@@ -90,7 +121,7 @@ gen_key_sign_ver_test(){
     if [ "${1}" = "rsa" ]; then
         ./wolfssl -$1 -verify -inkey $2.priv -inform $4 -sigfile $3 -in sign-this.txt \
                   -out $5.private_result
-    elif [ "${1}" = "dilithium" ]; then
+    elif [ "${1}" = "dilithium" ] || [ "${1}" = "xmss" ] || [ "${1}" = "xmssmt" ]; then
         # ./wolfssl -$1 -verify -inkey $2.priv -inform $4 -sigfile $3 -in sign-this.txt
         # pass
         :
@@ -189,5 +220,55 @@ do
     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
 done
 fi
+
+if grep -q "#define WOLFSSL_HAVE_XMSS" /usr/local/include/wolfssl/options.h; then
+    ALGORITHM="xmss"
+    SIGOUTNAME="xmss-signed.sig"
+    DERPEMRAW="raw"
+    HEIGHT=10
+
+    gen_key_sign_ver_test ${ALGORITHM} "XMSS-SHA2_${HEIGHT}_256" ${SIGOUTNAME} ${DERPEMRAW} ${HEIGHT}
+
+    # Too long to run
+    # for HEIGHT in 10 16 20
+    # do
+    #     KEYFILENAME="XMSS-SHA2_${HEIGHT}_256"
+    #     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${HEIGHT}
+    # done
+
+    # ALGORITHM="xmssmt"
+    # SIGOUTNAME="xmssmt-signed.sig"
+    # DERPEMRAW="raw"
+    # HEIGHT=20
+
+    # for LAYER in 2 4
+    # do
+    #     KEYFILENAME="XMSSMT-SHA2_${HEIGHT}-${LAYER}_256"
+    #     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${HEIGHT} ${LAYER}
+    # done
+
+    # ALGORITHM="xmssmt"
+    # SIGOUTNAME="xmssmt-signed.sig"
+    # DERPEMRAW="raw"
+    # HEIGHT=40
+
+    # for LAYER in 2 4 8
+    # do
+    #     KEYFILENAME="XMSSMT-SHA2_${HEIGHT}-${LAYER}_256"
+    #     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${HEIGHT} ${LAYER}
+    # done
+
+    # ALGORITHM="xmssmt"
+    # SIGOUTNAME="xmssmt-signed.sig"
+    # DERPEMRAW="raw"
+    # HEIGHT=60
+
+    # for LAYER in 3 6 12
+    # do
+    #     KEYFILENAME="XMSSMT-SHA2_${HEIGHT}-${LAYER}_256"
+    #     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${HEIGHT} ${LAYER}
+    # done
+fi
+
 
 exit 0

@@ -141,6 +141,8 @@ enum {
 
 /* PQC signeture */
 #define WOLFCLU_DILITHIUM 2019
+#define WOLFCLU_XMSS      2020
+#define WOLFCLU_XMSSMT    2021
 
 #define WOLFCLU_PBKDF2 2
 #define WOLFCLU_PBKDF1 1

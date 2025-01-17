@@ -1274,6 +1274,310 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 #endif /* HAVE_DILITHIUM */
 }
 
+/* The call back function of the writting xmss key */
+#ifdef WOLFSSL_HAVE_XMSS
+enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
+                                       word32 privSz, void * context)
+{
+    FILE *       file = NULL;
+    const char * filename = NULL;
+    int          n_cmp = 0;
+    size_t       n_read = 0;
+    size_t       n_write = 0;
+    byte *       buff = NULL;
+    int          err = 0;
+
+    if (priv == NULL || context == NULL || privSz == 0) {
+        fprintf(stderr, "error: invalid write args\n");
+        return WC_XMSS_RC_BAD_ARG;
+    }
+
+    filename = context;
+
+    /* Open file for read and write. */
+    file = fopen(filename, "rb+");
+    if (!file) {
+        /* Create the file if it didn't exist. */
+        file = fopen(filename, "wb+");
+        if (!file) {
+            fprintf(stderr, "error: fopen(%s, \"w+\") failed.\n", filename);
+            return WC_XMSS_RC_WRITE_FAIL;
+        }
+    }
+
+    n_write = fwrite(priv, 1, privSz, file);
+
+    if (n_write != privSz) {
+        fprintf(stderr, "error: wrote %zu, expected %d: %d\n", n_write, privSz,
+                ferror(file));
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
+    err = fclose(file);
+    if (err) {
+        fprintf(stderr, "error: fclose returned %d\n", err);
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
+    /* Verify private key data has actually been written to persistent
+     * storage correctly. */
+    file = fopen(filename, "rb+");
+    if (!file) {
+        fprintf(stderr, "error: fopen(%s, \"r+\") failed.\n", filename);
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
+    buff = malloc(privSz);
+    if (buff == NULL) {
+        fprintf(stderr, "error: malloc(%d) failed\n", privSz);
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
+    XMEMSET(buff, 0, n_write);
+
+    n_read = fread(buff, 1, n_write, file);
+
+    if (n_read != n_write) {
+        fprintf(stderr, "error: read %zu, expected %zu: %d\n", n_read, n_write,
+                ferror(file));
+        free(buff);
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
+    n_cmp = XMEMCMP(buff, priv, n_write);
+    free(buff);
+    buff = NULL;
+
+    if (n_cmp != 0) {
+        fprintf(stderr, "error: write data was corrupted: %d\n", n_cmp);
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
+    err = fclose(file);
+    if (err) {
+        fprintf(stderr, "error: fclose returned %d\n", err);
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
+    return WC_XMSS_RC_SAVED_TO_NV_MEMORY;
+}
+
+enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte * priv,
+                                      word32 privSz, void * context)
+{
+    FILE *       file = NULL;
+    const char * filename = NULL;
+    size_t       n_read = 0;
+
+    if (priv == NULL || context == NULL || privSz == 0) {
+        fprintf(stderr, "error: invalid read args\n");
+        return WC_XMSS_RC_BAD_ARG;
+    }
+
+    filename = context;
+
+    file = fopen(filename, "rb");
+    if (!file) {
+        fprintf(stderr, "error: fopen(%s, \"rb\") failed\n", filename);
+        return WC_XMSS_RC_READ_FAIL;
+    }
+
+    n_read = fread(priv, 1, privSz, file);
+
+    if (n_read != privSz) {
+        fprintf(stderr, "error: read %zu, expected %d: %d\n", n_read, privSz,
+                ferror(file));
+        return WC_XMSS_RC_READ_FAIL;
+    }
+
+    fclose(file);
+
+    return WC_XMSS_RC_READ_TO_MEMORY;
+}
+#endif  /* WOLFSSL_HAVE_XMSS */
+
+int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
+                        int directive, const char* paramStr)
+{
+#ifdef WOLFSSL_HAVE_XMSS
+    int ret            = 0;
+    int fNameSz        = 0;           /* file name without append         */
+    int fExtSz         = 6;           /* size of ".priv\0" and ".pub\0\0" */
+    char fExtPriv[6]   = ".priv\0";
+    char fExtPub[6]    = ".pub\0\0";
+    char* fOutNameBuf  = NULL;        /* file name + fExt       */
+    XFILE file         = NULL;        /* public key file        */
+    byte* pubOutBuf    = NULL;        /* public key buffer      */
+    word32 pubOutBufSz = 0;           /* public key buffer size */
+
+#ifdef WOLFSSL_SMALL_STACK
+    XmssKey* key;
+    key = (XmssKey*)XMALLOC(sizeof(XmssKey),
+                            HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (key == NULL) {
+        wolfCLU_LogError("Failed to allocate memory for XMSS key.\n");
+        return MEMORY_E;
+    }
+#else
+    XmssKey key[1];
+#endif
+
+    if (rng == NULL || fName == NULL) {
+        wolfCLU_LogError("Invalid arguments.\n");
+        ret = BAD_FUNC_ARG;
+    }
+
+    /* init the xmss key */
+    if (ret == 0) {
+        XMEMSET(key, 0, sizeof(XmssKey));
+        ret = wc_XmssKey_Init(key, HEAP_HINT, 0);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to initialize XMSS Key."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* set the XMSS/XMSS^MT parametar strings */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetParamStr(key, paramStr);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set parameter string."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* set the CallBack function of wrtitting the XMSS/XMSS^MT key */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetWriteCb(key, wolfCLU_XmssKey_WriteCb);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set write callback function."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* set up the file name output buffer */
+    if (ret == 0) {
+        fNameSz = (int)XSTRLEN(fName);
+        fOutNameBuf = (char*)XMALLOC(fNameSz + fExtSz + 1, HEAP_HINT,
+            DYNAMIC_TYPE_TMP_BUFFER);
+        if (fOutNameBuf == NULL) {
+            ret = MEMORY_E;
+            wolfCLU_LogError("Failed to allocate memory for file name buffer."
+                             "\nRET: %d", ret);
+        }
+        else {
+            XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
+            XMEMCPY(fOutNameBuf, fName, fNameSz);
+            XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
+
+            /* replace from '/' to '-' */
+            for (int i = 0; fOutNameBuf[i] != '\0'; i++) {
+                if (fOutNameBuf[i] == '/') {
+                    fOutNameBuf[i] = '-';
+                    WOLFCLU_LOG(WOLFCLU_L0, "INFO: Replace '/' to '-' in file name.\n");
+                    break;
+                }
+            }
+
+            WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
+        }
+    }
+
+    /* set the context of the XMSS/XMSS^MT key */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetContext(key, fOutNameBuf);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set context.\nRET: %d", ret);
+        }
+    }
+
+    /* make the xmss key */
+    if (ret == 0) {
+        ret = wc_XmssKey_MakeKey(key, rng);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to make XMSS Key.\nRET: %d", ret);
+        }
+    }
+
+    /* output XMSS/XMSS^MT public key */
+    if (ret == 0 && directive != PRIV_ONLY_FILE) {
+        /* add on the final part of the file name ".pub" */
+        XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
+        WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
+
+        /* open the file for writing the public key */
+        file = XFOPEN(fOutNameBuf, "wb");
+        if (file == NULL) {
+            ret = OUTPUT_FILE_ERROR;
+            wolfCLU_LogError("unable to open file %s\nRET: %d", fOutNameBuf, ret);
+        }
+
+        /* get the public key length */
+        if (ret == 0) {
+            ret = wc_XmssKey_GetPubLen(key, &pubOutBufSz);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to get public key length."
+                                 "\nRET: %d", ret);
+            }
+
+            if (pubOutBufSz == 0) {
+                WOLFCLU_LOG(WOLFCLU_L0, "Public key length is 0.\n");
+                ret = BAD_FUNC_ARG;
+            }
+        }
+
+        /* allocate output public key buffer */
+        if (ret == 0) {
+            pubOutBuf = (byte*)XMALLOC(pubOutBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (pubOutBuf == NULL) {
+                wolfCLU_LogError("Failed to allocate memory for public key buffer.\n");
+                ret = MEMORY_E;
+            }
+        }
+
+        /* write the public key to buffer */
+        if (ret == 0) {
+            ret = wc_XmssKey_ExportPubRaw(key, pubOutBuf, &pubOutBufSz);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to write public key.\nRET: %d", ret);
+            }
+        }
+
+        /* write to file */
+        if (ret == 0) {
+            if ((int)XFWRITE(pubOutBuf, 1, pubOutBufSz, file) <= 0) {
+                ret = OUTPUT_FILE_ERROR;
+            }
+        }
+
+        if (file != NULL) {
+            XFCLOSE(file);
+        }
+    }
+
+    /* clean allocated memory */
+    if (fOutNameBuf != NULL) {
+        XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (pubOutBuf != NULL) {
+        XFREE(pubOutBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    wc_XmssKey_Free(key);
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
+
+    return (ret == 0) ? WOLFCLU_SUCCESS : ret;
+#else
+    (void)rng;
+    (void)fName;
+    (void)directive;
+
+    return NOT_COMPILED_IN;
+#endif /* HAVE_XMSS */
+}
+
 #endif /* WOLFSSL_KEY_GEN && !NO_ASN*/
 
 
