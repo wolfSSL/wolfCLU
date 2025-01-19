@@ -1573,6 +1573,7 @@ int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
     (void)rng;
     (void)fName;
     (void)directive;
+    (void)paramStr;
 
     return NOT_COMPILED_IN;
 #endif /* HAVE_XMSS */
