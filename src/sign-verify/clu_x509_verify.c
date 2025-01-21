@@ -170,11 +170,18 @@ int wolfCLU_x509Verify(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
         if (wolfSSL_X509_LOOKUP_load_file(lookup, caCert, X509_FILETYPE_PEM)
                 != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Failed to load CA file");
+            wolfCLU_LogError("Failed to load CA file via lookup");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
+    if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
+        if (wolfSSL_CertManagerLoadCA(store->cm, caCert, NULL)
+            != WOLFSSL_SUCCESS) {
+            wolfCLU_LogError("Failed to load CA file into CertManager");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
 
 #ifdef HAVE_CRL
     if (ret == WOLFCLU_SUCCESS) {
