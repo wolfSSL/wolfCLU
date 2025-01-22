@@ -174,7 +174,7 @@ EOF
 touch index.txt
 run_success "ca -h"
 run_success "ca -help"
-run_success "req -key ./certs/server-key.pem -subj O=wolfSSL/C=US/ST=MT/L=Bozeman/CN=wolfSSL/OU=org-unit -out tmp-ca.csr"
+run_success "req -key ./certs/server-key.pem -subj /O=wolfSSL/C=US/ST=MT/L=Bozeman/CN=wolfSSL/OU=org-unit -out tmp-ca.csr"
 
 # testing reading bad conf file
 run_fail "ca -config ca-example.conf -in tmp-ca.csr -out tmp.pem -md sha256 -selfsign -keyfile ./certs/ca-key.pem"

@@ -1221,8 +1221,7 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
             break;
         }
 
-        tagSz = tagSz + 1; /* include the '=' char */
-        if (tagSz + 2 > (int)sizeof(tag)) { /* +2 for '/' and '\0' chars */
+        if (tagSz + 1 > (int)sizeof(tag)) { /* +1 for null terminator */
             wolfCLU_LogError("found a tag that was too large!");
             wolfSSL_X509_NAME_free(ret);
             ret = NULL;
@@ -1235,12 +1234,12 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
             break;
         }
         else {
-            XMEMCPY(tag + 1, word, tagSz);
-            tag[tagSz + 1] = '\0'; /* append terminating character */
+            XMEMCPY(tag, word, tagSz);
+            tag[tagSz] = '\0'; /* append terminating character */
         }
 
         if (ret != NULL) {
-            entry = &word[tagSz];
+            entry = &word[tagSz+1];
             nid = wolfSSL_OBJ_sn2nid(tag);
             if (nid == NID_countryName) {
                 encoding = CTC_PRINTABLE;
