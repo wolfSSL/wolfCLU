@@ -349,7 +349,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         int directiveArg = PRIV_AND_PUB_FILES;
         char xmssmtParam[XMSSMT_NAME_MAX_LEN + 1];   /* XMSS^MT parameter */
         char xmssmtParamHead[] = "XMSSMT-SHA2_\0";
-        const int xmssmtHeadLen = XSTRLEN(xmssmtParamHead);
+        const int xmssmtHeadLen = (int)XSTRLEN(xmssmtParamHead);
         int height = 0;
         const int XMSSMT_MIN_HEIGHT = 20;
         const int hdLen = 9;
@@ -511,7 +511,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         int directiveArg = PRIV_AND_PUB_FILES;
         char xmssParam[XMSS_NAME_LEN + 1];   /* XMSS parameter */
         char xmssParamHead[] = "XMSS-SHA2_";
-        int xmssHeadLen = XSTRLEN(xmssParamHead);
+        int xmssHeadLen = (int)XSTRLEN(xmssParamHead);
         const int hLen = 6;
 
         WOLFCLU_LOG(WOLFCLU_L0, "Generate XMSS Key");
