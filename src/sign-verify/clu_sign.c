@@ -902,9 +902,13 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
     word32 outBufSz = 0;                 /* signature buffer size        */
     char* paramStr  = NULL;              /* parameter string             */
     int paramLen    = 0;                 /* parameter string length      */
-    int privKeyLen  = XSTRLEN(privKey);  /* private key file name length */
+    int privKeyLen  = 0;                 /* private key file name length */
     int fileHeadLen = 7;                 /* file header(XMSSMT-) length  */
 
+    if (privKey == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    privKeyLen  = (int)XSTRLEN(privKey);
 #ifdef WOLFSSL_SMALL_STACK
     XmssKey *key = (XmssKey*)XMALLOC(sizeof(XmssKey),
                                      HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -974,7 +978,7 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
             XMEMSET(paramStr, 0, paramLen);
             XSTRNCPY(paramStr, privKey, paramLen);
             paramStr[paramLen - 1] = '\0';
-            /* 
+            /*
              * replace from '-' to '/' such as
              * from "XMSSMT-SHA2_20-2_256" to "XMSSMT-SHA2_20/2_256"
             */
