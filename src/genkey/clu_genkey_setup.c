@@ -344,6 +344,260 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         return NOT_COMPILED_IN;
     #endif  /* HAVE_DILITHIUM */
     }
+    else if (XSTRNCMP(keyType, "xmssmt", 6) == 0) {
+    #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN)
+        int directiveArg = PRIV_AND_PUB_FILES;
+        char xmssmtParam[XMSSMT_NAME_MAX_LEN + 1];   /* XMSS^MT parameter */
+        char xmssmtParamHead[] = "XMSSMT-SHA2_\0";
+        const int xmssmtHeadLen = XSTRLEN(xmssmtParamHead);
+        int height = 0;
+        const int XMSSMT_MIN_HEIGHT = 20;
+        const int hdLen = 9;
+
+        WOLFCLU_LOG(WOLFCLU_L0, "Generate XMSS^MT Key");
+
+        /* XMSS/XMSS^MS support only RAW format */
+        if (formatArg != RAW_FORM) {
+            WOLFCLU_LOG(WOLFCLU_L0, "XMSS/XMSS^MT only supports RAW format");
+        }
+
+        /* get the directive argument */
+        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
+        if (ret > 0) {
+            if (argv[ret+1] != NULL) {
+                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                    directiveArg = PUB_ONLY_FILE;
+                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                    directiveArg = PRIV_ONLY_FILE;
+                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                    directiveArg = PRIV_AND_PUB_FILES;
+            }
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
+        }
+
+        /* set XMSS Param head */
+        XMEMSET(xmssmtParam, 0, XSTRLEN(xmssmtParam));
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS Param Head: %s\nLength: %d",
+                    xmssmtParamHead, xmssmtHeadLen);
+        XMEMCPY(xmssmtParam, xmssmtParamHead, xmssmtHeadLen);
+
+        /* get the height argument */
+        ret = wolfCLU_checkForArg("-height", 7, argc, argv);
+        if (ret > 0 || argv[ret+1] != NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", argv[ret+1]);
+            
+            if (XSTRNCMP(argv[ret+1], "20", 2) == 0
+                || XSTRNCMP(argv[ret+1], "40", 2) == 0
+                || XSTRNCMP(argv[ret+1], "60", 2) == 0) {
+                height = XATOI(argv[ret+1]);
+            }
+            else {
+                WOLFCLU_LOG(WOLFCLU_L0, "Invalid -height (%s), using 20", argv[ret+1]);
+                height = XMSSMT_MIN_HEIGHT;
+            }
+        }
+        else {
+            /* no option -height */
+            WOLFCLU_LOG(WOLFCLU_L0, "No -height [ 20 | 40 | 60 ]");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use height 20");
+            height = XMSSMT_MIN_HEIGHT;
+        }
+
+        /* get the layer argument */
+        ret = wolfCLU_checkForArg("-layer", 6, argc, argv);
+        if (ret > 0 || argv[ret+1] != NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Layer: %s", argv[ret+1]);
+            
+            switch (height) {
+                case 20:
+                    if (XSTRNCMP(argv[ret+1], "2", 1) == 0) {
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/2_256\0", hdLen);
+                    }
+                    else if (XSTRNCMP(argv[ret+1], "4", 1) == 0) {
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/4_256\0", hdLen);
+                    }
+                    else {
+                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", argv[ret+1]);
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/2_256\0", hdLen);
+                    }
+                    break;
+                case 40:
+                    if (XSTRNCMP(argv[ret+1], "2", 1) == 0) {
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_256\0", hdLen);
+                    }
+                    else if (XSTRNCMP(argv[ret+1], "4", 1) == 0) {
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/4_256\0", hdLen);
+                    }
+                    else if (XSTRNCMP(argv[ret+1], "8", 1) == 0) {
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/8_256\0", hdLen);
+                    }
+                    else {
+                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", argv[ret+1]);
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_25\0", hdLen);
+                    }
+                    break;
+                case 60:
+                    if (XSTRNCMP(argv[ret+1], "3", 1) == 0) {
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/3_256\0", hdLen);
+                    }
+                    else if (XSTRNCMP(argv[ret+1], "6", 1) == 0) {
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/8_256\0", hdLen);
+                    }
+                    else if (XSTRNCMP(argv[ret+1], "12", 2) == 0) {
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/12_256\0", hdLen+1);
+                    }
+                    else {
+                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 3", argv[ret+1]);
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/3_256\0", hdLen);
+                    }
+                    break;
+                default:
+                    WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", argv[ret+1]);
+                    XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/2_256\0", hdLen);
+                    break;
+            }
+        }
+        else {
+            /* no option -layer */
+            WOLFCLU_LOG(WOLFCLU_L0, "No -layer [ 2 | 4 | 8 ]");
+            switch (height) {
+                case 20:
+                    WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use layer 2");
+                    XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/2_256\0", hdLen);
+                    break;
+                case 40:
+                    WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use layer 2");
+                    XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_256\0", hdLen);
+                    break;
+                case 60:
+                    WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use layer 3");
+                    XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/3_256\0", hdLen);
+                    break;
+                default:
+                    WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use layer 2");
+                    XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/2_256\0", hdLen);
+                    break;
+            }
+        }
+
+        xmssmtParam[XMSSMT_NAME_MAX_LEN] = '\0';
+        
+        /* check XMSS Param Length */
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT Param: %s", xmssmtParam);
+        if (!(XSTRLEN(xmssmtParam) == XMSSMT_NAME_MIN_LEN
+            || XSTRLEN(xmssmtParam) == XMSSMT_NAME_MAX_LEN)) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid XMSS parameter length");
+            WOLFCLU_LOG(WOLFCLU_L0, "XMSS parameter length: %d", (int)XSTRLEN(xmssmtParam));
+            wc_FreeRng(&rng);
+            return USER_INPUT_ERROR;
+        }
+
+        WOLFCLU_LOG(WOLFCLU_L0, "Generate XMSS^MT Key: %s", xmssmtParam);
+
+        ret = wolfCLU_genKey_XMSS(&rng, keyOutFName, directiveArg, xmssmtParam);
+    #else
+        wolfCLU_LogError("Invalid option, XMSS not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with"
+               "--enable-xmss --enable-experimental andtry again");
+        wc_FreeRng(&rng);
+        return NOT_COMPILED_IN;
+    #endif  /* WOLFSSL_HAVE_XMSS */
+    }
+    else if (XSTRNCMP(keyType, "xmss", 4) == 0) {
+    #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN)
+        int directiveArg = PRIV_AND_PUB_FILES;
+        char xmssParam[XMSS_NAME_LEN + 1];   /* XMSS parameter */
+        char xmssParamHead[] = "XMSS-SHA2_";
+        int xmssHeadLen = XSTRLEN(xmssParamHead);
+        const int hLen = 6;
+
+        WOLFCLU_LOG(WOLFCLU_L0, "Generate XMSS Key");
+
+        /* XMSS/XMSS^MS support only RAW format */
+        if (formatArg != RAW_FORM) {
+            WOLFCLU_LOG(WOLFCLU_L0, "XMSS/XMSS^MT only supports RAW format");
+        }
+
+        /* get the directive argument */
+        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
+        if (ret > 0) {
+            if (argv[ret+1] != NULL) {
+                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                    directiveArg = PUB_ONLY_FILE;
+                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                    directiveArg = PRIV_ONLY_FILE;
+                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                    directiveArg = PRIV_AND_PUB_FILES;
+            }
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
+        }
+
+        /* set XMSS Param head */
+        XMEMSET(xmssParam, 0, XSTRLEN(xmssParam));
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS Param Head: %s", xmssParamHead);
+        XMEMCPY(xmssParam, xmssParamHead, xmssHeadLen);
+
+        /* get the height argument */
+        ret = wolfCLU_checkForArg("-height", 7, argc, argv);
+        if (ret > 0 || argv[ret+1] != NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", argv[ret+1]);
+            
+            if (XSTRNCMP(argv[ret+1], "10", 2) == 0) {
+                XMEMCPY(xmssParam + xmssHeadLen, "10_256", hLen);
+            }
+            else if (XSTRNCMP(argv[ret+1], "16", 2) == 0) {
+                XMEMCPY(xmssParam + xmssHeadLen, "16_256", hLen);
+            }
+            else if (XSTRNCMP(argv[ret+1], "20", 2) == 0) {
+                XMEMCPY(xmssParam + xmssHeadLen, "20_256", hLen);
+            }
+            else {
+                WOLFCLU_LOG(WOLFCLU_L0, "Invalid -height (%s)"
+                            "\nDefault: use height 10", argv[ret+1]);
+                XMEMCPY(xmssParam + xmssHeadLen, "10_256", hLen);
+            }
+        }
+        else {
+            /* no option -height */
+            WOLFCLU_LOG(WOLFCLU_L0, "No -height [ 10 | 16 | 20 ]");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use height 10");
+            XMEMCPY(xmssParam + xmssHeadLen, "10_256", hLen);
+        }
+
+        xmssParam[XMSS_NAME_LEN] = '\0';
+        
+        /* check XMSS Param Length */
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS Param: %s", xmssParam);
+        if (XSTRLEN(xmssParam) != XMSS_NAME_LEN) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid XMSS parameter length");
+            WOLFCLU_LOG(WOLFCLU_L0, "XMSS parameter length: %d", (int)XSTRLEN(xmssParam));
+            wc_FreeRng(&rng);
+            return WOLFCLU_FATAL_ERROR;
+        }
+
+        /* When do sign, file name must be "XMSS-SHA2_<height>_256" */
+        if (XSTRNCMP(keyOutFName, xmssParam, XMSS_NAME_LEN) != 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Warm: When do sign, "
+                        "file name must be \"%s\"", xmssParam);
+        }
+
+        WOLFCLU_LOG(WOLFCLU_L0, "Generate XMSS Key: %s", xmssParam);
+
+        ret = wolfCLU_genKey_XMSS(&rng, keyOutFName, directiveArg, xmssParam);
+    #else
+        wolfCLU_LogError("Invalid option, XMSS not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with"
+               "--enable-xmss --enable-experimental andtry again");
+        wc_FreeRng(&rng);
+        return NOT_COMPILED_IN;
+    #endif  /* WOLFSSL_HAVE_XMSS */
+    }
     else {
         wolfCLU_LogError("\"%s\" is an invalid key type, or not compiled in", keyType);
         wc_FreeRng(&rng);

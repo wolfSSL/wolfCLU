@@ -61,6 +61,8 @@ static const struct option mode_options[] = {
     {"ecc",       no_argument,       0, WOLFCLU_ECC         },
     {"ed25519",   no_argument,       0, WOLFCLU_ED25519     },
     {"dilithium", no_argument,       0, WOLFCLU_DILITHIUM   },
+    {"xmss",      no_argument,       0, WOLFCLU_XMSS        },
+    {"xmssmt",    no_argument,       0, WOLFCLU_XMSSMT      },
     {"dgst",      no_argument,       0, WOLFCLU_DGST        },
     {"verify",    no_argument,       0, WOLFCLU_VERIFY      },
     {"pkcs7",     no_argument,       0, WOLFCLU_PKCS7       },
@@ -278,6 +280,8 @@ int main(int argc, char** argv)
         case WOLFCLU_ECC:
         case WOLFCLU_ED25519:
         case WOLFCLU_DILITHIUM:
+        case WOLFCLU_XMSS:
+        case WOLFCLU_XMSSMT:
             ret = wolfCLU_sign_verify_setup(argc, argv);
             break;
 

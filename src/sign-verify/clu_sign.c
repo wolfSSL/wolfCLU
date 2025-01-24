@@ -23,6 +23,7 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/sign-verify/clu_sign.h>
 #include <wolfclu/x509/clu_cert.h>
+#include <wolfclu/genkey/clu_genkey.h>  /* for xmss callback functions */
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -129,6 +130,15 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
 #ifdef HAVE_DILITHIUM
     case DILITHIUM_SIG_VER:
         ret = wolfCLU_sign_data_dilithium(data, out, fSz, privKey, inForm);
+        break;
+#endif
+
+#ifdef WOLFSSL_HAVE_XMSS
+    case XMSS_SIG_VER:
+        ret = wolfCLU_sign_data_xmss(data, out, fSz, privKey);
+        break;
+    case XMSSMT_SIG_VER:
+        ret = wolfCLU_sign_data_xmssmt(data, out, fSz, privKey);
         break;
 #endif
 
@@ -706,6 +716,371 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
     return NOT_COMPILED_IN;
 #endif
+}
+
+int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey)
+{
+#ifdef WOLFSSL_HAVE_XMSS
+    int ret         = 0;
+    int fExtSz      = 5;                 /* size of ".priv"         */
+    XFILE outFile   = NULL;              /* output file             */
+    byte* outBuf    = NULL;              /* signature buffer        */
+    word32 outBufSz = 0;                 /* signature buffer size   */
+    char* paramStr = NULL;               /* parameter string        */
+    int paramLen   = XMSS_NAME_LEN + 1;  /* parameter string length */
+
+#ifdef WOLFSSL_SMALL_STACK
+    XmssKey *key = (XmssKey*)XMALLOC(sizeof(XmssKey),
+                    HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (key == NULL) {
+        wolfCLU_LogError("Failed to allocate memory for XMSS key."
+                         "\nRET: %d", ret);
+        return MEMORY_E;
+    }
+#else
+    XmssKey key[1];
+#endif
+
+    /* init the XMSS key */
+    XMEMSET(key, 0, sizeof(XmssKey));
+    ret = wc_XmssKey_Init(key, HEAP_HINT, 0);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize XMSS Key."
+                         "\nRET: %d", ret);
+    }
+
+    /* set CallBack read XMSS private key */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetReadCb(key, wolfCLU_XmssKey_ReadCb);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set read callback."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* set CallBack write XMSS private key */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetWriteCb(key, wolfCLU_XmssKey_WriteCb);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set write callback.\nRET: %d", ret);
+        }
+    }
+
+    /* check the private key file name */
+    if (XSTRNCMP(privKey, "XMSS-", 5) != 0) {
+        ret = BAD_FUNC_ARG;
+        wolfCLU_LogError("Invalid XMSS parameter string."
+                         "\nRET: %d", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS private key file name must be "
+                    "Parameter such as \"XMSS-SHA2_10_256\"");
+    }
+    else if ((XSTRLEN(privKey) - fExtSz) != XMSS_NAME_LEN) {
+        ret = BAD_FUNC_ARG;
+        wolfCLU_LogError("Invalid XMSS parameter string length."
+                         "\nRET: %d", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS private key file name must be "
+                    "Parameter such as \"XMSS-SHA2_10_256\"");
+    }
+
+    /* get the XMSS parameter string */
+    if (ret == 0) {
+        paramStr = XMALLOC(paramLen, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (paramStr == NULL) {
+            ret = MEMORY_E;
+            wolfCLU_LogError("Failed to allocate memory for parameter string."
+                             "\nRET: %d", ret);
+        }
+        else {
+            XMEMSET(paramStr, 0, paramLen);
+            XSTRNCPY(paramStr, privKey, paramLen);
+            paramStr[paramLen - 1] = '\0';
+        }
+    }
+
+    /* set the XMSS parameter string */
+    if (ret == 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS parameter string: %s", paramStr);
+        ret = wc_XmssKey_SetParamStr(key, paramStr);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set parameter string.\nRET: %d", ret);
+        }
+    }
+
+    /* get XMSS signature Size */
+    if (ret == 0) {
+        ret = wc_XmssKey_GetSigLen(key, &outBufSz);
+        if (ret == 0) {
+            /* if the getting signature size is success, allocating signature buffer */
+            outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (outBuf == NULL) {
+                ret = MEMORY_E;
+                wolfCLU_LogError("Failed to allocate memory for signature buffer."
+                                 "\nRET: %d", ret);
+            }
+        }
+        else {
+            wolfCLU_LogError("Failed to get signature length.\nRET: %d", ret);
+        }
+    }
+
+    /* set the context of the xmss key */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetContext(key, privKey);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set context.\nRET: %d", ret);
+        }
+    }
+
+    /* reload XMSS key to be signable state */
+    if (ret == 0) {
+        ret = wc_XmssKey_Reload(key);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to reload XMSS key.\nRET: %d", ret);
+        }
+    }
+
+    /* sign with xmss private key */
+    if (ret == 0) {
+        ret = wc_XmssKey_Sign(key, outBuf, &outBufSz, data, fSz);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to sign data with XMSS private key."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* output signature */
+    if (ret == 0) {
+        outFile = XFOPEN(out, "wb");
+        if (outFile == NULL) {
+            ret = OUTPUT_FILE_ERROR;
+            wolfCLU_LogError("Failed to open file %s.\nRET: %d", out, ret);
+        }
+        else if (ret == 0) {
+            /* write to file */
+            if ((int)XFWRITE(outBuf, 1, outBufSz, outFile) <= 0) {
+                ret = OUTPUT_FILE_ERROR;
+            }
+            XFCLOSE(outFile);
+            outFile = NULL;
+        }
+    }
+
+    /* clena up allocated memory */
+    if (outFile != NULL) {
+        XFCLOSE(outFile);
+    }
+    if (outBuf != NULL) {
+        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (paramStr != NULL) {
+        XFREE(paramStr, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    wc_XmssKey_Free(key);
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
+
+    return (ret == 0) ? WOLFCLU_SUCCESS : ret;
+#else
+    (void)data;
+    (void)out;
+    (void)fSz;
+    (void)privKey;
+
+    return NOT_COMPILED_IN;
+#endif  /* WOLFSSL_HAVE_XMSS */
+}
+
+int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
+{
+#ifdef WOLFSSL_HAVE_XMSS
+    int ret         = 0;
+    int fExtSz      = 5;                 /* size of ".priv"              */
+    XFILE outFile   = NULL;              /* output file                  */
+    byte* outBuf    = NULL;              /* signature buffer             */
+    word32 outBufSz = 0;                 /* signature buffer size        */
+    char* paramStr  = NULL;              /* parameter string             */
+    int paramLen    = 0;                 /* parameter string length      */
+    int privKeyLen  = XSTRLEN(privKey);  /* private key file name length */
+    int fileHeadLen = 7;                 /* file header(XMSSMT-) length  */
+
+#ifdef WOLFSSL_SMALL_STACK
+    XmssKey *key = (XmssKey*)XMALLOC(sizeof(XmssKey),
+                                     HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (key == NULL) {
+        wolfCLU_LogError("Failed to allocate memory for XMSS key."
+                         "\nRET: %d", ret);
+        return MEMORY_E;
+    }
+#else
+    XmssKey key[1];
+#endif
+
+    /* init the xmss key */
+    XMEMSET(key, 0, sizeof(XmssKey));
+    ret = wc_XmssKey_Init(key, HEAP_HINT, 0);
+    if (ret != 0) {
+        wolfCLU_LogError("Failed to initialize XMSS Key.\nRET: %d", ret);
+    }
+
+    /* set CallBack read XMSS private key */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetReadCb(key, wolfCLU_XmssKey_ReadCb);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set read callback.\nRET: %d", ret);
+        }
+    }
+
+    /* set CallBack write XMSS private key */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetWriteCb(key, wolfCLU_XmssKey_WriteCb);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set write callback.\nRET: %d", ret);
+        }
+    }
+
+    /* check private key file name */
+    if (XSTRNCMP(privKey, "XMSSMT-", fileHeadLen) != 0) {
+        ret = BAD_FUNC_ARG;
+        wolfCLU_LogError("Invalid XMSS^MT private key file name."
+                         "\nRET: %d", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT private key file name must"
+                                "start with \"XMSSMT-\"");
+    }
+    else if (privKeyLen == XMSSMT_NAME_MIN_LEN + fExtSz) {
+        paramLen = XMSSMT_NAME_MIN_LEN + 1;
+    }
+    else if (privKeyLen == XMSSMT_NAME_MAX_LEN + fExtSz) {
+        paramLen = XMSSMT_NAME_MAX_LEN + 1;
+    }
+    else {
+        ret = BAD_FUNC_ARG;
+        wolfCLU_LogError("Invalid XMSS^MT parameter string length."
+                         "\nRET: %d", ret);
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT private key file name must be "
+                                "Parameter such as \"XMSSMT-SHA2_20-2_256\"");
+    }
+
+    /* get the XMSS^MT parameter from private key file name */
+    if (ret == 0) {
+        paramStr = XMALLOC(paramLen, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (paramStr == NULL) {
+            ret = MEMORY_E;
+            wolfCLU_LogError("Failed to allocate memory for parameter string."
+                             "\nRET: %d", ret);
+        }
+        else {
+            XMEMSET(paramStr, 0, paramLen);
+            XSTRNCPY(paramStr, privKey, paramLen);
+            paramStr[paramLen - 1] = '\0';
+            /* 
+             * replace from '-' to '/' such as
+             * from "XMSSMT-SHA2_20-2_256" to "XMSSMT-SHA2_20/2_256"
+            */
+            for (int i = fileHeadLen+1; paramStr[i] != '\0'; i++) {
+                if (paramStr[i] == '-') {
+                    paramStr[i] = '/';
+                    break;
+                }
+            }
+        }
+    }
+
+    /* set the XMSS^MT parameter */
+    if (ret == 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT parameter string: %s", paramStr);
+        ret = wc_XmssKey_SetParamStr(key, paramStr);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set parameter string.\nRET: %d", ret);
+        }
+    }
+
+    /* get XMSS^MT signature size */
+    if (ret == 0) {
+        ret = wc_XmssKey_GetSigLen(key, &outBufSz);
+        if (ret == 0) {
+            /* if the getting signature size is success, allocating signature buffer */
+            outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (outBuf == NULL) {
+                ret = MEMORY_E;
+                wolfCLU_LogError("Failed to allocate memory for signature buffer."
+                                 "\nRET: %d", ret);
+            }
+        }
+        else {
+            wolfCLU_LogError("Failed to get signature length.\nRET: %d", ret);
+        }
+    }
+
+    /* set the context of the XMSS^MT key */
+    if (ret == 0) {
+        ret = wc_XmssKey_SetContext(key, privKey);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to set context.\nRET: %d", ret);
+        }
+    }
+
+    /* reload XMSS^MT key to be signable state */
+    if (ret == 0) {
+        ret = wc_XmssKey_Reload(key);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to reload XMSS^MT key."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* sign with XMSS^MT private key */
+    if (ret == 0) {
+        ret = wc_XmssKey_Sign(key, outBuf, &outBufSz, data, fSz);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to sign data with XMSS^MT private key."
+                             "\nRET: %d", ret);
+        }
+    }
+
+    /* output signature */
+    if (ret == 0) {
+        outFile = XFOPEN(out, "wb");
+        if (outFile == NULL) {
+            ret = OUTPUT_FILE_ERROR;
+            wolfCLU_LogError("Failed to open file %s.\nRET: %d", out, ret);
+        }
+        else if (ret == 0) {
+            /* write to file */
+            if ((int)XFWRITE(outBuf, 1, outBufSz, outFile) <= 0) {
+                ret = OUTPUT_FILE_ERROR;
+            }
+            XFCLOSE(outFile);
+            outFile = NULL;
+        }
+    }
+
+    /* clena up allocated memory */
+    if (outFile != NULL) {
+        XFCLOSE(outFile);
+    }
+    if (outBuf != NULL) {
+        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (paramStr != NULL) {
+        XFREE(paramStr, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    wc_XmssKey_Free(key);
+#ifdef WOLFSSL_SMALL_STACK
+    XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+#endif
+
+    return (ret == 0) ? WOLFCLU_SUCCESS : ret;
+#else
+    (void)data;
+    (void)out;
+    (void)fSz;
+    (void)privKey;
+
+    return NOT_COMPILED_IN;
+#endif  /* WOLFSSL_HAVE_XMSS */
 }
 
 #endif /* !WOLFCLU_NO_FILESYSTEM */

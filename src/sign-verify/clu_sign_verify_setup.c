@@ -56,6 +56,12 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     else if (wolfCLU_checkForArg("dilithium", 9, argc, argv) > 0) {
         algCheck = DILITHIUM_SIG_VER;
     }
+    else if (wolfCLU_checkForArg("xmss", 4, argc, argv) > 0) {
+        algCheck = XMSS_SIG_VER;
+    }
+    else if (wolfCLU_checkForArg("xmssmt", 6, argc, argv) > 0) {
+        algCheck = XMSSMT_SIG_VER;
+    }
     else {
         return WOLFCLU_FATAL_ERROR;
     }
@@ -222,6 +228,19 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         else if (algCheck == DILITHIUM_SIG_VER && verifyCheck == 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
                     "signing with Dilithium.");
+            wolfCLU_signHelp(algCheck);
+            if (priv)
+                XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (in)
+                XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (sig)
+                XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            return ret;
+        }
+        else if ((algCheck == XMSS_SIG_VER || algCheck == XMSSMT_SIG_VER)
+                  && verifyCheck == 0) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
+                    "signing with XMSS/XMSS^MT.");
             wolfCLU_signHelp(algCheck);
             if (priv)
                 XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

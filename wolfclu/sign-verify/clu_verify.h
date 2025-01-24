@@ -35,6 +35,9 @@
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
 #endif
+#ifdef WOLFSSL_HAVE_XMSS
+    #include <wolfssl/wolfcrypt/wc_xmss.h>
+#endif
 
 int wolfCLU_x509Verify(int argc, char** argv);
 int wolfCLU_CRLVerify(int argc, char** argv);
@@ -45,3 +48,5 @@ int wolfCLU_verify_signature_rsa(byte* , char*, int, char*, int, int);
 int wolfCLU_verify_signature_ecc(byte*, int, byte*, int, char*, int, int);
 int wolfCLU_verify_signature_ed25519(byte*, int, byte*, int, char*, int, int);
 int wolfCLU_verify_signature_dilithium(byte*, int, byte*, word32, char*, int);
+int wolfCLU_verify_signature_xmss(byte*, int, byte*, int, char*);
+int wolfCLU_verify_signature_xmssmt(byte*, int, byte*, int, char*);

@@ -122,6 +122,8 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "For RSA sign/ver: wolfssl -rsa -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For ECC sign/ver: wolfssl -ecc -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For ED25519 sign/ver: wolfssl -ed25519 -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For XMSS sign/ver: wolfssl -xmss -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For XMSS^MT sign/ver: wolfssl -xmssmt -help");
  }
 
 /*
@@ -456,6 +458,10 @@ void wolfCLU_genKeyHelp(void)
     #ifdef HAVE_DILITHIUM
         ,"dilithium"
     #endif
+    #ifdef WOLFSSL_HAVE_XMSS
+        ,"xmss"
+        ,"xmssmt"
+    #endif
         };
 
         WOLFCLU_LOG(WOLFCLU_L0, "Available keys with current configure settings:");
@@ -472,6 +478,14 @@ void wolfCLU_genKeyHelp(void)
 #ifdef HAVE_DILITHIUM
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
            "[2|3|5] -out mykey -outform der -output KEYPAIR");
+#endif
+#ifdef WOLFSSL_HAVE_XMSS
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmss -height [10|16|20] -out mykey -outform raw"
+                " -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmssmt -height [20|40|60] -layer [2|4|8|3|6|12]"
+                "  -out mykey -outform raw -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "XMSS key file name must be something like \"XMSS-SHA2_10_256\""
+                "\nXMSS/XMSS^MT parametaers are determined by file name when signing");
 #endif
     WOLFCLU_LOG(WOLFCLU_L0,
            "\n\nThe above command would output the files: mykey.priv "
@@ -493,6 +507,10 @@ void wolfCLU_signHelp(int keyType)
         #endif
         #ifdef HAVE_ECC
         ,"ecc"
+        #endif
+        #ifdef WOLFSSL_HAVE_XMSS
+        ,"xmss"
+        ,"xmssmt"
         #endif
         };
 
@@ -523,6 +541,18 @@ void wolfCLU_signHelp(int keyType)
                        " -in <filename> -out <filename>\n");
                 break;
             #endif
+            #ifdef WOLFSSL_HAVE_XMSS
+            case XMSS_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "XMSS Sign Usage: \nwolfssl -xmss -sign -inkey <priv_key>"
+                       " -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            case XMSSMT_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT Sign Usage: \nwolfssl -xmssmt -sign -inkey <priv_key>"
+                       " -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
             default:
                 WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
         }
@@ -540,6 +570,10 @@ void wolfCLU_verifyHelp(int keyType) {
         #endif
         #ifdef HAVE_ECC
         ,"ecc"
+        #endif
+        #ifdef WOLFSSL_HAVE_XMSS
+        ,"xmss"
+        ,"xmssmt"
         #endif
         };
 
@@ -581,6 +615,20 @@ void wolfCLU_verifyHelp(int keyType) {
                 WOLFCLU_LOG(WOLFCLU_L0, "ECC Verify with Public Key"
                        "wolfssl -ecc -verify -inkey <pub_key>"
                        " -sigfile <signature> -in <original>\n");
+                break;
+            #endif
+            #ifdef WOLFSSL_HAVE_XMSS
+            case XMSS_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "XMSS Verify with Public Key"
+                       "wolfssl -xmss -verify -inkey <pub_key>"
+                       " -sigfile <signature> -in <original>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            case XMSSMT_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT Verify with Public Key"
+                       "wolfssl -xmssmt -verify -inkey <pub_key>"
+                       " -sigfile <signature> -in <original>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
             #endif
             default:
