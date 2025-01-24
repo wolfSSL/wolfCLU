@@ -36,6 +36,11 @@ cp  $CERTS_DIR/ca-cert.der .
 echo "Copy over pkcs12 test bundles"
 cp  $CERTS_DIR/test-servercert.p12 .
 
+echo "Copy over certificates for longer chain"
+cp  $CERTS_DIR/intermediate/ca-int-cert.pem .
+cp  $CERTS_DIR/intermediate/ca-int2-cert.pem .
+cp  $CERTS_DIR/intermediate/client-int-cert.pem .
+
 echo "Additional update of client example source code"
 cp $CERTS_DIR/../examples/client/client.c ../src/client/client.c
 sed -i '' "s/examples\/client\//wolfclu\//" ../src/client/client.c

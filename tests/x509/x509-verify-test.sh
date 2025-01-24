@@ -96,4 +96,22 @@ else
     echo "Skipping CRL tests..."
 fi
 
+# Test verifying along a chain of certificates
+RESULT=`./wolfssl verify -CAfile ./certs/ca-int-cert.pem ./certs/ca-int2-cert.pem`
+if [ $? == 0 ]; then
+    echo "Should have failed to verify ca-int2-cert.pem with ca-int-cert.pem"
+    exit 99
+fi
+RESULT=`./wolfssl verify -partial_chain -CAfile ./certs/ca-int-cert.pem ./certs/ca-int2-cert.pem`
+if [ $? != 0 ]; then
+    echo "Failed to verify ca-int2-cert.pem with ca-int-cert.pem"
+    exit 99
+fi
+RESULT=`./wolfssl verify -partial_chain -CAfile ./certs/ca-int2-cert.pem ./certs/client-int-cert.pem`
+if [ $? != 0 ]; then
+    echo "Failed to verify client-int-cert.pem with ca-int2-cert.pem"
+    exit 99
+fi
+
+
 exit 0
