@@ -61,14 +61,14 @@ static const struct option crypt_algo_options[] = {
  */
  void wolfCLU_help(void)
  {
-    WOLFCLU_LOG(WOLFCLU_L0, "Linked with wolfSSL version %s%s",
-        LIBWOLFSSL_VERSION_STRING,
-#ifdef HAVE_FIPS
-    ": using FIPS mode"
+#if defined(HAVE_FIPS)
+    static const char* isFips = ": using FIPS mode";
 #else
-    ""
+    static const char* isFips = "";
 #endif
-    );
+
+    WOLFCLU_LOG(WOLFCLU_L0, "Linked with wolfSSL version %s%s",
+        LIBWOLFSSL_VERSION_STRING, isFips);
     WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "-help           Help, print out this help menu");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
