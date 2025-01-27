@@ -589,7 +589,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     if (wc_dilithium_init(key) != 0) {
         wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
     #ifdef WOLFSSL_SMALL_STACK
-        wc_dilithium_free(key);
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return WOLFCLU_FAILURE;
     }
@@ -597,8 +597,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
     if (wc_InitRng(&rng) != 0) {
         wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return WOLFCLU_FAILURE;
     }
@@ -608,8 +609,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     if (privKeyFile == NULL) {
         wolfCLU_LogError("Faild to open Private key FILE.");
         wc_FreeRng(&rng);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return ret;
     }
@@ -620,8 +622,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     if (privBuf == NULL) {
         XFCLOSE(privKeyFile);
         wc_FreeRng(&rng);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return MEMORY_E;
     }
@@ -633,8 +636,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         wolfCLU_Log(WOLFCLU_L0, "incorecct size: %d", privFileSz);
         XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return ret;
     }
@@ -647,8 +651,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
             XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             wc_FreeRng(&rng);
-        #ifdef WOLFSSL_SMALL_STACK
             wc_dilithium_free(key);
+        #ifdef WOLFSSL_SMALL_STACK
+            XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         #endif
             return ret;
         }
@@ -659,12 +664,13 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
     /* retrieving private key and staoring in the Dilithium key */
     ret = wc_Dilithium_PrivateKeyDecode(privBuf, &index, key, privBufSz);
+    XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0) {
         wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
-        XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return ret;
     }
@@ -675,20 +681,22 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     if (outBuf == NULL) {
         XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return MEMORY_E;
     }
-    
+
     /* sign the message usign Dilithium private key */
     ret = wc_dilithium_sign_msg(data, dataSz, outBuf, &outBufSz, key, &rng);
     if (ret != 0) {
         wolfCLU_LogError("Failed to sign data with Dilithium private key.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return ret;
     }
@@ -701,9 +709,10 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
     XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     wc_FreeRng(&rng);
+    wc_dilithium_free(key);
 
 #ifdef WOLFSSL_SMALL_STACK
-    wc_dilithium_free(key);
+    XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 #endif
 
     return WOLFCLU_SUCCESS;
