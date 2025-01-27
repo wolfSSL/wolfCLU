@@ -41,9 +41,10 @@ cp  $CERTS_DIR/intermediate/ca-int-cert.pem .
 cp  $CERTS_DIR/intermediate/ca-int2-cert.pem .
 cp  $CERTS_DIR/intermediate/client-int-cert.pem .
 
-echo "Additional update of client example source code"
-cp $CERTS_DIR/../examples/client/client.c ../src/client/client.c
-sed -i '' "s/examples\/client\//wolfclu\//" ../src/client/client.c
+# client is decoupled from wolfSSL example client
+#echo "Additional update of client example source code"
+#cp $CERTS_DIR/../examples/client/client.c ../src/client/client.c
+#sed -i '' "s/examples\/client\//wolfclu\//" ../src/client/client.c
 
 echo "Recreate expected encrypted data with new files"
 openssl enc -aes-256-cbc -nosalt -in ./crl.der -out ./crl.der.enc -k ""
