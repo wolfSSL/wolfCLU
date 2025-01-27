@@ -1,3 +1,13 @@
+# wolfCLU v0.1.7 (Jan 27, 2025)
+- Initial support for XMSS-XMSS^MT gnkey, sign and verify (PR 163)
+- Support longer certificate chains (PR 162)
+- Fix for setting wrong version in CSRs (PR 154)
+- Fix DIlithium pem header and sign-verify without level option (PR 158)
+- Fix typo VERIFY_USE_PREVERIFY in src/client/client.c and src/server/server.c
+ (PR 160)
+- Fix for change to OBJ sn2nid behavior in wolfSSL (PR 166)
+
+
 # wolfCLU v0.1.6 (Nov 11, 2024)
 - Expanded continuous integration tests with more GitHub actions added (PR 142,
  146, 147)

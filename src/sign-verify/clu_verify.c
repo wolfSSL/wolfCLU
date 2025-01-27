@@ -755,7 +755,7 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
     #ifdef WOLFSSL_SMALL_STACK
-        wc_dilithium_free(key);
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return ret;
     }
@@ -765,8 +765,9 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     keyFile = XFOPEN(keyPath, "rb");
     if (keyFile == NULL) {
         wolfCLU_LogError("Faild to open Private key FILE.");
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return BAD_FUNC_ARG;
     }
@@ -777,8 +778,9 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     if (keyBuf == NULL) {
         wolfCLU_LogError("Failed to malloc key buffer.");
         XFCLOSE(keyFile);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return MEMORY_E;
     }
@@ -788,8 +790,9 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
         (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
         wolfCLU_LogError("Failed to read public key.\nRET: %d", ret);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return WOLFCLU_FATAL_ERROR;
     }
@@ -802,8 +805,9 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
             XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        #ifdef WOLFSSL_SMALL_STACK
             wc_dilithium_free(key);
+        #ifdef WOLFSSL_SMALL_STACK
+            XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         #endif
             return ret;
         }
@@ -814,23 +818,24 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
 
     /* retrieving public key and storing in the dilithium key */
     ret = wc_Dilithium_PublicKeyDecode(keyBuf, &index, key, keyBufSz);
+    XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0) {
         wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
-        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return ret;
     }
-    XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     /* verify the massage using the dilithium public key */
     ret = wc_dilithium_verify_msg(sig, sigSz, msg, msgLen, &res, key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to verify data with Dilithium public key.\n"
                         "RET: %d", ret);
-    #ifdef WOLFSSL_SMALL_STACK
         wc_dilithium_free(key);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return ret;
     }
@@ -840,9 +845,10 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     else {
         wolfCLU_LogError("Invalid Signature.");
     }
+    wc_dilithium_free(key);
 
 #ifdef WOLFSSL_SMALL_STACK
-    wc_dilithium_free(key);
+    XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 #endif
 
     return WOLFCLU_SUCCESS;

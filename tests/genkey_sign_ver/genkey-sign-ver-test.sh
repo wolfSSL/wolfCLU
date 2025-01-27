@@ -201,7 +201,7 @@ SIGOUTNAME="ed-signed.sig"
 DERPEMRAW="raw"
 gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW}
 
-if grep -q "#define HAVE_DILITHIUM" /usr/local/include/wolfssl/options.h; then
+if ./wolfssl -genkey -h 2>&1 | grep -A6 "Available keys with current configure" | grep dilithium; then
     ALGORITHM="dilithium"
     KEYFILENAME="mldsakey"
     SIGOUTNAME="mldsa-signed.sig"
@@ -221,7 +221,9 @@ do
 done
 fi
 
-if grep -q "#define WOLFSSL_HAVE_XMSS" /usr/local/include/wolfssl/options.h; then
+# Check if xmss is availabe
+if ./wolfssl xmss -help 2>&1 | grep -A6 "Available keys with current configure" | grep xmss; then
+    printf "Testing XMSS sign/verify\n"
     ALGORITHM="xmss"
     SIGOUTNAME="xmss-signed.sig"
     DERPEMRAW="raw"
