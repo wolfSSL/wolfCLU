@@ -2226,7 +2226,7 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
             if (myoptarg != NULL) {
                 if (XSTRLEN(myoptarg) >= DTLS_CID_BUFFER_SIZE) {
                     fprintf(stderr, "provided connection ID is too big\n");
-                    return BAD_FUNC_ARG;
+                    XEXIT_T(EXIT_FAILURE);
                 }
                 else {
                     strcpy(dtlsCID, myoptarg);
@@ -3427,10 +3427,11 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
         unsigned int receivedCIDSz;
         printf("CID extension was negotiated\n");
         ret = wolfSSL_dtls_cid_get_tx_size(ssl, &receivedCIDSz);
-        if (ret != WOLFSSL_SUCCESS)
+        if (ret != WOLFSSL_SUCCESS) {
             release(ctx, ssl, "Can't get negotiated DTLS CID size");
             ((func_args*)args)->return_code = ret;
             goto exit;
+        }
 
         if (receivedCIDSz > 0) {
             ret = wolfSSL_dtls_cid_get_tx(ssl, receivedCID,
