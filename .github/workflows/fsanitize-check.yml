@@ -19,6 +19,7 @@ jobs:
           '--enable-wolfclu --enable-smallstack',
           '--enable-wolfclu --enable-experimental --enable-dilithium',
           '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium',
+          '--enable-all',
         ]
     name: Build wolfssl
     runs-on: ${{ matrix.os }}
@@ -55,6 +56,7 @@ jobs:
           '--enable-wolfclu --enable-smallstack',
           '--enable-wolfclu --enable-experimental --enable-dilithium',
           '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium',
+          '--enable-all',
         ]
     name: Build wolfclu
     runs-on: ${{ matrix.os }}
