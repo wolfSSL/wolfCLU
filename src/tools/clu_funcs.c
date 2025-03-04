@@ -1267,7 +1267,6 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
         return NULL;
     }
 
-    tag[0] = '/';
     for (word = strtok_r((char*)n, deli, &end); word != NULL;
             word = strtok_r(NULL, deli, &end)) {
         tagSz = (int)strcspn(word, "=");
@@ -1298,6 +1297,14 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
         if (ret != NULL) {
             entry = &word[tagSz+1];
             nid = wolfSSL_OBJ_sn2nid(tag);
+            if (nid == 0) { /* try using old tag value */
+                char oldTag[8];
+                tagSz = (int)XSTRLEN(tag);
+                if (tagSz + 3 <= (int)sizeof(oldTag)) {
+                    XSNPRINTF(oldTag, sizeof(oldTag)-1, "/%s=", tag);
+                    nid = wolfSSL_OBJ_sn2nid(oldTag);
+                }
+            }
             if (nid == NID_countryName) {
                 encoding = CTC_PRINTABLE;
             }
