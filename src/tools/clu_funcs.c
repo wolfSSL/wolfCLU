@@ -623,7 +623,7 @@ void wolfCLU_verifyHelp(int keyType) {
             case ECC_SIG_VER:
                 WOLFCLU_LOG(WOLFCLU_L0, "ECC Verify with Public Key"
                        "wolfssl -ecc -verify -inkey <pub_key>"
-                       " -sigfile <signature> -in <original>\n");
+                       " -sigfile <signature> -in <original> -pubin\n");
                 break;
             #endif
             #ifdef WOLFSSL_HAVE_XMSS
