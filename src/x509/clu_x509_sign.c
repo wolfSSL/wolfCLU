@@ -24,6 +24,10 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
+#include <wolfssl/wolfcrypt/ecc.h>
+#include <wolfssl/wolfcrypt/dilithium.h>
+#include <wolfssl/wolfcrypt/asn_public.h>
+#include <wolfssl/wolfcrypt/asn.h>
 
 #define WOLFCLU_CN_MATCH    0x00000001 /* country name must match */
 #define WOLFCLU_CN_SUPPLIED 0x00000002 /* country name must be set */
@@ -39,6 +43,11 @@
 #define WOLFCLU_CM_SUPPLIED 0x00000800 /* common name must be set */
 #define WOLFCLU_EA_MATCH    0x00001000 /* email must match */
 #define WOLFCLU_EA_SUPPLIED 0x00002000 /* email must be set */
+
+#define LARGE_TEMP_SZ 9216
+#define OID_ALT_PUBKEY     "2.5.29.72"
+#define OID_ALT_SIGALG     "2.5.29.73"
+#define OID_ALT_SIGNATURE  "2.5.29.74"
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -62,6 +71,14 @@ struct WOLFCLU_CERT_SIGN {
     word32 policy; /* bitmap of policy restrictions */
     enum wc_HashType hashType;
     byte unique; /* flag if subject needs to be unique */
+    /* extend cert sign */
+    byte*  privKeyBuf;
+    word32 privKeySz;
+    byte*  altPubKeyBuf;
+    word32 altPubKeySz;
+    byte*  altPrivKeyBuf;
+    word32 altPrivKeySz;
+    int    altKeyLevel;
 };
 
 
@@ -794,6 +811,300 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
     return ret;
 }
 
+int wolfCLU_CertSignSetPrivKey(WOLFCLU_CERT_SIGN* csign, const byte* privBuf, word32 privSz) 
+{
+    if (!csign) return WOLFCLU_FATAL_ERROR;
+    if (!privBuf || !privSz) return WOLFCLU_FATAL_ERROR;
+
+    if (csign->privKeyBuf) {
+        XFREE(csign->privKeyBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        csign->privKeyBuf = NULL;
+    }
+    csign->privKeyBuf = (byte*)XMALLOC(privSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    if (csign->privKeyBuf == NULL) return WOLFCLU_FATAL_ERROR;
+
+    XMEMCPY(csign->privKeyBuf, privBuf, privSz);
+    csign->privKeySz = privSz;
+
+    return WOLFCLU_SUCCESS;
+}
+
+int wolfCLU_CertSignSetAltKeys(WOLFCLU_CERT_SIGN* csign,const byte* altPubBuf, word32 altPubSz,
+    const byte* altPrivBuf, word32 altPrivSz, int altKeyLevel)
+{
+    if (!csign) return WOLFCLU_FATAL_ERROR;
+    if (!altPubBuf || !altPubSz || !altPrivBuf || !altPrivSz) {
+        return WOLFCLU_FATAL_ERROR; 
+    }
+
+    if (csign->altPubKeyBuf) {
+        XFREE(csign->altPubKeyBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        csign->altPubKeyBuf = NULL;
+    }
+    csign->altPubKeyBuf = (byte*)XMALLOC(altPubSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    if (csign->altPubKeyBuf == NULL) return WOLFCLU_FATAL_ERROR;
+
+    if (csign->altPrivKeyBuf) {
+        XFREE(csign->altPrivKeyBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        csign->altPrivKeyBuf = NULL;
+    }
+    csign->altPrivKeyBuf = (byte*)XMALLOC(altPrivSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    if (csign->altPrivKeyBuf == NULL) {
+        XFREE(csign->altPubKeyBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        csign->altPubKeyBuf = NULL;
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    XMEMCPY(csign->altPubKeyBuf, altPubBuf, altPubSz);
+    csign->altPubKeySz = altPubSz;
+    XMEMCPY(csign->altPrivKeyBuf, altPrivBuf, altPrivSz);
+    csign->altPrivKeySz = altPrivSz;
+    csign->altKeyLevel = altKeyLevel;
+    return WOLFCLU_SUCCESS; 
+}
+
+int wolfCLU_ExtendCertSign(WOLFCLU_CERT_SIGN* signer, WOLFSSL_X509* x509)
+{
+    #if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
+        int ret = WOLFCLU_SUCCESS;
+        WC_RNG rng;
+        int derSz = wolfSSL_i2d_X509(x509, NULL);
+        byte* derBuf = NULL;
+        DecodedCert decoded;
+        int initDecoded = 0;
+        byte preTbsBuf[LARGE_TEMP_SZ];
+        int  preTbsSz = 0;
+
+        dilithium_key altKey;
+        byte derKeyBuf[LARGE_TEMP_SZ];
+        int derKeySz = LARGE_TEMP_SZ;
+        ecc_key key;
+        word32 idx;
+
+        byte altSigValBuf[LARGE_TEMP_SZ];
+        int  altSigValSz;
+        byte altSigAlgBuf[256]; 
+        int  altSigAlgSz = 0;
+
+        Cert newCert;  
+        byte outBuf[LARGE_TEMP_SZ];
+        word32 outSz = sizeof(outBuf);
+
+        if (signer == NULL || x509 == NULL) {
+            wolfCLU_LogError("Bad argument to wolfCLU_ExtendCertSign");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (wc_InitRng(&rng) != 0) {
+            wolfCLU_LogError("wc_InitRng error");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            if (derSz <= 0) {
+                wolfCLU_LogError("wolfSSL_i2d_X509 size error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            derBuf = (byte*)XMALLOC(derSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+            if (derBuf == NULL) {
+                wolfCLU_LogError("Memory error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            byte* tmp = derBuf; 
+            int encodeRet = wolfSSL_i2d_X509(x509, &tmp);
+            if (encodeRet <= 0) {
+                wolfCLU_LogError("wolfSSL_i2d_X509 encode error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            wc_InitDecodedCert(&decoded, derBuf, derSz, 0);
+            initDecoded = 1;
+            if (wc_ParseCert(&decoded, CERT_TYPE, NO_VERIFY, NULL) < 0) {
+                wolfCLU_LogError("wc_ParseCert error ");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+  
+        if (ret == WOLFCLU_SUCCESS) {
+            XMEMSET(preTbsBuf, 0, sizeof(preTbsBuf));
+            preTbsSz = wc_GeneratePreTBS(&decoded, preTbsBuf, (int)sizeof(preTbsBuf));
+            if (preTbsSz <= 0) {
+                wolfCLU_LogError("wc_GeneratePreTBS error %d", preTbsSz);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            wc_ecc_init(&key);
+            if (wc_KeyPemToDer(signer->privKeyBuf, (word32)signer->privKeySz, derKeyBuf, derKeySz, NULL) < 0) {
+                wolfCLU_LogError("wc_KeyPemToDer() failed: %d\n", ret);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            idx = 0;
+            if (wc_EccPrivateKeyDecode(derKeyBuf, &idx, &key, derKeySz) < 0) {
+                wolfCLU_LogError("wc_Ecc_PrivateKeyDecode error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            wc_dilithium_init(&altKey);
+            if (wc_dilithium_set_level(&altKey, (byte)signer->altKeyLevel) < 0) {
+                wolfCLU_LogError("wc_dilithium_set_level error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            idx = 0;
+            if (wc_Dilithium_PrivateKeyDecode(signer->altPrivKeyBuf, &idx, &altKey,
+                                            (word32)signer->altPrivKeySz) < 0) {
+                wolfCLU_LogError("wc_Dilithium_PrivateKeyDecode error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+   
+        if (ret == WOLFCLU_SUCCESS) {
+            XMEMSET(altSigAlgBuf, 0, sizeof(altSigAlgBuf));
+            switch (signer->altKeyLevel) {
+                case 2:
+                    altSigAlgSz = SetAlgoID(CTC_ML_DSA_LEVEL2, altSigAlgBuf, oidSigType, 0);
+                break;
+                case 3:
+                    altSigAlgSz = SetAlgoID(CTC_ML_DSA_LEVEL3, altSigAlgBuf, oidSigType, 0);
+                    break;
+                case 5:
+                    altSigAlgSz = SetAlgoID(CTC_ML_DSA_LEVEL5, altSigAlgBuf, oidSigType, 0);
+                    break;
+                default:
+                    wolfCLU_LogError("Unknown Dilithium level: %d", signer->altKeyLevel);
+                    ret = WOLFCLU_FATAL_ERROR;
+            }
+            if (altSigAlgSz <= 0) {
+                wolfCLU_LogError("SetAlgoID failed, returned %d", altSigAlgSz);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            XMEMSET(altSigValBuf, 0, sizeof(altSigValBuf));
+            switch (signer->altKeyLevel) {
+            case 2:
+                altSigValSz = wc_MakeSigWithBitStr(altSigValBuf, (word32)sizeof(altSigValBuf),CTC_ML_DSA_LEVEL2, preTbsBuf, preTbsSz,
+                    ML_DSA_LEVEL2_TYPE, &altKey, &rng);
+                break;
+            case 3:
+                altSigValSz = wc_MakeSigWithBitStr(altSigValBuf, (word32)sizeof(altSigValBuf),CTC_ML_DSA_LEVEL3, preTbsBuf, preTbsSz,
+                    ML_DSA_LEVEL3_TYPE, &altKey, &rng);
+                break;
+            case 5:
+                altSigValSz = wc_MakeSigWithBitStr(altSigValBuf, (word32)sizeof(altSigValBuf),CTC_ML_DSA_LEVEL5, preTbsBuf, preTbsSz,
+                    ML_DSA_LEVEL5_TYPE, &altKey, &rng);
+                break;
+            }
+            if (altSigValSz < 0) {
+                wolfCLU_LogError("wc_MakeSigWithBitStr error %d", altSigValSz);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            wc_InitCert(&newCert);
+            strncpy(newCert.subject.commonName, decoded.subjectCN, decoded.subjectCNLen);
+            switch (signer->altKeyLevel)
+            {
+                case 2: 
+                    newCert.sigType = CTC_SHA256wECDSA;
+                    break;
+                case 3: 
+                    newCert.sigType = CTC_SHA384wECDSA;
+                    break;
+                case 5: 
+                    newCert.sigType = CTC_SHA512wECDSA;
+                    break;
+            } 
+
+            if (wc_SetCustomExtension(&newCert, 0,  OID_ALT_PUBKEY, signer->altPubKeyBuf, (word32)signer->altPubKeySz) < 0 )
+            {
+                wolfCLU_LogError("wc_SetCustomExtension error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            if (wc_SetCustomExtension(&newCert, 0, OID_ALT_SIGALG, altSigAlgBuf, altSigAlgSz) < 0)
+            {
+                wolfCLU_LogError("wc_SetCustomExtension error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            if (wc_SetCustomExtension(&newCert, 0, OID_ALT_SIGNATURE, altSigValBuf, altSigValSz) < 0)
+            {
+                wolfCLU_LogError("wc_SetCustomExtension error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS)
+        {
+            if (wc_MakeCert(&newCert, outBuf, outSz, NULL, &key, &rng) < 0)
+            {
+                wolfCLU_LogError("wc_MakeCert error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            if (wc_SignCert(newCert.bodySz, newCert.sigType, outBuf, outSz, NULL, &key, &rng) < 0)
+            {
+                wolfCLU_LogError("wc_SignCert error");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+ 
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            WOLFSSL_X509* dualCert = NULL;
+            WOLFSSL_BIO* pemOut = NULL;
+            WOLFSSL_BIO* memBio = NULL;
+
+            memBio = wolfSSL_BIO_new_mem_buf(outBuf, outSz);
+            if (memBio == NULL) {
+                wolfCLU_LogError("Unable to create memory BIO for DER data");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                dualCert = wolfSSL_d2i_X509_bio(memBio, NULL);
+                wolfSSL_BIO_free(memBio);
+                if (dualCert == NULL) {
+                    wolfCLU_LogError("Error converting DER to X509 structure");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    pemOut = wolfSSL_BIO_new_file(signer->outDir, "wb");
+                    if (pemOut == NULL) {
+                        wolfCLU_LogError("Unable to open output PEM file");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    else {
+                        if (wolfSSL_PEM_write_bio_X509(pemOut, dualCert) != WOLFSSL_SUCCESS) {
+                            wolfCLU_LogError("Error writing PEM certificate to file");
+                            ret = WOLFCLU_FATAL_ERROR;
+                        }
+                        else {
+                            WOLFCLU_LOG(WOLFCLU_L0, "Dual certificate successfully output to PEM file: %s", signer->outDir);
+                        }
+                        wolfSSL_BIO_free(pemOut);
+                    }
+                    wolfSSL_X509_free(dualCert);
+                }
+            }
+        }
+
+        if (initDecoded) {
+            wc_FreeDecodedCert(&decoded);
+        }
+        XFREE(derBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        wc_FreeRng(&rng);
+
+        return ret;
+    #else
+        (void)signer;
+        (void)x509;
+        wolfCLU_LogError("requires DILITHIUM and DUAL_ALG_CERTS");
+        return WOLFCLU_FATAL_ERROR;
+    #endif
+}
 
 static void _setPolicy(word32* ret, char* str, word32 matchMask,
         word32 suppliedMask)
