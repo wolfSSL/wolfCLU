@@ -1,3 +1,10 @@
+# wolfCLU v0.1.8 (Apr 4, 2025)
+- Fix build errors in server.c when linked to wolfssl with --enable-all (PR 170)
+- Increase CI tests to include --enable-all build of wolfSSL (PR 171)
+- Fix for using old SN style for subject name to account for differences in
+ OBJ_sn2nid (PR 172)
+- Update the ecc help menu to list -pubin (PR 173)
+
 # wolfCLU v0.1.7 (Jan 27, 2025)
 - Initial support for XMSS-XMSS^MT gnkey, sign and verify (PR 163)
 - Support longer certificate chains (PR 162)
@@ -6,7 +13,6 @@
 - Fix typo VERIFY_USE_PREVERIFY in src/client/client.c and src/server/server.c
  (PR 160)
 - Fix for change to OBJ sn2nid behavior in wolfSSL (PR 166)
-
 
 # wolfCLU v0.1.6 (Nov 11, 2024)
 - Expanded continuous integration tests with more GitHub actions added (PR 142,

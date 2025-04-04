@@ -26,8 +26,8 @@
 extern "C" {
 #endif
 
-#define CLUWOLFSSL_VERSION_STRING "0.1.7"
-#define CLUWOLFSSL_VERSION_HEX 0x00001007
+#define CLUWOLFSSL_VERSION_STRING "0.1.8"
+#define CLUWOLFSSL_VERSION_HEX 0x00001008
 
 #ifdef __cplusplus
 }

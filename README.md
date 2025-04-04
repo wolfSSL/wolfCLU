@@ -163,4 +163,4 @@ Please contact support@wolfssl.com with any questions or comments.
 
 ## License
 
-Copyright (c) 2006-2021 wolfSSL Inc.
+Copyright (c) 2006-2025 wolfSSL Inc.
