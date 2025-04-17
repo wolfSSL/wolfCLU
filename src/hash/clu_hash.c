@@ -23,8 +23,6 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
-#define MAX_STDINSZ 8192
-
 #ifndef WOLFCLU_NO_FILESYSTEM
 
 /*

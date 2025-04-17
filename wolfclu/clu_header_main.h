@@ -111,6 +111,7 @@ extern "C" {
 #endif
 #define MAX_TERM_WIDTH 80
 #define MAX_THREADS 64
+#define MAX_STDINSZ 8192
 #ifndef MAX_FILENAME_SZ
     #define MAX_FILENAME_SZ 256
 #endif

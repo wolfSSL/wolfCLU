@@ -67,7 +67,7 @@ int wolfCLU_PKCS7(int argc, char** argv)
     DerBuffer* derObj = NULL;
     byte* buf = NULL;
     byte* derContent = NULL;
-    int   bufSz;
+    int   bufSz = MAX_STDINSZ;
     int   derContentSz = 0;
     int   freePkcs7 = 0;
 
@@ -123,65 +123,54 @@ int wolfCLU_PKCS7(int argc, char** argv)
         }
     }
 
-    /* currently only supporting PKCS7 parsing, an input file is expected */
+    /* currently only supporting PKCS7 parsing, input is expected */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
-        wolfCLU_LogError("No input file set");
-        ret = WOLFCLU_FATAL_ERROR;
+        bioIn = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
+        wolfSSL_BIO_set_fp(bioIn, stdin, BIO_NOCLOSE);
     }
 
     /* read the input bio to a temporary buffer and convert to PKCS7 */
     if (ret == WOLFCLU_SUCCESS) {
-        bufSz = wolfSSL_BIO_get_len(bioIn);
-        if (bufSz > 0) {
-            buf = (byte*)XMALLOC(bufSz, HEAP_HINT, DYNAMIC_TYPE_PKCS);
-            if (buf == NULL) {
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                /* reading the full file into a buffer */
-                if (wolfSSL_BIO_read(bioIn, buf, bufSz) != bufSz) {
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
-                else {
-                    freePkcs7 = 1;
-
-                    if (wc_PKCS7_Init(&pkcs7, HEAP_HINT, INVALID_DEVID)) {
-                        wolfCLU_LogError("Error on pkcs init");
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-                    if (ret == WOLFCLU_SUCCESS &&
-                            wc_PKCS7_InitWithCert(&pkcs7, HEAP_HINT, 0)) {
-                        wolfCLU_LogError("Error on pkcs initWithCert");
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-
-                    if (ret == WOLFCLU_SUCCESS && inForm == PEM_FORM) {
-                        if (wc_PemToDer(buf, bufSz, PKCS7_TYPE, &derObj,
-                                    HEAP_HINT, NULL, NULL) == 0) {
-                            derContent   = derObj->buffer;
-                            derContentSz = derObj->length;
-
-                        }
-                        else {
-                            ret = WOLFCLU_FATAL_ERROR;
-                        }
-                    }
-                    else if (ret == WOLFCLU_SUCCESS) {
-                        derContent   = buf;
-                        derContentSz = bufSz;
-                    }
-
-                    if (ret == WOLFCLU_SUCCESS && wc_PKCS7_VerifySignedData(
-                                &pkcs7, derContent, derContentSz)) {
-                        wolfCLU_LogError("Error reading pkcs7 file");
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-                }
-            }
+        buf = (byte*)XMALLOC(bufSz, HEAP_HINT, DYNAMIC_TYPE_PKCS);
+        if (buf == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            wolfCLU_LogError("Error getting length of pkcs7 file");
-            ret = WOLFCLU_FATAL_ERROR;
+            /* reading the full file into a buffer */
+            bufSz = wolfSSL_BIO_read(bioIn, buf, bufSz);
+            freePkcs7 = 1;
+
+            if (wc_PKCS7_Init(&pkcs7, HEAP_HINT, INVALID_DEVID)) {
+                wolfCLU_LogError("Error on pkcs init");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            if (ret == WOLFCLU_SUCCESS &&
+                    wc_PKCS7_InitWithCert(&pkcs7, HEAP_HINT, 0)) {
+                wolfCLU_LogError("Error on pkcs initWithCert");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS && inForm == PEM_FORM) {
+                if (wc_PemToDer(buf, bufSz, PKCS7_TYPE, &derObj,
+                            HEAP_HINT, NULL, NULL) == 0) {
+                    derContent   = derObj->buffer;
+                    derContentSz = derObj->length;
+
+                }
+                else {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+            else if (ret == WOLFCLU_SUCCESS) {
+                derContent   = buf;
+                derContentSz = bufSz;
+            }
+
+            if (ret == WOLFCLU_SUCCESS && wc_PKCS7_VerifySignedData(
+                        &pkcs7, derContent, derContentSz)) {
+                wolfCLU_LogError("Error reading pkcs7 file");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 
