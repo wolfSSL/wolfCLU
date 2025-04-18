@@ -682,7 +682,7 @@ static int SetKeyShare(WOLFSSL* ssl, int onlyKeyShare, int useX25519,
     #endif
         }
         else if (usePqc == 1) {
-    #ifdef HAVE_PQC
+    #if defined(HAVE_PQC) && defined(WOLFSSL_MLKEM_KYBER)
             groups[count] = 0;
             if (XSTRCMP(pqcAlg, "KYBER_LEVEL1") == 0) {
                 groups[count] = WOLFSSL_KYBER_LEVEL1;
