@@ -642,7 +642,7 @@ static void SetKeyShare(WOLFSSL* ssl, int onlyKeyShare, int useX25519,
         } while (ret == WC_PENDING_E);
     #endif
     }
-    #ifdef HAVE_PQC
+    #if defined(HAVE_PQC) && defined(WOLFSSL_MLKEM_KYBER)
     if (onlyKeyShare == 0 || onlyKeyShare == 3) {
         if (usePqc) {
             int group = 0;
