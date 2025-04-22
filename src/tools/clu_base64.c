@@ -40,7 +40,7 @@ static void wolfCLU_Base64Help(void)
     WOLFCLU_LOG(WOLFCLU_L0, "Base64 encode/decode data");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in file       Input file to encode/decode");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file      Output file for encoded/decoded data");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-d             Decode data (default is to encode)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-d             Decode data");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-help          Display this message");
 }
 
@@ -200,7 +200,8 @@ int wolfCLU_Base64Setup(int argc, char** argv)
             outputSz = (inputSz * 3) / 4 + 1;
 
             /* Allocate output buffer */
-            output = (byte*)XMALLOC(outputSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            output = (byte*)XMALLOC(outputSz, HEAP_HINT,
+                    DYNAMIC_TYPE_TMP_BUFFER);
             if (output == NULL) {
                 wolfCLU_LogError("Memory allocation error for output buffer");
                 ret = MEMORY_E;

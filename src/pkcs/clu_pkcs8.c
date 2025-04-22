@@ -52,6 +52,10 @@ static void wolfCLU_pKeyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write results to (default stdout)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inform pem/der");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-outform pem/der");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-passin password for encrypted keys");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-traditional use pkcs#1 format");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-topk8 use pkcs#8 format");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-nocrypt output unencrypted private key");
 }
 
 static int password_cb(char *buf, int size, int rwflag, void *u) {
@@ -194,7 +198,8 @@ int wolfCLU_PKCS8(int argc, char** argv)
             pkey = wolfSSL_PEM_read_bio_PrivateKey(bioIn, NULL, NULL, pass);
         }
         else {
-            pkey = wolfSSL_d2i_PKCS8PrivateKey_bio(bioIn, NULL, password_cb, pass);
+            pkey = wolfSSL_d2i_PKCS8PrivateKey_bio(bioIn, NULL, password_cb,
+                                                    pass);
         }
     }
 

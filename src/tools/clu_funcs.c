@@ -93,6 +93,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "x509           X509 certificate processing");
     WOLFCLU_LOG(WOLFCLU_L0, "verify         X509 certificate verify");
     WOLFCLU_LOG(WOLFCLU_L0, "pkcs7          Used for parsing PKCS7 files");
+    WOLFCLU_LOG(WOLFCLU_L0, "pkcs8          Used for parsing PKCS8 files");
     WOLFCLU_LOG(WOLFCLU_L0, "pkcs12         Used for parsing PKCS12 files");
     WOLFCLU_LOG(WOLFCLU_L0, "s_server       Basic TLS server for testing"
                                            " connection");
@@ -101,6 +102,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "sha256         Creates a SHA256 hash");
     WOLFCLU_LOG(WOLFCLU_L0, "sha384         Creates a SHA384 hash");
     WOLFCLU_LOG(WOLFCLU_L0, "sha512         Creates a SHA512 hash");
+    WOLFCLU_LOG(WOLFCLU_L0, "base64         Base64 encode/decode data");
     WOLFCLU_LOG(WOLFCLU_L0, "rand           Generates random data");
     WOLFCLU_LOG(WOLFCLU_L0, "version        Print wolfCLU/wolfSSL versions");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
