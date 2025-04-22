@@ -3,5 +3,6 @@
 # ALl path should be given relative to root directory
 
 dist_noinst_SCRIPTS+=tests/pkcs/pkcs12-test.sh
+dist_noinst_SCRIPTS+=tests/pkcs/pkcs8-test.sh
 dist_noinst_SCRIPTS+=tests/pkcs/pkcs7-test.sh
 

@@ -49,5 +49,13 @@ fi
 #check pem to der
 run "pkcs7 -inform PEM -in certs/signed.p7s -outform DER"
 
+#check stdin input
+RESULT=`cat certs/signed.p7b | ./wolfssl pkcs7 -inform DER`
+echo $RESULT | grep "BEGIN PKCS7"
+if [ $? != 0 ]; then
+    echo "Couldn't parse PKCS7 from stdin"
+    exit 99
+fi
+
 echo "Done"
 exit 0

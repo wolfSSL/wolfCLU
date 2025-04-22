@@ -112,6 +112,10 @@ if [ $? != 0 ]; then
     echo "Failed to verify client-int-cert.pem with ca-int2-cert.pem"
     exit 99
 fi
-
+RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem -untrusted ./certs/ca-int-cert.pem ./certs/ca-int2-cert.pem`
+if [ $? != 0 ]; then
+    echo "Failed to verify ca-int2-cert.pem with ca-cert.pem and ca-int-cert.pem"
+    exit 99
+fi
 
 exit 0
