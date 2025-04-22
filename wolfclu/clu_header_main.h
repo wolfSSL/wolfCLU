@@ -583,6 +583,12 @@ int wolfCLU_Rand(int argc, char** argv);
  */
 int wolfCLU_DsaParamSetup(int argc, char** argv);
 
+
+/**
+ * @brief function to encode/decode data in base64 format
+ */
+int wolfCLU_Base64Setup(int argc, char** argv);
+
 /**
  * @brief function to generate dh params and keys
  */

@@ -74,6 +74,7 @@ static const struct option mode_options[] = {
     {"rand",      no_argument,       0, WOLFCLU_RAND        },
     {"dsaparam",  no_argument,       0, WOLFCLU_DSA         },
     {"dhparam",   no_argument,       0, WOLFCLU_DH          },
+    {"base64",    no_argument,       0, WOLFCLU_BASE64      },
     {"help",      no_argument,       0, WOLFCLU_HELP        },
     {"h",         no_argument,       0, WOLFCLU_HELP        },
     {"v",         no_argument,       0, 'v'       },
@@ -316,6 +317,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_DH:
             ret = wolfCLU_DhParamSetup(argc, argv);
+            break;
+
+        case WOLFCLU_BASE64:
+            ret = wolfCLU_Base64Setup(argc, argv);
             break;
 
         case WOLFCLU_HELP:
