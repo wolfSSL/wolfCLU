@@ -540,6 +540,10 @@ void wolfCLU_convertToLower(char* s, int sSz);
  */
 int wolfCLU_PKCS7(int argc, char** argv);
 
+/**
+ * @brief handles PKCS8 command
+ */
+int wolfCLU_PKCS8(int argc, char** argv);
 
 /**
  * @brief handles PKCS12 command

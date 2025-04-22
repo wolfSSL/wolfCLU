@@ -66,6 +66,7 @@ static const struct option mode_options[] = {
     {"dgst",      no_argument,       0, WOLFCLU_DGST        },
     {"verify",    no_argument,       0, WOLFCLU_VERIFY      },
     {"pkcs7",     no_argument,       0, WOLFCLU_PKCS7       },
+    {"pkcs8",     no_argument,       0, WOLFCLU_PKCS8       },
     {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12      },
     {"crl",       no_argument,       0, WOLFCLU_CRL         },
     {"s_client",  no_argument,       0, WOLFCLU_CLIENT      },
@@ -287,6 +288,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_PKCS7:
             ret = wolfCLU_PKCS7(argc, argv);
+            break;
+
+        case WOLFCLU_PKCS8:
+            ret = wolfCLU_PKCS8(argc, argv);
             break;
 
         case WOLFCLU_PKCS12:
