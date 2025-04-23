@@ -160,6 +160,7 @@
     <ClCompile Include="src\hash\clu_hash_setup.c" />
     <ClCompile Include="src\hash\clu_alg_hash.c" />
     <ClCompile Include="src\pkcs\clu_pkcs7.c" />
+    <ClCompile Include="src\pkcs\clu_pkcs8.c" />
     <ClCompile Include="src\pkcs\clu_pkcs12.c" />
     <ClCompile Include="src\pkey\clu_pkey.c" />
     <ClCompile Include="src\pkey\clu_rsa.c" />
@@ -174,6 +175,7 @@
     <ClCompile Include="src\tools\clu_funcs.c" />
     <ClCompile Include="src\tools\clu_hex_to_bin.c" />
     <ClCompile Include="src\tools\clu_rand.c" />
+    <ClCompile Include="src\tools\clu_base64.c" />
     <ClCompile Include="src\x509\clu_ca_setup.c" />
     <ClCompile Include="src\x509\clu_cert_setup.c" />
     <ClCompile Include="src\x509\clu_config.c" />

@@ -162,22 +162,35 @@ int wolfCLU_PKCS8(int argc, char** argv)
         XMEMSET(keyBuffer, 0, MAX_STDINSZ);
         keyLen = (int)XFREAD(keyBuffer, 1, sizeof(keyBuffer) - 1, stdin);
         if (keyLen <= 0) {
-            fprintf(stderr, "Error reading private key from stdin\n");
-            return -1;
+            WOLFCLU_LOG(WOLFCLU_E0, "Error reading private key from stdin");
+            ret = WOLFCLU_FATAL_ERROR;
         }
-        keyBuffer[keyLen] = '\0'; /* Null-terminate the key buffer */
+        else {
+            /* Null-terminate the key buffer */
+            keyBuffer[keyLen] = '\0';
 
-        bioIn = wolfSSL_BIO_new_mem_buf(keyBuffer, keyLen);
+            bioIn = wolfSSL_BIO_new_mem_buf(keyBuffer, keyLen);
 
-        /* Reopen terminal since we might get password data from stdin later */
-    #ifdef USE_WINDOWS_API
-        freopen("CON", "r", stdin);
-    #else
-        freopen("/dev/tty", "r", stdin);
-    #endif
+            if (bioIn == NULL) {
+                wolfCLU_LogError("Unable to open pkcs8 file %s",
+                        optarg);
+                ret = MEMORY_E;
+            }
+            else if (pass == NULL) {
+            /* Reopen terminal since we might get password data
+             * from stdin later */
+            #ifdef USE_WINDOWS_API
+                if (freopen("CON", "r", stdin) == NULL) {
+            #else
+                if (freopen("/dev/tty", "r", stdin) == NULL) {
+            #endif
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+        }
     }
 
-    if (pass == NULL) {
+    if (ret == WOLFCLU_SUCCESS && pass == NULL) {
         if (inForm == PEM_FORM) {
             pkey = wolfSSL_PEM_read_bio_PrivateKey(bioIn, NULL, NULL, NULL);
         }
@@ -186,7 +199,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
         }
     }
 
-    if (pass == NULL && pkey == NULL) {
+    if (ret == WOLFCLU_SUCCESS && pass == NULL && pkey == NULL) {
         wolfCLU_GetStdinPassword((byte*)password, (word32*)&passwordSz);
         pass = (byte*)password;
     }
@@ -203,7 +216,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
         }
     }
 
-    if (pkey == NULL) {
+    if (ret == WOLFCLU_SUCCESS && pkey == NULL) {
         WOLFCLU_LOG(WOLFCLU_E0, "Error decrypting PKCS8 key");
         ret = WOLFCLU_FATAL_ERROR;
     }
@@ -268,6 +281,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
 
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
+    wolfSSL_EVP_PKEY_free(pkey);
 
     return ret;
 #else

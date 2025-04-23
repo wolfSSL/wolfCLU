@@ -263,6 +263,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
     wolfSSL_X509_free(cert);
     wolfSSL_X509_free(intermediate);
     wolfSSL_X509_STORE_free(store);
+    wolfSSL_sk_X509_free(intermStack);
     return ret;
 #else
     (void)argc;
