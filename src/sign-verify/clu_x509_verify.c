@@ -29,6 +29,7 @@
 
 static const struct option verify_options[] = {
     {"-CAfile",        required_argument, 0, WOLFCLU_CAFILE        },
+    {"-untrusted",     required_argument, 0, WOLFCLU_INTERMEDIATE  },
     {"-crl_check",     no_argument,       0, WOLFCLU_CHECK_CRL     },
     {"-partial_chain", no_argument,       0, WOLFCLU_PARTIAL_CHAIN },
     {"-help",          no_argument,       0, WOLFCLU_HELP          },
@@ -41,9 +42,37 @@ static const struct option verify_options[] = {
 static void wolfCLU_x509VerifyHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl verify -CAfile <ca file name> "
-            "[-crl_check] [-partial_chain] <cert to verify>");
+            "[-untrusted <intermidate file>] [-crl_check] "
+            "[-partial_chain] <cert to verify>");
+
+    WOLFCLU_LOG(WOLFCLU_L0, "Note: Current support only allows for loading "
+            "1 cert as -untrusted");
+
 }
 #endif
+
+static X509* load_cert_from_file(const char* filename) {
+    WOLFSSL_BIO*  bio = NULL;
+    WOLFSSL_X509* cert = NULL;
+
+    /* Try PEM format first */
+    bio = wolfSSL_BIO_new_file(filename, "r");
+    if (bio) {
+        cert = wolfSSL_PEM_read_bio_X509(bio, NULL, NULL, NULL);
+        wolfSSL_BIO_free(bio);
+    }
+
+    /* Try DER if PEM was unsuccessful */
+    if (!cert) {
+        bio = wolfSSL_BIO_new_file(filename, "rb");
+        if (bio) {
+            cert = wolfSSL_d2i_X509_bio(bio, NULL);
+            wolfSSL_BIO_free(bio);
+        }
+    }
+
+    return cert;
+}
 
 int wolfCLU_x509Verify(int argc, char** argv)
 {
@@ -56,8 +85,13 @@ int wolfCLU_x509Verify(int argc, char** argv)
     int option;
     char* caCert     = NULL;
     char* verifyCert = NULL;
+    char* intermCert = NULL;
     WOLFSSL_X509_STORE*  store = NULL;
     WOLFSSL_X509_LOOKUP* lookup = NULL;
+    WOLFSSL_X509_STORE_CTX* ctx = NULL;
+    WOLFSSL_X509* cert = NULL;
+    WOLFSSL_X509* intermediate = NULL;
+    STACK_OF(WOLFSSL_X509)* intermStack = NULL;
 
     /* last parameter is the certificate to verify */
     if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
@@ -94,6 +128,10 @@ int wolfCLU_x509Verify(int argc, char** argv)
                     caCert = optarg;
                     break;
 
+                case WOLFCLU_INTERMEDIATE:
+                    intermCert = optarg;
+                    break;
+
                 case WOLFCLU_PARTIAL_CHAIN:
                     partialChain = 1;
                     break;
@@ -114,6 +152,20 @@ int wolfCLU_x509Verify(int argc, char** argv)
                     /* do nothing. */
                     (void)ret;
             }
+        }
+    }
+
+    cert = load_cert_from_file(verifyCert);
+    if (!cert) {
+        wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ret == WOLFCLU_SUCCESS && intermCert) {
+        intermediate = load_cert_from_file(intermCert);
+        if (!intermediate) {
+            wolfCLU_LogError("Failed to load cert: %s\n", intermCert);
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -175,54 +227,47 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
-        if (wolfSSL_CertManagerLoadCA(store->cm, caCert, NULL)
-            != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Failed to load CA file into CertManager");
+    if (ret == WOLFCLU_SUCCESS && crlCheck) {
+        wolfSSL_X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK);
+    }
+
+    if (ret == WOLFCLU_SUCCESS && partialChain) {
+        wolfSSL_X509_STORE_set_flags(store, X509_V_FLAG_PARTIAL_CHAIN);
+    }
+
+    if (ret == WOLFCLU_SUCCESS && intermCert) {
+        intermStack = wolfSSL_sk_X509_new_null();
+        if (!intermStack) {
+            wolfCLU_LogError("Failed to create untrusted chain stack");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+         wolfSSL_sk_X509_push(intermStack, intermediate);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ctx = X509_STORE_CTX_new();
+        if (!ctx || X509_STORE_CTX_init(ctx, store, cert, intermStack) != 1) {
+            wolfCLU_LogError("Failed to initialize verification context");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-#ifdef HAVE_CRL
     if (ret == WOLFCLU_SUCCESS) {
-        if (crlCheck) {
-            if (wolfSSL_CertManagerEnableCRL(store->cm, WOLFSSL_CRL_CHECKALL)
-                    != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Failed to enable CRL use");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-        else {
-            if (wolfSSL_CertManagerDisableCRL(store->cm) != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Failed to disable CRL use");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-    }
-#endif
-
-    if (ret == WOLFCLU_SUCCESS) {
-        int err;
-
-        err = wolfSSL_CertManagerVerify(store->cm, verifyCert,
-                WOLFSSL_FILETYPE_PEM);
-        if (err == ASN_NO_PEM_HEADER) {
-            /* most likely the file was DER if PEM header not found */
-            err = wolfSSL_CertManagerVerify(store->cm, verifyCert,
-                    WOLFSSL_FILETYPE_ASN1);
-        }
-        if (err != WOLFSSL_SUCCESS) {
+        if (X509_verify_cert(ctx) == 1) {
+            WOLFCLU_LOG(WOLFCLU_L0, "OK");
+        } else {
+            int err = X509_STORE_CTX_get_error(ctx);
             wolfCLU_LogError("Verification Failed\nErr (%d): %s",
                              err, wolfSSL_ERR_reason_error_string(err));
             ret = WOLFCLU_FATAL_ERROR;
         }
-        else {
-            WOLFCLU_LOG(WOLFCLU_L0, "OK");
-        }
     }
 
+    wolfSSL_X509_STORE_CTX_free(ctx);
+    wolfSSL_X509_free(cert);
+    wolfSSL_X509_free(intermediate);
     wolfSSL_X509_STORE_free(store);
-    (void)crlCheck;
+    wolfSSL_sk_X509_free(intermStack);
     return ret;
 #else
     (void)argc;

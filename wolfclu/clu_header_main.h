@@ -111,6 +111,7 @@ extern "C" {
 #endif
 #define MAX_TERM_WIDTH 80
 #define MAX_THREADS 64
+#define MAX_STDINSZ 8192
 #ifndef MAX_FILENAME_SZ
     #define MAX_FILENAME_SZ 256
 #endif
@@ -539,6 +540,10 @@ void wolfCLU_convertToLower(char* s, int sSz);
  */
 int wolfCLU_PKCS7(int argc, char** argv);
 
+/**
+ * @brief handles PKCS8 command
+ */
+int wolfCLU_PKCS8(int argc, char** argv);
 
 /**
  * @brief handles PKCS12 command
@@ -577,6 +582,12 @@ int wolfCLU_Rand(int argc, char** argv);
  * @brief function to generate dsa params and keys
  */
 int wolfCLU_DsaParamSetup(int argc, char** argv);
+
+
+/**
+ * @brief function to encode/decode data in base64 format
+ */
+int wolfCLU_Base64Setup(int argc, char** argv);
 
 /**
  * @brief function to generate dh params and keys

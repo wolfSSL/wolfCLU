@@ -66,6 +66,7 @@ static const struct option mode_options[] = {
     {"dgst",      no_argument,       0, WOLFCLU_DGST        },
     {"verify",    no_argument,       0, WOLFCLU_VERIFY      },
     {"pkcs7",     no_argument,       0, WOLFCLU_PKCS7       },
+    {"pkcs8",     no_argument,       0, WOLFCLU_PKCS8       },
     {"pkcs12",    no_argument,       0, WOLFCLU_PKCS12      },
     {"crl",       no_argument,       0, WOLFCLU_CRL         },
     {"s_client",  no_argument,       0, WOLFCLU_CLIENT      },
@@ -73,6 +74,7 @@ static const struct option mode_options[] = {
     {"rand",      no_argument,       0, WOLFCLU_RAND        },
     {"dsaparam",  no_argument,       0, WOLFCLU_DSA         },
     {"dhparam",   no_argument,       0, WOLFCLU_DH          },
+    {"base64",    no_argument,       0, WOLFCLU_BASE64      },
     {"help",      no_argument,       0, WOLFCLU_HELP        },
     {"h",         no_argument,       0, WOLFCLU_HELP        },
     {"v",         no_argument,       0, 'v'       },
@@ -289,6 +291,10 @@ int main(int argc, char** argv)
             ret = wolfCLU_PKCS7(argc, argv);
             break;
 
+        case WOLFCLU_PKCS8:
+            ret = wolfCLU_PKCS8(argc, argv);
+            break;
+
         case WOLFCLU_PKCS12:
             ret = wolfCLU_PKCS12(argc, argv);
             break;
@@ -311,6 +317,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_DH:
             ret = wolfCLU_DhParamSetup(argc, argv);
+            break;
+
+        case WOLFCLU_BASE64:
+            ret = wolfCLU_Base64Setup(argc, argv);
             break;
 
         case WOLFCLU_HELP:

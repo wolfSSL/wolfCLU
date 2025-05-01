@@ -17,7 +17,7 @@ if [ $? == 0 ]; then
     echo "Failed on test \"./wolfssl verify ./certs/server-cert.pem\""
     exit 99
 fi
-echo "$RESULT" | grep "Err (-188): certificate verify failed"
+echo "$RESULT" | grep "Err (20): unable to get local issuer certificate"
 if [ $? != 0 ]; then
     echo "Unexpected error result on test \"./wolfssl verify ./certs/server-cert.pem\""
     exit 99
@@ -28,7 +28,7 @@ if [ $? == 0 ]; then
     echo "Failed on test \"./wolfssl verify ./certs/ca-cert.pem\""
     exit 99
 fi
-echo "$RESULT" | grep "Err (-275): ASN self-signed certificate error"
+echo "$RESULT" | grep "Err (18): self-signed certificate in certificate chain"
 if [ $? != 0 ]; then
     echo "Unexpected error result on test \"./wolfssl verify ./certs/ca-cert.pem\""
     exit 99
@@ -112,6 +112,10 @@ if [ $? != 0 ]; then
     echo "Failed to verify client-int-cert.pem with ca-int2-cert.pem"
     exit 99
 fi
-
+RESULT=`./wolfssl verify -CAfile ./certs/ca-cert.pem -untrusted ./certs/ca-int-cert.pem ./certs/ca-int2-cert.pem`
+if [ $? != 0 ]; then
+    echo "Failed to verify ca-int2-cert.pem with ca-cert.pem and ca-int-cert.pem"
+    exit 99
+fi
 
 exit 0

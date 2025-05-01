@@ -50,6 +50,7 @@ include tests/dsa/include.am
 include tests/pkey/include.am
 include tests/dgst/include.am
 include tests/rand/include.am
+include tests/base64/include.am
 include tests/pkcs/include.am
 include tests/x509/include.am
 include tests/encrypt/include.am
