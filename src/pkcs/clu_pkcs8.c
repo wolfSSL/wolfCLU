@@ -29,7 +29,6 @@
 #if !defined(NO_PKCS8) && !defined(WOLFCLU_NO_FILESYSTEM)
 
 static const struct option pkcs8_options[] = {
-    {"-print_certs",  no_argument,       0, WOLFCLU_CERTFILE  },
     {"-in",           required_argument, 0, WOLFCLU_INFILE    },
     {"-out",          required_argument, 0, WOLFCLU_OUTFILE   },
     {"-inform",       required_argument, 0, WOLFCLU_INFORM    },

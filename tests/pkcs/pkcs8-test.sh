@@ -28,6 +28,15 @@ run() {
     fi
 }
 
+run_fail() {
+    RESULT=`./wolfssl $1`
+
+    if [ $? == 0 ]; then
+        echo "Failed on test \"./wolfssl $1\""
+        exit 99
+    fi
+}
+
 run "pkcs8 -in certs/server-keyEnc.pem -passin pass:yassl123 -outform DER -out keyEnc.der"
 
 run "pkcs8 -in keyEnc.der -inform DER -outform PEM -out key.pem"
@@ -53,6 +62,12 @@ if [ $? != 0 ]; then
     echo "Couldn't parse PKCS8 from stdin"
     exit 99
 fi
+
+run_fail "pkcs8 -in certs/server-cert.pem -passin pass:yassl123"
+
+run_fail "pkcs8 -in certs/server-keyEnc.pem -passin pass:wrongPass"
+
+run_fail "pkcs8 -in certs/server-keyEnc.pem -inform DER -passin pass:yassl123"
 
 echo "Done"
 exit 0

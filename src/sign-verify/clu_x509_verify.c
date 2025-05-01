@@ -42,8 +42,12 @@ static const struct option verify_options[] = {
 static void wolfCLU_x509VerifyHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl verify -CAfile <ca file name> "
-            "[-untrusted <intermidate file> [-crl_check] "
+            "[-untrusted <intermidate file>] [-crl_check] "
             "[-partial_chain] <cert to verify>");
+
+    WOLFCLU_LOG(WOLFCLU_L0, "Note: Current support only allows for loading "
+            "1 cert as -untrusted");
+
 }
 #endif
 
@@ -159,7 +163,7 @@ int wolfCLU_x509Verify(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS && intermCert) {
         intermediate = load_cert_from_file(intermCert);
-        if (!cert) {
+        if (!intermediate) {
             wolfCLU_LogError("Failed to load cert: %s\n", intermCert);
             ret = WOLFCLU_FATAL_ERROR;
         }
