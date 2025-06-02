@@ -40,8 +40,8 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     int fOutNmSz;                        /* file name without append */
     int fOutNmAppendSz = 6;              /* # of bytes to append to file name */
     int flagOutputPub = 0;               /* set if outputting both priv/pub */
-    char privAppend[6] = ".priv\0";      /* last part of the priv file name */
-    char pubAppend[6] = ".pub\0\0";      /* last part of the pub file name*/
+    char privAppend[6] = ".priv";        /* last part of the priv file name */
+    char pubAppend[6] = ".pub";          /* last part of the pub file name*/
     byte privKeyBuf[ED25519_KEY_SIZE*2]; /* will hold public & private parts */
     byte pubKeyBuf[ED25519_KEY_SIZE];    /* holds just the public key part */
     word32 privKeySz;                    /* size of private key */
@@ -611,8 +611,8 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
 #ifdef HAVE_ECC
     int   fNameSz;
     int   fExtSz      = 6;
-    char  fExtPriv[6] = ".priv\0";
-    char  fExtPub[6]  = ".pub\0\0";
+    char  fExtPriv[6] = ".priv";
+    char  fExtPub[6]  = ".pub";
     char* fOutNameBuf = NULL;
 
     WOLFSSL_BIO *bioPub = NULL;
@@ -790,8 +790,8 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     int   ret = WOLFCLU_SUCCESS;       /* return value */
     int   fNameSz;                     /* file name without append */
     int   fExtSz       = 6;            /* number of bytes to append to file name */
-    char  fExtPriv[6]  = ".priv\0";    /* last part of the priv file name */
-    char  fExtPub[6]   = ".pub\0\0";   /* last part of the pub file name*/
+    char  fExtPriv[6]  = ".priv";      /* last part of the priv file name */
+    char  fExtPub[6]   = ".pub";       /* last part of the pub file name*/
     char* fOutNameBuf  = NULL;         /* file name + fExt */
     int   flagOutputPub = 0;           /* set if outputting both priv/pub */
     byte* derBuf       = NULL;         /* buffer for DER format */
