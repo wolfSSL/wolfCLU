@@ -468,6 +468,7 @@ void wolfCLU_genKeyHelp(void)
     #endif
     #ifdef HAVE_DILITHIUM
         ,"dilithium"
+        ,"ml-dsa"
     #endif
     #ifdef WOLFSSL_HAVE_XMSS
         ,"xmss"
@@ -488,6 +489,8 @@ void wolfCLU_genKeyHelp(void)
            " -output KEYPAIR");
 #ifdef HAVE_DILITHIUM
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
+           "[2|3|5] -out mykey -outform der -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
            "[2|3|5] -out mykey -outform der -output KEYPAIR");
 #endif
 #ifdef WOLFSSL_HAVE_XMSS
