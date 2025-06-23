@@ -33,13 +33,16 @@ static const struct option ca_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"-keyfile",   required_argument, 0, WOLFCLU_KEY       },
+    {"-altkey",    required_argument, 0, WOLFCLU_ALTKEY    },
+    {"-altpub",    required_argument, 0, WOLFCLU_ALTPUB    },
     {"-cert",      required_argument, 0, WOLFCLU_CAFILE    },
     {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
     {"-md",        required_argument, 0, WOLFCLU_MD        },
     {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"-config",    required_argument, 0, WOLFCLU_CONFIG },
     {"-days",      required_argument, 0, WOLFCLU_DAYS },
-    {"-selfsign",  no_argument, 0, WOLFCLU_SELFSIGN },
+    {"-selfsign",  no_argument, 0, WOLFCLU_SELFSIGN  },
+    {"-altextend", no_argument, 0, WOLFCLU_ALTEXTEND },
     {"-h",         no_argument, 0, WOLFCLU_HELP },
     {"-help",      no_argument, 0, WOLFCLU_HELP },
 
@@ -59,6 +62,9 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to read configuration from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-selfsign sign with key associated with cert");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend sign with alternate key and read cert from file");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altkey file to read alternate private key from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altpub file to read alternate public key from");
 }
 #endif
 
@@ -67,10 +73,12 @@ int wolfCLU_CASetup(int argc, char** argv)
 {
 #ifndef WOLFCLU_NO_FILESYSTEM
     WOLFCLU_CERT_SIGN* signer = NULL;
-    WOLFSSL_BIO *keyIn  = NULL;
-    WOLFSSL_BIO *reqIn  = NULL;
-    WOLFSSL_X509 *x509  = NULL;
-    WOLFSSL_X509 *ca    = NULL;
+    WOLFSSL_BIO *keyIn     = NULL;
+    WOLFSSL_BIO *altKey    = NULL;
+    WOLFSSL_BIO *altKeyPub = NULL;
+    WOLFSSL_BIO *reqIn     = NULL;
+    WOLFSSL_X509 *x509     = NULL;
+    WOLFSSL_X509 *ca       = NULL;
     WOLFSSL_EVP_PKEY* pkey = NULL;
     enum wc_HashType hashType = WC_HASH_TYPE_NONE;
 
@@ -84,6 +92,7 @@ int wolfCLU_CASetup(int argc, char** argv)
     int longIndex = 1;
     int days = 0;
     int selfSigned = 0;
+    int altSign = 0;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -111,6 +120,28 @@ int wolfCLU_CASetup(int argc, char** argv)
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
+                break;
+
+            case WOLFCLU_ALTKEY:
+                altKey = wolfSSL_BIO_new_file(optarg, "rb");
+                if (altKey == NULL) {
+                    wolfCLU_LogError("Unable to open alternate key file %s",
+                            optarg);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
+
+            case WOLFCLU_ALTPUB:
+                altKeyPub = wolfSSL_BIO_new_file(optarg, "rb");
+                if (altKeyPub == NULL) {
+                    wolfCLU_LogError("Unable to open alternate public key file %s",
+                            optarg);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
+            
+            case WOLFCLU_ALTEXTEND:
+                altSign = 1;
                 break;
 
             case WOLFCLU_CAFILE:
@@ -168,7 +199,7 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
     }
 
-    if (reqIn == NULL) {
+    if (reqIn == NULL && !altSign) {
         wolfCLU_LogError("Expecting CSR input");
         ret = WOLFCLU_FATAL_ERROR;
     }
@@ -205,7 +236,7 @@ int wolfCLU_CASetup(int argc, char** argv)
         wolfCLU_CertSignSetDate(signer, days);
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && !altSign) {
         if (inForm == PEM_FORM) {
             wolfSSL_PEM_read_bio_X509_REQ(reqIn, &x509, NULL, NULL);
         }
@@ -218,10 +249,17 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && (pkey != NULL || ca != NULL)) {
+    if (ret == WOLFCLU_SUCCESS && (pkey != NULL || ca != NULL ||
+            altKey != NULL || altKeyPub != NULL)) {
         if (selfSigned) {
             wolfCLU_CertSignSetCA(signer, x509, pkey,
                     wolfCLU_GetTypeFromPKEY(pkey));
+        }
+        else if (altSign) {
+            // printf("Entering ChimeraCertSignSetCa\n");
+            wolfCLU_ChimeraCertSignSetCA(keyIn, altKey, altKeyPub,
+                wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(ca), 0, 0),
+                out);
         }
         else {
             wolfCLU_CertSignSetCA(signer, ca, pkey,
@@ -231,21 +269,27 @@ int wolfCLU_CASetup(int argc, char** argv)
 
     /* default to version 3 which supports extensions */
     if (ret == WOLFCLU_SUCCESS &&
-           wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS) {
+           wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS && !altSign) {
         wolfCLU_LogError("Unable to set version 3 for cert");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    if (ret == WOLFCLU_SUCCESS && ext != NULL) {
+    if (ret == WOLFCLU_SUCCESS && ext != NULL && !altSign) {
         wolfCLU_CertSignSetExt(signer, ext);
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && !altSign) {
         ret = wolfCLU_CertSign(signer, x509);
     }
 
     wolfSSL_BIO_free(reqIn);
     wolfSSL_BIO_free(keyIn);
+    if (altKey != NULL) {
+        wolfSSL_BIO_free(altKey);
+    }
+    if (altKeyPub != NULL) {
+        wolfSSL_BIO_free(altKeyPub);
+    }
     if (!selfSigned) {
         wolfSSL_X509_free(x509);
     }
