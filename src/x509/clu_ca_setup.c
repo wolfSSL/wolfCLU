@@ -33,6 +33,7 @@ static const struct option ca_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"-keyfile",   required_argument, 0, WOLFCLU_KEY       },
+    {"-subjkey",   required_argument, 0, WOLFCLU_SUBJKEY   },
     {"-altkey",    required_argument, 0, WOLFCLU_ALTKEY    },
     {"-altpub",    required_argument, 0, WOLFCLU_ALTPUB    },
     {"-cert",      required_argument, 0, WOLFCLU_CAFILE    },
@@ -65,6 +66,7 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend sign with alternate key and read cert from file");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-altkey file to read alternate private key from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-altpub file to read alternate public key from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-subjkey file to read subject key from (when altextend)");
 }
 #endif
 
@@ -74,9 +76,11 @@ int wolfCLU_CASetup(int argc, char** argv)
 #ifndef WOLFCLU_NO_FILESYSTEM
     WOLFCLU_CERT_SIGN* signer = NULL;
     WOLFSSL_BIO *keyIn     = NULL;
+    WOLFSSL_BIO *subjKey   = NULL;
     WOLFSSL_BIO *altKey    = NULL;
     WOLFSSL_BIO *altKeyPub = NULL;
     WOLFSSL_BIO *reqIn     = NULL;
+    WOLFSSL_BIO *caCert    = NULL;
     WOLFSSL_X509 *x509     = NULL;
     WOLFSSL_X509 *ca       = NULL;
     WOLFSSL_EVP_PKEY* pkey = NULL;
@@ -121,6 +125,15 @@ int wolfCLU_CASetup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
+            
+            case WOLFCLU_SUBJKEY:
+                subjKey = wolfSSL_BIO_new_file(optarg, "rb");
+                if (subjKey == NULL) {
+                    wolfCLU_LogError("Unable to open subject key file %s",
+                            optarg);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
 
             case WOLFCLU_ALTKEY:
                 altKey = wolfSSL_BIO_new_file(optarg, "rb");
@@ -148,9 +161,12 @@ int wolfCLU_CASetup(int argc, char** argv)
                 ca = wolfSSL_X509_load_certificate_file(optarg,
                         WOLFSSL_FILETYPE_PEM);
                 if (ca == NULL) {
-                    wolfCLU_LogError("Unable to open ca file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
+                    caCert = wolfSSL_BIO_new_file(optarg, "rb");
+                    if (caCert == NULL) {
+                        wolfCLU_LogError("Unable to open CA file %s",
+                                optarg);
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                 }
                 break;
 
@@ -236,8 +252,17 @@ int wolfCLU_CASetup(int argc, char** argv)
         wolfCLU_CertSignSetDate(signer, days);
     }
 
-    if (ret == WOLFCLU_SUCCESS && !altSign) {
-        if (inForm == PEM_FORM) {
+    if (ret == WOLFCLU_SUCCESS) {
+        if (altSign) {
+            XFILE fp;
+            byte buffer[9216];
+
+            wolfSSL_BIO_get_fp(reqIn, &fp);
+            XFREAD(buffer, 1, sizeof(buffer), fp);
+            x509 = wolfSSL_X509_load_certificate_buffer(buffer,
+                sizeof(buffer), WOLFSSL_FILETYPE_PEM);
+        }
+        else if (inForm == PEM_FORM) {
             wolfSSL_PEM_read_bio_X509_REQ(reqIn, &x509, NULL, NULL);
         }
         else {
@@ -257,8 +282,8 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
         else if (altSign) {
             // printf("Entering ChimeraCertSignSetCa\n");
-            wolfCLU_ChimeraCertSignSetCA(keyIn, altKey, altKeyPub,
-                wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(ca), 0, 0),
+            wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey, caCert,
+                wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(x509), 0, 0),
                 out);
         }
         else {
