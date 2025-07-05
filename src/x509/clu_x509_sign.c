@@ -24,6 +24,7 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
+#include <wolfclu/x509/clu_cert.h>
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
 #endif  /* HAVE_DILITHIUM */
@@ -213,8 +214,8 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
 
 /* ref: https://github.com/wolfssl/wolfssl-examples/X9.146/gen_ecdsa_mldsa_dual_keysig_cert.c */
 void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
-        WOLFSSL_BIO *bioAltSubjPubKey, WOLFSSL_BIO *bioSubjKey, WOLFSSL_BIO *bioCaCert,
-        const char *subject, const char *outFileName)
+        WOLFSSL_BIO *bioAltSubjPubKey, WOLFSSL_BIO *bioSubjKey, WOLFSSL_X509 *caCert,
+        const char *subject, const char *outFileName, int outForm)
 {
 #if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
     int ret = WOLFCLU_SUCCESS;
@@ -239,7 +240,6 @@ void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     XFILE caKeyFp       = NULL;
     XFILE altCaKeyFp    = NULL;
     XFILE altCaPubKeyFp = NULL;
-    XFILE caCertFp      = NULL;
     XFILE serverKeyFp   = NULL;
     WOLFSSL_BIO *out    = NULL;
 
@@ -250,7 +250,7 @@ void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     char *subj    = NULL;
     int  subjSz   = 0;
 
-    const int LARGE_TEMP_SZ = 9216;
+    const int LARGE_TEMP_SZ = 11264;
     byte caKeyBuf[LARGE_TEMP_SZ];
     int  caKeySz   = LARGE_TEMP_SZ;
     byte altCaKeyBuf[LARGE_TEMP_SZ];
@@ -265,6 +265,8 @@ void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     int  preTbsSz = LARGE_TEMP_SZ;
     byte altSigValBuf[LARGE_TEMP_SZ];
     int  altSigValSz = LARGE_TEMP_SZ;
+    byte derBuf[LARGE_TEMP_SZ];
+    int  derSz = LARGE_TEMP_SZ;
     byte outBuf[LARGE_TEMP_SZ];
     int  outSz = LARGE_TEMP_SZ;
     DerBuffer *derObj = NULL;
@@ -275,16 +277,16 @@ void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     byte serverKeyBuf[LARGE_TEMP_SZ];
     int  serverKeySz = LARGE_TEMP_SZ;
 
-    if (bioCaCert == NULL || bioAltCaKey == NULL || bioAltSubjPubKey == NULL
+    if (bioCaKey == NULL || bioAltCaKey == NULL || bioAltSubjPubKey == NULL
         || subject == NULL || outFileName == NULL) {
         wolfCLU_LogError("Error NULL argument in wolfCLU_GenChimeraCertSign");
         ret = BAD_FUNC_ARG;
     }
-    else if (bioSubjKey == NULL && bioCaCert == NULL) {
+    else if (bioSubjKey == NULL && caCert == NULL) {
         isCA = 1;
         WOLFCLU_LOG(WOLFCLU_L0, "Generating Chimera CA certificate\n");
     }
-    else if (bioSubjKey != NULL && bioCaCert != NULL) {
+    else if (bioSubjKey != NULL && caCert != NULL) {
         isCA = 0;
         WOLFCLU_LOG(WOLFCLU_L0, "Generating Chimera server certificate\n");
     }
@@ -318,23 +320,15 @@ void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 
     /* open the CA der certificate */
     if (ret == WOLFCLU_SUCCESS && !isCA) {
-        ret = wolfSSL_BIO_get_fp(bioCaCert, &caCertFp);
-        if (ret != WOLFCLU_SUCCESS) {
-            wolfCLU_LogError("Error cannot get CA cert fd");
+        const byte *tmpBuf = wolfSSL_X509_get_der(caCert, &caCertSz);
+        if (tmpBuf == NULL || caCertSz <= 0) {
+            wolfCLU_LogError("Error getting DER from CA cert");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            XFSEEK(caCertFp, 0, SEEK_SET);
-            ret = (int)XFREAD(caCertBuf, 1, caCertSz, caCertFp);
-            if (ret <= 0) {
-                wolfCLU_LogError("Error reading CA cert");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                caCertSz = ret;
-                WOLFCLU_LOG(WOLFCLU_L0, "Read %d bytes from CA cert file", caCertSz);
-                ret = WOLFCLU_SUCCESS;
-            }
+            XMEMCPY(caCertBuf, tmpBuf, caCertSz);
+            WOLFCLU_LOG(WOLFCLU_L0, "Read %d bytes from CA cert", caCertSz);
+            ret = WOLFCLU_SUCCESS;
         }
     }
 
@@ -807,42 +801,60 @@ void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     }
 
     if (ret == WOLFCLU_SUCCESS && isCA) {
-        ret = wc_MakeCert(&newCert, outBuf, outSz, NULL, &caKey, &rng);
+        ret = wc_MakeCert(&newCert, derBuf, derSz, NULL, &caKey, &rng);
         if (ret < 0) {
             wolfCLU_LogError("Error making certificate");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            ret = wc_SignCert(newCert.bodySz, newCert.sigType, outBuf, outSz, NULL, &caKey, &rng);
+            ret = wc_SignCert(newCert.bodySz, newCert.sigType, derBuf, derSz, NULL, &caKey, &rng);
             if (ret < 0) {
                 wolfCLU_LogError("Error signing certificate");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                outSz = ret;
+                derSz = ret;
                 ret = WOLFCLU_SUCCESS;
-                printf("Successfully created Chimera CA certificate with %d bytes\n", outSz);
+                printf("Successfully created Chimera CA certificate with %d bytes\n", derSz);
             }
         }
     }
     else if (ret == WOLFCLU_SUCCESS && !isCA) {
-        ret = wc_MakeCert(&newCert, outBuf, outSz, NULL, &serverKey, &rng);
+        ret = wc_MakeCert(&newCert, derBuf, derSz, NULL, &serverKey, &rng);
         if (ret < 0) {
             wolfCLU_LogError("Error making server certificate");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            ret = wc_SignCert(newCert.bodySz, newCert.sigType, outBuf, outSz, NULL, &caKey, &rng);
+            ret = wc_SignCert(newCert.bodySz, newCert.sigType, derBuf, derSz, NULL, &caKey, &rng);
             if (ret < 0) {
                 wolfCLU_LogError("Error signing server certificate");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                outSz = ret;
+                derSz = ret;
                 ret = WOLFCLU_SUCCESS;
-                WOLFCLU_LOG(WOLFCLU_L0, "Successfully created Chimera certificate with %d bytes\n", outSz);
+                WOLFCLU_LOG(WOLFCLU_L0, "Successfully created Chimera certificate with %d bytes\n", derSz);
             }
         }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && outForm == PEM_FORM) {
+        ret = wc_DerToPem(derBuf, derSz, outBuf, outSz, CERT_TYPE);
+        if (ret < 0) {
+            wolfCLU_LogError("Error converting DER to PEM");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            outSz = ret;
+            ret = WOLFCLU_SUCCESS;
+            WOLFCLU_LOG(WOLFCLU_L0, "Converted certificate to PEM format; %d bytes", outSz);
+        }
+    }
+    else if (ret == WOLFCLU_SUCCESS && outForm == DER_FORM) {
+        outSz = derSz;
+        XMEMCPY(outBuf, derBuf, outSz);
+        WOLFCLU_LOG(WOLFCLU_L0, "Using DER format; %d bytes", outSz);
     }
 
     if (ret == WOLFCLU_SUCCESS) {

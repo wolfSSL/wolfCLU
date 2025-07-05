@@ -40,6 +40,7 @@ static const struct option ca_options[] = {
     {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
     {"-md",        required_argument, 0, WOLFCLU_MD        },
     {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
+    {"-outform",   required_argument, 0, WOLFCLU_OUTFORM   },
     {"-config",    required_argument, 0, WOLFCLU_CONFIG },
     {"-days",      required_argument, 0, WOLFCLU_DAYS },
     {"-selfsign",  no_argument, 0, WOLFCLU_SELFSIGN  },
@@ -60,6 +61,7 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions section in config file to parse extensions from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-md type of hash i.e sha256");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inform type PEM/DER of CSR input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-outform type PEM/DER of output");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to read configuration from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-selfsign sign with key associated with cert");
@@ -80,7 +82,6 @@ int wolfCLU_CASetup(int argc, char** argv)
     WOLFSSL_BIO *altKey    = NULL;
     WOLFSSL_BIO *altKeyPub = NULL;
     WOLFSSL_BIO *reqIn     = NULL;
-    WOLFSSL_BIO *caCert    = NULL;
     WOLFSSL_X509 *x509     = NULL;
     WOLFSSL_X509 *ca       = NULL;
     WOLFSSL_EVP_PKEY* pkey = NULL;
@@ -92,6 +93,7 @@ int wolfCLU_CASetup(int argc, char** argv)
     char* ext = NULL;
 
     int inForm  = PEM_FORM;
+    int outForm = PEM_FORM;
     int option;
     int longIndex = 1;
     int days = 0;
@@ -161,12 +163,8 @@ int wolfCLU_CASetup(int argc, char** argv)
                 ca = wolfSSL_X509_load_certificate_file(optarg,
                         WOLFSSL_FILETYPE_PEM);
                 if (ca == NULL) {
-                    caCert = wolfSSL_BIO_new_file(optarg, "rb");
-                    if (caCert == NULL) {
-                        wolfCLU_LogError("Unable to open CA file %s",
-                                optarg);
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
+                    ca = wolfSSL_X509_load_certificate_file(optarg,
+                        WOLFSSL_FILETYPE_ASN1);
                 }
                 break;
 
@@ -184,6 +182,10 @@ int wolfCLU_CASetup(int argc, char** argv)
 
             case WOLFCLU_INFORM:
                 inForm = wolfCLU_checkInform(optarg);
+                break;
+
+            case WOLFCLU_OUTFORM:
+                outForm = wolfCLU_checkOutform(optarg);
                 break;
 
             case WOLFCLU_CONFIG:
@@ -282,9 +284,9 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
         else if (altSign) {
             // printf("Entering ChimeraCertSignSetCa\n");
-            wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey, caCert,
+            wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey, ca,
                 wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(x509), 0, 0),
-                out);
+                out, outForm);
         }
         else {
             wolfCLU_CertSignSetCA(signer, ca, pkey,
