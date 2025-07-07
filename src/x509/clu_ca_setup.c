@@ -65,10 +65,10 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to read configuration from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-selfsign sign with key associated with cert");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend sign with alternate key and read cert from file");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend sign with alternate key");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-altkey file to read alternate private key from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-altpub file to read alternate public key from");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-subjkey file to read subject key from (when altextend)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-subjkey file to read subject key from");
 }
 #endif
 
@@ -149,8 +149,8 @@ int wolfCLU_CASetup(int argc, char** argv)
             case WOLFCLU_ALTPUB:
                 altKeyPub = wolfSSL_BIO_new_file(optarg, "rb");
                 if (altKeyPub == NULL) {
-                    wolfCLU_LogError("Unable to open alternate public key file %s",
-                            optarg);
+                    wolfCLU_LogError("Unable to open alternate public key file \
+                                        %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
@@ -256,13 +256,7 @@ int wolfCLU_CASetup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS) {
         if (altSign) {
-            XFILE fp;
-            byte buffer[9216];
-
-            wolfSSL_BIO_get_fp(reqIn, &fp);
-            XFREAD(buffer, 1, sizeof(buffer), fp);
-            x509 = wolfSSL_X509_load_certificate_buffer(buffer,
-                sizeof(buffer), WOLFSSL_FILETYPE_PEM);
+           wolfSSL_PEM_read_bio_X509(reqIn, &x509, NULL, NULL);
         }
         else if (inForm == PEM_FORM) {
             wolfSSL_PEM_read_bio_X509_REQ(reqIn, &x509, NULL, NULL);
@@ -283,7 +277,6 @@ int wolfCLU_CASetup(int argc, char** argv)
                     wolfCLU_GetTypeFromPKEY(pkey));
         }
         else if (altSign) {
-            // printf("Entering ChimeraCertSignSetCa\n");
             wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey, ca,
                 wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(x509), 0, 0),
                 out, outForm);
@@ -296,7 +289,8 @@ int wolfCLU_CASetup(int argc, char** argv)
 
     /* default to version 3 which supports extensions */
     if (ret == WOLFCLU_SUCCESS &&
-           wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS && !altSign) {
+           wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS &&
+           !altSign) {
         wolfCLU_LogError("Unable to set version 3 for cert");
         ret = WOLFCLU_FATAL_ERROR;
     }
