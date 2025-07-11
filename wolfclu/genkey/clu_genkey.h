@@ -124,6 +124,21 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                             int keySz, int level, int withAlg);
 
 /**
+ * generate a ML-DSA key
+ * 
+ * @param rng       the randam number generator
+ * @param fName     name of the file to write to
+ * @param directive which key to output, public or private, maybe both
+ * @param fmt       output format (PEM/DER)
+ * @param level     the ML-DSA level 2, 3 or 5
+ * @param withAlg   Whether to use SubjectPublicKeyInfo format
+ *
+ * return WOLFCLU_SUCCESS on success
+*/
+int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
+                            int keySz, int level, int withAlg);
+
+/**
  * call back function of read/write a XMSS private key
  *
  * @param priv      the private key
