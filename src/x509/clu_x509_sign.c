@@ -932,8 +932,11 @@ void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     (void)bioCaKey;
     (void)bioAltCaKey;
     (void)bioAltSubjPubKey;
+    (void)bioSubjKey;
+    (void)caCert;
     (void)subject;
     (void)outFileName;
+    (void)outForm;
 
     wolfCLU_LogError("Please compile wolfSSL with --enable-dual-alg-certs "
            "--enable-experimental --enable-dilithium\n");
