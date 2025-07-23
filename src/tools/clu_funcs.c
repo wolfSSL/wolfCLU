@@ -1125,7 +1125,18 @@ int wolfCLU_version(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "You are using version %s of the wolfssl Command Line Utility."
         , CLUWOLFSSL_VERSION_STRING);
-    WOLFCLU_LOG(WOLFCLU_L0, "Linked to wolfSSL version %s", LIBWOLFSSL_VERSION_STRING);
+    WOLFCLU_LOG(WOLFCLU_L0, "Linked to wolfSSL version %s%s",
+        LIBWOLFSSL_VERSION_STRING,
+    #ifdef HAVE_FIPS
+        " FIPS"
+    #else
+        ""
+    #endif
+    );
+#ifdef HAVE_FIPS
+    WOLFCLU_LOG(WOLFCLU_L0, "In FIPS builds there are algorithm restrictions "
+        "such as use of DES");
+#endif
     return WOLFCLU_SUCCESS;
 }
 

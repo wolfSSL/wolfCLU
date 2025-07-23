@@ -1,7 +1,7 @@
 Certificate Purpose:
 Any Extended Key Usage : YES
 TLS Web Server Authentication : YES
-TLS Web Client Authentication : NO
+TLS Web Client Authentication : YES
 OCSP Signing : YES
 Email Protect : YES
 Time Stamp Signing : YES
