@@ -12,6 +12,12 @@ then
     exit 77
 fi
 
+# Is this a FIPS build?
+IS_FIPS=0
+if ./wolfssl -v 2>&1 | grep -q FIPS; then
+    IS_FIPS=1
+fi
+
 run() {
     if [ -z "$2" ]; then
         RESULT=`./wolfssl $1`
@@ -67,30 +73,35 @@ run_fail "rsa -in ./certs/server-key.pem -pubin"
 
 # Test success cases for -RSAPublicKey_in
 run "rsa -in ./certs/server-keyPub.pem -RSAPublicKey_in"
-run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123"
-run_fail "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl12"
 
-run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123 -noout -modulus"
+if [ ${IS_FIPS} != "1" ]; then
+    run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123"
+    run_fail "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl12"
+
+    run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123 -noout -modulus"
+fi
 
 # Test success cases for -pubin
 run "rsa -in ./certs/server-keyPub.pem -pubin"
-run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123"
-run_fail "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl12"
+if [ ${IS_FIPS} != "1" ]; then
+    run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123"
+    run_fail "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl12"
 
-run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123 -noout -modulus"
+    run "rsa -in ./certs/server-keyEnc.pem -passin pass:yassl123 -noout -modulus"
 
-# Check that modulus was printed
-echo $RESULT | grep "Modulus"
-if [ $? != 0 ]; then
-    echo "ERROR with -modulus option"
-    exit 99
-fi
+    # Check that modulus was printed
+    echo $RESULT | grep "Modulus"
+    if [ $? != 0 ]; then
+        echo "ERROR with -modulus option"
+        exit 99
+    fi
 
-# Check that key was not printed
-echo $RESULT | grep "BEGIN"
-if [ $? == 0 ]; then
-    echo "ERROR found a key with -modulus option"
-    exit 99
+    # Check that key was not printed
+    echo $RESULT | grep "BEGIN"
+    if [ $? == 0 ]; then
+        echo "ERROR found a key with -modulus option"
+        exit 99
+    fi
 fi
 
 # Expexted result -RSAPublicKey_in

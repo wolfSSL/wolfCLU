@@ -1123,9 +1123,20 @@ void wolfCLU_stats(double start, int blockSize, int64_t blocks)
 /* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_version(void)
 {
+#ifdef HAVE_FIPS
+    const char *isFIPS = " FIPS";
+#else
+    const char *isFIPS = "";
+#endif
+
     WOLFCLU_LOG(WOLFCLU_L0, "You are using version %s of the wolfssl Command Line Utility."
         , CLUWOLFSSL_VERSION_STRING);
-    WOLFCLU_LOG(WOLFCLU_L0, "Linked to wolfSSL version %s", LIBWOLFSSL_VERSION_STRING);
+    WOLFCLU_LOG(WOLFCLU_L0, "Linked to wolfSSL version %s%s",
+        LIBWOLFSSL_VERSION_STRING, isFIPS);
+#ifdef HAVE_FIPS
+    WOLFCLU_LOG(WOLFCLU_L0, "In FIPS builds there are algorithm restrictions "
+        "such as use of DES");
+#endif
     return WOLFCLU_SUCCESS;
 }
 
