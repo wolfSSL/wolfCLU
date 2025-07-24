@@ -29,7 +29,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 {
 #ifndef WOLFCLU_NO_FILESYSTEM
     char     keyOutFName[MAX_FILENAME_SZ];  /* default outFile for genKey */
-    char     defaultFormat[4] = "der\0";
+    char     defaultFormat[4] = "der";
     WC_RNG   rng;
 
     char*    keyType = NULL;       /* keyType */
