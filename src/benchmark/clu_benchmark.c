@@ -97,6 +97,7 @@ int wolfCLU_benchmark(int timer, int* option)
         wc_RNG_GenerateBlock(&rng, iv, AES_BLOCK_SIZE);
         start = wolfCLU_getTime();
 
+        wc_AesInit(&aes, HEAP_HINT, INVALID_DEVID);
         wc_AesSetKey(&aes, key, AES_BLOCK_SIZE, iv, AES_ENCRYPTION);
 
         while (loop) {
@@ -107,6 +108,7 @@ int wolfCLU_benchmark(int timer, int* option)
             /* if stop >= timer, loop = 0 */
             loop = (stop >= timer) ? 0 : 1;
         }
+        wc_AesFree(&aes);
         printf("\n");
         printf("AES-CBC ");
         wolfCLU_stats(start, AES_BLOCK_SIZE, blocks);

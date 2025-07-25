@@ -71,6 +71,8 @@ int wolfCLU_PKCS7(int argc, char** argv)
     int   derContentSz = 0;
     int   freePkcs7 = 0;
 
+    XMEMSET(&pkcs7, 0, sizeof(PKCS7));
+
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "",
