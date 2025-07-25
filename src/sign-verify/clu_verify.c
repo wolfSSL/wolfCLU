@@ -450,7 +450,9 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     }
 
     /* Cleanup allocated resources */
-    XFCLOSE(keyPathFile);
+    if (keyPathFile != NULL) {
+        XFCLOSE(keyPathFile);
+    }
 
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -578,7 +580,9 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     }
 
     /* cleanup allocated resources */
-    XFCLOSE(keyPathFile);
+    if (keyPathFile != NULL) {
+        XFCLOSE(keyPathFile);
+    }
 
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -711,7 +715,9 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     }
 
     /* cleanup allocated resources */
-    XFCLOSE(keyPathFile);
+    if (keyPathFile != NULL) {
+        XFCLOSE(keyPathFile);
+    }
 
     if (keyBuf != NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

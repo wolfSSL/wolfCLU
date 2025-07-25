@@ -354,6 +354,9 @@ static WC_INLINE void clu_tcp_connect(SOCKET_T* sockfd, const char* ip,
         clu_build_addr(NULL, &ipv6, ip, port, udp, sctp);
         clu_tcp_socket(sockfd, udp, sctp, isIpv6);
         if (!udp) {
+            if (*sockfd < 0)
+                err_sys_with_errno("tcp bad socket");
+
             if (connect(*sockfd, (const struct sockaddr*)&ipv6, sizeof(ipv6))
                     != 0)
                 err_sys_with_errno("ipv6 tcp connect failed");
@@ -367,6 +370,9 @@ static WC_INLINE void clu_tcp_connect(SOCKET_T* sockfd, const char* ip,
         clu_tcp_socket(sockfd, udp, sctp, isIpv6);
 
         if (!udp) {
+            if (*sockfd < 0)
+                err_sys_with_errno("tcp bad socket");
+
             if (connect(*sockfd, (const struct sockaddr*)&addr, sizeof(addr))
                     != 0)
                 err_sys_with_errno("tcp connect failed");
@@ -3355,8 +3361,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
     #if defined(WOLFSSL_TRUST_PEER_CERT) && !defined(NO_FILESYSTEM)
         if (trustCert) {
-            if ((ret = wolfSSL_CTX_trust_peer_cert(ctx, trustCert,
-                                    WOLFSSL_FILETYPE_PEM)) != WOLFSSL_SUCCESS) {
+            if (wolfSSL_CTX_trust_peer_cert(ctx, trustCert,
+                                    WOLFSSL_FILETYPE_PEM) != WOLFSSL_SUCCESS) {
                 wolfSSL_CTX_free(ctx); ctx = NULL;
                 err_sys("can't load trusted peer cert file");
             }

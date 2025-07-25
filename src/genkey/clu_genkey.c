@@ -89,7 +89,8 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             ret = WC_KEY_SIZE_E;
 
         /* export keys to buffers */
-        ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz,
+        if (ret == 0)
+            ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz,
                                     pubKeyBuf, &pubKeySz);
     }
 
