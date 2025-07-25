@@ -163,15 +163,17 @@ int wolfCLU_Base64Setup(int argc, char** argv)
                 /* Try other types if PRIVATEKEY_TYPE fails */
                 ret = wc_PemToDer(input, (long)inputSz, CERT_TYPE,
                                     &der, NULL, NULL, NULL);
-                if (ret < 0) {
-                    ret = wc_PemToDer(input, (long)inputSz, CERTREQ_TYPE,
+            }
+
+            if (ret < 0) {
+                ret = wc_PemToDer(input, (long)inputSz, PKCS7_TYPE,
                                         &der, NULL, NULL, NULL);
-                    if (ret < 0) {
-                        wolfCLU_LogError("PEM to DER conversion failed: %d",
-                                ret);
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-                }
+            }
+
+            /* If all PEM to DER attempts failed then set error */
+            if (ret < 0) {
+                wolfCLU_LogError("PEM to DER conversion failed: %d", ret);
+                ret = WOLFCLU_FATAL_ERROR;
             }
 
             if (ret == 0) {
@@ -247,6 +249,9 @@ int wolfCLU_Base64Setup(int argc, char** argv)
                 wolfCLU_LogError("Base64 encode failed: %d", ret);
                 ret = WOLFCLU_FATAL_ERROR;
             }
+            else {
+                ret = WOLFCLU_SUCCESS;
+            }
         }
     }
 
@@ -256,6 +261,9 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         if (ret <= 0) {
             wolfCLU_LogError("Failed to write output data: %d", ret);
             ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = WOLFCLU_SUCCESS;
         }
     }
     else if (ret == WOLFCLU_SUCCESS) {
@@ -267,6 +275,9 @@ int wolfCLU_Base64Setup(int argc, char** argv)
             if (ret <= 0) {
                 wolfCLU_LogError("Failed to write to stdout: %d", ret);
                 ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                ret = WOLFCLU_SUCCESS;
             }
         }
         else {
