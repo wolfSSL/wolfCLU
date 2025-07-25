@@ -294,7 +294,7 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         wolfSSL_BIO_free(bioOut);
     }
 
-    return WOLFCLU_SUCCESS;
+    return ret;
 #else
     (void)argc;
     (void)argv;
