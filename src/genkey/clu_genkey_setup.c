@@ -344,6 +344,76 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         return NOT_COMPILED_IN;
     #endif  /* HAVE_DILITHIUM */
     }
+    else if (XSTRNCMP(keyType, "ml-dsa", 6) == 0) {
+    #if defined(HAVE_DILITHIUM) && defined(WOLFSSL_KEY_GEN)
+        int directiveArg = PRIV_AND_PUB_FILES;
+        int keySz = DILITHIUM_ML_DSA_44_PRV_KEY_SIZE;
+        int level = WC_ML_DSA_44;
+        int withAlg = DILITHIUM_LEVEL2k;
+        const char* levelStr;
+
+        WOLFCLU_LOG(WOLFCLU_L0, "Generate ML-DSA Key");
+
+        /* get the level argument */
+        ret = wolfCLU_checkForArg("-level", 6, argc, argv);
+        if (ret > 0) {
+            level = XATOI(argv[ret+1]);
+            switch (level) {
+                case WC_ML_DSA_44:
+                    keySz = DILITHIUM_ML_DSA_44_PRV_KEY_SIZE;
+                    withAlg = ML_DSA_LEVEL2k;
+                    break;
+                case WC_ML_DSA_65:
+                    keySz = DILITHIUM_ML_DSA_65_PRV_KEY_SIZE;
+                    withAlg = ML_DSA_LEVEL3k;
+                    break;
+                case WC_ML_DSA_87:
+                    keySz = DILITHIUM_ML_DSA_87_PRV_KEY_SIZE;
+                    withAlg = ML_DSA_LEVEL5k;
+                    break;
+                default:
+                    WOLFCLU_LOG(WOLFCLU_L0, "Invalid -level (%s), using level%d",
+                                argv[ret+1], level);
+                    break;
+            }
+        }
+        else {
+            /* no option -level */
+            WOLFCLU_LOG(WOLFCLU_L0, "No -level [ 2 | 3 | 5 ]");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use Level %d", level);
+        }
+
+        /* get the directive argument */
+        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
+        if (ret > 0) {
+            if (argv[ret+1] != NULL) {
+                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                    directiveArg = PUB_ONLY_FILE;
+                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                    directiveArg = PRIV_ONLY_FILE;
+                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                    directiveArg = PRIV_AND_PUB_FILES;
+            }
+        }
+        else {
+            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
+            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
+        }
+
+        levelStr = (level == WC_ML_DSA_44) ? "44" :
+               (level == WC_ML_DSA_65) ? "65" :
+               (level == WC_ML_DSA_87) ? "87" : "Unknown";
+        WOLFCLU_LOG(WOLFCLU_L0, "using ML-DSA-%s", levelStr);
+        ret = wolfCLU_genKey_ML_DSA(&rng, keyOutFName, directiveArg,
+            formatArg, keySz, level, withAlg);
+    #else
+        wolfCLU_LogError("Invalid option, ML-DSA not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "
+                "--enable-dilithium, --enable-experimental and try again");
+        wc_FreeRng(&rng);
+        return NOT_COMPILED_IN;
+    #endif  /* HAVE_DILITHIUM */
+    }
     else if (XSTRNCMP(keyType, "xmssmt", 6) == 0) {
     #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN)
         int directiveArg = PRIV_AND_PUB_FILES;

@@ -157,6 +157,43 @@ wolfssl verify -CAfile A.cert B.cert
 wolfssl verify -CAfile A.cert C.cert
 ```
 
+### Creating Chimera Certificates
+
+Following is a scenario creating Chimera (dual algorithms) certificates for PQC(Post Quantum Cryptography).
+
+The following demonstrates how to create a root CA and use it to sign other certificates. This example uses ECC and ML-DSA. In this scenario there are three entities A, B, and C, where A is meant to function as a root CA. 
+
+The following steps demonstrate how to generate keys and certificates for A, B, and C, where A is self-signed and B and C are signed by A
+
+1. Create private ECC and ML-DSA keys for A, B, and C
+```
+wolfssl genkey -ecc -out ecc-key-A -output priv -outform PEM
+wolfssl genkey -ecc -out ecc-key-B -output priv -outform PEM
+wolfssl genkey -ecc -out ecc-key-C -output priv -outform PEM
+wolfssl genkey -ml-dsa -out ml-dsa-key-A -output keypair -outform PEM
+wolfssl genkey -ml-dsa -out ml-dsa-key-B -output keypair -outform PEM
+wolfssl genkey -ml-dsa -out ml-dsa-key-C -output keypair -outform PEM
+```
+
+2. Create a self-signed conventional certificate for A, root CA certificate.
+```
+wolfssl req -new -key ecc-key-A.priv -subj O=org-A/C=US/ST=WA/L=Seattle/CN=A/OU=org-unit-A -x509 -out A.cert -outform PEM
+wolfssl ca -altextend -in A.cert -keyfile ecc-key-A.priv -altkey ml-dsa-key-A.priv -altpub ml-dsa-key-A.pub -out A-chimera.cert
+```
+
+3. Create certificates for B and C.
+```
+# first create conventional certificate signing request (CSR) for B and C
+wolfssl req -new -key ecc-key-B.priv -subj O=org-B/C=US/ST=WA/L=Seattle/CN=B/OU=org-unit-B -out B.csr -outform PEM
+wolfssl req -new -key ecc-key-C.priv -subj O=org-C/C=US/ST=WA/L=Seattle/CN=C/OU=org-unit-C -out C.csr -outform PEM
+
+# now have conventional signed certs, then add a pub key and Chimera signs the B and C to generate Chimera certificates
+wolfssl ca -in B.csr -keyfile ecc-key-A.priv -cert A.cert -out B.cert
+wolfssl ca -in C.csr -keyfile ecc-key-B.priv -cert B.cert -out C.cert
+wolfssl ca -altextend -in B.cert -keyfile ecc-key-A.priv -altkey ml-dsa-key-A.priv -altpub ml-dsa-key-B.pub -subjkey ecc-key-B.priv  -cert A-chimera.cert -out B-chimera.cert
+wolfssl ca -altextend -in C.cert -keyfile ecc-key-B.priv -altkey ml-dsa-key-B.priv -altpub ml-dsa-key-C.pub -subjkey ecc-key-C.priv  -cert B-chimera.cert -out C-chimera.cert
+```
+
 ## Contacts
 
 Please contact support@wolfssl.com with any questions or comments.
