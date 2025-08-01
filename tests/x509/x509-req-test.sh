@@ -43,7 +43,7 @@ run_fail() {
 }
 
 
-cat << EOF >> test.conf
+cat << EOF > test.conf
 [ req ]
 distinguished_name =req_distinguished_name
 attributes =req_attributes
@@ -90,7 +90,7 @@ DNS.9 = thirdName
 DNS.10 = tenthName
 EOF
 
-cat << EOF >> test-prompt.conf
+cat << EOF > test-prompt.conf
 [ req ]
 distinguished_name =req_distinguished_name
 attributes =req_attributes
