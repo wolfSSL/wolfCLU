@@ -12,6 +12,12 @@ then
     exit 77
 fi
 
+# Is this a FIPS build?
+if ./wolfssl -v 2>&1 | grep -q FIPS; then
+    #return 77 to indicate to automake that the test was skipped
+    exit 77
+fi
+
 RESULT=`./wolfssl pkcs12 -nodes -passin pass:"wolfSSL test" -passout pass: -in ./certs/test-servercert.p12 2>&1`
 echo "$RESULT" | grep "Recompile wolfSSL with PKCS12 support"
 if [ $? == 0 ]; then

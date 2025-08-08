@@ -1,12 +1,12 @@
 /* clu_sign.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -263,8 +263,14 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
         if (ret >= 0) {
             XFILE s;
             s = XFOPEN(out, "wb");
-            XFWRITE(outBuf, 1, outBufSz, s);
-            XFCLOSE(s);
+            if (s == NULL) {
+                wolfCLU_LogError("Failed to open output file");
+                ret = BAD_FUNC_ARG;
+            }
+            else {
+                XFWRITE(outBuf, 1, outBufSz, s);
+                XFCLOSE(s);
+            }
         }
         else {
             wolfCLU_LogError("Failed to sign data with RSA private key.\nRET: %d", ret);
@@ -272,7 +278,9 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     }
 
     /* cleanup allocated resources */
-    XFCLOSE(privKeyFile);
+    if (privKeyFile != NULL) {
+        XFCLOSE(privKeyFile);
+    }
 
     if (keyBuf!= NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -388,8 +396,14 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
         if (ret >= 0) {
             XFILE s;
             s = XFOPEN(out, "wb");
-            XFWRITE(outBuf, 1, outLen, s);
-            XFCLOSE(s);
+            if (s == NULL) {
+                wolfCLU_LogError("Failed to open file");
+                ret = BAD_FUNC_ARG;
+            }
+            else {
+                XFWRITE(outBuf, 1, outLen, s);
+                XFCLOSE(s);
+            }
         }
         else {
             wolfCLU_LogError("Failed to sign data with Ecc private key.\nRET: %d", ret);
@@ -397,7 +411,9 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     }
 
     /* cleanup allocated resources */
-    XFCLOSE(privKeyFile);
+    if (privKeyFile != NULL) {
+        XFCLOSE(privKeyFile);
+    }
 
     if (keyBuf!= NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -530,8 +546,14 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
         if (ret >= 0) {
             XFILE s;
             s = XFOPEN(out, "wb");
-            XFWRITE(outBuf, 1, outBufSz, s);
-            XFCLOSE(s);
+            if (s == NULL) {
+                wolfCLU_LogError("Failed to open file");
+                ret = BAD_FUNC_ARG;
+            }
+            else {
+                XFWRITE(outBuf, 1, outBufSz, s);
+                XFCLOSE(s);
+            }
         }
         else {
             wolfCLU_LogError("Failed to sign data with ED25519 private key.\nRET: %d", ret);
@@ -539,7 +561,9 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     }
 
     /* cleanup allocated resources */
-    XFCLOSE(privKeyFile);
+    if (privKeyFile != NULL) {
+        XFCLOSE(privKeyFile);
+    }
 
     if (keyBuf!= NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

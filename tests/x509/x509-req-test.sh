@@ -12,6 +12,12 @@ then
     exit 77
 fi
 
+# Is this a FIPS build?
+IS_FIPS=0
+if ./wolfssl -v 2>&1 | grep -q FIPS; then
+    IS_FIPS=1
+fi
+
 run_success() {
     if [ -z "$2" ]; then
         RESULT=`./wolfssl $1`
@@ -37,7 +43,7 @@ run_fail() {
 }
 
 
-cat << EOF >> test.conf
+cat << EOF > test.conf
 [ req ]
 distinguished_name =req_distinguished_name
 attributes =req_attributes
@@ -84,7 +90,7 @@ DNS.9 = thirdName
 DNS.10 = tenthName
 EOF
 
-cat << EOF >> test-prompt.conf
+cat << EOF > test-prompt.conf
 [ req ]
 distinguished_name =req_distinguished_name
 attributes =req_attributes
@@ -218,13 +224,16 @@ if [ $? != 0 ]; then
 fi
 rm -f tmp.cert
 
-run_success "req -new -newkey rsa:2048 -config ./test.conf -x509 -out tmp.cert -passout stdin" "long test password"
-echo $RESULT | grep "ENCRYPTED"
-if [ $? -ne 0 ]; then
-    echo "no encrypted key found in result"
-    exit 99
+
+if [ ${IS_FIPS} != "1" ]; then
+    run_success "req -new -newkey rsa:2048 -config ./test.conf -x509 -out tmp.cert -passout stdin" "long test password"
+    echo $RESULT | grep "ENCRYPTED"
+    if [ $? -ne 0 ]; then
+        echo "no encrypted key found in result"
+        exit 99
+    fi
+    rm -f tmp.cert
 fi
-rm -f tmp.cert
 
 #testing hash and key algos
 run_success "req -new -days 3650 -rsa -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
@@ -242,7 +251,9 @@ rm -f tmp.cert
 run_success "req -new -days 3650 -sha512 -key ./certs/server-key.pem -config ./test.conf -out tmp.cert -x509"
 rm -f tmp.cert
 
-run_success "req -new -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -x509 -out tmp.cert -passout stdin" "long test password"
+if [ ${IS_FIPS} != "1" ]; then
+    run_success "req -new -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -x509 -out tmp.cert -passout stdin" "long test password"
+fi
 
 run_success "req -new -key ./certs/ca-key.pem -config ./test.conf -extensions v3_alt_req_full -out tmp.cert"
 run_success "req -in ./tmp.cert -noout -text"
@@ -252,9 +263,11 @@ if [ $? -ne 0 ]; then
     exit 99
 fi
 
+if [ ${IS_FIPS} != "1" ]; then
 #test passout
-run_success "req -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -out tmp.cert -passout pass:123456789wolfssl -outform pem -sha256"
-run_success "rsa -in new-key.pem -passin pass:123456789wolfssl"
+    run_success "req -newkey rsa:2048 -keyout new-key.pem -config ./test.conf -out tmp.cert -passout pass:123456789wolfssl -outform pem -sha256"
+    run_success "rsa -in new-key.pem -passin pass:123456789wolfssl"
+fi
 
 run_success "req -new -x509 -key ./certs/ca-key.pem -config ./test-prompt.conf -out tmp.cert" "AA"
 run_fail "req -new -x509 -key ./certs/ca-key.pem -config ./test-prompt.conf -out tmp.cert" "LONG"

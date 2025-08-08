@@ -1,12 +1,12 @@
 /* clu_benchmark.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -97,6 +97,7 @@ int wolfCLU_benchmark(int timer, int* option)
         wc_RNG_GenerateBlock(&rng, iv, AES_BLOCK_SIZE);
         start = wolfCLU_getTime();
 
+        wc_AesInit(&aes, HEAP_HINT, INVALID_DEVID);
         wc_AesSetKey(&aes, key, AES_BLOCK_SIZE, iv, AES_ENCRYPTION);
 
         while (loop) {
@@ -107,6 +108,7 @@ int wolfCLU_benchmark(int timer, int* option)
             /* if stop >= timer, loop = 0 */
             loop = (stop >= timer) ? 0 : 1;
         }
+        wc_AesFree(&aes);
         printf("\n");
         printf("AES-CBC ");
         wolfCLU_stats(start, AES_BLOCK_SIZE, blocks);

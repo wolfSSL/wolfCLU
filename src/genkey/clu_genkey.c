@@ -1,12 +1,12 @@
 /* clu_genkey.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -40,8 +40,8 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     int fOutNmSz;                        /* file name without append */
     int fOutNmAppendSz = 6;              /* # of bytes to append to file name */
     int flagOutputPub = 0;               /* set if outputting both priv/pub */
-    char privAppend[6] = ".priv\0";      /* last part of the priv file name */
-    char pubAppend[6] = ".pub\0\0";      /* last part of the pub file name*/
+    char privAppend[6] = ".priv";        /* last part of the priv file name */
+    char pubAppend[6] = ".pub";          /* last part of the pub file name*/
     byte privKeyBuf[ED25519_KEY_SIZE*2]; /* will hold public & private parts */
     byte pubKeyBuf[ED25519_KEY_SIZE];    /* holds just the public key part */
     word32 privKeySz;                    /* size of private key */
@@ -89,7 +89,8 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
             ret = WC_KEY_SIZE_E;
 
         /* export keys to buffers */
-        ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz,
+        if (ret == 0)
+            ret = wc_ed25519_export_key(&edKeyOut, privKeyBuf, &privKeySz,
                                     pubKeyBuf, &pubKeySz);
     }
 
@@ -611,8 +612,8 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
 #ifdef HAVE_ECC
     int   fNameSz;
     int   fExtSz      = 6;
-    char  fExtPriv[6] = ".priv\0";
-    char  fExtPub[6]  = ".pub\0\0";
+    char  fExtPriv[6] = ".priv";
+    char  fExtPub[6]  = ".pub";
     char* fOutNameBuf = NULL;
 
     WOLFSSL_BIO *bioPub = NULL;
@@ -790,8 +791,8 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     int   ret = WOLFCLU_SUCCESS;       /* return value */
     int   fNameSz;                     /* file name without append */
     int   fExtSz       = 6;            /* number of bytes to append to file name */
-    char  fExtPriv[6]  = ".priv\0";    /* last part of the priv file name */
-    char  fExtPub[6]   = ".pub\0\0";   /* last part of the pub file name*/
+    char  fExtPriv[6]  = ".priv";      /* last part of the priv file name */
+    char  fExtPub[6]   = ".pub";       /* last part of the pub file name*/
     char* fOutNameBuf  = NULL;         /* file name + fExt */
     int   flagOutputPub = 0;           /* set if outputting both priv/pub */
     byte* derBuf       = NULL;         /* buffer for DER format */
@@ -1650,8 +1651,8 @@ int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
     int ret            = 0;
     int fNameSz        = 0;           /* file name without append         */
     int fExtSz         = 6;           /* size of ".priv\0" and ".pub\0\0" */
-    char fExtPriv[6]   = ".priv\0";
-    char fExtPub[6]    = ".pub\0\0";
+    char fExtPriv[6]   = ".priv";
+    char fExtPub[6]    = ".pub";
     char* fOutNameBuf  = NULL;        /* file name + fExt       */
     XFILE file         = NULL;        /* public key file        */
     byte* pubOutBuf    = NULL;        /* public key buffer      */

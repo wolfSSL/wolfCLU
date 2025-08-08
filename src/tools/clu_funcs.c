@@ -1,12 +1,12 @@
 /* clu_funcs.c
  *
- * Copyright (C) 2006-2023 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -1126,9 +1126,20 @@ void wolfCLU_stats(double start, int blockSize, int64_t blocks)
 /* returns WOLFCLU_SUCCESS on success */
 int wolfCLU_version(void)
 {
+#ifdef HAVE_FIPS
+    const char *isFIPS = " FIPS";
+#else
+    const char *isFIPS = "";
+#endif
+
     WOLFCLU_LOG(WOLFCLU_L0, "You are using version %s of the wolfssl Command Line Utility."
         , CLUWOLFSSL_VERSION_STRING);
-    WOLFCLU_LOG(WOLFCLU_L0, "Linked to wolfSSL version %s", LIBWOLFSSL_VERSION_STRING);
+    WOLFCLU_LOG(WOLFCLU_L0, "Linked to wolfSSL version %s%s",
+        LIBWOLFSSL_VERSION_STRING, isFIPS);
+#ifdef HAVE_FIPS
+    WOLFCLU_LOG(WOLFCLU_L0, "In FIPS builds there are algorithm restrictions "
+        "such as use of DES");
+#endif
     return WOLFCLU_SUCCESS;
 }
 

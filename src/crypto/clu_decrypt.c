@@ -1,12 +1,12 @@
 /* clu_decrypt.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -145,15 +145,25 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
      */
     while (length > 0 && ret == 0) {
         /* Read in 1kB */
-        if (ret == 0 &&
-                (ret = (int)XFREAD(input, 1, MAX_LEN, inFile)) != MAX_LEN) {
+        if (ret == 0) {
             if (feof(inFile)) {
-                tempMax = ret;
-                ret = 0; /* success */
+                wolfCLU_LogError("Unexpected end of the file.");
+                ret = FREAD_ERROR;
+            }
+            else if (ferror(inFile)) {
+                wolfCLU_LogError("File stream in error state");
+                ret = FREAD_ERROR;
             }
             else {
-                wolfCLU_LogError("Input file does not exist.");
-                ret = FREAD_ERROR;
+                ret = (int)XFREAD(input, 1, MAX_LEN, inFile);
+                if ((ret > 0 && ret != MAX_LEN) || feof(inFile)) {
+                    tempMax = ret;
+                    ret = 0; /* success */
+                }
+                else {
+                    wolfCLU_LogError("Input file does not exist.");
+                    ret = FREAD_ERROR;
+                }
             }
         }
 

@@ -1,3 +1,10 @@
+# wolfCLU v0.1.9 (July 24, 2025)
+- Fix client and server KEM macro (PR 177)
+- Implementing PKCS8 and Base64 commands (PR 178)
+- Adjust tests for disable of DES with FIPS and add FIPS print out (PR 183)
+- Fixed problems with string init of array (PR 179)
+- Update license from GPLv2 to GPLv3 (PR 184)
+
 # wolfCLU v0.1.8 (Apr 4, 2025)
 - Fix build errors in server.c when linked to wolfssl with --enable-all (PR 170)
 - Increase CI tests to include --enable-all build of wolfSSL (PR 171)

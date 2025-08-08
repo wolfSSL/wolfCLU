@@ -1,12 +1,12 @@
 /* clu_verify.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -450,7 +450,9 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     }
 
     /* Cleanup allocated resources */
-    XFCLOSE(keyPathFile);
+    if (keyPathFile != NULL) {
+        XFCLOSE(keyPathFile);
+    }
 
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -578,7 +580,9 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     }
 
     /* cleanup allocated resources */
-    XFCLOSE(keyPathFile);
+    if (keyPathFile != NULL) {
+        XFCLOSE(keyPathFile);
+    }
 
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -711,7 +715,9 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     }
 
     /* cleanup allocated resources */
-    XFCLOSE(keyPathFile);
+    if (keyPathFile != NULL) {
+        XFCLOSE(keyPathFile);
+    }
 
     if (keyBuf != NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

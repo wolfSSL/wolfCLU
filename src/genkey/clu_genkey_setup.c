@@ -1,12 +1,12 @@
 /* clu_genkey_setup.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -29,7 +29,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 {
 #ifndef WOLFCLU_NO_FILESYSTEM
     char     keyOutFName[MAX_FILENAME_SZ];  /* default outFile for genKey */
-    char     defaultFormat[4] = "der\0";
+    char     defaultFormat[4] = "der";
     WC_RNG   rng;
 
     char*    keyType = NULL;       /* keyType */

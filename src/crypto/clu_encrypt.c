@@ -1,12 +1,12 @@
 /* clu_encrypt.c
  *
- * Copyright (C) 2006-2021 wolfSSL Inc.
+ * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
+ * the Free Software Foundation; either version 3 of the License, or
  * (at your option) any later version.
  *
  * wolfSSL is distributed in the hope that it will be useful,
@@ -76,8 +76,15 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
         /* open the file to write */
         tempInFile = XFOPEN(in, "wb");
-        XFWRITE(userInputBuffer, 1, inputLength, tempInFile);
-        XFCLOSE(tempInFile);
+        if (tempInFile == NULL) {
+            wolfCLU_LogError("unable to open file %s", in);
+            XFREE(userInputBuffer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            return BAD_FUNC_ARG;
+        }
+        else {
+            XFWRITE(userInputBuffer, 1, inputLength, tempInFile);
+            XFCLOSE(tempInFile);
+        }
 
         /* free buffer */
         XFREE(userInputBuffer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -121,6 +128,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         ret = wc_RNG_GenerateBlock(&rng, iv, block);
 
         if (ret != 0) {
+            XFCLOSE(inFile);
             return ret;
         }
 
@@ -128,6 +136,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         ret = wolfCLU_genKey_PWDBASED(&rng, pwdKey, size, salt, padCounter);
         if (ret != WOLFCLU_SUCCESS) {
             wolfCLU_LogError("failed to set pwdKey.");
+            XFCLOSE(inFile);
             return ret;
         }
         /* move the generated pwdKey to "key" for encrypting */
@@ -140,6 +149,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     outFile = XFOPEN(out, "wb");
     if (outFile == NULL) {
         wolfCLU_LogError("unable to open output file %s", out);
+        XFCLOSE(inFile);
         return WOLFCLU_FATAL_ERROR;
     }
     XFWRITE(salt, 1, SALT_SIZE, outFile);
@@ -148,10 +158,13 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
     /* MALLOC 1kB buffers */
     input = (byte*) XMALLOC(MAX_LEN, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (input == NULL)
+    if (input == NULL) {
+        XFCLOSE(inFile);
         return MEMORY_E;
+    }
     output = (byte*) XMALLOC(MAX_LEN, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (output == NULL) {
+        XFCLOSE(inFile);
         wolfCLU_freeBins(input, NULL, NULL, NULL, NULL);
         return MEMORY_E;
     }
@@ -159,10 +172,15 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     /* loop, encrypt 1kB at a time till length <= 0 */
     while (length > 0) {
         /* Read in 1kB to input[] */
-        if (inputHex == 1)
-            ret = (int) fread(inputString, 1, MAX_LEN, inFile);
-        else
-            ret = (int) fread(input, 1, MAX_LEN, inFile);
+        if (feof(inFile)) {
+            ret = 0;
+        }
+        else {
+            if (inputHex == 1)
+                ret = (int) fread(inputString, 1, MAX_LEN, inFile);
+            else
+                ret = (int) fread(input, 1, MAX_LEN, inFile);
+        }
 
         if (ret != MAX_LEN) {
             /* check for end of file */
@@ -178,6 +196,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                      if (hexRet != WOLFCLU_SUCCESS) {
                         wolfCLU_LogError("failed during conversion of input,"
                             " ret = %d", hexRet);
+                        XFCLOSE(inFile);
                         return hexRet;
                     }
                 }/* end hex or ascii */
@@ -191,6 +210,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             }
             else { /* otherwise we got a file read error */
                 wolfCLU_freeBins(input, output, NULL, NULL, NULL);
+                XFCLOSE(inFile);
                 return FREAD_ERROR;
             }/* End feof check */
         }/* End fread check */
@@ -200,6 +220,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 alg == WOLFCLU_CAMELLIA256CBC) {
             ret = wc_CamelliaSetKey(&camellia, key, block, iv);
             if (ret != 0) {
+                XFCLOSE(inFile);
                 wolfCLU_LogError("CamelliaSetKey failed.");
                 wolfCLU_freeBins(input, output, NULL, NULL, NULL);
                 return ret;
@@ -208,6 +229,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 wc_CamelliaCbcEncrypt(&camellia, output, input, tempMax);
             }
             else {
+                XFCLOSE(inFile);
                 wolfCLU_LogError("Incompatible mode while using Camellia.");
                 wolfCLU_freeBins(input, output, NULL, NULL, NULL);
                 return FATAL_ERROR;
@@ -233,14 +255,25 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
         /* Open the outFile in append mode */
         outFile = XFOPEN(out, "ab");
+        if (outFile == NULL) {
+            XFCLOSE(inFile);
+            wolfCLU_LogError("failed to open file.");
+            wolfCLU_freeBins(input, output, NULL, NULL, NULL);
+            return FWRITE_ERROR;
+        }
+
         ret = (int)XFWRITE(output, 1, tempMax, outFile);
 
         if (ferror(outFile)) {
+            XFCLOSE(outFile);
+            XFCLOSE(inFile);
             wolfCLU_LogError("failed to write to file.");
             wolfCLU_freeBins(input, output, NULL, NULL, NULL);
             return FWRITE_ERROR;
         }
         if (ret > MAX_LEN) {
+            XFCLOSE(outFile);
+            XFCLOSE(inFile);
             wolfCLU_LogError("Wrote too much to file.");
             wolfCLU_freeBins(input, output, NULL, NULL, NULL);
             return FWRITE_ERROR;
