@@ -1043,17 +1043,10 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
     XFILE  file = NULL;
     int   fNameSz     = 0;
-    int   fExtSz      = 6;  // size of ".priv\0" or ".pub\0\0"
+    int   fExtSz      = 6;  /* size of ".priv\0" or ".pub\0\0" */
     char  fExtPriv[6] = ".priv\0";
     char  fExtPub[6]  = ".pub\0\0";
     char* fOutNameBuf = NULL;
-
-    #ifdef NO_AES
-    /* use 16 bytes for AES block size */
-    size_t maxDerBufSz = 4 * keySz * 16;
-    #else
-    size_t maxDerBufSz = 4 * keySz * AES_BLOCK_SIZE;
-    #endif  /* NO_AES */
 
     byte*  derBuf      = NULL;
     byte*  pemBuf      = NULL;
@@ -1074,6 +1067,9 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 #endif
 
     if (rng == NULL || fName == NULL) {
+#ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
+#endif
         return BAD_FUNC_ARG;
     }
 
@@ -1085,7 +1081,6 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
     #endif
         return ret;
     }
-    XMEMSET(key, 0, sizeof(dilithium_key));
 
     /* set the level of the dilithium key */
     if (wc_dilithium_set_level(key, level) != 0) {
@@ -1118,7 +1113,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
         XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
         XMEMCPY(fOutNameBuf, fName, fNameSz);
 
-        derBuf = (byte*)XMALLOC(maxDerBufSz, HEAP_HINT,
+        derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
                 DYNAMIC_TYPE_TMP_BUFFER);
         if (derBuf == NULL) {
             ret = MEMORY_E;
@@ -1137,12 +1132,14 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* Private key to der */
                 derBufSz = wc_Dilithium_PrivateKeyToDer(key,
-                                        derBuf, (word32)maxDerBufSz);
+                                        derBuf, (word32)keySz);
                 if (derBufSz < 0) {
                     ret = derBufSz;
                 }
-                outBuf   = derBuf;
-                outBufSz = derBufSz;
+                else {
+                    outBuf   = derBuf;
+                    outBufSz = derBufSz;
+                }
 
                 /* check if should convert to PEM format */
                 if (ret == WOLFCLU_SUCCESS && fmt == PEM_FORM) {
@@ -1151,8 +1148,10 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                     if (pemBufSz <= 0 || pemBuf == NULL) {
                         ret =  WOLFCLU_FAILURE;
                     }
-                    outBuf   = pemBuf;
-                    outBufSz = pemBufSz;
+                    else {
+                        outBuf   = pemBuf;
+                        outBufSz = pemBufSz;
+                    }
                 }
 
                 /* open file and write Private key */
@@ -1171,7 +1170,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                     }
                 }
 
-                if (directive != PRIV_AND_PUB_FILES) {
+                if (ret != WOLFCLU_SUCCESS || directive != PRIV_AND_PUB_FILES) {
                     break;
                 }
 
@@ -1188,14 +1187,14 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                 WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
-                derBuf = (byte*)XMALLOC(maxDerBufSz, HEAP_HINT,
+                derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
                                         DYNAMIC_TYPE_TMP_BUFFER);
                 if (derBuf == NULL) {
                     ret = MEMORY_E;
                 }
-
+                
                 derBufSz = wc_Dilithium_PublicKeyToDer(key, derBuf,
-                                                (word32)maxDerBufSz, withAlg);
+                                                (word32)keySz, withAlg);
                 if (derBufSz < 0) {
                     ret = derBufSz;
                 }
@@ -1211,8 +1210,10 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                     if (pemBufSz <= 0 || pemBuf == NULL) {
                         ret =  WOLFCLU_FAILURE;
                     }
-                    outBuf   = pemBuf;
-                    outBufSz = pemBufSz;
+                    else {
+                        outBuf   = pemBuf;
+                        outBufSz = pemBufSz;
+                    }
                 }
 
                 /* open file and write Public key */
@@ -1242,7 +1243,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
         XFCLOSE(file);
 
     if (derBuf != NULL) {
-        wolfCLU_ForceZero(derBuf, (unsigned int)maxDerBufSz);
+        wolfCLU_ForceZero(derBuf, keySz);
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
@@ -1275,24 +1276,17 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 }
 
 int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
-    int keySz, int level, int withAlg)
+                            int keySz, int level, int withAlg)
 {
 #ifdef HAVE_DILITHIUM
     int    ret = WOLFCLU_SUCCESS;
 
     XFILE  file       = NULL;
     int   fNameSz     = 0;
-    int   fExtSz      = 6;  // size of ".priv\0" or ".pub\0\0"
+    int   fExtSz      = 6;  /* size of ".priv\0" or ".pub\0\0" */
     char  fExtPriv[6] = ".priv\0";
     char  fExtPub[6]  = ".pub\0\0";
     char* fOutNameBuf = NULL;
-
-#ifdef NO_AES
-    /* use 16 bytes for AES block size */
-    size_t maxDerBufSz = 4 * keySz * 16;
-#else
-    size_t maxDerBufSz = 4 * keySz * AES_BLOCK_SIZE;
-#endif  /* NO_AES */
 
     byte*  derBuf      = NULL;
     byte*  pemBuf      = NULL;
@@ -1313,21 +1307,24 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 #endif
 
     if (rng == NULL || fName == NULL) {
+#ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
+#endif
         return BAD_FUNC_ARG;
     }
 
     /* init the ML-DSA key */
     if (wc_MlDsaKey_Init(key, NULL, 0) != 0) {
-        wolfCLU_LogError("Failed to initialize ML-DSA Key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize ML-DSA Key");
 #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
 #endif
-        return ret;
+        return WOLFCLU_FAILURE;
     }
-    XMEMSET(key, 0, sizeof(MlDsaKey));
 
     /* set the level of the ML-DSA key */
     if (wc_MlDsaKey_SetParams(key, level) != 0) {
+        wolfCLU_LogError("Failed to set ML-DSA Key parameters");
         wc_MlDsaKey_Free(key);
 #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
@@ -1337,6 +1334,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
     /* make the ML-DSA key */
     if (wc_MlDsaKey_MakeKey(key, rng) != 0) {
+        wolfCLU_LogError("Failed to make ML-DSA Key");
         wc_MlDsaKey_Free(key);
 #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
@@ -1358,7 +1356,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
         XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
         XMEMCPY(fOutNameBuf, fName, fNameSz);
 
-        derBuf = (byte*)XMALLOC(maxDerBufSz, HEAP_HINT,
+        derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
                     DYNAMIC_TYPE_TMP_BUFFER);
         if (derBuf == NULL) {
             ret = MEMORY_E;
@@ -1377,12 +1375,14 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* Private key to der */
                 derBufSz = wc_MlDsaKey_PrivateKeyToDer(key,
-                                derBuf, (word32)maxDerBufSz);
+                                derBuf, (word32)keySz);
                 if (derBufSz < 0) {
                     ret = derBufSz;
                 }
-                outBuf   = derBuf;
-                outBufSz = derBufSz;
+                else {
+                    outBuf   = derBuf;
+                    outBufSz = derBufSz;
+                }
 
                 /* check if should convert to PEM format */
                 if (ret == WOLFCLU_SUCCESS && fmt == PEM_FORM) {
@@ -1391,8 +1391,10 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                     if (pemBufSz <= 0 || pemBuf == NULL) {
                         ret =  WOLFCLU_FAILURE;
                     }
-                    outBuf   = pemBuf;
-                    outBufSz = pemBufSz;
+                    else {
+                        outBuf   = pemBuf;
+                        outBufSz = pemBufSz;
+                    }
                 }
 
                 /* open file and write Private key */
@@ -1411,7 +1413,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                     }
                 }
 
-                if (directive != PRIV_AND_PUB_FILES) {
+                if (ret != WOLFCLU_SUCCESS || directive != PRIV_AND_PUB_FILES) {
                     break;
                 }
 
@@ -1428,20 +1430,22 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                 WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
-                derBuf = (byte*)XMALLOC(maxDerBufSz, HEAP_HINT,
+                derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
                                 DYNAMIC_TYPE_TMP_BUFFER);
                 if (derBuf == NULL) {
                     ret = MEMORY_E;
                 }
 
-                derBufSz = wc_MlDsaKey_PublicKeyToDer(key, derBuf,
-                                        (word32)maxDerBufSz, withAlg);
-                if (derBufSz < 0) {
-                    ret = derBufSz;
-                }
-                else {
-                    outBuf   = derBuf;
-                    outBufSz = derBufSz;
+                if (ret == WOLFCLU_SUCCESS) {
+                    derBufSz = wc_MlDsaKey_PublicKeyToDer(key, derBuf,
+                                            (word32)keySz, withAlg);
+                    if (derBufSz < 0) {
+                        ret = derBufSz;
+                    }
+                    else {
+                        outBuf   = derBuf;
+                        outBufSz = derBufSz;
+                    }
                 }
 
                 /* check if should convert to PEM format */
@@ -1451,8 +1455,10 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                     if (pemBufSz <= 0 || pemBuf == NULL) {
                         ret =  WOLFCLU_FAILURE;
                     }
-                    outBuf   = pemBuf;
-                    outBufSz = pemBufSz;
+                    else {
+                        outBuf   = pemBuf;
+                        outBufSz = pemBufSz;
+                    }
                 }
 
                 /* open file and write Public key */
@@ -1483,7 +1489,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
     }
 
     if (derBuf != NULL) {
-        wolfCLU_ForceZero(derBuf, (unsigned int)maxDerBufSz);
+        wolfCLU_ForceZero(derBuf, keySz);
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 

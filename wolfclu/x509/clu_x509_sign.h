@@ -30,7 +30,7 @@ int wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign);
 void wolfCLU_CertSignSetSerial(WOLFCLU_CERT_SIGN* csign, WOLFSSL_BIO* s);
 void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
         void* key, int keyType);
-void wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
+int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         WOLFSSL_BIO *bioAltSubjPubKey, WOLFSSL_BIO *bioSubjKey, WOLFSSL_X509 *caCert,
         const char *subject, const char *outFileName, int outForm);
 void wolfCLU_CertSignSetHash(WOLFCLU_CERT_SIGN* csign,

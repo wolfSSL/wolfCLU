@@ -163,6 +163,8 @@ Following is a scenario creating Chimera (dual algorithms) certificates for PQC(
 
 The following demonstrates how to create a root CA and use it to sign other certificates. This example uses ECC and ML-DSA. In this scenario there are three entities A, B, and C, where A is meant to function as a root CA. 
 
+Before running the commands below, ensure you have the `ml-dsa` option enabled in wolfSSL. This can be done by configuring wolfSSL with `--enable-dilithium`, `--enable-dual-alg-certs` and `--enable-experimental`.
+
 The following steps demonstrate how to generate keys and certificates for A, B, and C, where A is self-signed and B and C are signed by A
 
 1. Create private ECC and ML-DSA keys for A, B, and C

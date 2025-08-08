@@ -111,7 +111,7 @@ int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
 /**
  * generate a Dilithium key
  *
- * @param rng       the randam number generator
+ * @param rng       the random number generator
  * @param fName     name of the file to write to
  * @param directive which key to output, public or private, maybe both
  * @param fmt       output format (PEM/DER)
@@ -126,7 +126,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 /**
  * generate a ML-DSA key
  * 
- * @param rng       the randam number generator
+ * @param rng       the random number generator
  * @param fName     name of the file to write to
  * @param directive which key to output, public or private, maybe both
  * @param fmt       output format (PEM/DER)
@@ -155,7 +155,7 @@ enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte* priv, word32 privSz, void* context);
 /**
  * generate a XMSS key
  *
- * @param rng       the randam number generator 
+ * @param rng       the random number generator 
  * @param fName     name of the file to write to
  * @param directive which key to output, public or private, maybe both
  * @param paramStr  the XMSS parameter

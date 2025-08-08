@@ -339,7 +339,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     #else
         wolfCLU_LogError("Invalid option, Dithium not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "
-                "--enable-dilithium, --enable-experimental and try again");
+                "--enable-dilithium and try again");
         wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
     #endif  /* HAVE_DILITHIUM */
@@ -347,10 +347,9 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     else if (XSTRNCMP(keyType, "ml-dsa", 6) == 0) {
     #if defined(HAVE_DILITHIUM) && defined(WOLFSSL_KEY_GEN)
         int directiveArg = PRIV_AND_PUB_FILES;
-        int keySz = DILITHIUM_ML_DSA_44_PRV_KEY_SIZE;
+        int keySz = ML_DSA_LEVEL2_BOTH_KEY_DER_SIZE;
         int level = WC_ML_DSA_44;
         int withAlg = DILITHIUM_LEVEL2k;
-        const char* levelStr;
 
         WOLFCLU_LOG(WOLFCLU_L0, "Generate ML-DSA Key");
 
@@ -360,16 +359,16 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             level = XATOI(argv[ret+1]);
             switch (level) {
                 case WC_ML_DSA_44:
-                    keySz = DILITHIUM_ML_DSA_44_PRV_KEY_SIZE;
-                    withAlg = ML_DSA_LEVEL2k;
+                    keySz    = ML_DSA_LEVEL2_BOTH_KEY_DER_SIZE;
+                    withAlg  = ML_DSA_LEVEL2k;
                     break;
                 case WC_ML_DSA_65:
-                    keySz = DILITHIUM_ML_DSA_65_PRV_KEY_SIZE;
-                    withAlg = ML_DSA_LEVEL3k;
+                    keySz    = ML_DSA_LEVEL3_BOTH_KEY_DER_SIZE;
+                    withAlg  = ML_DSA_LEVEL3k;
                     break;
                 case WC_ML_DSA_87:
-                    keySz = DILITHIUM_ML_DSA_87_PRV_KEY_SIZE;
-                    withAlg = ML_DSA_LEVEL5k;
+                    keySz    = ML_DSA_LEVEL5_BOTH_KEY_DER_SIZE;
+                    withAlg  = ML_DSA_LEVEL5k;
                     break;
                 default:
                     WOLFCLU_LOG(WOLFCLU_L0, "Invalid -level (%s), using level%d",
@@ -400,16 +399,12 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
         }
 
-        levelStr = (level == WC_ML_DSA_44) ? "44" :
-               (level == WC_ML_DSA_65) ? "65" :
-               (level == WC_ML_DSA_87) ? "87" : "Unknown";
-        WOLFCLU_LOG(WOLFCLU_L0, "using ML-DSA-%s", levelStr);
         ret = wolfCLU_genKey_ML_DSA(&rng, keyOutFName, directiveArg,
-            formatArg, keySz, level, withAlg);
+                                    formatArg, keySz, level, withAlg);
     #else
         wolfCLU_LogError("Invalid option, ML-DSA not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "
-                "--enable-dilithium, --enable-experimental and try again");
+                "--enable-dilithium and try again");
         wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
     #endif  /* HAVE_DILITHIUM */

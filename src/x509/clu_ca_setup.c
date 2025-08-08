@@ -149,8 +149,8 @@ int wolfCLU_CASetup(int argc, char** argv)
             case WOLFCLU_ALTPUB:
                 altKeyPub = wolfSSL_BIO_new_file(optarg, "rb");
                 if (altKeyPub == NULL) {
-                    wolfCLU_LogError("Unable to open alternate public key file \
-                                        %s", optarg);
+                    wolfCLU_LogError("Unable to open \
+                                    alternate public key file %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
@@ -165,6 +165,11 @@ int wolfCLU_CASetup(int argc, char** argv)
                 if (ca == NULL) {
                     ca = wolfSSL_X509_load_certificate_file(optarg,
                         WOLFSSL_FILETYPE_ASN1);
+                }
+                
+                if (ca == NULL) {
+                    wolfCLU_LogError("Unable to open CA file %s", optarg);
+                    ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
@@ -277,7 +282,7 @@ int wolfCLU_CASetup(int argc, char** argv)
                     wolfCLU_GetTypeFromPKEY(pkey));
         }
         else if (altSign) {
-            wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey, ca,
+            ret = wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey, ca,
                 wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(x509), 0, 0),
                 out, outForm);
         }
