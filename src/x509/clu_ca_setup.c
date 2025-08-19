@@ -65,10 +65,12 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to read configuration from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-selfsign sign with key associated with cert");
+#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend sign with alternate key");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-altkey file to read alternate private key from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-altpub file to read alternate public key from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-subjkey file to read subject key from");
+#endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
 }
 #endif
 
@@ -127,7 +129,7 @@ int wolfCLU_CASetup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
-            
+#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
             case WOLFCLU_SUBJKEY:
                 subjKey = wolfSSL_BIO_new_file(optarg, "rb");
                 if (subjKey == NULL) {
@@ -154,7 +156,8 @@ int wolfCLU_CASetup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
-            
+#endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
+
             case WOLFCLU_ALTEXTEND:
                 altSign = 1;
                 break;

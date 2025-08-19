@@ -343,6 +343,29 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         }
     }
 
+    /* open CA ecc private key */
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfSSL_BIO_get_fp(bioCaKey, &caKeyFp);
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Error cannot get CA key fd");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XFSEEK(caKeyFp, 0, SEEK_SET);
+            ret = (int)XFREAD(caKeyBuf, 1, caKeySz, caKeyFp);
+            if (ret <= 0) {
+                wolfCLU_LogError("Error reading CA key");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                caKeySz = ret;
+                WOLFCLU_LOG(WOLFCLU_L0, "Read %d bytes from CA key file",
+                            caKeySz);
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
     /* open server ecc private key */
     if (ret == WOLFCLU_SUCCESS && !isCA) {
         ret = wolfSSL_BIO_get_fp(bioSubjKey, &serverKeyFp);
@@ -368,44 +391,24 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 
     /* open CA ecc private key */
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfSSL_BIO_get_fp(bioCaKey, &caKeyFp);
-        if (ret != WOLFCLU_SUCCESS) {
-            wolfCLU_LogError("Error cannot get CA key fd");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            XFSEEK(caKeyFp, 0, SEEK_SET);
-            ret = (int)XFREAD(caKeyBuf, 1, caKeySz, caKeyFp);
-            if (ret <= 0) {
-                wolfCLU_LogError("Error reading ECC key");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                caKeySz = ret;
-                WOLFCLU_LOG(WOLFCLU_L0, "Read %d bytes from CA key file",
-                            caKeySz);
-                ret = WOLFCLU_SUCCESS;
-            }
-        }
-    }
-
-    /* check not equal CA ecc private key and server ecc private key */
-    if (ret == WOLFCLU_SUCCESS && !isCA) {
-        if (XMEMCMP(caKeyBuf, serverKeyBuf, caKeySz) == 0) {
-            wolfCLU_LogError("CA key and server key are the same");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-
-    /* load CA ecc private key */
-    if (ret == WOLFCLU_SUCCESS) {
+        /* Try EC PRIVATE KEY format first */
         ret = wc_PemToDer(caKeyBuf, caKeySz, ECC_PRIVATEKEY_TYPE,
                             &derObj, HEAP_HINT, NULL, NULL);
         if (ret < 0) {
-            wolfCLU_LogError("Error convert pem to der");
-            ret = WOLFCLU_FATAL_ERROR;
+            WOLFCLU_LOG(WOLFCLU_L0, "Failed to convert EC PRIVATE KEY format, trying PRIVATE KEY format");
+            /* Try PRIVATE KEY format (PKCS#8) */
+            ret = wc_PemToDer(caKeyBuf, caKeySz, PRIVATEKEY_TYPE,
+                                &derObj, HEAP_HINT, NULL, NULL);
+            if (ret != 0) {
+                wolfCLU_LogError("Error convert pem to der");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                WOLFCLU_LOG(WOLFCLU_L0, "Successfully converted CA key to DER format");
+            }
         }
-        else {
+        
+        if (ret == 0) {
             XMEMSET(caKeyBuf, 0, caKeySz); /* clear original buffer */
             caKeySz = derObj->length;
             XMEMCPY(caKeyBuf, derObj->buffer, caKeySz);
@@ -446,10 +449,20 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         ret = wc_PemToDer(serverKeyBuf, serverKeySz, ECC_PRIVATEKEY_TYPE,
                             &derObj, HEAP_HINT, NULL, NULL);
         if (ret < 0) {
-            wolfCLU_LogError("Error convert pem to der");
-            ret = WOLFCLU_FATAL_ERROR;
+            WOLFCLU_LOG(WOLFCLU_L0, "Failed to convert EC PRIVATE KEY format, trying PRIVATE KEY format");
+            /* Try PRIVATE KEY format (PKCS#8) */
+            ret = wc_PemToDer(serverKeyBuf, serverKeySz, PRIVATEKEY_TYPE,
+                                &derObj, HEAP_HINT, NULL, NULL);
+            if (ret < 0) {
+                wolfCLU_LogError("Error convert pem to der");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                WOLFCLU_LOG(WOLFCLU_L0, "Successfully converted server key to DER format");
+            }
         }
-        else {
+
+        if (ret == 0) {
             XMEMSET(serverKeyBuf, 0, serverKeySz); /* clear original buffer */
             serverKeySz = derObj->length;
             XMEMCPY(serverKeyBuf, derObj->buffer, serverKeySz);
@@ -503,8 +516,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             }
             else {
                 sapkiSz = ret;
-                WOLFCLU_LOG(WOLFCLU_L0, "Read %d bytes from \
-                            alternative CA public key file", sapkiSz);
+                WOLFCLU_LOG(WOLFCLU_L0, "Read %d bytes from "
+                            "alternative CA public key file", sapkiSz);
                 ret = WOLFCLU_SUCCESS;
             }
         }
@@ -522,8 +535,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             sapkiSz = derObj->length;
             XMEMCPY(sapkiBuf, derObj->buffer, sapkiSz);
             wc_FreeDer(&derObj);
-            WOLFCLU_LOG(WOLFCLU_L0, "Converted alternative CA public key \
-                        to DER format; %d bytes", sapkiSz);
+            WOLFCLU_LOG(WOLFCLU_L0, "Converted alternative CA public key "
+                        "to DER format; %d bytes", sapkiSz);
             ret = WOLFCLU_SUCCESS;
         }
     }
@@ -556,8 +569,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             }
             else {
                 altCaKeySz = ret;
-                WOLFCLU_LOG(WOLFCLU_L0, "Read %d bytes from \
-                            alternative CA key file", altCaKeySz);
+                WOLFCLU_LOG(WOLFCLU_L0, "Read %d bytes from "
+                            "alternative CA key file", altCaKeySz);
                 ret = WOLFCLU_SUCCESS;
             }
         }
@@ -575,8 +588,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             altCaKeySz = derObj->length;
             XMEMCPY(altCaKeyBuf, derObj->buffer, altCaKeySz);
             wc_FreeDer(&derObj);
-            WOLFCLU_LOG(WOLFCLU_L0, "Converted alternative CA key \
-                        to DER format; %d bytes", altCaKeySz);
+            WOLFCLU_LOG(WOLFCLU_L0, "Converted alternative CA key "
+                        "to DER format; %d bytes", altCaKeySz);
             ret = WOLFCLU_SUCCESS;
         }
     }
@@ -590,8 +603,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            WOLFCLU_LOG(WOLFCLU_L0, "Successfully decoded \
-                        CA alt private key");
+            WOLFCLU_LOG(WOLFCLU_L0, "Successfully decoded "
+                        "CA alt private key");
             wc_MlDsaKey_GetParams(&altCaKey, &level);
             WOLFCLU_LOG(WOLFCLU_L0, "ML-DSA level: %d", level);
             ret = WOLFCLU_SUCCESS;
@@ -624,8 +637,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            WOLFCLU_LOG(WOLFCLU_L0, "Successfully generated \
-                alternative signature algorithm; %d bytes", altSigAlgSz);
+            WOLFCLU_LOG(WOLFCLU_L0, "Successfully generated "
+                "alternative signature algorithm; %d bytes", altSigAlgSz);
         }
     }
 
@@ -855,8 +868,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             else {
                 derSz = ret;
                 ret = WOLFCLU_SUCCESS;
-                WOLFCLU_LOG(WOLFCLU_L0, "Successfully created \
-                            Chimera CA certificate; %d bytes\n", derSz);
+                WOLFCLU_LOG(WOLFCLU_L0, "Successfully created "
+                            "Chimera CA certificate; %d bytes\n", derSz);
             }
         }
     }
@@ -876,8 +889,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             else {
                 derSz = ret;
                 ret = WOLFCLU_SUCCESS;
-                WOLFCLU_LOG(WOLFCLU_L0, "Successfully created \
-                            Chimera certificate; %d bytes\n", derSz);
+                WOLFCLU_LOG(WOLFCLU_L0, "Successfully created "
+                            "Chimera certificate; %d bytes\n", derSz);
             }
         }
     }
@@ -937,8 +950,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         wolfCLU_LogError("Error in wolfCLU_ChimeraCertSignSetCA: %d", ret);
     }
     else {
-        WOLFCLU_LOG(WOLFCLU_L0, "Successfully created \
-                    Chimera certificate: %s", outFileName);
+        WOLFCLU_LOG(WOLFCLU_L0, "Successfully created "
+                    "Chimera certificate: %s", outFileName);
     }
 
     return ret;
