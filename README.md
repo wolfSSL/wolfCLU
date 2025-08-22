@@ -169,12 +169,12 @@ The following steps demonstrate how to generate keys and certificates for A, B, 
 
 1. Create private ECC and ML-DSA keys for A, B, and C
 ```
-wolfssl genkey -ecc -name secp521r1 -out ecc-key-A -output priv -outform PEM
-wolfssl genkey -ecc -name secp384r1 -out ecc-key-B -output priv -outform PEM
-wolfssl genkey -ecc -name secp256r1 -out ecc-key-C -output priv -outform PEM
-wolfssl genkey -ml-dsa -level 5 -out ml-dsa-key-A -output keypair -outform PEM
-wolfssl genkey -ml-dsa -level 3 -out ml-dsa-key-B -output keypair -outform PEM
-wolfssl genkey -ml-dsa -level 2 -out ml-dsa-key-C -output keypair -outform PEM
+wolfssl genkey ecc -name secp521r1 -out ecc-key-A -output priv -outform PEM
+wolfssl genkey ecc -name secp384r1 -out ecc-key-B -output priv -outform PEM
+wolfssl genkey ecc -name secp256r1 -out ecc-key-C -output priv -outform PEM
+wolfssl genkey ml-dsa -level 5 -out ml-dsa-key-A -output keypair -outform PEM
+wolfssl genkey ml-dsa -level 3 -out ml-dsa-key-B -output keypair -outform PEM
+wolfssl genkey ml-dsa -level 2 -out ml-dsa-key-C -output keypair -outform PEM
 ```
 
 2. Create a self-signed conventional certificate for A, root CA certificate.
