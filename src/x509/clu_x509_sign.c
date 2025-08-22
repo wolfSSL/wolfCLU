@@ -24,6 +24,10 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
+#include <wolfclu/x509/clu_cert.h>
+#ifdef HAVE_DILITHIUM
+    #include <wolfssl/wolfcrypt/dilithium.h>
+#endif  /* HAVE_DILITHIUM */
 
 #define WOLFCLU_CN_MATCH    0x00000001 /* country name must match */
 #define WOLFCLU_CN_SUPPLIED 0x00000002 /* country name must be set */
@@ -208,6 +212,716 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
     }
 }
 
+/* ref: https://github.com/wolfssl/wolfssl-examples/X9.146/gen_ecdsa_mldsa_dual_keysig_cert.c */
+int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
+        WOLFSSL_BIO *bioAltSubjPubKey, WOLFSSL_BIO *bioSubjKey,
+        WOLFSSL_X509 *caCert, const char *subject,
+        const char *outFileName, int outForm)
+{
+#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
+    int ret = WOLFCLU_SUCCESS;
+    int isCA = 0;
+
+    WC_RNG   rng;
+    ecc_key  caKey;
+    ecc_key  serverKey;
+    MlDsaKey altCaKey;
+    word32 idx = 0;
+    byte level = 0;
+
+    Cert newCert;
+    DecodedCert preTBS;
+
+    int initRNG       = 0;
+    int initCaKey     = 0;
+    int initServerKey = 0;
+    int initAltCaKey  = 0;
+    int initPreTBS    = 0;
+
+    XFILE caKeyFp       = NULL;
+    XFILE altCaKeyFp    = NULL;
+    XFILE altCaPubKeyFp = NULL;
+    XFILE serverKeyFp   = NULL;
+    WOLFSSL_BIO *out    = NULL;
+
+    char *token   = NULL;
+    char *key     = NULL;
+    char *value   = NULL;
+    char *saveptr = NULL;
+    char *subj    = NULL;
+    int  subjSz   = 0;
+
+    /* custom cert extension oid */
+    const char *subjectAltPubKeyOid = "2.5.29.72";
+    const char *altSigAlgOid        = "2.5.29.73";
+    const char *altSigValOid        = "2.5.29.74";
+
+    /* 
+     * LARGE_TEMO_SZ defines the size of temporary buffers used for signature key,
+     * verification key and signature value buffers.
+     * The value 11264 is enough for P-521 and ML-DSA-87 PEM certs.
+    */
+    const int LARGE_TEMP_SZ = 11264;
+    byte caKeyBuf[LARGE_TEMP_SZ];
+    int  caKeySz   = LARGE_TEMP_SZ;
+    byte altCaKeyBuf[LARGE_TEMP_SZ];
+    int  altCaKeySz = LARGE_TEMP_SZ;
+    byte sapkiBuf[LARGE_TEMP_SZ];
+    int  sapkiSz = LARGE_TEMP_SZ;
+    byte altSigAlgBuf[LARGE_TEMP_SZ];
+    int  altSigAlgSz = LARGE_TEMP_SZ;
+    byte scratchBuf[LARGE_TEMP_SZ];
+    int  scratchSz = LARGE_TEMP_SZ;
+    byte preTbsBuf[LARGE_TEMP_SZ];
+    int  preTbsSz = LARGE_TEMP_SZ;
+    byte altSigValBuf[LARGE_TEMP_SZ];
+    int  altSigValSz = LARGE_TEMP_SZ;
+    byte derBuf[LARGE_TEMP_SZ];
+    int  derSz = LARGE_TEMP_SZ;
+    byte outBuf[LARGE_TEMP_SZ];
+    int  outSz = LARGE_TEMP_SZ;
+    DerBuffer *derObj = NULL;
+
+    /* if generate server cert */
+    byte caCertBuf[LARGE_TEMP_SZ];
+    int  caCertSz = LARGE_TEMP_SZ;
+    byte serverKeyBuf[LARGE_TEMP_SZ];
+    int  serverKeySz = LARGE_TEMP_SZ;
+
+    if (bioCaKey == NULL || bioAltCaKey == NULL || bioAltSubjPubKey == NULL
+        || subject == NULL || outFileName == NULL) {
+        wolfCLU_LogError("Error invalid argument wolfCLU_GenChimeraCertSign");
+        ret = BAD_FUNC_ARG;
+    }
+    else if (bioSubjKey == NULL && caCert == NULL) {
+        isCA = 1;
+    }
+    else if (bioSubjKey != NULL && caCert != NULL) {
+        isCA = 0;
+    }
+    else {
+        wolfCLU_LogError("Error invalid argument wolfCLU_GenChimeraCertSign");
+        ret = BAD_FUNC_ARG;
+    }
+
+    XMEMSET(caKeyBuf,     0, caKeySz);
+    XMEMSET(altCaKeyBuf,  0, altCaKeySz);
+    XMEMSET(sapkiBuf,     0, sapkiSz);
+    XMEMSET(altSigAlgBuf, 0, altSigAlgSz);
+    XMEMSET(scratchBuf,   0, scratchSz);
+    XMEMSET(preTbsBuf,    0, preTbsSz);
+    XMEMSET(altSigValBuf, 0, altSigValSz);
+    XMEMSET(outBuf,       0, outSz);
+    XMEMSET(caCertBuf,    0, caCertSz);
+    XMEMSET(serverKeyBuf, 0, serverKeySz);
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_InitRng(&rng);
+        if (ret != 0) {
+            wolfCLU_LogError("Error init RNG");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            initRNG = 1;
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    /* open the CA der certificate */
+    if (ret == WOLFCLU_SUCCESS && !isCA) {
+        const byte *tmpBuf = wolfSSL_X509_get_der(caCert, &caCertSz);
+        if (tmpBuf == NULL || caCertSz <= 0) {
+            wolfCLU_LogError("Error getting DER from CA cert");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XMEMCPY(caCertBuf, tmpBuf, caCertSz);
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    /* open CA ecc private key */
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfSSL_BIO_get_fp(bioCaKey, &caKeyFp);
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Error cannot get CA key fd");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XFSEEK(caKeyFp, 0, SEEK_SET);
+            ret = (int)XFREAD(caKeyBuf, 1, caKeySz, caKeyFp);
+            if (ret <= 0) {
+                wolfCLU_LogError("Error reading CA key");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                caKeySz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
+    /* open server ecc private key */
+    if (ret == WOLFCLU_SUCCESS && !isCA) {
+        ret = wolfSSL_BIO_get_fp(bioSubjKey, &serverKeyFp);
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Error cannot get server key fd");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XFSEEK(serverKeyFp, 0, SEEK_SET);
+            ret = (int)XFREAD(serverKeyBuf, 1, serverKeySz, serverKeyFp);
+            if (ret <= 0) {
+                wolfCLU_LogError("Error reading server key");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                serverKeySz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
+    /* open CA ecc private key */
+    if (ret == WOLFCLU_SUCCESS) {
+        /* Try EC PRIVATE KEY format first */
+        ret = wc_PemToDer(caKeyBuf, caKeySz, ECC_PRIVATEKEY_TYPE,
+                            &derObj, HEAP_HINT, NULL, NULL);
+        if (ret < 0) {
+            /* Try PRIVATE KEY format (PKCS#8) */
+            ret = wc_PemToDer(caKeyBuf, caKeySz, PRIVATEKEY_TYPE,
+                                &derObj, HEAP_HINT, NULL, NULL);
+            if (ret != 0) {
+                wolfCLU_LogError("Error convert pem to der");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        
+        if (ret == 0) {
+            XMEMSET(caKeyBuf, 0, caKeySz); /* clear original buffer */
+            caKeySz = derObj->length;
+            XMEMCPY(caKeyBuf, derObj->buffer, caKeySz);
+            wc_FreeDer(&derObj);
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_ecc_init(&caKey);
+        if (ret != 0) {
+            wolfCLU_LogError("Error init ecc key");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            initCaKey = 1;
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        idx = 0;
+        ret = wc_EccPrivateKeyDecode(caKeyBuf, &idx, &caKey, caKeySz);
+        if (ret != 0) {
+            wolfCLU_LogError("Error decoding ECC key");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    /* load server ecc private key */
+    if (ret == WOLFCLU_SUCCESS && !isCA) {
+        ret = wc_PemToDer(serverKeyBuf, serverKeySz, ECC_PRIVATEKEY_TYPE,
+                            &derObj, HEAP_HINT, NULL, NULL);
+        if (ret < 0) {
+            /* Try PRIVATE KEY format (PKCS#8) */
+            ret = wc_PemToDer(serverKeyBuf, serverKeySz, PRIVATEKEY_TYPE,
+                                &derObj, HEAP_HINT, NULL, NULL);
+            if (ret < 0) {
+                wolfCLU_LogError("Error convert pem to der");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
+        if (ret == 0) {
+            XMEMSET(serverKeyBuf, 0, serverKeySz); /* clear original buffer */
+            serverKeySz = derObj->length;
+            XMEMCPY(serverKeyBuf, derObj->buffer, serverKeySz);
+            wc_FreeDer(&derObj);
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && !isCA) {
+        ret = wc_ecc_init(&serverKey);
+        if (ret != 0) {
+            wolfCLU_LogError("Error init server key");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            initServerKey = 1;
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && !isCA) {
+        idx = 0;
+        ret = wc_EccPrivateKeyDecode(serverKeyBuf, &idx,
+                                        &serverKey, serverKeySz);
+        if (ret != 0) {
+            wolfCLU_LogError("Error decoding server key");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    /* load alternative CA public key */
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfSSL_BIO_get_fp(bioAltSubjPubKey, &altCaPubKeyFp);
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Error get AltCAkey fd");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XFSEEK(altCaPubKeyFp, 0, SEEK_SET);
+            ret = (int)XFREAD(sapkiBuf, 1, sapkiSz, altCaPubKeyFp);
+            if (ret <= 0) {
+                wolfCLU_LogError("Error cannot read ML-DSA key");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                sapkiSz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_PemToDer(sapkiBuf, sapkiSz, PUBLICKEY_TYPE,
+                            &derObj, HEAP_HINT, NULL, NULL);
+        if (ret < 0) {
+            wolfCLU_LogError("Error convert file pem to der");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XMEMSET(sapkiBuf, 0, sapkiSz); /* clear original buffer */
+            sapkiSz = derObj->length;
+            XMEMCPY(sapkiBuf, derObj->buffer, sapkiSz);
+            wc_FreeDer(&derObj);
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    /* load alternative CA private key */
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_MlDsaKey_Init(&altCaKey, NULL, 0);
+        if (ret != 0) {
+            wolfCLU_LogError("Error init ML-DSA key");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            initAltCaKey = 1;
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfSSL_BIO_get_fp(bioAltCaKey, &altCaKeyFp);
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Error cannot get AltCA key fd");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XFSEEK(altCaKeyFp, 0, SEEK_SET);
+            ret = (int)XFREAD(altCaKeyBuf, 1, altCaKeySz, altCaKeyFp);
+            if (ret <= 0) {
+                wolfCLU_LogError("Error reading alternative CA key");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                altCaKeySz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_PemToDer(altCaKeyBuf, altCaKeySz, PKCS8_PRIVATEKEY_TYPE,
+                            &derObj, HEAP_HINT, NULL, NULL);
+        if (ret < 0) {
+            wolfCLU_LogError("Error convert pem to der");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XMEMSET(altCaKeyBuf, 0, altCaKeySz); /* clear original buffer */
+            altCaKeySz = derObj->length;
+            XMEMCPY(altCaKeyBuf, derObj->buffer, altCaKeySz);
+            wc_FreeDer(&derObj);
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        idx = 0;
+        ret = wc_Dilithium_PrivateKeyDecode(altCaKeyBuf, &idx,
+                                            &altCaKey, (word32)altCaKeySz);
+        if (ret != 0) {
+            wolfCLU_LogError("Error decoding ML-DSA key");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            wc_MlDsaKey_GetParams(&altCaKey, &level);
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        switch (level) {
+            case 2:
+                altSigAlgSz = SetAlgoID(CTC_ML_DSA_LEVEL2,
+                                        altSigAlgBuf, oidSigType, 0);
+                break;
+            case 3:
+                altSigAlgSz = SetAlgoID(CTC_ML_DSA_LEVEL3,
+                                        altSigAlgBuf, oidSigType, 0);
+                break;
+            case 5:
+                altSigAlgSz = SetAlgoID(CTC_ML_DSA_LEVEL5,
+                                        altSigAlgBuf, oidSigType, 0);
+                break;
+            default:
+                wolfCLU_LogError("Error Invalid ML-DSA level %d", level);
+                altSigAlgSz = 0;
+                break;
+        }
+
+        if (altSigAlgSz <= 0) {
+            wolfCLU_LogError("Error SetAlgoID(%d) returned: %d\n",
+                            level, altSigAlgSz);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_InitCert(&newCert);
+        if (ret != 0) {
+            wolfCLU_LogError("Error init newCert");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        subjSz = XSTRLEN(subject) + 1;
+        subj = (char*)XMALLOC(subjSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (subj == NULL) {
+            wolfCLU_LogError("Failed to allocate memory for subject");
+            ret = MEMORY_E;
+        }
+        else {
+            XMEMCPY(subj, subject, subjSz);
+            token = XSTRTOK(subj, "/", &saveptr);
+            while (token != NULL) {
+                key   = XSTRTOK(token, "=", &saveptr);
+                value = XSTRTOK(NULL,  "=", &saveptr);
+
+                if (key == NULL || value == NULL) {
+                    /* exit loop if key or value is NULL */
+                    break;
+                }
+                if (XSTRCMP(key, "C") == 0) {
+                    XSTRLCPY(newCert.subject.country, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "ST") == 0) {
+                    XSTRLCPY(newCert.subject.state, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "L") == 0) {
+                    XSTRLCPY(newCert.subject.locality, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "O") == 0) {
+                    XSTRLCPY(newCert.subject.org, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "OU") == 0) {
+                    XSTRLCPY(newCert.subject.unit, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "CN") == 0) {
+                    XSTRLCPY(newCert.subject.commonName, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "emailAddress") == 0) {
+                    XSTRLCPY(newCert.subject.email, value, CTC_NAME_SIZE);
+                }
+
+                token = XSTRTOK(NULL, "/", &saveptr);
+            }
+
+            XFREE(subj, HEAP_HINT, NULL);
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        switch (level) {
+            case 2: 
+                newCert.sigType = CTC_SHA256wECDSA;
+                break;
+            case 3: 
+                newCert.sigType = CTC_SHA384wECDSA;
+                break;
+            case 5: 
+                newCert.sigType = CTC_SHA512wECDSA;
+                break;
+        }
+
+        if (isCA) {
+            newCert.isCA = 1;
+        }
+        else {
+            newCert.isCA = 0;
+            ret = wc_SetIssuerBuffer(&newCert, caCertBuf, caCertSz);
+            if (ret != 0) {
+                wolfCLU_LogError("Error setting issuer buffer");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                ret = WOLFCLU_SUCCESS;
+            }
+        }        
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_SetCustomExtension(&newCert, 0, subjectAltPubKeyOid,
+                                    sapkiBuf, sapkiSz);
+        if (ret < 0) {
+            wolfCLU_LogError("Error setting custom extension");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = wc_SetCustomExtension(&newCert, 0, altSigAlgOid,
+                                        altSigAlgBuf, altSigAlgSz);
+            if (ret < 0) {
+                wolfCLU_LogError("Error setting custom extension");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && isCA) {
+        ret = wc_MakeCert(&newCert, scratchBuf, 
+                            scratchSz, NULL, &caKey, &rng);
+        if (ret <= 0) {
+            wolfCLU_LogError("Error making certificate");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = wc_SignCert(newCert.bodySz, newCert.sigType, scratchBuf,
+                                scratchSz, NULL, &caKey, &rng);
+            if (ret <= 0) {
+                wolfCLU_LogError("Error signing certificate");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                scratchSz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }        
+    }
+    else if (ret == WOLFCLU_SUCCESS && !isCA) {
+        ret = wc_MakeCert(&newCert, scratchBuf, scratchSz,
+                            NULL, &serverKey, &rng);
+        if (ret <= 0) {
+            wolfCLU_LogError("Error making server certificate");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = wc_SignCert(newCert.bodySz, newCert.sigType, scratchBuf,
+                                scratchSz, NULL, &caKey, &rng);
+            if (ret <= 0) {
+                wolfCLU_LogError("Error signing server certificate");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                scratchSz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        wc_InitDecodedCert(&preTBS, scratchBuf, scratchSz, 0);
+        initPreTBS = 1;
+        ret = wc_ParseCert(&preTBS, CERT_TYPE, NO_VERIFY, NULL);
+        if (ret < 0) {
+            wolfCLU_LogError("Error parsing certificate");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = wc_GeneratePreTBS(&preTBS, preTbsBuf, preTbsSz);
+            if (ret < 0) {
+                wolfCLU_LogError("Error generating preTBS");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                preTbsSz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        switch (level) {
+            case 2:
+                ret = wc_MakeSigWithBitStr(altSigValBuf, altSigValSz,
+                                        CTC_ML_DSA_LEVEL2, preTbsBuf, preTbsSz,
+                                        ML_DSA_LEVEL2_TYPE, &altCaKey, &rng);
+                break;
+            case 3:
+                ret = wc_MakeSigWithBitStr(altSigValBuf, altSigValSz,
+                                        CTC_ML_DSA_LEVEL3, preTbsBuf, preTbsSz,
+                                        ML_DSA_LEVEL3_TYPE, &altCaKey, &rng);
+                break;
+            case 5:
+                ret = wc_MakeSigWithBitStr(altSigValBuf, altSigValSz,
+                                        CTC_ML_DSA_LEVEL5, preTbsBuf, preTbsSz,
+                                        ML_DSA_LEVEL5_TYPE, &altCaKey, &rng);
+                break;
+        }
+
+        if (ret < 0) {
+            wolfCLU_LogError("Error making signature with bit string");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            altSigValSz = ret;
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wc_SetCustomExtension(&newCert, 0, altSigValOid,
+                                    altSigValBuf, altSigValSz);
+        if (ret < 0) {
+            wolfCLU_LogError("Error setting custom extension");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && isCA) {
+        ret = wc_MakeCert(&newCert, derBuf, derSz, NULL, &caKey, &rng);
+        if (ret < 0) {
+            wolfCLU_LogError("Error making certificate");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = wc_SignCert(newCert.bodySz, newCert.sigType,
+                                derBuf, derSz, NULL, &caKey, &rng);
+            if (ret < 0) {
+                wolfCLU_LogError("Error signing certificate");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                derSz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+    else if (ret == WOLFCLU_SUCCESS && !isCA) {
+        ret = wc_MakeCert(&newCert, derBuf, derSz, NULL, &serverKey, &rng);
+        if (ret < 0) {
+            wolfCLU_LogError("Error making server certificate");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            ret = wc_SignCert(newCert.bodySz, newCert.sigType,
+                                derBuf, derSz, NULL, &caKey, &rng);
+            if (ret < 0) {
+                wolfCLU_LogError("Error signing server certificate");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                derSz = ret;
+                ret = WOLFCLU_SUCCESS;
+            }
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && outForm == PEM_FORM) {
+        ret = wc_DerToPem(derBuf, derSz, outBuf, outSz, CERT_TYPE);
+        if (ret < 0) {
+            wolfCLU_LogError("Error converting DER to PEM");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            outSz = ret;
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
+    else if (ret == WOLFCLU_SUCCESS && outForm == DER_FORM) {
+        outSz = derSz;
+        XMEMCPY(outBuf, derBuf, outSz);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        out = wolfSSL_BIO_new_file(outFileName, "wb");
+        if (out == NULL) {
+            wolfCLU_LogError("Unable to open out file %s", outFileName);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            wolfSSL_BIO_write(out, outBuf, outSz);
+        }
+    }
+
+    if (initRNG) {
+        wc_FreeRng(&rng);
+    }
+    if (initCaKey) {
+        wc_ecc_free(&caKey);
+    }
+    if (initServerKey) {
+        wc_ecc_free(&serverKey);
+    }
+    if (initAltCaKey) {
+        wc_MlDsaKey_Free(&altCaKey);
+    }
+    if (initPreTBS) {
+        wc_FreeDecodedCert(&preTBS);
+    }
+    if (out != NULL) {
+        wolfSSL_BIO_free(out);
+    }
+
+    if (ret != WOLFCLU_SUCCESS) {
+        wolfCLU_LogError("Error in wolfCLU_ChimeraCertSignSetCA: %d", ret);
+    }
+
+    return ret;
+
+#else
+    (void)bioCaKey;
+    (void)bioAltCaKey;
+    (void)bioAltSubjPubKey;
+    (void)bioSubjKey;
+    (void)caCert;
+    (void)subject;
+    (void)outFileName;
+    (void)outForm;
+
+    wolfCLU_LogError("Please compile wolfSSL with --enable-dual-alg-certs "
+           "--enable-experimental --enable-dilithium\n");
+
+    return NOT_COMPILED_IN;
+#endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
+}
 
 void wolfCLU_CertSignSetSerial(WOLFCLU_CERT_SIGN* csign, WOLFSSL_BIO* s)
 {
