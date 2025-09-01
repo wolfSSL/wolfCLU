@@ -280,7 +280,6 @@ fi
 
 rm -f test_ca.pem
 rm -f tmp.pem
-rm -f tmp.csr
 rm -f rand-file-test
 rm -f serial-file-test
 rm -f tmp-ca.csr
