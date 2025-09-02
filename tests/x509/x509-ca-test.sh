@@ -259,6 +259,25 @@ run_success "ca -config ca.conf -in tmp-ca.csr -out tmp.pem -md sha256 -keyfile 
 run_success "req -key ./certs/server-key.pem -subj O=Sawtooth/CN=www.wolfclu.com/C=US/ST=MT/L=Bozeman/OU=org-unit -out tmp-ca.csr"
 run_fail "ca -config ca-match.conf -in tmp-ca.csr -out tmp.pem -md sha256 -keyfile ./certs/ca-key.pem"
 
+# chimera certificate test
+if ./wolfssl ca -help 2>&1 | grep altextend &> /dev/null; then
+    echo "Testing chimera certificate extension"
+    run_success "req -new -x509 -key ./certs/ca-ecc-key.pem -subj O=org-A/C=US/ST=WA/L=Seattle/CN=A/OU=org-unit-A -out tmp-ca-cert.pem -outform PEM"
+    run_success "ca -altextend -in tmp-ca-cert.pem -keyfile ./certs/ca-ecc-key.pem -altkey ./certs/ca-mldsa44-key.pem -altpub ./certs/ca-mldsa44-keyPub.pem -out tmp-ca-chimera-cert.pem"
+
+    run_success "req -new -key ./certs/server-ecc-key.pem -subj O=org-B/C=US/ST=WA/L=Seattle/CN=B/OU=org-unit-B -out tmp-server.csr -outform PEM"
+    run_success "ca -in tmp-server.csr -keyfile ./certs/ca-ecc-key.pem -cert tmp-ca-cert.pem -out tmp-server-cert.pem"
+    run_success "ca -altextend -in tmp-server-cert.pem -keyfile ./certs/ca-ecc-key.pem -altkey ./certs/ca-mldsa44-key.pem -altpub ./certs/server-mldsa44-keyPub.pem -subjkey ./certs/server-ecc-key.pem -cert tmp-ca-chimera-cert.pem -out tmp-server-chimera-cert.pem"
+
+    echo "Chimera certificate test passed"
+
+    rm -f tmp-ca-cert.pem
+    rm -f tmp-ca-chimera-cert.pem
+    rm -f tmp-server.csr
+    rm -f tmp-server-cert.pem
+    rm -f tmp-server-chimera-cert.pem
+fi
+
 rm -f test_ca.pem
 rm -f tmp.pem
 rm -f rand-file-test
