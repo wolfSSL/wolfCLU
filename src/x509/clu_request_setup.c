@@ -598,9 +598,16 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_NEWKEY:
-                if (XSTRSTR(optarg, ":") == NULL) {
-                    wolfCLU_LogError("key string does not have ':'");
+                if (optarg == NULL) {
+                    wolfCLU_LogError("no key string");
                     ret = WOLFCLU_FATAL_ERROR;
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    if (XSTRSTR(optarg, ":") == NULL) {
+                        wolfCLU_LogError("key string does not have ':'");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
