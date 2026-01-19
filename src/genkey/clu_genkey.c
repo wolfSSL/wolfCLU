@@ -1045,8 +1045,8 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
     XFILE  file = NULL;
     int   fNameSz     = 0;
     int   fExtSz      = 6;  /* size of ".priv\0" or ".pub\0\0" */
-    char  fExtPriv[6] = ".priv\0";
-    char  fExtPub[6]  = ".pub\0\0";
+    char  fExtPriv[6] = ".priv";
+    char  fExtPub[6]  = ".pub";
     char* fOutNameBuf = NULL;
 
     byte*  derBuf      = NULL;
@@ -1285,8 +1285,8 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
     XFILE  file       = NULL;
     int   fNameSz     = 0;
     int   fExtSz      = 6;  /* size of ".priv\0" or ".pub\0\0" */
-    char  fExtPriv[6] = ".priv\0";
-    char  fExtPub[6]  = ".pub\0\0";
+    char  fExtPriv[6] = ".priv";
+    char  fExtPub[6]  = ".pub";
     char* fOutNameBuf = NULL;
 
     byte*  derBuf      = NULL;
