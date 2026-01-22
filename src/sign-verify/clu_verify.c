@@ -834,8 +834,10 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
         return ret;
     }
 
-    /* verify the massage using the dilithium public key */
-    ret = wc_dilithium_verify_msg(sig, sigSz, msg, msgLen, &res, key);
+    /* verify the message using the dilithium public key. Note that the
+     * context is empty. This is for interoperability. */
+    ret = wc_dilithium_verify_ctx_msg(sig, sigSz, NULL, 0, msg, msgLen, &res,
+                                      key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to verify data with Dilithium public key.\n"
                         "RET: %d", ret);
