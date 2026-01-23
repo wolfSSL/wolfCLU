@@ -722,19 +722,31 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
             nameCheck = 1;
     }
 
-    /* gets mode after second "-" and before the third */
+    /* gets mode and size after the algorithm name, supports both
+     * "alg-size-mode" (aes-256-cbc) and "alg-mode-size" (aes-cbc-256) */
     if (nameCheck != 0) {
-        /* gets size after third "-" */
         sz = strtok_r(NULL, "-", &end);
         if (sz == NULL) {
             return WOLFCLU_FATAL_ERROR;
         }
+        tmpMode = strtok_r(NULL, "-", &end);
+        if (tmpMode == NULL) {
+            return WOLFCLU_FATAL_ERROR;
+        }
+
+        /* if second token isn't numeric, it's the mode (alg-mode-size) */
+        if (sz[0] < '0' || sz[0] > '9') {
+            char* tmp = sz;
+            sz = tmpMode;
+            tmpMode = tmp;
+        }
         *size = XATOI(sz);
     }
-
-    tmpMode = strtok_r(NULL, "-", &end);
-    if (tmpMode == NULL) {
-        return WOLFCLU_FATAL_ERROR;
+    else {
+        tmpMode = strtok_r(NULL, "-", &end);
+        if (tmpMode == NULL) {
+            return WOLFCLU_FATAL_ERROR;
+        }
     }
 
     for (i = 0; i < (int) (sizeof(acceptMode)/sizeof(acceptMode[0])); i++) {
@@ -866,16 +878,16 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     return ret;
 }
 
-static const char WOLFCLU_AES128CTR_NAME[] = "aes-128-ctr";
-static const char WOLFCLU_AES192CTR_NAME[] = "aes-192-ctr";
-static const char WOLFCLU_AES256CTR_NAME[] = "aes-256-ctr";
-static const char WOLFCLU_AES128CBC_NAME[] = "aes-128-cbc";
-static const char WOLFCLU_AES192CBC_NAME[] = "aes-192-cbc";
-static const char WOLFCLU_AES256CBC_NAME[] = "aes-256-cbc";
-static const char WOLFCLU_CAMELLIA128CBC_NAME[] = "camellia-128-cbc";
-static const char WOLFCLU_CAMELLIA192CBC_NAME[] = "camellia-192-cbc";
-static const char WOLFCLU_CAMELLIA256CBC_NAME[] = "camellia-256-cbc";
-static const char WOLFCLU_DESCBC_NAME[] = "des-cbc";
+static const char WOLFCLU_AES128CTR_NAME[] = "-aes-128-ctr";
+static const char WOLFCLU_AES192CTR_NAME[] = "-aes-192-ctr";
+static const char WOLFCLU_AES256CTR_NAME[] = "-aes-256-ctr";
+static const char WOLFCLU_AES128CBC_NAME[] = "-aes-128-cbc";
+static const char WOLFCLU_AES192CBC_NAME[] = "-aes-192-cbc";
+static const char WOLFCLU_AES256CBC_NAME[] = "-aes-256-cbc";
+static const char WOLFCLU_CAMELLIA128CBC_NAME[] = "-camellia-128-cbc";
+static const char WOLFCLU_CAMELLIA192CBC_NAME[] = "-camellia-192-cbc";
+static const char WOLFCLU_CAMELLIA256CBC_NAME[] = "-camellia-256-cbc";
+static const char WOLFCLU_DESCBC_NAME[] = "-des-cbc";
 
 static const char* algoName[] = {
     WOLFCLU_AES128CTR_NAME,
@@ -894,23 +906,21 @@ static const char* algoName[] = {
  * names */
 #define MAX_AES_IDX 6
 static const char* oldAlgoName[] = {
-    "aes-ctr-128",
-    "aes-ctr-192",
-    "aes-ctr-256",
-    "aes-cbc-128",
-    "aes-cbc-192",
-    "aes-cbc-256",
+    "-aes-ctr-128",
+    "-aes-ctr-192",
+    "-aes-ctr-256",
+    "-aes-cbc-128",
+    "-aes-cbc-192",
+    "-aes-cbc-256",
 };
 
 
 /* convert an old algo name into one optargs can handle */
-static void wolfCLU_oldAlgo(int argc, char** argv, int maxIdx)
+static void wolfCLU_oldAlgo(int argc, char** argv)
 {
-    int end;
     int i, j;
 
-    end = (argc < maxIdx)? argc : maxIdx;
-    for (i = 0; i < end; i++) {
+    for (i = 0; i < argc; i++) {
         for (j = 0; j < MAX_AES_IDX; j++) {
             if (XSTRCMP(argv[i], oldAlgoName[j]) == 0) {
                 argv[i] = (char*)algoName[j];
@@ -957,7 +967,7 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
     int option;
     char name[80];
 
-    wolfCLU_oldAlgo(argc, argv, 3);
+    wolfCLU_oldAlgo(argc, argv);
     XMEMSET(name, 0, sizeof(name));
     XSTRLCPY(name, argv[2], XSTRLEN(argv[2])+1);
     ret = wolfCLU_parseAlgo(name, alg, mode, size);
