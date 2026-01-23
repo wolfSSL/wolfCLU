@@ -712,8 +712,10 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         return MEMORY_E;
     }
 
-    /* sign the message usign Dilithium private key */
-    ret = wc_dilithium_sign_msg(data, dataSz, outBuf, &outBufSz, key, &rng);
+    /* sign the message usign Dilithium private key. Note that the context is
+     * empty. This is for interoperability. */
+    ret = wc_dilithium_sign_ctx_msg(NULL, 0, data, dataSz, outBuf, &outBufSz,
+                                    key, &rng);
     if (ret != 0) {
         wolfCLU_LogError("Failed to sign data with Dilithium private key.\nRET: %d", ret);
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
