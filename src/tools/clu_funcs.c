@@ -1175,8 +1175,8 @@ int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
            return 1;
 
         }
-        else if (XMEMCMP(argv[i], searchTerm, length) == 0 &&
-                   (int)XSTRLEN(argv[i]) == length) {
+        else if ((int)XSTRLEN(argv[i]) == length &&
+                   XMEMCMP(argv[i], searchTerm, length) == 0) {
             ret = i;
             if (argFound == 1) {
                 wolfCLU_LogError("ERROR: argument found twice: \"%s\"", searchTerm);
