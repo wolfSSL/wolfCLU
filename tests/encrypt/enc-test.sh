@@ -141,5 +141,49 @@ if [ $? == 0 ]; then
     rm -f test-enc.der
 fi
 
+# test legacy algo names
+run "enc -base64 -aes-cbc-256 -in certs/crl.der -out test-enc.der" "test password"
+run "enc -base64 -d -aes-cbc-256 -in test-enc.der -out test-dec.der" "test password"
+diff "./certs/crl.der" "./test-dec.der" &> /dev/null
+if [ $? != 0 ]; then
+    echo "issue with legacy name aes-cbc-256 round trip"
+    exit 99
+fi
+rm -f test-dec.der
+rm -f test-enc.der
+
+# encrypt with legacy name, decrypt with canonical name
+run "enc -aes-cbc-256 -in certs/crl.der -out test-enc.der" "test password"
+run "enc -d -aes-256-cbc -in test-enc.der -out test-dec.der" "test password"
+diff "./certs/crl.der" "./test-dec.der" &> /dev/null
+if [ $? != 0 ]; then
+    echo "issue with legacy enc / canonical dec"
+    exit 99
+fi
+rm -f test-dec.der
+rm -f test-enc.der
+
+# encrypt with canonical name, decrypt with legacy name
+run "enc -aes-256-cbc -in certs/crl.der -out test-enc.der" "test password"
+run "enc -d -aes-cbc-256 -in test-enc.der -out test-dec.der" "test password"
+diff "./certs/crl.der" "./test-dec.der" &> /dev/null
+if [ $? != 0 ]; then
+    echo "issue with canonical enc / legacy dec"
+    exit 99
+fi
+rm -f test-dec.der
+rm -f test-enc.der
+
+# test legacy name with aes-cbc-128
+run "enc -aes-cbc-128 -in certs/crl.der -out test-enc.der" "test password"
+run "enc -d -aes-cbc-128 -in test-enc.der -out test-dec.der" "test password"
+diff "./certs/crl.der" "./test-dec.der" &> /dev/null
+if [ $? != 0 ]; then
+    echo "issue with legacy name aes-cbc-128 round trip"
+    exit 99
+fi
+rm -f test-dec.der
+rm -f test-enc.der
+
 echo "Done"
 exit 0
