@@ -278,6 +278,64 @@ if ./wolfssl ca -help 2>&1 | grep altextend &> /dev/null; then
     rm -f tmp-server-chimera-cert.pem
 fi
 
+# Test path concatenation fix for -out with new_certs_dir
+echo "Testing -out path handling with new_certs_dir"
+mkdir -p outdir-test/certs
+cat << EOF > ca-outdir.conf
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir = ./certs
+database = ./index.txt
+new_certs_dir = ./outdir-test/certs
+certificate = \$dir/ca-cert.pem
+private_key = \$dir/ca-key.pem
+rand_serial = yes
+default_days = 365
+default_md = sha256
+policy = policy_any
+
+[ policy_any ]
+countryName            = supplied
+stateOrProvinceName    = optional
+organizationName       = optional
+organizationalUnitName = optional
+commonName             = supplied
+emailAddress           = optional
+EOF
+
+rm index.txt
+touch index.txt
+run_success "req -key ./certs/server-key.pem -subj /O=wolfSSL/C=US/ST=MT/L=Bozeman/CN=wolfSSL/OU=org-unit -out tmp-outdir.csr"
+
+# Test 1: absolute -out path should override new_certs_dir
+ABS_OUT_PATH="$(pwd)/outdir-test/absolute-out.pem"
+run_success "ca -config ca-outdir.conf -in tmp-outdir.csr -out $ABS_OUT_PATH"
+if [ ! -f "$ABS_OUT_PATH" ]; then
+    echo "Absolute -out path test failed: file not found at $ABS_OUT_PATH"
+    exit 99
+fi
+if [ -f ./outdir-test/certs"$ABS_OUT_PATH" ]; then
+    echo "Absolute -out path test failed: file incorrectly concatenated"
+    exit 99
+fi
+echo "Absolute -out path test passed"
+
+# Test 2: relative -out path should be appended to new_certs_dir
+rm index.txt
+touch index.txt
+run_success "ca -config ca-outdir.conf -in tmp-outdir.csr -out relative-out.pem"
+if [ ! -f ./outdir-test/certs/relative-out.pem ]; then
+    echo "Relative -out path test failed: file not found at ./outdir-test/certs/relative-out.pem"
+    exit 99
+fi
+echo "Relative -out path test passed"
+
+rm -rf outdir-test
+rm -f ca-outdir.conf
+rm -f tmp-outdir.csr
+
 rm -f test_ca.pem
 rm -f tmp.pem
 rm -f rand-file-test

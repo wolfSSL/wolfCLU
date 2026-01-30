@@ -1045,15 +1045,34 @@ int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
     if (ret == WOLFCLU_SUCCESS && csign->outDir != NULL && out != NULL) {
         int currentSz = (int)XSTRLEN(csign->outDir);
 
-        s = (char*)XMALLOC(outSz + currentSz + 1, HEAP_HINT,
-                DYNAMIC_TYPE_TMP_BUFFER);
-        if (s == NULL) {
-            ret = MEMORY_E;
+        /* If out is an absolute path, use it directly instead of appending */
+        if (out[0] == '/') {
+            s = (char*)XMALLOC(outSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (s == NULL) {
+                ret = MEMORY_E;
+            }
+            else {
+                XMEMCPY(s, out, outSz);
+                s[outSz] = '\0';
+            }
         }
         else {
-            XMEMCPY(s, csign->outDir, currentSz);
-            XMEMCPY(s + currentSz, out, outSz);
-            s[outSz + currentSz] = '\0';
+            /* Relative path: append with separator if needed */
+            int needSep = (csign->outDir[currentSz - 1] != '/') ? 1 : 0;
+
+            s = (char*)XMALLOC(outSz + currentSz + needSep + 1, HEAP_HINT,
+                    DYNAMIC_TYPE_TMP_BUFFER);
+            if (s == NULL) {
+                ret = MEMORY_E;
+            }
+            else {
+                XMEMCPY(s, csign->outDir, currentSz);
+                if (needSep) {
+                    s[currentSz] = '/';
+                }
+                XMEMCPY(s + currentSz + needSep, out, outSz);
+                s[outSz + currentSz + needSep] = '\0';
+            }
         }
     }
 
