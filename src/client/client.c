@@ -36,6 +36,8 @@
 
 #include <wolfssl/ssl.h>
 
+#include <wolfclu/clu_header_main.h>
+
 #define HAVE_GETADDRINFO 1
 #define HAVE_ERRNO_H 1
 
@@ -389,7 +391,6 @@ static const char kResumeMsg[] = "resuming wolfssl!" TEST_STR_TERM;
 #if defined(WOLFSSL_TLS13) && defined(WOLFSSL_EARLY_DATA)
     static const char kEarlyMsg[] = "A drop of info" TEST_STR_TERM;
 #endif
-static const char kHttpGetMsg[] = "GET /index.html HTTP/1.0\r\n\r\n";
 
 /* Write needs to be largest of the above strings (29) */
 #define CLI_MSG_SZ      32
@@ -943,7 +944,8 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
         #endif
             {
                 /* no null term */
-                if (wolfSSL_write(ssl, kHttpGetMsg, sizeof(kHttpGetMsg)-1) <= 0)
+                if (wolfSSL_write(ssl, wolfCLU_GetDefaultHttpGet(),
+                                  wolfCLU_GetDefaultHttpGetLength()) <= 0)
                     err_sys("SSL_write failed");
 
                 if (wolfSSL_read(ssl, reply, sizeof(reply)-1) <= 0)
@@ -4141,8 +4143,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     if (sendGET) {
         printf("SSL connect ok, sending GET...\n");
 
-        msgSz = (int)XSTRLEN(kHttpGetMsg);
-        XMEMCPY(msg, kHttpGetMsg, msgSz);
+        msgSz = wolfCLU_GetDefaultHttpGetLength();
+        XMEMCPY(msg, wolfCLU_GetDefaultHttpGet(), msgSz);
     }
     else {
         msgSz = (int)XSTRLEN(kHelloMsg);
@@ -4436,8 +4438,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
         XMEMSET(msg, 0, sizeof(msg));
         if (sendGET) {
-            msgSz = (int)XSTRLEN(kHttpGetMsg);
-            XMEMCPY(msg, kHttpGetMsg, msgSz);
+            msgSz = wolfCLU_GetDefaultHttpGetLength();
+            XMEMCPY(msg, wolfCLU_GetDefaultHttpGet(), msgSz);
         }
         else {
             msgSz = (int)XSTRLEN(kResumeMsg);

@@ -35,6 +35,8 @@
 #undef TEST_OPENSSL_COEXIST /* can't use this option with this example */
 #include <wolfssl/ssl.h> /* name change portability layer */
 
+#include <wolfclu/clu_header_main.h>
+
 #ifdef HAVE_ECC
     #include <wolfssl/wolfcrypt/ecc.h>   /* wc_ecc_fp_free */
 #endif
@@ -110,21 +112,6 @@ static const char kReplyMsg[] = "I hear you fa shizzle!";
 #else
 static const char kReplyMsg[] = "I hear you fa shizzle!\n";
 #endif
-
-static const char kHttpServerMsg[] =
-    "HTTP/1.1 200 OK\r\n"
-    "Content-Type: text/html\r\n"
-    "Connection: close\r\n"
-    "Content-Length: 141\r\n"
-    "\r\n"
-    "<html>\r\n"
-    "<head>\r\n"
-    "<title>Welcome to wolfSSL!</title>\r\n"
-    "</head>\r\n"
-    "<body>\r\n"
-    "<p>wolfSSL has successfully performed handshake!</p>\r\n"
-    "</body>\r\n"
-    "</html>\r\n";
 
 /* Read needs to be largest of the client.c message strings (29) */
 #define SRV_READ_SZ    32
@@ -3599,8 +3586,8 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
                 write_msg_sz = (int)XSTRLEN(kReplyMsg);
             }
             else {
-                write_msg = kHttpServerMsg;
-                write_msg_sz = (int)XSTRLEN(kHttpServerMsg);
+                write_msg = wolfCLU_GetDefaultHttpResponse();
+                write_msg_sz = wolfCLU_GetDefaultHttpResponseLength();
             }
             ServerWrite(ssl, write_msg, write_msg_sz);
 

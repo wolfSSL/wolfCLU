@@ -74,6 +74,9 @@ static const struct option mode_options[] = {
     {"rand",      no_argument,       0, WOLFCLU_RAND        },
     {"dsaparam",  no_argument,       0, WOLFCLU_DSA         },
     {"dhparam",   no_argument,       0, WOLFCLU_DH          },
+#if defined(HAVE_OCSP) && defined(HAVE_OCSP_RESPONDER)
+    {"ocsp",      no_argument,       0, WOLFCLU_OCSP        },
+#endif
     {"base64",    no_argument,       0, WOLFCLU_BASE64      },
     {"help",      no_argument,       0, WOLFCLU_HELP        },
     {"h",         no_argument,       0, WOLFCLU_HELP        },
@@ -318,6 +321,12 @@ int main(int argc, char** argv)
         case WOLFCLU_DH:
             ret = wolfCLU_DhParamSetup(argc, argv);
             break;
+
+#if defined(HAVE_OCSP) && defined(HAVE_OCSP_RESPONDER)
+        case WOLFCLU_OCSP:
+            ret = wolfCLU_OcspSetup(argc, argv);
+            break;
+#endif
 
         case WOLFCLU_BASE64:
             ret = wolfCLU_Base64Setup(argc, argv);

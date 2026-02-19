@@ -596,6 +596,205 @@ int wolfCLU_DhParamSetup(int argc, char** argv);
 
 
 /**
+ * @brief function to handle OCSP commands (client and responder)
+ */
+int wolfCLU_OcspSetup(int argc, char** argv);
+
+/**
+ * @brief Get a simple HTTP GET request string
+ * @return pointer to static HTTP GET request string
+ */
+const char* wolfCLU_GetDefaultHttpGet(void);
+
+/**
+ * @brief Get the length of the default HTTP GET request (without null terminator)
+ * @return length of HTTP GET request
+ */
+int wolfCLU_GetDefaultHttpGetLength(void);
+
+/**
+ * @brief Get a simple HTTP 200 OK response string with HTML content
+ * @return pointer to static HTTP response string
+ */
+const char* wolfCLU_GetDefaultHttpResponse(void);
+
+/**
+ * @brief Get the length of the default HTTP response (without null terminator)
+ * @return length of HTTP response
+ */
+int wolfCLU_GetDefaultHttpResponseLength(void);
+
+/**
+ * @brief Build a custom HTTP GET request
+ * @param path the path to request (e.g., "/index.html")
+ * @param host optional host header value (can be NULL)
+ * @param buffer buffer to write the request to
+ * @param bufferSz size of the buffer
+ * @return number of bytes written to buffer, or negative on error
+ */
+int wolfCLU_BuildHttpGet(const char* path, const char* host, char* buffer,
+                         int bufferSz);
+
+/**
+ * @brief Build a simple HTTP response
+ * @param statusCode HTTP status code (e.g., 200, 404)
+ * @param statusText HTTP status text (e.g., "OK", "Not Found")
+ * @param contentType MIME type (e.g., "text/html")
+ * @param body response body content
+ * @param buffer buffer to write the response to
+ * @param bufferSz size of the buffer
+ * @return number of bytes written to buffer, or negative on error
+ */
+int wolfCLU_BuildHttpResponse(int statusCode, const char* statusText,
+                              const char* contentType, const char* body,
+                              char* buffer, int bufferSz);
+
+/* Platform-specific socket type */
+#ifdef _WIN32
+    #ifndef SOCKET_T
+        #define SOCKET_T SOCKET
+    #endif
+#else
+    #ifndef SOCKET_T
+        #define SOCKET_T int
+    #endif
+    #ifndef INVALID_SOCKET
+        #define INVALID_SOCKET (-1)
+    #endif
+#endif
+
+/**
+ * @brief Create and bind a server socket using tcp_listen
+ * @param port pointer to port number (will be updated with actual port)
+ * @return socket descriptor on success, INVALID_SOCKET on error
+ */
+SOCKET_T wolfCLU_HttpServerListen(word16* port);
+
+/**
+ * @brief Accept a client connection
+ * @param serverfd server socket descriptor
+ * @return client socket descriptor on success, INVALID_SOCKET on error
+ */
+SOCKET_T wolfCLU_ServerAccept(SOCKET_T serverfd);
+
+/**
+ * @brief Receive a complete HTTP request
+ * @param clientfd client socket descriptor
+ * @param buffer buffer to store request
+ * @param bufferSz size of buffer
+ * @return number of bytes received, or negative on error
+ */
+int wolfCLU_HttpServerRecv(SOCKET_T clientfd, byte* buffer, int bufferSz);
+
+/**
+ * @brief Send an HTTP response with OCSP content
+ * @param clientfd client socket descriptor
+ * @param body response body (OCSP response)
+ * @param bodySz size of response body
+ * @return 0 on success, negative on error
+ */
+int wolfCLU_HttpServerSendOcspResponse(SOCKET_T clientfd, const byte* body,
+                                        int bodySz);
+
+/**
+ * @brief Send an HTTP error response
+ * @param clientfd client socket descriptor
+ * @param statusCode HTTP status code
+ * @param statusMsg HTTP status message
+ * @return 0 on success, negative on error
+ */
+int wolfCLU_HttpServerSendError(SOCKET_T clientfd, int statusCode,
+                                 const char* statusMsg);
+
+/**
+ * @brief Close a socket
+ * @param sockfd socket descriptor to close
+ */
+void wolfCLU_ServerClose(SOCKET_T sockfd);
+
+/**
+ * @brief Parse HTTP POST request to extract OCSP request body
+ * @param httpReq HTTP request buffer
+ * @param httpReqSz size of HTTP request
+ * @param body pointer to store body location (output)
+ * @param bodySz pointer to store body size (output)
+ * @return 0 on success, negative on error
+ */
+int wolfCLU_HttpServerParseRequest(const byte* httpReq, int httpReqSz,
+                                    const byte** body, int* bodySz);
+
+/* SCGI protocol functions */
+/**
+ * @brief Read and parse an SCGI request from socket
+ * @param sockfd socket descriptor
+ * @param buffer buffer to store the complete request
+ * @param bufferSz size of buffer
+ * @param req output structure to store parsed request (defined in clu_scgi.h)
+ * @return 0 on success, negative on error
+ */
+struct ScgiRequest {
+    const byte* body;
+    int bodyLen;
+    int contentLength;
+    const char* requestMethod;
+    const char* requestUri;
+};
+typedef struct ScgiRequest ScgiRequest;
+int wolfCLU_ScgiReadRequest(SOCKET_T sockfd, byte* buffer, int bufferSz,
+                             ScgiRequest* req);
+
+/**
+ * @brief Send SCGI response with status and body
+ * @param sockfd socket descriptor
+ * @param statusCode HTTP status code
+ * @param statusText HTTP status text
+ * @param contentType MIME type
+ * @param body response body
+ * @param bodyLen size of response body
+ * @return 0 on success, negative on error
+ */
+int wolfCLU_ScgiSendResponse(SOCKET_T sockfd, int statusCode,
+                              const char* statusText, const char* contentType,
+                              const byte* body, int bodyLen);
+
+/**
+ * @brief Send SCGI error response
+ * @param sockfd socket descriptor
+ * @param statusCode HTTP status code
+ * @param statusText HTTP status text (also used as body)
+ * @return 0 on success, negative on error
+ */
+int wolfCLU_ScgiSendError(SOCKET_T sockfd, int statusCode,
+                           const char* statusText);
+
+/**
+ * @brief Load certificate file in DER format (handles PEM conversion)
+ * @param filename certificate file path
+ * @param der pointer to store DER buffer (caller must XFREE)
+ * @param derSz pointer to store DER size
+ * @return 0 on success, negative on error
+ */
+int wolfCLU_LoadCertDer(const char* filename, byte** der, word32* derSz);
+
+/**
+ * @brief Load private key file in DER format (handles PEM conversion)
+ * @param filename key file path
+ * @param der pointer to store DER buffer (caller must XFREE)
+ * @param derSz pointer to store DER size
+ * @return 0 on success, negative on error
+ */
+int wolfCLU_LoadKeyDer(const char* filename, byte** der, word32* derSz);
+
+/**
+ * @brief Load certificate file and return DER size
+ * @param filename certificate file path
+ * @param outDer pointer to store DER buffer (caller must XFREE)
+ * @return DER size on success, negative on error
+ */
+int wolfCLU_ReadCertDer(const char* filename, byte** outDer);
+
+
+/**
  * @brief function to prompt user for password from stdin
  */
 int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz);
