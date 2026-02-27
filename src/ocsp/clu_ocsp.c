@@ -788,8 +788,10 @@ static int ocspResponder(OcspResponderConfig* config)
         goto cleanup;
     }
 
+#ifndef _WIN32
     /* Setup signal handlers for graceful shutdown */
     setupSignalHandlers();
+#endif
 
     WOLFCLU_LOG(WOLFCLU_L0, "OCSP responder%s listening on port %d", 
                 (transportType == TRANSPORT_SCGI) ? " (SCGI mode)" : "", config->port);
@@ -865,10 +867,6 @@ static int ocspResponder(OcspResponderConfig* config)
 
         wolfCLU_ServerClose(clientfd);
         clientfd = INVALID_SOCKET;
-        
-        if (config->nrequest > 0 && requestsProcessed >= config->nrequest) {
-            break;
-        }
     }
 
     ret = WOLFCLU_SUCCESS;

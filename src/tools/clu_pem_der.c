@@ -80,8 +80,8 @@ static int loadFileToDer(const char* filename, byte** der, word32* derSz, int pe
                 XMEMCPY(*der, pDer->buffer, pDer->length);
                 *derSz = pDer->length;
             }
-            wc_FreeDer(&pDer);
         }
+        wc_FreeDer(&pDer);
         XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return (*der != NULL) ? 0 : -1;
     }

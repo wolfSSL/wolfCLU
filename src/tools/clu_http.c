@@ -281,8 +281,11 @@ int wolfCLU_HttpServerRecv(SOCKET_T clientfd, byte* buffer, int bufferSz)
                 cl = XSTRSTR((char*)buffer, "Content-Length:");
                 if (cl == NULL)
                     cl = XSTRSTR((char*)buffer, "content-length:");
-                if (cl != NULL)
+                if (cl != NULL) {
                     contentLen = XATOI(cl + 15);
+                    if (contentLen < 0)
+                        contentLen = 0;
+                }
             }
         }
         /* Check if we have the full body */
@@ -403,6 +406,9 @@ int wolfCLU_HttpServerParseRequest(const byte* httpReq, int httpReqSz,
     }
     if (contentLen) {
         *bodySz = XATOI(contentLen + 15);
+        if (*bodySz < 0) {
+            return -1;
+        }
     }
 
     /* Find body (after \r\n\r\n) */

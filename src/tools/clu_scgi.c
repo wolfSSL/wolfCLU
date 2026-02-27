@@ -96,6 +96,9 @@ static int parseNetstringLength(SOCKET_T sockfd, int* length)
         if (lenBuf[i] == ':') {
             lenBuf[i] = '\0';
             *length = XATOI(lenBuf);
+            if (*length < 0) {
+                return -1;
+            }
             return 0;
         }
         i++;

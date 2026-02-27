@@ -5,7 +5,6 @@ scgi_param  CONTENT_TYPE       $content_type;
 scgi_param  CONTENT_LENGTH     $content_length;
 
 scgi_param  SCRIPT_NAME        $fastcgi_script_name;
-scgi_param  REQUEST_URI        $request_uri;
 scgi_param  DOCUMENT_URI       $document_uri;
 scgi_param  DOCUMENT_ROOT      $document_root;
 scgi_param  SERVER_PROTOCOL    $server_protocol;
