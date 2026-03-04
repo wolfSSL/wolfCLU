@@ -2,6 +2,10 @@
 
 This is the wolfSSL Command Line Utility (wolfCLU).
 
+## Prerequisites
+
+To build wolfSSL and wolfCLU, you will need autoconf, automake and libtool installed.
+
 ## wolfSSL Installation
 
 Configure and install wolfSSL with the following commands:
