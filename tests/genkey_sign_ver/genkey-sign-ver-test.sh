@@ -176,6 +176,14 @@ DERPEMRAW="der"
 VERIFYOUTNAME="rsa-sigout"
 gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${VERIFYOUTNAME}
 
+# Regression test: -exponent value must not overwrite -size (was stored in
+# sizeArg instead of expArg, corrupting the key size).
+./wolfssl -genkey rsa -size 2048 -exponent 65537 -out rsakey_exp \
+          -outform der -output KEYPAIR
+RESULT=$?
+[ $RESULT -ne 0 ] && printf '%s\n' "Failed rsa genkey with explicit -exponent" && exit 99
+rm -f rsakey_exp.priv rsakey_exp.pub
+
 ALGORITHM="ed25519"
 KEYFILENAME="edkey"
 SIGOUTNAME="ed-signed.sig"

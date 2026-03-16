@@ -252,7 +252,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                 else {
                     for (cur = argv[ret+1]; *cur && isdigit(*cur); ++cur);
                     if (*cur == '\0') {
-                        sizeArg = XATOI(argv[ret+1]);
+                        expArg = XATOI(argv[ret+1]);
                     }
                     else {
                         WOLFCLU_LOG(WOLFCLU_L0, "Invalid -exponent (%s), using 65537",
@@ -453,7 +453,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-height", 7, argc, argv);
         if (ret > 0 || argv[ret+1] != NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", argv[ret+1]);
-            
+
             if (XSTRNCMP(argv[ret+1], "20", 2) == 0
                 || XSTRNCMP(argv[ret+1], "40", 2) == 0
                 || XSTRNCMP(argv[ret+1], "60", 2) == 0) {
@@ -475,7 +475,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-layer", 6, argc, argv);
         if (ret > 0 || argv[ret+1] != NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "Layer: %s", argv[ret+1]);
-            
+
             switch (height) {
                 case 20:
                     if (XSTRNCMP(argv[ret+1], "2", 1) == 0) {
@@ -549,7 +549,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         xmssmtParam[XMSSMT_NAME_MAX_LEN] = '\0';
-        
+
         /* check XMSS Param Length */
         WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT Param: %s", xmssmtParam);
         if (!(XSTRLEN(xmssmtParam) == XMSSMT_NAME_MIN_LEN
@@ -612,7 +612,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-height", 7, argc, argv);
         if (ret > 0 || argv[ret+1] != NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", argv[ret+1]);
-            
+
             if (XSTRNCMP(argv[ret+1], "10", 2) == 0) {
                 XMEMCPY(xmssParam + xmssHeadLen, "10_256", hLen);
             }
@@ -636,7 +636,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         xmssParam[XMSS_NAME_LEN] = '\0';
-        
+
         /* check XMSS Param Length */
         WOLFCLU_LOG(WOLFCLU_L0, "XMSS Param: %s", xmssParam);
         if (XSTRLEN(xmssParam) != XMSS_NAME_LEN) {
