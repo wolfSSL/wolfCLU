@@ -401,11 +401,16 @@ int clu_entry(const void* argument)
         }
     }
 
+    if (argc > MAX_COMMAND_ARGS) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Too many arguments (max %d)", MAX_COMMAND_ARGS);
+        return -1;
+    }
+
     i = 0;
     token = strtok(command, " ");
 
     /* split the command string to correspond to separate argv[i] */
-    while (token != NULL && i <= MAX_COMMAND_ARGS) {
+    while (token != NULL && i < argc) {
         argv[i] = XMALLOC(XSTRLEN(token)+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         XMEMSET(argv[i], 0, XSTRLEN(token)+1);
         XSTRNCPY(argv[i], token, XSTRLEN(token));
