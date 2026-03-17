@@ -634,8 +634,8 @@ static int ocspResponder(OcspResponderConfig* config)
     SOCKET_T clientfd = INVALID_SOCKET;
     int requestsProcessed = 0;
     int ret = WOLFCLU_SUCCESS;
-    const char* caSubject;
-    word32 caSubjectSz;
+    char* caSubject = NULL;
+    word32 caSubjectSz = 0;
     byte* caCertDer = NULL;
     word32 caCertDerSz = 0;
     byte* signerCertDer = NULL;
@@ -693,12 +693,25 @@ static int ocspResponder(OcspResponderConfig* config)
         goto cleanup;
     }
 
-    caSubject = wc_GetDecodedCertSubject(&caCert, &caSubjectSz);
-    if (caSubject == NULL || caSubjectSz == 0) {
+    /* First call: get required buffer size */
+    if (wc_GetDecodedCertSubject(&caCert, NULL, &caSubjectSz) != LENGTH_ONLY_E ||
+            caSubjectSz == 0) {
+        wolfCLU_LogError("Could not get CA subject size");
+        ret = WOLFCLU_FATAL_ERROR;
+        goto cleanup;
+    }
+    caSubject = (char*)XMALLOC(caSubjectSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (caSubject == NULL) {
+        wolfCLU_LogError("Memory allocation failed for CA subject");
+        ret = WOLFCLU_FATAL_ERROR;
+        goto cleanup;
+    }
+    if (wc_GetDecodedCertSubject(&caCert, caSubject, &caSubjectSz) != 0) {
         wolfCLU_LogError("Could not get CA subject");
         ret = WOLFCLU_FATAL_ERROR;
         goto cleanup;
     }
+    caSubject[caSubjectSz] = '\0';
 
     /* Load index file if provided */
     if (config->indexFile) {
@@ -878,16 +891,12 @@ cleanup:
         wolfCLU_ServerClose(sockfd);
 
     wc_FreeDecodedCert(&caCert);
-    if (responder)
-        wc_OcspResponder_free(responder);
-    if (indexEntries)
-        freeIndexEntries(indexEntries);
-    if (caCertDer)
-        XFREE(caCertDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (signerCertDer)
-        XFREE(signerCertDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (signerKeyDer)
-        XFREE(signerKeyDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    wc_OcspResponder_free(responder);
+    freeIndexEntries(indexEntries);
+    XFREE(caCertDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(signerCertDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(signerKeyDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(caSubject, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     return ret;
 }
