@@ -713,6 +713,15 @@ int wolfCLU_HttpServerSendError(SOCKET_T clientfd, int statusCode,
 void wolfCLU_ServerClose(SOCKET_T sockfd);
 
 /**
+ * @brief Send all bytes on a socket, looping on partial writes and EINTR
+ * @param sockfd socket descriptor
+ * @param buf data to send
+ * @param len number of bytes to send
+ * @return number of bytes sent on success, negative on error
+ */
+int wolfCLU_SendAll(SOCKET_T sockfd, const char* buf, int len);
+
+/**
  * @brief Parse HTTP POST request to extract OCSP request body
  * @param httpReq HTTP request buffer
  * @param httpReqSz size of HTTP request

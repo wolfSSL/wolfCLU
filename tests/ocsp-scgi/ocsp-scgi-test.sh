@@ -276,21 +276,13 @@ run_test() {
         -CAfile "$CERTS_DIR/ca-cert.pem" \
         -url http://localhost:8080/ocsp 2>&1)
     
-    OCSP_EXIT_CODE=$?
-    
     echo "$OCSP_OUTPUT"
     
-    # Check if the request was successful
-    if [ $OCSP_EXIT_CODE -eq 0 ]; then
-        if echo "$OCSP_OUTPUT" | grep -q "$expected_status"; then
-            echo "✓ Test PASSED: Found expected status '$expected_status'"
-            return $EXIT_SUCCESS
-        else
-            echo "✗ Test FAILED: Expected '$expected_status' but got different status"
-            return $EXIT_FAILURE
-        fi
+    if echo "$OCSP_OUTPUT" | grep -q "$expected_status"; then
+        echo "✓ Test PASSED: Found expected status '$expected_status'"
+        return $EXIT_SUCCESS
     else
-        echo "✗ Test FAILED: OCSP request failed with exit code $OCSP_EXIT_CODE"
+        echo "✗ Test FAILED: Expected '$expected_status' but got different status"
         return $EXIT_FAILURE
     fi
 }

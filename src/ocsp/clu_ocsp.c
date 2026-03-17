@@ -818,15 +818,13 @@ static int ocspResponder(OcspResponderConfig* config)
 
         /* Accept connection */
         clientfd = wolfCLU_ServerAccept(sockfd);
-        if (clientfd == INVALID_SOCKET) {
-            continue;
-        }
+        if (clientfd == INVALID_SOCKET)
+            goto continue_loop;
 
         /* Read request from transport layer */
         ret = transportReadRequest(clientfd, transportType, &ocspReq, &ocspReqSz);
-        if (ret != WOLFCLU_SUCCESS) {
-            break;
-        }
+        if (ret != WOLFCLU_SUCCESS)
+            goto continue_loop;
 
         /* Process OCSP request and generate response */
         respSz = sizeof(respBuffer);
@@ -862,14 +860,13 @@ static int ocspResponder(OcspResponderConfig* config)
             if (ret != 0) {
                 /* If we can't encode an error response, send HTTP/SCGI error */
                 transportSendError(clientfd, transportType, 500, "Internal Server Error");
-                break;
+                goto continue_loop;
             }
         }
 
         /* Send response via transport layer */
-        if (transportSendResponse(clientfd, transportType, respBuffer, (int)respSz) != 0) {
-            break;
-        }
+        if (transportSendResponse(clientfd, transportType, respBuffer, (int)respSz) != 0)
+            goto continue_loop;
 
         requestsProcessed++;
 
@@ -878,7 +875,9 @@ static int ocspResponder(OcspResponderConfig* config)
             break;
         }
 
-        wolfCLU_ServerClose(clientfd);
+continue_loop:
+        if (clientfd != INVALID_SOCKET)
+            wolfCLU_ServerClose(clientfd);
         clientfd = INVALID_SOCKET;
     }
 

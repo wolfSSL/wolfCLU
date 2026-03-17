@@ -295,6 +295,25 @@ int wolfCLU_HttpServerRecv(SOCKET_T clientfd, byte* buffer, int bufferSz)
     return totalLen;
 }
 
+/* Send all bytes, looping on partial writes and EINTR */
+int wolfCLU_SendAll(SOCKET_T sockfd, const char* buf, int len)
+{
+    int sent = 0;
+    while (sent < len) {
+        int n = (int)send(sockfd, buf + sent, (size_t)(len - sent), 0);
+        if (n < 0) {
+#ifndef _WIN32
+            if (errno == EINTR) continue;
+#endif
+            return -1;
+        }
+        if (n == 0)
+            return -1;
+        sent += n;
+    }
+    return sent;
+}
+
 /**
  * @brief Send an HTTP response with OCSP content
  * @param clientfd client socket descriptor
@@ -307,7 +326,6 @@ int wolfCLU_HttpServerSendOcspResponse(SOCKET_T clientfd, const byte* body,
 {
     char header[512];
     int headerLen;
-    int sent;
 
     headerLen = XSNPRINTF(header, sizeof(header),
         "HTTP/1.0 200 OK\r\n"
@@ -321,15 +339,13 @@ int wolfCLU_HttpServerSendOcspResponse(SOCKET_T clientfd, const byte* body,
     }
 
     /* Send header */
-    sent = (int)send(clientfd, header, (size_t)headerLen, 0);
-    if (sent != headerLen) {
+    if (wolfCLU_SendAll(clientfd, header, headerLen) != headerLen) {
         return -1;
     }
 
     /* Send body */
     if (bodySz > 0) {
-        sent = (int)send(clientfd, (const char*)body, (size_t)bodySz, 0);
-        if (sent != bodySz) {
+        if (wolfCLU_SendAll(clientfd, (const char*)body, bodySz) != bodySz) {
             return -1;
         }
     }
@@ -390,12 +406,18 @@ int wolfCLU_HttpServerParseRequest(const byte* httpReq, int httpReqSz,
 {
     const char* contentLen;
     const char* bodyStart;
+    int bodyAvail;
 
     *body = NULL;
     *bodySz = 0;
 
+    if (httpReqSz < (int)XSTR_SIZEOF("POST ")) {
+        return -1;
+    }
+
     /* Check for POST method */
-    if (XSTRNCMP((char*)httpReq, "POST ", 5) != 0) {
+    if (XSTRNCMP((char*)httpReq, "POST ", 
+                 XSTR_SIZEOF("POST ")) != 0) {
         return -1;
     }
 
@@ -405,22 +427,26 @@ int wolfCLU_HttpServerParseRequest(const byte* httpReq, int httpReqSz,
         contentLen = XSTRSTR((char*)httpReq, "content-length:");
     }
     if (contentLen) {
-        *bodySz = XATOI(contentLen + 15);
-        if (*bodySz < 0) {
+        *bodySz = XATOI(contentLen + XSTR_SIZEOF("Content-Length:"));
+        if (*bodySz <= 0) {
             return -1;
         }
     }
 
-    /* Find body (after \r\n\r\n) */
-    bodyStart = XSTRSTR((char*)httpReq, "\r\n\r\n");
-    if (bodyStart) {
-        *body = (const byte*)(bodyStart + 4);
-        /* Use Content-Length if available, otherwise use remaining data */
-        if (*bodySz == 0) {
-            *bodySz = httpReqSz - (int)(*body - httpReq);
-        }
-        return 0;
+    /* Find body (has to appear after headers) */
+    bodyStart = XSTRSTR((char*)contentLen, "\r\n\r\n");
+    if (!bodyStart)
+        return -1;
+    bodyAvail = (int)(((char*)httpReq + httpReqSz) - 
+        (bodyStart + XSTR_SIZEOF("\r\n\r\n")));
+    /* Use Content-Length if available, otherwise use
+     * remaining data. Verify how much body we have. */
+    if (*bodySz == 0) {
+        *bodySz = bodyAvail;
     }
-
-    return -1;
+    else if (*bodySz > bodyAvail) {
+        return -1;
+    }
+    *body = (const byte*)(bodyStart + XSTR_SIZEOF("\r\n\r\n"));
+    return 0;
 }

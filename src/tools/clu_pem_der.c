@@ -55,7 +55,7 @@ static int loadFileToDer(const char* filename, byte** der, word32* derSz, int pe
         return -1;
     }
 
-    buf = (byte*)XMALLOC(bufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    buf = (byte*)XMALLOC(bufSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (buf == NULL) {
         wolfSSL_BIO_free(bio);
         return -1;
@@ -68,6 +68,7 @@ static int loadFileToDer(const char* filename, byte** der, word32* derSz, int pe
         return -1;
     }
     wolfSSL_BIO_free(bio);
+    buf[bufSz] = '\0';
 
     /* Check if PEM format */
     isPem = (XSTRSTR((char*)buf, "-----BEGIN") != NULL) ? 1 : 0;

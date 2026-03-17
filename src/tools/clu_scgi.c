@@ -118,21 +118,31 @@ static int parseHeaders(const byte* headers, int headerLen, ScgiRequest* req)
     
     while (pos < headerLen) {
         const char* key = (const char*)(headers + pos);
-        int keyLen = (int)XSTRLEN(key);
+        const char* keyEnd;
         const char* value;
+        const char* valueEnd;
+        int keyLen;
         int valueLen;
-        
-        if (pos + keyLen >= headerLen) {
+
+        /* Find NUL terminator for key within remaining bounds */
+        keyEnd = (const char*)memchr(key, '\0', (size_t)(headerLen - pos));
+        if (keyEnd == NULL) {
             break;
         }
-        
+        keyLen = (int)(keyEnd - key);
         pos += keyLen + 1;
-        value = (const char*)(headers + pos);
-        valueLen = (int)XSTRLEN(value);
-        
-        if (pos + valueLen >= headerLen) {
+
+        if (pos >= headerLen) {
             break;
         }
+
+        /* Find NUL terminator for value within remaining bounds */
+        value = (const char*)(headers + pos);
+        valueEnd = (const char*)memchr(value, '\0', (size_t)(headerLen - pos));
+        if (valueEnd == NULL) {
+            break;
+        }
+        valueLen = (int)(valueEnd - value);
         
         if (XSTRCMP(key, "CONTENT_LENGTH") == 0) {
             req->contentLength = XATOI(value);
@@ -235,7 +245,6 @@ int wolfCLU_ScgiSendResponse(SOCKET_T sockfd, int statusCode,
 {
     char header[512];
     int headerLen;
-    int sent;
     
     headerLen = XSNPRINTF(header, sizeof(header),
         "Status: %d %s\r\n"
@@ -248,14 +257,12 @@ int wolfCLU_ScgiSendResponse(SOCKET_T sockfd, int statusCode,
         return -1;
     }
     
-    sent = (int)send(sockfd, header, headerLen, 0);
-    if (sent != headerLen) {
+    if (wolfCLU_SendAll(sockfd, header, headerLen) != headerLen) {
         return -1;
     }
     
     if (bodyLen > 0 && body != NULL) {
-        sent = (int)send(sockfd, (const char*)body, bodyLen, 0);
-        if (sent != bodyLen) {
+        if (wolfCLU_SendAll(sockfd, (const char*)body, bodyLen) != bodyLen) {
             return -1;
         }
     }
