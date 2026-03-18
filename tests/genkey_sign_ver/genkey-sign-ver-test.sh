@@ -40,6 +40,10 @@ cleanup_genkey_sign_ver(){
     rm rsakey.pub
     rm mldsakey.priv
     rm mldsakey.pub
+    rm mldsakey_pub.pub
+    rm mldsakey_pub.priv
+    rm mldsakey_priv.pub
+    rm mldsakey_priv.priv
     rm ecc-signed.sig
     rm ed-signed.sig
     rm rsa-signed.sig
@@ -89,7 +93,7 @@ rsa_compare_decrypted(){
     else
         printf '%s\n' "Decrypted mismatch with original, FAILURE!"
         printf '%s\n' "DECRYPTED --> ${1}"
-        printf '%s\n' "ORIGINAL --> ${2}" && exit -1
+        printf '%s\n' "ORIGINAL --> ${2}" && exit 99
     fi
 }
 
@@ -109,13 +113,13 @@ gen_key_sign_ver_test(){
     printf '%s\n' "genkey RESULT - $RESULT"
     [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 genkey" && \
     printf '%s\n' "Before running this test please configure wolfssl with" && \
-    printf '%s\n' "--enable-keygen" && exit -1
+    printf '%s\n' "--enable-keygen" && exit 99
 
     # test signing with priv key
     ./wolfssl -$1 -sign -inkey $2.priv -inform $4 -in sign-this.txt -out $3
     RESULT=$?
     printf '%s\n' "sign RESULT - $RESULT"
-    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 sign" && exit -1
+    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 sign" && exit 99
 
     # test verifying with priv key
     if [ "${1}" = "rsa" ]; then
@@ -130,7 +134,7 @@ gen_key_sign_ver_test(){
     fi
     RESULT=$?
     printf '%s\n' "private verify RESULT - $RESULT"
-    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 private verify" && exit -1
+    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 private verify" && exit 99
 
     # test verifying with pub key
     if [ "${1}" = "rsa" ]; then
@@ -141,7 +145,7 @@ gen_key_sign_ver_test(){
     fi
     RESULT=$?
     printf '%s\n' "public verify RESULT - $RESULT"
-    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 public verify " && exit -1
+    [ $RESULT -ne 0 ] && printf '%s\n' "Failed $1 public verify " && exit 99
 
     if [ $1 = "rsa" ]; then
         ORIGINAL=`cat -A sign-this.txt`
@@ -237,6 +241,20 @@ for level in 2 3 5
 do
     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
 done
+
+# Verifies that -output PUB generates only the public key file.
+./wolfssl -genkey dilithium -level 2 -out mldsakey_pub -outform der -output pub
+RESULT=$?
+[ $RESULT -ne 0 ] && printf '%s\n' "Failed dilithium genkey -output PUB" && exit 99
+[ ! -f mldsakey_pub.pub ]  && printf '%s\n' "dilithium -output PUB: .pub file missing"           && exit 99
+[ -f  mldsakey_pub.priv ]  && printf '%s\n' "dilithium -output PUB: .priv unexpectedly created"  && exit 99
+
+# Verifies that -output PRIV generates only the private key file.
+./wolfssl -genkey dilithium -level 2 -out mldsakey_priv -outform der -output priv
+RESULT=$?
+[ $RESULT -ne 0 ] && printf '%s\n' "Failed dilithium genkey -output PRIV" && exit 99
+[ ! -f mldsakey_priv.priv ] && printf '%s\n' "dilithium -output PRIV: .priv file missing"         && exit 99
+[ -f  mldsakey_priv.pub ]   && printf '%s\n' "dilithium -output PRIV: .pub unexpectedly created"  && exit 99
 
 # Dilithium sign to an unwritable path must fail gracefully
 ./wolfssl -genkey dilithium -level 2 -out mldsakey -outform der -output keypair
