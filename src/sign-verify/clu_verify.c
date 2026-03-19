@@ -438,14 +438,16 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         }
 
         /* write the output to the specified file */
-        XFILE s = XFOPEN(out, "wb");
-        if (s == NULL) {
-            wolfCLU_LogError("Unable to open file %s", out);
-            ret = BAD_FUNC_ARG;
-        }
-        else {
-            XFWRITE(outBuf, 1, ret, s);
-            XFCLOSE(s);
+        if (ret > 0) {
+            XFILE s = XFOPEN(out, "wb");
+            if (s == NULL) {
+                wolfCLU_LogError("Unable to open file %s", out);
+                ret = BAD_FUNC_ARG;
+            }
+            else {
+                XFWRITE(outBuf, 1, ret, s);
+                XFCLOSE(s);
+            }
         }
     }
 
@@ -954,7 +956,7 @@ int wolfCLU_verify_signature_xmss(byte* sig, int sigSz,
         for (int i = 0; i < XMSS_OID_LEN; i++) {
             oid = (oid << 8) | keyBuf[i];
         }
-        
+
         switch (oid) {
             case WC_XMSS_OID_SHA2_10_256:
                 XMEMCPY(paramStr, "XMSS-SHA2_10_256\0", paramLen);
@@ -1109,7 +1111,7 @@ int wolfCLU_verify_signature_xmssmt(byte* sig, int sigSz,
         for (int i = 0; i < XMSS_OID_LEN; i++) {
             oid = (oid << 8) | keyBuf[i];
         }
-        
+
         switch (oid) {
             case WC_XMSSMT_OID_SHA2_20_2_256:
                 XMEMCPY(paramStr, "XMSSMT-SHA2_20/2_256\0\0", paramLen);

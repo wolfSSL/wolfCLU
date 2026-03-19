@@ -176,6 +176,16 @@ DERPEMRAW="der"
 VERIFYOUTNAME="rsa-sigout"
 gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${VERIFYOUTNAME}
 
+# A verify with invalid signature must fail gracefully.
+./wolfssl -rsa -verify -inkey rsakey.pub -inform der \
+          -sigfile sign-this.txt -in sign-this.txt \
+          -out rsa_badverify_out.txt -pubin
+RESULT=$?
+[ $RESULT -eq 0 ] && \
+    printf '%s\n' "RSA verify with invalid sig should have failed" && exit 99
+[ -f rsa_badverify_out.txt ] && \
+    printf '%s\n' "RSA verify with invalid sig: output file must not be created" && exit 99
+
 # Regression test: -exponent value must not overwrite -size (was stored in
 # sizeArg instead of expArg, corrupting the key size).
 ./wolfssl -genkey rsa -size 2048 -exponent 65537 -out rsakey_exp \
@@ -227,6 +237,14 @@ for level in 2 3 5
 do
     gen_key_sign_ver_test ${ALGORITHM} ${KEYFILENAME} ${SIGOUTNAME} ${DERPEMRAW} ${level}
 done
+
+# Dilithium sign to an unwritable path must fail gracefully
+./wolfssl -genkey dilithium -level 2 -out mldsakey -outform der -output keypair
+./wolfssl -dilithium -sign -inkey mldsakey.priv -inform der \
+    -in sign-this.txt -out /nonexistent_dir/mldsa_bad.sig
+RESULT=$?
+[ $RESULT -eq 0 ] && \
+    printf '%s\n' "dilithium sign to invalid path should have failed" && exit 99
 fi
 
 # Check if xmss is availabe
