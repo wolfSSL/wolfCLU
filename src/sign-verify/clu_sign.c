@@ -729,6 +729,16 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     else {
         XFILE outFile;
         outFile = XFOPEN(out, "wb");
+        if (outFile == NULL) {
+            wolfCLU_LogError("Failed to open output file %s", out);
+            XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            wc_FreeRng(&rng);
+            wc_dilithium_free(key);
+        #ifdef WOLFSSL_SMALL_STACK
+            XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        #endif
+            return BAD_FUNC_ARG;
+        }
         XFWRITE(outBuf, 1, outBufSz, outFile);
         XFCLOSE(outFile);
     }
