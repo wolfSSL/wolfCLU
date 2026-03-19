@@ -703,7 +703,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     outBufSz = wc_dilithium_sig_size(key);
     outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (outBuf == NULL) {
-        XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRng(&rng);
         wc_dilithium_free(key);
     #ifdef WOLFSSL_SMALL_STACK
