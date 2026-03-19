@@ -41,6 +41,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     WOLFSSL_BIO *in  = NULL;
     WOLFSSL_BIO *tmp = NULL;
     WOLFSSL_EVP_CIPHER_CTX* ctx    = NULL;
+    byte* decodedBase64 = NULL;
 
     WC_RNG     rng;                 /* random number generator declaration */
 
@@ -74,7 +75,6 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     if (fileIn != NULL) {
         in = wolfSSL_BIO_new_file(fileIn, "rb");
         if (in != NULL && !enc && isBase64) {
-            byte *decodedBase64 = NULL;
             word32 decodeSz;
 
             decodeSz = wolfSSL_BIO_get_len(in);
@@ -101,9 +101,6 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                 }
             }
 
-            if (decodedBase64 != NULL) {
-                XFREE(decodedBase64, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            }
         }
     }
     else {
@@ -398,6 +395,9 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     wolfSSL_BIO_free(out);
     wolfSSL_BIO_free(in);
     wolfSSL_BIO_free(tmp);
+    if (decodedBase64 != NULL) {
+        XFREE(decodedBase64, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
 
     XMEMSET(key, 0, keySz);
     XMEMSET(iv, 0 , ivSz);
