@@ -48,6 +48,17 @@ fi
 
 rm -rf testp7.der
 
+# base64 encode round-trip test
+run "base64 -in certs/server-key.der -out test-b64-encoded.b64"
+run "base64 -d -in test-b64-encoded.b64 -out test-b64-decoded.der"
+diff certs/server-key.der test-b64-decoded.der > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "base64 encode/decode round-trip failed"
+    rm -f test-b64-encoded.b64 test-b64-decoded.der
+    exit 99
+fi
+rm -f test-b64-encoded.b64 test-b64-decoded.der
+
 #check stdin input
 RESULT=`cat certs/signed.p7b | ./wolfssl base64`
 if [ $? != 0 ]; then
