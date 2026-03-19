@@ -227,7 +227,7 @@ int wolfCLU_Base64Setup(int argc, char** argv)
             }
         }
     }
-    else if (ret == WOLFSSL_SUCCESS) {
+    else if (ret == WOLFCLU_SUCCESS && !decode) {
         /* For encoding */
         /* Calculate output size */
         if (Base64_Encode(input, inputSz, NULL, &outputSz) != LENGTH_ONLY_E) {
