@@ -1,6 +1,6 @@
 /* clu_ocsp.c
  *
- * Copyright (C) 2006-2025 wolfSSL Inc.
+ * Copyright (C) 2006-2026 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -511,9 +511,10 @@ static byte respBuffer[16384];
 #ifndef _WIN32
     #include <signal.h>
     #include <errno.h>
+    static volatile sig_atomic_t shutdownRequested = 0;
+#else
+    static volatile int shutdownRequested = 0;
 #endif
-
-static volatile sig_atomic_t shutdownRequested = 0;
 
 #ifndef _WIN32
 /* Signal handler for SIGINT and SIGTERM - sets shutdown flag */
@@ -752,25 +753,16 @@ static int ocspResponder(OcspResponderConfig* config)
     if (indexEntries != NULL) {
         IndexEntry* entry;
         for (entry = indexEntries; entry != NULL; entry = entry->next) {
-            byte serial[64];
+            byte* serial = NULL;
             word32 serialLen = 0;
             enum Ocsp_Cert_Status status;
             time_t revTime = 0;
-            word32 i;
-            char* p = entry->serial;
 
             /* Convert hex string to bytes */
-            serialLen = (word32)XSTRLEN(entry->serial) / 2;
-            if (serialLen == 0 || serialLen > sizeof(serial)) {
+            if (wolfCLU_hexToBin(entry->serial, &serial, &serialLen,
+                                 NULL, NULL, NULL, NULL, NULL, NULL,
+                                 NULL, NULL, NULL) != WOLFCLU_SUCCESS) {
                 continue;
-            }
-
-            for (i = 0; i < serialLen; i++) {
-                int high = (p[i*2] >= 'A') ? (p[i*2] - 'A' + 10) :
-                          (p[i*2] >= 'a') ? (p[i*2] - 'a' + 10) : (p[i*2] - '0');
-                int low = (p[i*2+1] >= 'A') ? (p[i*2+1] - 'A' + 10) :
-                         (p[i*2+1] >= 'a') ? (p[i*2+1] - 'a' + 10) : (p[i*2+1] - '0');
-                serial[i] = (byte)((high << 4) | low);
             }
 
             /* Determine status */
@@ -790,6 +782,7 @@ static int ocspResponder(OcspResponderConfig* config)
                                           serial, serialLen, status, revTime,
                                           CRL_REASON_UNSPECIFIED,
                                           (status == CERT_GOOD) ? 86400 : 0);
+            wolfCLU_freeBins(serial, NULL, NULL, NULL, NULL);
         }
     }
 
@@ -868,6 +861,9 @@ static int ocspResponder(OcspResponderConfig* config)
         if (transportSendResponse(clientfd, transportType, respBuffer, (int)respSz) != 0)
             goto continue_loop;
 
+        /* Only count successfully processed requests toward the -nrequest
+         * limit. Failed reads/sends jump to continue_loop above, so a
+         * misbehaving client cannot exhaust the budget. */
         requestsProcessed++;
 
         /* Check if we've hit the request limit */

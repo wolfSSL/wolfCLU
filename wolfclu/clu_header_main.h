@@ -738,7 +738,7 @@ int wolfCLU_HttpServerParseRequest(const byte* httpReq, int httpReqSz,
  * @param sockfd socket descriptor
  * @param buffer buffer to store the complete request
  * @param bufferSz size of buffer
- * @param req output structure to store parsed request (defined in clu_scgi.h)
+ * @param req output structure to store parsed request
  * @return 0 on success, negative on error
  */
 struct ScgiRequest {

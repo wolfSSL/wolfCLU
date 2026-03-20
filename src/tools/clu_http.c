@@ -379,7 +379,7 @@ int wolfCLU_HttpServerSendError(SOCKET_T clientfd, int statusCode,
         return -1;
     }
 
-    return (send(clientfd, response, (size_t)len, 0) == len) ? 0 : -1;
+    return (wolfCLU_SendAll(clientfd, response, len) == len) ? 0 : -1;
 }
 
 /**
@@ -434,7 +434,7 @@ int wolfCLU_HttpServerParseRequest(const byte* httpReq, int httpReqSz,
     }
 
     /* Find body (has to appear after headers) */
-    bodyStart = XSTRSTR((char*)contentLen, "\r\n\r\n");
+    bodyStart = XSTRSTR(contentLen != NULL ? contentLen : (char*)httpReq, "\r\n\r\n");
     if (!bodyStart)
         return -1;
     bodyAvail = (int)(((char*)httpReq + httpReqSz) - 
