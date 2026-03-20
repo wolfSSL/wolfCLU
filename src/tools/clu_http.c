@@ -265,8 +265,8 @@ int wolfCLU_HttpServerRecv(SOCKET_T clientfd, byte* buffer, int bufferSz)
     int headerSz = 0;
 
     while (totalLen < bufferSz - 1) {
-        int n = (int)recv(clientfd, (char*)buffer + totalLen,
-                     (size_t)(bufferSz - 1 - totalLen), 0);
+        int n = wolfCLU_Recv(clientfd, (char*)buffer + totalLen,
+                     bufferSz - 1 - totalLen);
         if (n <= 0)
             break;
         totalLen += n;
@@ -293,6 +293,22 @@ int wolfCLU_HttpServerRecv(SOCKET_T clientfd, byte* buffer, int bufferSz)
             break;
     }
     return totalLen;
+}
+
+/* Receive bytes, retrying on EINTR */
+int wolfCLU_Recv(SOCKET_T sockfd, char* buf, int len)
+{
+    int n;
+    do {
+        n = (int)recv(sockfd, buf, (size_t)len, 0);
+    } while (
+#ifndef _WIN32
+        n < 0 && errno == EINTR
+#else
+        0
+#endif
+    );
+    return n;
 }
 
 /* Send all bytes, looping on partial writes and EINTR */

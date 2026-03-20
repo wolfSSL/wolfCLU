@@ -69,9 +69,10 @@
 static int readExactly(SOCKET_T sockfd, byte* buffer, int n)
 {
     int totalRead = 0;
-    
+
     while (totalRead < n) {
-        int ret = (int)recv(sockfd, (char*)buffer + totalRead, n - totalRead, 0);
+        int ret = wolfCLU_Recv(sockfd, (char*)buffer + totalRead,
+                               n - totalRead);
         if (ret <= 0) {
             return -1;
         }
@@ -85,11 +86,11 @@ static int parseNetstringLength(SOCKET_T sockfd, int* length)
 {
     char lenBuf[16];
     int i = 0;
-    
+
     *length = 0;
-    
+
     while (i < (int)sizeof(lenBuf) - 1) {
-        int ret = (int)recv(sockfd, &lenBuf[i], 1, 0);
+        int ret = wolfCLU_Recv(sockfd, &lenBuf[i], 1);
         if (ret <= 0) {
             return -1;
         }
@@ -103,7 +104,7 @@ static int parseNetstringLength(SOCKET_T sockfd, int* length)
         }
         i++;
     }
-    
+
     return -1;
 }
 

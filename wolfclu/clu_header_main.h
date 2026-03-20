@@ -713,6 +713,15 @@ int wolfCLU_HttpServerSendError(SOCKET_T clientfd, int statusCode,
 void wolfCLU_ServerClose(SOCKET_T sockfd);
 
 /**
+ * @brief Receive bytes from a socket, retrying on EINTR
+ * @param sockfd socket descriptor
+ * @param buf buffer to receive into
+ * @param len maximum number of bytes to receive
+ * @return number of bytes received, 0 on connection closed, negative on error
+ */
+int wolfCLU_Recv(SOCKET_T sockfd, char* buf, int len);
+
+/**
  * @brief Send all bytes on a socket, looping on partial writes and EINTR
  * @param sockfd socket descriptor
  * @param buf data to send
