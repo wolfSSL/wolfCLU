@@ -612,18 +612,12 @@ static int transportSendResponse(SOCKET_T clientfd, enum TRANSPORT_TYPE transpor
 }
 
 /* Send error response via transport layer */
-static int transportSendError(SOCKET_T clientfd, enum TRANSPORT_TYPE transportType, int statusCode, const char* statusMsg)
+static void transportSendError(SOCKET_T clientfd, enum TRANSPORT_TYPE transportType, int statusCode, const char* statusMsg)
 {
-    if (transportType == TRANSPORT_HTTP) {
+    if (transportType == TRANSPORT_HTTP)
         wolfCLU_HttpServerSendError(clientfd, statusCode, statusMsg);
-        return WOLFCLU_SUCCESS;
-    }
-    else if (transportType == TRANSPORT_SCGI) {
-        return wolfCLU_ScgiSendError(clientfd, statusCode, statusMsg);
-    }
-    else {
-        return WOLFCLU_FATAL_ERROR;
-    }
+    else if (transportType == TRANSPORT_SCGI)
+        wolfCLU_ScgiSendError(clientfd, statusCode, statusMsg);
 }
 
 static int ocspResponder(OcspResponderConfig* config)
