@@ -648,121 +648,178 @@ static void SetKeyShare(WOLFSSL* ssl, int onlyKeyShare, int useX25519,
         } while (ret == WC_PENDING_E);
     #endif
     }
-    #if defined(HAVE_PQC) && defined(WOLFSSL_MLKEM_KYBER)
+    #if defined(HAVE_PQC)
     if (onlyKeyShare == 0 || onlyKeyShare == 3) {
         if (usePqc) {
             int group = 0;
 
-            if (XSTRNCMP(pqcAlg, "KYBER_LEVEL1", XSTRLEN("KYBER_LEVEL1")) == 0) {
+    #ifndef WOLFSSL_NO_ML_KEM
+        #if !defined(WOLFSSL_NO_ML_KEM_512) && \
+                                       !defined(WOLFSSL_TLS_NO_MLKEM_STANDALONE)
+            if (XSTRCMP(pqcAlg, "ML_KEM_512") == 0) {
+                group = WOLFSSL_ML_KEM_512;
+            }
+            else
+        #endif
+        #if !defined(WOLFSSL_NO_ML_KEM_768) && \
+                                       !defined(WOLFSSL_TLS_NO_MLKEM_STANDALONE)
+            if (XSTRCMP(pqcAlg, "ML_KEM_768") == 0) {
+                group = WOLFSSL_ML_KEM_768;
+            }
+            else
+        #endif
+        #if !defined(WOLFSSL_NO_ML_KEM_1024) && \
+                                       !defined(WOLFSSL_TLS_NO_MLKEM_STANDALONE)
+            if (XSTRCMP(pqcAlg, "ML_KEM_1024") == 0) {
+                group = WOLFSSL_ML_KEM_1024;
+            }
+            else
+        #endif
+        #if !defined(WOLFSSL_NO_ML_KEM_512) && \
+                                              defined(WOLFSSL_EXTRA_PQC_HYBRIDS)
+            if (XSTRCMP(pqcAlg, "SecP256r1MLKEM512") == 0) {
+                group = WOLFSSL_SECP256R1MLKEM512;
+            }
+            else
+        #endif
+        #ifndef WOLFSSL_NO_ML_KEM_768
+            #ifdef WOLFSSL_EXTRA_PQC_HYBRIDS
+            if (XSTRCMP(pqcAlg, "SecP384r1MLKEM768") == 0) {
+                group = WOLFSSL_SECP384R1MLKEM768;
+            }
+            else
+            #endif /* WOLFSSL_EXTRA_PQC_HYBRIDS */
+            #ifdef WOLFSSL_PQC_HYBRIDS
+            if (XSTRCMP(pqcAlg, "SecP256r1MLKEM768") == 0) {
+                group = WOLFSSL_SECP256R1MLKEM768;
+            }
+            else
+            #endif /* WOLFSSL_PQC_HYBRIDS */
+        #endif
+        #ifndef WOLFSSL_NO_ML_KEM_1024
+            #ifdef WOLFSSL_EXTRA_PQC_HYBRIDS
+            if (XSTRCMP(pqcAlg, "SecP521r1MLKEM1024") == 0) {
+                group = WOLFSSL_SECP521R1MLKEM1024;
+            }
+            else
+            #endif /* WOLFSSL_EXTRA_PQC_HYBRIDS */
+            #ifdef WOLFSSL_PQC_HYBRIDS
+            if (XSTRCMP(pqcAlg, "SecP384r1MLKEM1024") == 0) {
+                group = WOLFSSL_SECP384R1MLKEM1024;
+            }
+            else
+            #endif /* WOLFSSL_PQC_HYBRIDS */
+        #endif
+        #if !defined(WOLFSSL_NO_ML_KEM_512) && defined(HAVE_CURVE25519) && \
+                                        defined(WOLFSSL_EXTRA_PQC_HYBRIDS)
+            if (XSTRCMP(pqcAlg, "X25519MLKEM512") == 0) {
+                group = WOLFSSL_X25519MLKEM512;
+            }
+            else
+        #endif
+        #if !defined(WOLFSSL_NO_ML_KEM_768) && defined(HAVE_CURVE25519) && \
+            defined(WOLFSSL_PQC_HYBRIDS)
+            if (XSTRCMP(pqcAlg, "X25519MLKEM768") == 0) {
+                group = WOLFSSL_X25519MLKEM768;
+            }
+            else
+        #endif
+        #if !defined(WOLFSSL_NO_ML_KEM_768) && defined(HAVE_CURVE448) && \
+                                        defined(WOLFSSL_EXTRA_PQC_HYBRIDS)
+            if (XSTRCMP(pqcAlg, "X448MLKEM768") == 0) {
+                group = WOLFSSL_X448MLKEM768;
+            }
+            else
+        #endif
+    #endif /* WOLFSSL_NO_ML_KEM */
+    #ifdef WOLFSSL_MLKEM_KYBER
+        #ifndef WOLFSSL_NO_KYBER512
+            if (XSTRCMP(pqcAlg, "KYBER_LEVEL1") == 0) {
                 group = WOLFSSL_KYBER_LEVEL1;
             }
-            else if (XSTRNCMP(pqcAlg, "KYBER_LEVEL3",
-                                XSTRLEN("KYBER_LEVEL3")) == 0) {
+            else
+        #endif
+        #ifndef WOLFSSL_NO_KYBER768
+            if (XSTRCMP(pqcAlg, "KYBER_LEVEL3") == 0) {
                 group = WOLFSSL_KYBER_LEVEL3;
             }
-            else if (XSTRNCMP(pqcAlg, "KYBER_LEVEL5",
-                                XSTRLEN("KYBER_LEVEL5")) == 0) {
+            else
+        #endif
+        #ifndef WOLFSSL_NO_KYBER1024
+            if (XSTRCMP(pqcAlg, "KYBER_LEVEL5") == 0) {
                 group = WOLFSSL_KYBER_LEVEL5;
             }
-            else if (XSTRNCMP(pqcAlg, "NTRU_HPS_LEVEL1",
-                                XSTRLEN("NTRU_HPS_LEVEL1")) == 0) {
-                group = WOLFSSL_NTRU_HPS_LEVEL1;
-            }
-            else if (XSTRNCMP(pqcAlg, "NTRU_HPS_LEVEL3",
-                                XSTRLEN("NTRU_HPS_LEVEL3")) == 0) {
-                group = WOLFSSL_NTRU_HPS_LEVEL3;
-            }
-            else if (XSTRNCMP(pqcAlg, "NTRU_HPS_LEVEL5",
-                                XSTRLEN("NTRU_HPS_LEVEL5")) == 0) {
-                group = WOLFSSL_NTRU_HPS_LEVEL5;
-            }
-            else if (XSTRNCMP(pqcAlg, "NTRU_HRSS_LEVEL3",
-                                XSTRLEN("NTRU_HRSS_LEVEL3")) == 0) {
-                group = WOLFSSL_NTRU_HRSS_LEVEL3;
-            }
-            else if (XSTRNCMP(pqcAlg, "SABER_LEVEL1",
-                                XSTRLEN("SABER_LEVEL1")) == 0) {
-                group = WOLFSSL_SABER_LEVEL1;
-            }
-            else if (XSTRNCMP(pqcAlg, "SABER_LEVEL3",
-                                XSTRLEN("SABER_LEVEL3")) == 0) {
-                group = WOLFSSL_SABER_LEVEL3;
-            }
-            else if (XSTRNCMP(pqcAlg, "SABER_LEVEL5",
-                                XSTRLEN("SABER_LEVEL5")) == 0) {
-                group = WOLFSSL_SABER_LEVEL5;
-            }
-            else if (XSTRNCMP(pqcAlg, "KYBER_90S_LEVEL1",
-                                XSTRLEN("KYBER_90S_LEVEL1")) == 0) {
-                group = WOLFSSL_KYBER_90S_LEVEL1;
-            }
-            else if (XSTRNCMP(pqcAlg, "KYBER_90S_LEVEL3",
-                                XSTRLEN("KYBER_90S_LEVEL3")) == 0) {
-                group = WOLFSSL_KYBER_90S_LEVEL3;
-            }
-            else if (XSTRNCMP(pqcAlg, "KYBER_90S_LEVEL5",
-                                XSTRLEN("KYBER_90S_LEVEL5")) == 0) {
-                group = WOLFSSL_KYBER_90S_LEVEL5;
-            }
-            else if (XSTRNCMP(pqcAlg, "P256_NTRU_HPS_LEVEL1",
-                                XSTRLEN("P256_NTRU_HPS_LEVEL1")) == 0) {
-                group = WOLFSSL_P256_NTRU_HPS_LEVEL1;
-            }
-            else if (XSTRNCMP(pqcAlg, "P384_NTRU_HPS_LEVEL3",
-                                XSTRLEN("P384_NTRU_HPS_LEVEL3")) == 0) {
-                group = WOLFSSL_P384_NTRU_HPS_LEVEL3;
-            }
-            else if (XSTRNCMP(pqcAlg, "P521_NTRU_HPS_LEVEL5",
-                                XSTRLEN("P521_NTRU_HPS_LEVEL5")) == 0) {
-                group = WOLFSSL_P521_NTRU_HPS_LEVEL5;
-            }
-            else if (XSTRNCMP(pqcAlg, "P384_NTRU_HRSS_LEVEL3",
-                                XSTRLEN("P384_NTRU_HRSS_LEVEL3")) == 0) {
-                group = WOLFSSL_P384_NTRU_HRSS_LEVEL3;
-            }
-            else if (XSTRNCMP(pqcAlg, "P256_SABER_LEVEL1",
-                                XSTRLEN("P256_SABER_LEVEL1")) == 0) {
-                group = WOLFSSL_P256_SABER_LEVEL1;
-            }
-            else if (XSTRNCMP(pqcAlg, "P384_SABER_LEVEL3",
-                                XSTRLEN("P384_SABER_LEVEL3")) == 0) {
-                group = WOLFSSL_P384_SABER_LEVEL3;
-            }
-            else if (XSTRNCMP(pqcAlg, "P521_SABER_LEVEL5",
-                                XSTRLEN("P521_SABER_LEVEL5")) == 0) {
-                group = WOLFSSL_P521_SABER_LEVEL5;
-            }
-            else if (XSTRNCMP(pqcAlg, "P256_KYBER_LEVEL1",
-                                XSTRLEN("P256_KYBER_LEVEL1")) == 0) {
+            else
+        #endif
+        #ifndef WOLFSSL_NO_KYBER512
+            if (XSTRCMP(pqcAlg, "P256_KYBER_LEVEL1") == 0) {
                 group = WOLFSSL_P256_KYBER_LEVEL1;
             }
-            else if (XSTRNCMP(pqcAlg, "P384_KYBER_LEVEL3",
-                                XSTRLEN("P384_KYBER_LEVEL3")) == 0) {
+            else
+        #endif
+        #ifndef WOLFSSL_NO_KYBER768
+            if (XSTRCMP(pqcAlg, "P384_KYBER_LEVEL3") == 0) {
                 group = WOLFSSL_P384_KYBER_LEVEL3;
             }
-            else if (XSTRNCMP(pqcAlg, "P521_KYBER_LEVEL5",
-                                XSTRLEN("P521_KYBER_LEVEL5")) == 0) {
+            else if (XSTRCMP(pqcAlg, "P256_KYBER_LEVEL3") == 0) {
+                group = WOLFSSL_P256_KYBER_LEVEL3;
+            }
+            else
+        #endif
+        #ifndef WOLFSSL_NO_KYBER1024
+            if (XSTRCMP(pqcAlg, "P521_KYBER_LEVEL5") == 0) {
                 group = WOLFSSL_P521_KYBER_LEVEL5;
             }
-            else if (XSTRNCMP(pqcAlg, "P256_KYBER_90S_LEVEL1",
-                                XSTRLEN("P256_KYBER_90S_LEVEL1")) == 0) {
-                group = WOLFSSL_P256_KYBER_90S_LEVEL1;
+            else
+        #endif
+        #if !defined(WOLFSSL_NO_KYBER512) && defined(HAVE_CURVE25519)
+            if (XSTRCMP(pqcAlg, "X25519_KYBER_LEVEL1") == 0) {
+                group = WOLFSSL_X25519_KYBER_LEVEL1;
             }
-            else if (XSTRNCMP(pqcAlg, "P384_KYBER_90S_LEVEL3",
-                                XSTRLEN("P384_KYBER_90S_LEVEL3")) == 0) {
-                group = WOLFSSL_P384_KYBER_90S_LEVEL3;
+            else
+        #endif
+        #if !defined(WOLFSSL_NO_KYBER768) && defined(HAVE_CURVE25519)
+            if (XSTRCMP(pqcAlg, "X25519_KYBER_LEVEL3") == 0) {
+                group = WOLFSSL_X25519_KYBER_LEVEL3;
             }
-            else if (XSTRNCMP(pqcAlg, "P521_KYBER_90S_LEVEL5",
-                                XSTRLEN("P521_KYBER_90S_LEVEL5")) == 0) {
-                group = WOLFSSL_P521_KYBER_90S_LEVEL5;
-            } else {
+            else
+        #endif
+        #if !defined(WOLFSSL_NO_KYBER768) && defined(HAVE_CURVE448)
+            if (XSTRCMP(pqcAlg, "X448_KYBER_LEVEL3") == 0) {
+                group = WOLFSSL_X448_KYBER_LEVEL3;
+            }
+            else
+        #endif
+    #endif /* WOLFSSL_MLKEM_KYBER */
+            {
                 err_sys("invalid post-quantum KEM specified");
             }
 
-            printf("Using Post-Quantum KEM: %s\n", pqcAlg);
-            if (wolfSSL_UseKeyShare(ssl, group) != WOLFSSL_SUCCESS) {
-                err_sys("unable to use post-quantum KEM");
+            do {
+                ret = wolfSSL_UseKeyShare(ssl, group);
+                if (ret == WOLFSSL_SUCCESS) {
+                    printf("Using Post-Quantum KEM: %s\n", pqcAlg);
+                    groups[count++] = group;
+                }
+            #ifdef WOLFSSL_ASYNC_CRYPT
+                else if (ret == WC_NO_ERR_TRACE(WC_PENDING_E))
+                    wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
+            #endif
+                else
+                    err_sys("unable to use post-quantum KEM");
+            } while (ret == WC_NO_ERR_TRACE(WC_PENDING_E));
+
+        #ifdef WOLFSSL_DTLS13
+            if (wolfSSL_dtls(ssl)) {
+                /* When the KeyShare is too large for an unfragmented
+                 * ClientHello, DTLS sends an empty KeyShare extension to
+                 * use the Hello Retry Request to enable fragmentation.
+                 * In order to enforce our desired PQC algorithm in the
+                 * second ClientHello, we need to set it as the only one
+                 * allowed in the SupportedGroups extension. */
+                setGroups = 1;
             }
+        #endif /* WOLFSSL_DTLS13 */
         }
     }
     #endif
@@ -1590,14 +1647,12 @@ static const char* client_usage_msg[][70] = {
         " SSLv3(0) - TLS1.3(4)\n",                  /* 69 */
 #endif
 #ifdef HAVE_PQC
-        "--pqc <alg> Key Share with specified post-quantum algorithm only [KYBER_LEVEL1, KYBER_LEVEL3,\n",
-        "            KYBER_LEVEL5, KYBER_90S_LEVEL1, KYBER_90S_LEVEL3, KYBER_90S_LEVEL5,\n",
-        "            NTRU_HPS_LEVEL1, NTRU_HPS_LEVEL3, NTRU_HPS_LEVEL5, NTRU_HRSS_LEVEL3,\n",
-        "            SABER_LEVEL1, SABER_LEVEL3, SABER_LEVEL5, P256_NTRU_HPS_LEVEL1,\n"
-        "            P384_NTRU_HPS_LEVEL3, P521_NTRU_HPS_LEVEL5, P384_NTRU_HRSS_LEVEL3,\n"
-        "            P256_SABER_LEVEL1, P384_SABER_LEVEL3, P521_SABER_LEVEL5, P256_KYBER_LEVEL1,\n"
-        "            P384_KYBER_LEVEL3, P521_KYBER_LEVEL5, P256_KYBER_90S_LEVEL1, P384_KYBER_90S_LEVEL3,\n"
-        "            P521_KYBER_90S_LEVEL5]\n\n",                  /* 70 */
+        "--pqc <alg> Key Share with specified post-quantum algorithm only [ML_KEM_512, ML_KEM_768,\n",
+        "            ML_KEM_1024, SecP256r1MLKEM512, SecP384r1MLKEM768, SecP256r1MLKEM768,\n",
+        "            SecP521r1MLKEM1024, SecP384r1MLKEM1024, X25519MLKEM512, X25519MLKEM768,\n",
+        "            X448MLKEM768, KYBER_LEVEL1, KYBER_LEVEL3, KYBER_LEVEL5, P256_KYBER_LEVEL1,\n"
+        "            P384_KYBER_LEVEL3, P256_KYBER_LEVEL3, P521_KYBER_LEVEL5, X25519_KYBER_LEVEL1,\n"
+        "            X25519_KYBER_LEVEL3, X448_KYBER_LEVEL3]\n\n", /* 70 */
 #endif
         "For simpler wolfSSL TLS client examples, visit\n"
         "https://github.com/wolfSSL/wolfssl-examples/tree/master/tls\n", /* 71 */
@@ -1801,13 +1856,11 @@ static const char* client_usage_msg[][70] = {
 #endif
 #ifdef HAVE_PQC
         "--pqc <alg> post-quantum 名前付きグループとの鍵共有のみ\n",
-        "[KYBER_LEVEL1, KYBER_LEVEL3, KYBER_LEVEL5, KYBER_90S_LEVEL1, KYBER_90S_LEVEL3, KYBER_90S_LEVEL5,\n",
-        " NTRU_HPS_LEVEL1, NTRU_HPS_LEVEL3, NTRU_HPS_LEVEL5, NTRU_HRSS_LEVEL3,\n",
-        " LIGHTSABER, SABER, FIRESABER, P256_NTRU_HPS_LEVEL1,\n"
-        " P384_NTRU_HPS_LEVEL3, P521_NTRU_HPS_LEVEL5, P384_NTRU_HRSS_LEVEL3,\n"
-        " P256_SABER_LEVEL1, P384_SABER_LEVEL3, P521_SABER_LEVEL5, P256_KYBER_LEVEL1,\n"
-        " P384_KYBER_LEVEL3, P521_KYBER_LEVEL5, P256_KYBER_90S_LEVEL1, P384_KYBER_90S_LEVEL3,\n"
-        " P521_KYBER_90S_LEVEL5]\n\n",                            /* 70 */
+        "[ML_KEM_512, ML_KEM_768, ML_KEM_1024, SecP256r1MLKEM512, SecP384r1MLKEM768,\n",
+        " SecP256r1MLKEM768, SecP521r1MLKEM1024, SecP384r1MLKEM1024, X25519MLKEM512,\n",
+        " X25519MLKEM768, X448MLKEM768, KYBER_LEVEL1, KYBER_LEVEL3, KYBER_LEVEL5,\n"
+        " P256_KYBER_LEVEL1, P384_KYBER_LEVEL3, P256_KYBER_LEVEL3, P521_KYBER_LEVEL5,\n"
+        " X25519_KYBER_LEVEL1, X25519_KYBER_LEVEL3, X448_KYBER_LEVEL3]\n\n", /* 70 */
 #endif
         "For simpler wolfSSL TLS client examples, visit\n"
         "https://github.com/wolfSSL/wolfssl-examples/tree/master/tls\n", /* 71 */
