@@ -165,7 +165,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
                 /* convert name to upper case */
                 for (i = 0; i < (int)XSTRLEN(name); i++)
-                    (void)toupper(name[i]);
+                    name[i] = (char)toupper((unsigned char)name[i]);
             }
         }
 
@@ -501,7 +501,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                     }
                     else {
                         WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", argv[ret+1]);
-                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_25\0", hdLen);
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_256\0", hdLen);
                     }
                     break;
                 case 60:
@@ -509,7 +509,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/3_256\0", hdLen);
                     }
                     else if (XSTRNCMP(argv[ret+1], "6", 1) == 0) {
-                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/8_256\0", hdLen);
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/6_256\0", hdLen);
                     }
                     else if (XSTRNCMP(argv[ret+1], "12", 2) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/12_256\0", hdLen+1);
