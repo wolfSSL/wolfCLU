@@ -509,7 +509,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/3_256\0", hdLen);
                     }
                     else if (XSTRNCMP(argv[ret+1], "6", 1) == 0) {
-                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/8_256\0", hdLen);
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/6_256\0", hdLen);
                     }
                     else if (XSTRNCMP(argv[ret+1], "12", 2) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/12_256\0", hdLen+1);
