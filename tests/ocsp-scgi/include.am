@@ -1,0 +1,9 @@
+# vim:ft=automake
+# included from Top Level Makefile.am
+# All paths should be given relative to the root
+
+# SCGI tests are run as part of make check
+# Tests will be skipped if nginx or openssl are not available
+dist_noinst_SCRIPTS += tests/ocsp-scgi/ocsp-scgi-test.sh
+
+EXTRA_DIST += tests/ocsp-scgi/scgi_params

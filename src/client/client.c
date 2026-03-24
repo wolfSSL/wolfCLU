@@ -36,6 +36,8 @@
 
 #include <wolfssl/ssl.h>
 
+#include <wolfclu/clu_header_main.h>
+
 #define HAVE_GETADDRINFO 1
 #define HAVE_ERRNO_H 1
 
@@ -389,7 +391,6 @@ static const char kResumeMsg[] = "resuming wolfssl!" TEST_STR_TERM;
 #if defined(WOLFSSL_TLS13) && defined(WOLFSSL_EARLY_DATA)
     static const char kEarlyMsg[] = "A drop of info" TEST_STR_TERM;
 #endif
-static const char kHttpGetMsg[] = "GET /index.html HTTP/1.0\r\n\r\n";
 
 /* Write needs to be largest of the above strings (29) */
 #define CLI_MSG_SZ      32
@@ -1000,7 +1001,8 @@ static int ClientBenchmarkConnections(WOLFSSL_CTX* ctx, char* host, word16 port,
         #endif
             {
                 /* no null term */
-                if (wolfSSL_write(ssl, kHttpGetMsg, sizeof(kHttpGetMsg)-1) <= 0)
+                if (wolfSSL_write(ssl, wolfCLU_GetDefaultHttpGet(),
+                                  wolfCLU_GetDefaultHttpGetLength()) <= 0)
                     err_sys("SSL_write failed");
 
                 if (wolfSSL_read(ssl, reply, sizeof(reply)-1) <= 0)
@@ -1247,7 +1249,7 @@ static int StartTLS_Init(SOCKET_T* sockfd)
 
     /* S: 220 <host> SMTP service ready */
     XMEMSET(tmpBuf, 0, sizeof(tmpBuf));
-    if (recv(*sockfd, tmpBuf, sizeof(tmpBuf)-1, 0) < 0)
+    if (wolfCLU_Recv(*sockfd, tmpBuf, sizeof(tmpBuf)-1) < 0)
         err_sys("failed to read STARTTLS command\n");
 
     if (!XSTRNCMP(tmpBuf, starttlsCmd[0], XSTRLEN(starttlsCmd[0]))) {
@@ -1257,13 +1259,14 @@ static int StartTLS_Init(SOCKET_T* sockfd)
     }
 
     /* C: EHLO mail.example.com */
-    if (send(*sockfd, starttlsCmd[1], (int)XSTRLEN(starttlsCmd[1]), 0) !=
+    if (wolfCLU_SendAll(*sockfd, starttlsCmd[1],
+              (int)XSTRLEN(starttlsCmd[1])) !=
               (int)XSTRLEN(starttlsCmd[1]))
         err_sys("failed to send STARTTLS EHLO command\n");
 
     /* S: 250 <host> offers a warm hug of welcome */
     XMEMSET(tmpBuf, 0, sizeof(tmpBuf));
-    if (recv(*sockfd, tmpBuf, sizeof(tmpBuf)-1, 0) < 0)
+    if (wolfCLU_Recv(*sockfd, tmpBuf, sizeof(tmpBuf)-1) < 0)
         err_sys("failed to read STARTTLS command\n");
 
     if (!XSTRNCMP(tmpBuf, starttlsCmd[2], XSTRLEN(starttlsCmd[2]))) {
@@ -1273,14 +1276,15 @@ static int StartTLS_Init(SOCKET_T* sockfd)
     }
 
     /* C: STARTTLS */
-    if (send(*sockfd, starttlsCmd[3], (int)XSTRLEN(starttlsCmd[3]), 0) !=
+    if (wolfCLU_SendAll(*sockfd, starttlsCmd[3],
+              (int)XSTRLEN(starttlsCmd[3])) !=
               (int)XSTRLEN(starttlsCmd[3])) {
         err_sys("failed to send STARTTLS command\n");
     }
 
     /* S: 220 Go ahead */
     XMEMSET(tmpBuf, 0, sizeof(tmpBuf));
-    if (recv(*sockfd, tmpBuf, sizeof(tmpBuf)-1, 0) < 0)
+    if (wolfCLU_Recv(*sockfd, tmpBuf, sizeof(tmpBuf)-1) < 0)
         err_sys("failed to read STARTTLS command\n");
     tmpBuf[sizeof(tmpBuf)-1] = '\0';
     if (!XSTRNCMP(tmpBuf, starttlsCmd[4], XSTRLEN(starttlsCmd[4]))) {
@@ -4194,8 +4198,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     if (sendGET) {
         printf("SSL connect ok, sending GET...\n");
 
-        msgSz = (int)XSTRLEN(kHttpGetMsg);
-        XMEMCPY(msg, kHttpGetMsg, msgSz);
+        msgSz = wolfCLU_GetDefaultHttpGetLength();
+        XMEMCPY(msg, wolfCLU_GetDefaultHttpGet(), msgSz);
     }
     else {
         msgSz = (int)XSTRLEN(kHelloMsg);
@@ -4489,8 +4493,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
         XMEMSET(msg, 0, sizeof(msg));
         if (sendGET) {
-            msgSz = (int)XSTRLEN(kHttpGetMsg);
-            XMEMCPY(msg, kHttpGetMsg, msgSz);
+            msgSz = wolfCLU_GetDefaultHttpGetLength();
+            XMEMCPY(msg, wolfCLU_GetDefaultHttpGet(), msgSz);
         }
         else {
             msgSz = (int)XSTRLEN(kResumeMsg);

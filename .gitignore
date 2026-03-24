@@ -10,6 +10,7 @@ autom4te.cache/
 config.log
 config.status
 configure
+configure~
 clu_src/config.h.in*
 *.lo
 *.Plo
@@ -35,3 +36,7 @@ src/config.h.in~
 src/stamp-h1
 *.gcno
 *.gcda
+.cproject
+.project
+.settings/
+AGENTS.md

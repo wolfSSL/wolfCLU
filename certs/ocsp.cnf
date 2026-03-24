@@ -1,0 +1,5 @@
+[ v3_ocsp ]
+basicConstraints       = CA:false
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+extendedKeyUsage       = OCSPSigning

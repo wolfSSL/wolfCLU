@@ -46,6 +46,10 @@ wolfssl_SOURCES = src/clu_main.c \
                     src/server/clu_server_setup.c \
                     src/pkcs/clu_pkcs7.c \
                     src/pkcs/clu_pkcs8.c \
-                    src/tools/clu_base64.c
+                    src/tools/clu_base64.c \
+                    src/tools/clu_http.c \
+                    src/tools/clu_scgi.c \
+                    src/tools/clu_pem_der.c \
+                    src/ocsp/clu_ocsp.c
 
 

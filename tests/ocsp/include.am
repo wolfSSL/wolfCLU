@@ -1,0 +1,6 @@
+# vim:ft=automake
+# included from top level Makefile.am
+# All paths should be given relative to root directory
+
+# Only register the consolidated test - interop test is a helper
+dist_noinst_SCRIPTS+=tests/ocsp/ocsp-test.sh

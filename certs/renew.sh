@@ -46,6 +46,17 @@ cp  $CERTS_DIR/intermediate/client-int-cert.pem .
 #cp $CERTS_DIR/../examples/client/client.c ../src/client/client.c
 #sed -i '' "s/examples\/client\//wolfclu\//" ../src/client/client.c
 
+echo "Generate OCSP responder certificate"
+openssl genrsa -out ocsp-responder-key.pem 2048
+openssl req -new -key ocsp-responder-key.pem -out ocsp-responder.csr \
+    -subj "/C=US/ST=Montana/L=Bozeman/O=wolfSSL OCSP/OU=Responder/CN=OCSP Responder"
+openssl x509 -req -in ocsp-responder.csr \
+    -CA ca-cert.pem -CAkey ca-key.pem \
+    -extfile ocsp.cnf -extensions v3_ocsp \
+    -days 1000 -set_serial 100 -out ocsp-responder-cert.pem
+rm ocsp-responder.csr
+echo "OCSP responder certificate created"
+
 echo "Recreate expected encrypted data with new files"
 openssl enc -aes-256-cbc -nosalt -in ./crl.der -out ./crl.der.enc -k ""
 openssl enc -base64 -aes-256-cbc -nosalt -in ./crl.der -out ./crl.der.enc.base64 -k ""

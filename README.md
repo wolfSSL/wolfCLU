@@ -200,6 +200,102 @@ wolfssl ca -altextend -in B.cert -keyfile ecc-key-A.priv -altkey ml-dsa-key-A.pr
 wolfssl ca -altextend -in C.cert -keyfile ecc-key-B.priv -altkey ml-dsa-key-B.priv -altpub ml-dsa-key-C.pub -subjkey ecc-key-C.priv  -cert B-chimera.cert -out C-chimera.cert
 ```
 
+## Deploying an OCSP Responder with nginx and SCGI
+
+wolfCLU includes an OCSP responder that can be deployed in production using nginx as an HTTP frontend and SCGI (Simple Common Gateway Interface) as the communication protocol. **This is the preferred deployment method** because SCGI is much simpler than HTTP while allowing you to leverage a mature and robust HTTP implementation like nginx.
+
+### Why SCGI?
+
+- **Simplicity**: SCGI is a straightforward protocol that's easier to implement than full HTTP
+- **Robustness**: nginx handles all HTTP concerns (timeouts, keep-alive, TLS, load balancing, etc.)
+- **Separation of roles**: The OCSP responder focuses on OCSP logic, nginx handles web serving
+
+### Prerequisites
+
+Install nginx:
+```
+sudo apt-get install nginx    # Debian/Ubuntu
+sudo yum install nginx        # RHEL/CentOS
+brew install nginx            # macOS
+```
+
+### Basic Setup
+
+1. **Start the wolfCLU OCSP responder in SCGI mode:**
+
+```bash
+wolfssl ocsp -scgi \
+    -port 8081 \
+    -index /path/to/index.txt \
+    -rsigner /path/to/ca-cert.pem \
+    -rkey /path/to/ca-key.pem \
+    -CA /path/to/ca-cert.pem
+```
+
+The responder will listen on port 8081 for SCGI connections.
+
+2. **Configure nginx to proxy HTTP OCSP requests to the SCGI backend:**
+
+Create a file `/etc/nginx/ocsp-scgi.conf`:
+
+```nginx
+# SCGI parameters for OCSP
+scgi_param  REQUEST_METHOD     $request_method;
+scgi_param  REQUEST_URI        $request_uri;
+scgi_param  QUERY_STRING       $query_string;
+scgi_param  CONTENT_TYPE       $content_type;
+scgi_param  CONTENT_LENGTH     $content_length;
+
+scgi_param  SCRIPT_NAME        $fastcgi_script_name;
+scgi_param  DOCUMENT_URI       $document_uri;
+scgi_param  DOCUMENT_ROOT      $document_root;
+scgi_param  SERVER_PROTOCOL    $server_protocol;
+scgi_param  HTTPS              $https if_not_empty;
+
+scgi_param  REMOTE_ADDR        $remote_addr;
+scgi_param  REMOTE_PORT        $remote_port;
+scgi_param  SERVER_PORT        $server_port;
+scgi_param  SERVER_NAME        $server_name;
+```
+
+Add to your nginx site configuration (e.g., `/etc/nginx/sites-available/default`):
+
+```nginx
+server {
+    listen 80;
+    server_name ocsp.example.com;
+    
+    location /ocsp {
+        scgi_pass localhost:8081;
+        include /etc/nginx/ocsp-scgi.conf;
+        
+        scgi_connect_timeout 5s;
+        scgi_send_timeout 10s;
+        scgi_read_timeout 10s;
+    }
+}
+```
+
+3. **Reload nginx:**
+
+```bash
+sudo nginx -t                 # Test configuration
+sudo systemctl reload nginx   # Reload nginx
+```
+
+4. **Test the OCSP responder:**
+
+```bash
+wolfssl ocsp \
+    -issuer ca-cert.pem \
+    -cert server-cert.pem \
+    -url http://ocsp.example.com/ocsp
+```
+
+### Index File Format
+
+The `-index` file uses OpenSSL's CA index format.
+
 ## Contacts
 
 Please contact support@wolfssl.com with any questions or comments.

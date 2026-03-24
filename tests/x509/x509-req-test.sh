@@ -330,6 +330,7 @@ if [ $? -eq 0 ]; then
     fi
 fi
 rm -f tmp.cert
+rm -f tmp.csr
 
 echo "Done"
 exit 0

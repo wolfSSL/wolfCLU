@@ -86,6 +86,9 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "enc / encrypt  Encrypt a file or some user input");
     WOLFCLU_LOG(WOLFCLU_L0, "hash           Hash a file or input");
     WOLFCLU_LOG(WOLFCLU_L0, "md5            Creates an MD5 hash");
+#if defined(HAVE_OCSP) && defined(HAVE_OCSP_RESPONDER)
+    WOLFCLU_LOG(WOLFCLU_L0, "ocsp           OCSP utility (client and responder)");
+#endif
     WOLFCLU_LOG(WOLFCLU_L0, "pkey           Used for key operations");
     WOLFCLU_LOG(WOLFCLU_L0, "req            Request for certificate generation");
     WOLFCLU_LOG(WOLFCLU_L0, "-rsa           Legacy RSA signing and signature verification");
