@@ -501,7 +501,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                     }
                     else {
                         WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", argv[ret+1]);
-                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_25\0", hdLen);
+                        XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_256\0", hdLen);
                     }
                     break;
                 case 60:
