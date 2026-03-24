@@ -154,7 +154,7 @@ int wolfCLU_ecparam(int argc, char** argv)
 
                 /* convert name to upper case */
                 for (i = 0; i < (int)XSTRLEN(name); i++)
-                    (void)toupper(name[i]);
+                    name[i] = toupper(name[i]);
 
                 #if 0
                 /* way to get the key size if needed in the future */
