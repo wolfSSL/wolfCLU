@@ -165,7 +165,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
                 /* convert name to upper case */
                 for (i = 0; i < (int)XSTRLEN(name); i++)
-                    name[i] = toupper(name[i]);
+                    name[i] = (char)toupper((unsigned char)name[i]);
             }
         }
 
