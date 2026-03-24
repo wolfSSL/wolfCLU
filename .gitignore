@@ -40,3 +40,8 @@ src/stamp-h1
 .project
 .settings/
 AGENTS.md
+Win32/
+x64/
+.vs/
+
+CLAUDE.md
