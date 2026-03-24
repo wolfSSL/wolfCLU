@@ -1039,7 +1039,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                             int keySz, int level, int withAlg)
 {
-#ifdef HAVE_DILITHIUM    
+#ifdef HAVE_DILITHIUM
     int    ret = WOLFCLU_SUCCESS;
 
     XFILE  file = NULL;
@@ -1076,11 +1076,11 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
     /* init the dilithium key */
     if (wc_dilithium_init(key) != 0) {
-        wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
+        wolfCLU_LogError("Failed to initialize Dilithium Key.");
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
     #endif
-        return ret;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     /* set the level of the dilithium key */
@@ -1113,12 +1113,6 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
     if (ret == WOLFCLU_SUCCESS) {
         XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
         XMEMCPY(fOutNameBuf, fName, fNameSz);
-
-        derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
-                DYNAMIC_TYPE_TMP_BUFFER);
-        if (derBuf == NULL) {
-            ret = MEMORY_E;
-        }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -1129,6 +1123,13 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
             case PRIV_ONLY_FILE:
                 /* add on the final part of the file name ".priv" */
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
+
+                derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (derBuf == NULL) {
+                    ret = MEMORY_E;
+                    break;
+                }
                 WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
 
                 /* Private key to der */
@@ -1184,7 +1185,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 FALL_THROUGH;
             case PUB_ONLY_FILE:
-                /* add on the final part of the file name ".priv" */
+                /* add on the final part of the file name ".pub" */
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                 WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
@@ -1192,8 +1193,9 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                                         DYNAMIC_TYPE_TMP_BUFFER);
                 if (derBuf == NULL) {
                     ret = MEMORY_E;
+                    break;
                 }
-                
+
                 derBufSz = wc_Dilithium_PublicKeyToDer(key, derBuf,
                                                 (word32)keySz, withAlg);
                 if (derBufSz < 0) {
