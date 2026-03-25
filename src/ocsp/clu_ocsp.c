@@ -1309,6 +1309,8 @@ int wolfCLU_OcspSetup(int argc, char** argv)
         return ret;
     }
 
+    StartTCP();
+
     if (!(isClientMode ^ isResponderMode)) {
         wolfCLU_LogError("Can't detect side (client vs responder) or multiple sides specified");
         wolfCLU_OcspHelp();

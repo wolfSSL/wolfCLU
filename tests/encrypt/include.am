@@ -2,6 +2,6 @@
 # included from top level Makefile.am
 # ALl path should be given relative to root directory
 
-dist_noinst_SCRIPTS+=tests/encrypt/enc-test.sh
+dist_noinst_SCRIPTS+=tests/encrypt/enc-test.py
 
 

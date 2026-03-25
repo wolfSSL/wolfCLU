@@ -43,5 +43,5 @@ AGENTS.md
 Win32/
 x64/
 .vs/
-
+__pycache__/
 CLAUDE.md

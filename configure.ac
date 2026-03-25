@@ -55,6 +55,8 @@ AC_PROG_INSTALL
 AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AM_PROG_CC_C_O
+AM_PATH_PYTHON([3.0],, [:])
+AC_SUBST([PYTHON])
 
 # Checks for headers/libraries
 AC_CHECK_HEADERS([sys/time.h string.h termios.h unistd.h])

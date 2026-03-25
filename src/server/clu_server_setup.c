@@ -190,6 +190,7 @@ int wolfCLU_Server(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
+        StartTCP();
         args.argv = (char**)serverArgv;
         args.argc = serverArgc;
         server_test(&args);
