@@ -2,9 +2,9 @@
 # included from top level Makefile.am
 # ALl path should be given relative to root directory
 
-dist_noinst_SCRIPTS+=tests/x509/x509-ca-test.sh
-dist_noinst_SCRIPTS+=tests/x509/x509-process-test.sh
-dist_noinst_SCRIPTS+=tests/x509/x509-req-test.sh
-dist_noinst_SCRIPTS+=tests/x509/x509-verify-test.sh
-dist_noinst_SCRIPTS+=tests/x509/CRL-verify-test.sh
+dist_noinst_SCRIPTS+=tests/x509/x509-ca-test.py
+dist_noinst_SCRIPTS+=tests/x509/x509-process-test.py
+dist_noinst_SCRIPTS+=tests/x509/x509-req-test.py
+dist_noinst_SCRIPTS+=tests/x509/x509-verify-test.py
+dist_noinst_SCRIPTS+=tests/x509/CRL-verify-test.py
 

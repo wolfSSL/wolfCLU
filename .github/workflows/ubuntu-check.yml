@@ -17,8 +17,8 @@ jobs:
         # Don't prompt for anything
         export DEBIAN_FRONTEND=noninteractive
         sudo apt-get update
-        # openssl and nginx used for ocsp testing
-        sudo apt-get install -y openssl nginx
+        # openssl used for ocsp interop testing
+        sudo apt-get install -y openssl
     - uses: actions/checkout@master
       with:
         repository: wolfssl/wolfssl

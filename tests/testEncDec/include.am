@@ -2,6 +2,5 @@
 # included from top level Makefile.am
 # ALl path should be given relative to root directory
 
-dist_noinst_SCRIPTS+=tests/dsa/dsa-test.py
-
+dist_noinst_SCRIPTS+=tests/testEncDec/encdec-test.py
 

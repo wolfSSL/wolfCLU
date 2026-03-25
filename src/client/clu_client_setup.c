@@ -65,11 +65,12 @@ static const char caFileFlag[]     = "-A";
 static const char noClientCert[]   = "-x";
 static const char startTLSFlag[]   = "-M";
 static const char disableCRLFlag[] = "-C";
+static const char sniFlag[]       = "-S";
 
 int myoptind = 0;
 char* myoptarg = NULL;
 
-#define MAX_CLIENT_ARGS 15
+#define MAX_CLIENT_ARGS 17
 
 /* return WOLFCLU_SUCCESS on success */
 static int _addClientArg(const char** args, const char* in, int* idx)
@@ -193,6 +194,14 @@ int wolfCLU_Client(int argc, char** argv)
                                 &clientArgc);
                     }
                 }
+
+                /* Set SNI hostname so modern servers accept the connection */
+                if (ret == WOLFCLU_SUCCESS && host != NULL) {
+                    ret = _addClientArg(clientArgv, sniFlag, &clientArgc);
+                    if (ret == WOLFCLU_SUCCESS) {
+                        ret = _addClientArg(clientArgv, host, &clientArgc);
+                    }
+                }
                 break;
 
             case WOLFCLU_STARTTLS:
@@ -264,6 +273,7 @@ int wolfCLU_Client(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
+        StartTCP();
         args.argv = (char**)clientArgv;
         args.argc = clientArgc;
 

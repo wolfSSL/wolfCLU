@@ -2,4 +2,4 @@
 # included from top level Makefile.am
 # ALl path should be given relative to root directory
 
-dist_noinst_SCRIPTS+=tests/hash/hash-test.sh
+dist_noinst_SCRIPTS+=tests/hash/hash-test.py

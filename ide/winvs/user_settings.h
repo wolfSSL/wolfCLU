@@ -25,7 +25,18 @@
 #define WOLFSSL_SHA512
 
 #define HAVE_TLS_EXTENSIONS
+#define HAVE_SNI
+#define WOLFSSL_TLS13
+#define HAVE_HKDF
+#define WC_RSA_PSS
+#define HAVE_SUPPORTED_CURVES
+#define HAVE_FFDHE_2048
 #define OPENSSL_ALL
 #define OPENSSL_EXTRA
+#define HAVE_PKCS7
+#define HAVE_PKCS12
+#define HAVE_CRL
+#define HAVE_OCSP
+#define HAVE_OCSP_RESPONDER
 
 #endif /* _WIN_USER_SETTINGS_H_ */

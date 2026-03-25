@@ -19,6 +19,9 @@ dist_doc_DATA=
 check_SCRIPTS=
 dist_noinst_SCRIPTS=
 
+TEST_EXTENSIONS = .sh .py
+PY_LOG_COMPILER = $(PYTHON)
+
 #includes additional rules from aminclude.am
 @INC_AMINCLUDE@
 DISTCLEANFILES+= aminclude.am
@@ -61,6 +64,7 @@ include tests/hash/include.am
 include tests/bench/include.am
 include tests/client/include.am
 include tests/server/include.am
+include tests/testEncDec/include.am
 include ide/include.am
 #####include data/include.am
 

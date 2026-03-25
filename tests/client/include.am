@@ -2,6 +2,6 @@
 # included from top level Makefile.am
 # ALl path should be given relative to root directory
 
-dist_noinst_SCRIPTS+=tests/client/client-test.sh
+dist_noinst_SCRIPTS+=tests/client/client-test.py
 
 
