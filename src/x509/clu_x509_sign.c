@@ -1293,6 +1293,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         #ifdef WOLFSSL_SHAKE256
             case WC_HASH_TYPE_SHAKE256:
         #endif
+            case WC_HASH_TYPE_SM3:
     #endif
             default:
                 wolfCLU_LogError("Unsupported hash type");
