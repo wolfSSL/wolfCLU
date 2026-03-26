@@ -347,7 +347,10 @@ int wolfCLU_setup(int argc, char** argv, char action)
             WOLFCLU_LOG(WOLFCLU_L0,
                     "-in flag was not set, please enter a string or"
                    "file name to be encrypted: ");
-            ret = (int) scanf("%s", inName);
+            ret = (fgets(inName, sizeof(inName), stdin) != NULL) ? 1 : 0;
+            if (ret > 0) {
+                inName[strcspn(inName, "\n")] = '\0';
+            }
         }
         in = inName;
         WOLFCLU_LOG(WOLFCLU_L0, "Encrypting :\"%s\"", inName);
@@ -397,7 +400,11 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 while (ret == 0) {
                     WOLFCLU_LOG(WOLFCLU_L0,
                             "Please enter a name for the output file: ");
-                    ret = (int) scanf("%s", outNameEnc);
+                    ret = (fgets(outNameEnc, sizeof(outNameEnc), stdin) != NULL)
+                                     ? 1 : 0;
+                    if (ret > 0) {
+                        outNameEnc[strcspn(outNameEnc, "\n")] = '\0';
+                    }
                     out = (ret > 0) ? outNameEnc : '\0';
                 }
             }
@@ -419,7 +426,11 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 while (ret == 0) {
                     WOLFCLU_LOG(WOLFCLU_L0,
                             "Please enter a name for the output file: ");
-                    ret = (int) scanf("%s", outNameDec);
+                    ret = (fgets(outNameDec, sizeof(outNameDec), stdin) != NULL)
+                                                                     ? 1 : 0;
+                    if (ret > 0) {
+                        outNameDec[strcspn(outNameDec, "\n")] = '\0';
+                    }
                     out = (ret > 0) ? outNameDec : '\0';
                 }
             }
