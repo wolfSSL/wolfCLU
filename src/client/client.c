@@ -34,6 +34,8 @@
 #endif
 #include <wolfssl/wolfcrypt/settings.h>
 
+#include <ctype.h>
+
 #include <wolfssl/ssl.h>
 
 #include <wolfclu/clu_header_main.h>
