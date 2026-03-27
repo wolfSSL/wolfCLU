@@ -187,7 +187,7 @@ rm -f test-enc.der
 
 # Regression tests for stack buffer overflow fix (scanf -> fgets)
 
-# Test: -in not provided, filename supplied via stdin (inName path, L344)
+# Test: -in not provided, filename supplied via stdin to exercise the inName Path
 printf "certs/crl.der\n" | ./wolfssl enc -aes-128-cbc -out test-stdin-in.enc -k "testpass" > /dev/null 2>&1
 if [ $? != 0 ]; then
     echo "Failed: enc with stdin input (no -in flag)"
