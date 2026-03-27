@@ -248,8 +248,10 @@ if [ $? -eq 0 ]; then
         exit 99
     fi
 
-    rm -f test-cam-probe.enc test-cam-stdin.enc test-cam-stdin.dec
+    rm -f test-cam-stdin.enc test-cam-stdin.dec
 fi
+
+rm -f test-cam-probe.enc
 
 # Test: inName empty line is rejected, re-prompt accepts valid filename
 printf "\ncerts/crl.der\n" | ./wolfssl enc -aes-128-cbc -out test-empty-in.enc -k "testpass" > /dev/null 2>&1
