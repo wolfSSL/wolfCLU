@@ -185,5 +185,28 @@ fi
 rm -f test-dec.der
 rm -f test-enc.der
 
+# camellia: decrypt file of exactly MAX_LEN bytes (non-EVP path)
+if grep -q "HAVE_CAMELLIA" wolfssl/wolfssl/options.h 2>/dev/null; then
+    dd if=/dev/urandom bs=2048 count=1 of=test_maxlen_camellia.bin 2>/dev/null
+    ./wolfssl encrypt camellia-cbc-128 -pwd testpwd \
+        -in test_maxlen_camellia.bin -out test_maxlen_camellia.enc
+    if [ $? != 0 ]; then
+        echo "failed to encrypt in MAX_LEN boundary test"
+        exit 99
+    fi
+    ./wolfssl decrypt camellia-cbc-128 \
+        -in test_maxlen_camellia.enc -out test_maxlen_camellia.dec -pwd testpwd
+    if [ $? != 0 ]; then
+        echo "failed to decrypt in MAX_LEN boundary test"
+        exit 99
+    fi
+    diff test_maxlen_camellia.bin test_maxlen_camellia.dec &> /dev/null
+    if [ $? != 0 ]; then
+        echo "MAX_LEN boundary: decrypted file does not match original"
+        exit 99
+    fi
+    rm -f test_maxlen_camellia.bin test_maxlen_camellia.enc test_maxlen_camellia.dec
+fi
+
 echo "Done"
 exit 0

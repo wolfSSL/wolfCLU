@@ -257,7 +257,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     const char *altSigAlgOid        = "2.5.29.73";
     const char *altSigValOid        = "2.5.29.74";
 
-    /* 
+    /*
      * LARGE_TEMO_SZ defines the size of temporary buffers used for signature key,
      * verification key and signature value buffers.
      * The value 11264 is enough for P-521 and ML-DSA-87 PEM certs.
@@ -397,7 +397,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
-        
+
         if (ret == 0) {
             XMEMSET(caKeyBuf, 0, caKeySz); /* clear original buffer */
             caKeySz = derObj->length;
@@ -667,13 +667,13 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 
     if (ret == WOLFCLU_SUCCESS) {
         switch (level) {
-            case 2: 
+            case 2:
                 newCert.sigType = CTC_SHA256wECDSA;
                 break;
-            case 3: 
+            case 3:
                 newCert.sigType = CTC_SHA384wECDSA;
                 break;
-            case 5: 
+            case 5:
                 newCert.sigType = CTC_SHA512wECDSA;
                 break;
         }
@@ -691,7 +691,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             else {
                 ret = WOLFCLU_SUCCESS;
             }
-        }        
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -715,7 +715,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     }
 
     if (ret == WOLFCLU_SUCCESS && isCA) {
-        ret = wc_MakeCert(&newCert, scratchBuf, 
+        ret = wc_MakeCert(&newCert, scratchBuf,
                             scratchSz, NULL, &caKey, &rng);
         if (ret <= 0) {
             wolfCLU_LogError("Error making certificate");
@@ -732,7 +732,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
                 scratchSz = ret;
                 ret = WOLFCLU_SUCCESS;
             }
-        }        
+        }
     }
     else if (ret == WOLFCLU_SUCCESS && !isCA) {
         ret = wc_MakeCert(&newCert, scratchBuf, scratchSz,
@@ -1274,7 +1274,13 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             case WC_HASH_TYPE_BLAKE2B:
             case WC_HASH_TYPE_BLAKE2S:
 
-    #if LIBWOLFSSL_VERSION_HEX > 0x05001000
+    #if LIBWOLFSSL_VERSION_HEX >= 0x05009000
+            case WC_HASH_TYPE_SHA512_224:
+            case WC_HASH_TYPE_SHA512_256:
+            case WC_HASH_TYPE_SHAKE128:
+            case WC_HASH_TYPE_SHAKE256:
+            case WC_HASH_TYPE_SM3:
+    #elif LIBWOLFSSL_VERSION_HEX > 0x05001000
         #ifndef WOLFSSL_NOSHA512_224
             case WC_HASH_TYPE_SHA512_224:
         #endif
