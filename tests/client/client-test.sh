@@ -42,7 +42,7 @@ if [ -f "$INJFILE" ]; then
 fi
 
 # Command substitution: "$(touch clu_injection_probe.txt)" passed as peer
-./wolfssl s_client -connect '$(touch clu_injection_probe.txt):443' \
+./wolfssl s_client -connect 'evil$(touch clu_injection_probe.txt).com:443' \
     2>/dev/null
 if [ -f "$INJFILE" ]; then
     echo "SECURITY FAILURE: command injection via hostname (command substitution)"
