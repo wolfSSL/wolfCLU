@@ -346,8 +346,31 @@ int wolfCLU_setup(int argc, char** argv, char action)
         while (ret == 0) {
             WOLFCLU_LOG(WOLFCLU_L0,
                     "-in flag was not set, please enter a string or"
-                   "file name to be encrypted: ");
-            ret = (int) scanf("%s", inName);
+                   " file name to be encrypted: ");
+            if (fgets(inName, sizeof(inName), stdin) == NULL) {
+                /* EOF or read error: cannot prompt further */
+                wolfCLU_LogError("failed to read input file name");
+                wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                if (mode != NULL)
+                    XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                return WOLFCLU_FATAL_ERROR;
+            }
+            /* If no newline is present, the line was too long: flush and
+             * re-prompt rather than proceeding with a truncated filename. */
+            if (strchr(inName, '\n') == NULL) {
+                int ch;
+                do {
+                    ch = getchar();
+                } while (ch != '\n' && ch != EOF);
+                wolfCLU_LogError("input too long, please try again");
+                continue;
+            }
+            inName[strcspn(inName, "\n")] = '\0';
+            /* Do not accept an empty string as valid input */
+            if (inName[0] == '\0') {
+                continue;
+            }
+            ret = 1;
         }
         in = inName;
         WOLFCLU_LOG(WOLFCLU_L0, "Encrypting :\"%s\"", inName);
@@ -397,8 +420,28 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 while (ret == 0) {
                     WOLFCLU_LOG(WOLFCLU_L0,
                             "Please enter a name for the output file: ");
-                    ret = (int) scanf("%s", outNameEnc);
-                    out = (ret > 0) ? outNameEnc : '\0';
+                    if (fgets(outNameEnc, sizeof(outNameEnc), stdin) == NULL) {
+                        /* EOF or read error: cannot prompt further */
+                        wolfCLU_LogError("failed to read output file name");
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        if (mode != NULL)
+                            XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        return WOLFCLU_FATAL_ERROR;
+                    }
+                    if (strchr(outNameEnc, '\n') == NULL) {
+                        int ch;
+                        do {
+                            ch = getchar();
+                        } while (ch != '\n' && ch != EOF);
+                        wolfCLU_LogError("input too long, please try again");
+                        continue;
+                    }
+                    outNameEnc[strcspn(outNameEnc, "\n")] = '\0';
+                    if (outNameEnc[0] == '\0') {
+                        continue;
+                    }
+                    out = outNameEnc;
+                    ret = 1;
                 }
             }
             ret = wolfCLU_encrypt(alg, mode, pwdKey, key, keySize, in, out,
@@ -419,8 +462,28 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 while (ret == 0) {
                     WOLFCLU_LOG(WOLFCLU_L0,
                             "Please enter a name for the output file: ");
-                    ret = (int) scanf("%s", outNameDec);
-                    out = (ret > 0) ? outNameDec : '\0';
+                    if (fgets(outNameDec, sizeof(outNameDec), stdin) == NULL) {
+                        /* EOF or read error: cannot prompt further */
+                        wolfCLU_LogError("failed to read output file name");
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        if (mode != NULL)
+                            XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        return WOLFCLU_FATAL_ERROR;
+                    }
+                    if (strchr(outNameDec, '\n') == NULL) {
+                        int ch;
+                        do {
+                            ch = getchar();
+                        } while (ch != '\n' && ch != EOF);
+                        wolfCLU_LogError("input too long, please try again");
+                        continue;
+                    }
+                    outNameDec[strcspn(outNameDec, "\n")] = '\0';
+                    if (outNameDec[0] == '\0') {
+                        continue;
+                    }
+                    out = outNameDec;
+                    ret = 1;
                 }
             }
             ret = wolfCLU_decrypt(alg, mode, pwdKey, key, keySize, in, out,

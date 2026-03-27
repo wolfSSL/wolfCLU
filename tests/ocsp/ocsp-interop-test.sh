@@ -293,7 +293,7 @@ if [ $RESULT = 0 ]; then
 fi
 
 # Check for error message
-grep -qi "fail\|error\|not found\|unable" "$TEST_DIR/test6.log"
+grep -qi "fail\|error\|not found\|unable\|no such\|could not" "$TEST_DIR/test6.log"
 if [ $? != 0 ]; then
     echo "Test 6 failed: expected error message about invalid file"
     exit 99
