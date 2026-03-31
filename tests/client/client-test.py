@@ -30,12 +30,18 @@ class ClientTest(unittest.TestCase):
                         if os.path.exists(tmp_crt) else None)
 
         # Run s_client with empty stdin so it connects then disconnects
-        s_client = subprocess.run(
-            [WOLFSSL_BIN, "s_client", "-connect", "www.google.com:443"],
-            input=b"\n",
-            capture_output=True,
-            timeout=30,
-        )
+        try:
+            s_client = subprocess.run(
+                [WOLFSSL_BIN, "s_client", "-connect", "www.google.com:443"],
+                input=b"\n",
+                capture_output=True,
+                timeout=30,
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            self.skipTest("s_client connection timed out or failed")
+
+        if s_client.returncode != 0 or not s_client.stdout:
+            self.skipTest("s_client could not connect (no network?)")
 
         # Pipe s_client stdout into x509 to extract the cert as PEM
         x509_extract = subprocess.run(

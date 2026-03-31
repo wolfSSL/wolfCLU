@@ -14,7 +14,7 @@ TESTS_X509_DIR = os.path.join(".", "tests", "x509")
 HAS_OPENSSL = shutil.which("openssl") is not None
 
 
-def _check_cert_signature(cert_path, digest):
+def _check_cert_signature(cert_path, digest, inform="PEM"):
     """Use OpenSSL to verify the signature on a self-signed certificate.
 
     Returns True on success, raises AssertionError on failure.
@@ -24,10 +24,13 @@ def _check_cert_signature(cert_path, digest):
         raise unittest.SkipTest("openssl not available")
 
     stripped = cert_path + ".stripped.pem"
+    sig_bin = cert_path + ".sig.bin"
+    body_bin = cert_path + ".body.bin"
+    pub_pem = cert_path + ".pub.pem"
     try:
         subprocess.run(
-            ["openssl", "x509", "-in", cert_path, "-out", stripped,
-             "-outform", "PEM"],
+            ["openssl", "x509", "-inform", inform, "-in", cert_path,
+             "-out", stripped, "-outform", "PEM"],
             check=True, capture_output=True, timeout=60)
 
         # Extract signature hex
@@ -48,17 +51,14 @@ def _check_cert_signature(cert_path, digest):
                 lines.append(stripped_line)
         sig_hex = "".join(lines)
 
-        sig_bin = cert_path + ".sig.bin"
         with open(sig_bin, "wb") as f:
             f.write(bytes.fromhex(sig_hex))
 
-        body_bin = cert_path + ".body.bin"
         subprocess.run(
             ["openssl", "asn1parse", "-in", stripped, "-strparse", "4",
              "-out", body_bin, "-noout"],
             check=True, capture_output=True, timeout=60)
 
-        pub_pem = cert_path + ".pub.pem"
         with open(pub_pem, "w") as pub_f:
             subprocess.run(
                 ["openssl", "x509", "-in", stripped, "-noout", "-pubkey"],
@@ -150,7 +150,7 @@ class TestX509ProcessValid(unittest.TestCase):
                         "-in", os.path.join(CERTS_DIR, "ca-cert.pem"),
                         "-out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
-        _check_cert_signature(out, "sha256")
+        _check_cert_signature(out, "sha256", inform="DER")
 
     def test_1d_der_to_pem_stdout(self):
         """DER -> PEM to stdout succeeds."""
@@ -175,7 +175,7 @@ class TestX509ProcessValid(unittest.TestCase):
                         "-in", os.path.join(CERTS_DIR, "ca-cert.der"),
                         "-out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
-        _check_cert_signature(out, "sha256")
+        _check_cert_signature(out, "sha256", inform="DER")
 
     def test_1f_der_text_noout(self):
         """DER text/noout succeeds."""
