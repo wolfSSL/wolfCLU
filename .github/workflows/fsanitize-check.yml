@@ -82,7 +82,6 @@ jobs:
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/build-dir/lib
         with:
-          repository: wolfssl/wolfclu
           path: wolfclu
           configure: CC="gcc -fsanitize=address" LDFLAGS="-L${{ github.workspace }}/build-dir/lib" CPPFLAGS="-I${{ github.workspace }}/build-dir/include"
           check: true
