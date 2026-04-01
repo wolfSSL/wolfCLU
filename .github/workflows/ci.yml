@@ -27,6 +27,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          path: wolfclu
 
       - uses: actions/checkout@v4
         with:
@@ -54,12 +56,14 @@ jobs:
           make install
 
       - name: Build wolfCLU
+        working-directory: ./wolfclu
         run: |
           ./autogen.sh
           ./configure ${{ matrix.sanitize }} --with-wolfssl=$GITHUB_WORKSPACE/build-dir
           make -j
 
       - name: Run tests
+        working-directory: ./wolfclu
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/build-dir/lib
           DYLD_LIBRARY_PATH: ${{ github.workspace }}/build-dir/lib
@@ -67,4 +71,5 @@ jobs:
 
       - name: Display log
         if: always()
+        working-directory: ./wolfclu
         run: cat test-suite.log || true
