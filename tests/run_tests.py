@@ -36,7 +36,10 @@ def main():
     for test_file in sorted(glob.glob(pattern, recursive=True)):
         suite.addTests(load_tests_from_file(test_file))
 
-    runner = unittest.TextTestRunner(verbosity=2, durations=5)
+    kwargs = dict(verbosity=2)
+    if sys.version_info >= (3, 12):
+        kwargs["durations"] = 5
+    runner = unittest.TextTestRunner(**kwargs)
     result = runner.run(suite)
     sys.exit(0 if result.wasSuccessful() else 1)
 

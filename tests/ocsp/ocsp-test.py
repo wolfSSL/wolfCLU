@@ -38,7 +38,7 @@ def _ocsp_supported(binary):
     try:
         r = subprocess.run([binary, "ocsp", "-help"],
                            capture_output=True, timeout=5)
-        return True
+        return r.returncode == 0
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
 
