@@ -132,6 +132,30 @@
     <ClCompile Include="src\x509\clu_x509_sign.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\ocsp\clu_ocsp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\pkcs\clu_pkcs8.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\server\clu_server_setup.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\server\server.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tools\clu_http.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tools\clu_pem_der.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tools\clu_scgi.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tools\clu_base64.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="wolfclu\client.h">
