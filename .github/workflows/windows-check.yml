@@ -29,22 +29,22 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Restore wolfSSL NuGet packages
-        run: nuget restore wolfssl/wolfssl64.sln
-
       - name: Replace user_settings.h
         run: cp wolfclu/ide/winvs/user_settings.h wolfssl/IDE/WIN/user_settings.h
 
-      - name: Build wolfSSL
-        run: msbuild /m /p:Platform=${{ env.BUILD_PLATFORM }} /p:Configuration=${{ env.BUILD_CONFIGURATION }} wolfssl/wolfssl64.sln
+      - name: Detect platform toolset
+        id: toolset
+        run: |
+          $major = (vswhere -latest -property installationVersion).Split('.')[0]
+          $ts = @{ "16" = "v142"; "17" = "v143"; "18" = "v144" }[$major]
+          echo "value=$ts" >> $env:GITHUB_OUTPUT
 
-      - name: Restore wolfCLU NuGet packages
-        working-directory: wolfclu
-        run: nuget restore wolfclu.sln
+      - name: Build wolfSSL
+        run: msbuild /m /p:PlatformToolset=${{ steps.toolset.outputs.value }} /p:Platform=${{ env.BUILD_PLATFORM }} /p:Configuration=${{ env.BUILD_CONFIGURATION }} wolfssl/wolfssl64.sln
 
       - name: Build wolfCLU
         working-directory: wolfclu
-        run: msbuild /m /p:Platform=${{ env.BUILD_PLATFORM }} /p:Configuration=${{ env.BUILD_CONFIGURATION }} wolfclu.sln
+        run: msbuild /m /p:PlatformToolset=${{ steps.toolset.outputs.value }} /p:Platform=${{ env.BUILD_PLATFORM }} /p:Configuration=${{ env.BUILD_CONFIGURATION }} wolfclu.sln
 
       - name: Run tests
         working-directory: wolfclu
