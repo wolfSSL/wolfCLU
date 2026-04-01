@@ -61,6 +61,12 @@ class HashShortcutTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+
     def test_md5(self):
         r = run_wolfssl("md5", CERT_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
