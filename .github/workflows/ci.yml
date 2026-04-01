@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: ['*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        config:
+          - '--enable-wolfclu'
+          - '--enable-wolfclu --enable-crl --enable-dsa --enable-pkcs7'
+          - '--enable-wolfclu --enable-smallstack'
+          - '--enable-wolfclu --enable-experimental --enable-dilithium'
+          - '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium'
+          - '--enable-all'
+        sanitize: ['', 'CC="cc -fsanitize=address"']
+
+    name: ${{ matrix.os }} ${{ matrix.sanitize && 'ASAN' || '' }} (${{ matrix.config }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: wolfssl/wolfssl
+          ref: master
+          path: wolfssl
+
+      - name: Install dependencies (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update
+          sudo apt-get install -y openssl
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install automake libtool
+
+      - name: Build and install wolfSSL
+        working-directory: ./wolfssl
+        run: |
+          ./autogen.sh
+          ./configure ${{ matrix.config }} ${{ matrix.sanitize }} --prefix=$GITHUB_WORKSPACE/build-dir
+          make -j
+          make install
+
+      - name: Build wolfCLU
+        run: |
+          ./autogen.sh
+          ./configure ${{ matrix.sanitize }} --with-wolfssl=$GITHUB_WORKSPACE/build-dir
+          make -j
+
+      - name: Run tests
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/build-dir/lib
+          DYLD_LIBRARY_PATH: ${{ github.workspace }}/build-dir/lib
+        run: make check
+
+      - name: Display log
+        if: always()
+        run: cat test-suite.log || true

@@ -27,17 +27,17 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
       with:
         repository: wolfssl/wolfssl
         path: wolfssl 
         
-    - uses: actions/checkout@master
+    - uses: actions/checkout@v4
       with: 
         path: wolfclu
     
     - name: Add MSBuild to PATH
-      uses: microsoft/setup-msbuild@v1
+      uses: microsoft/setup-msbuild@v2
 
     - name: Restore wolfSSL NuGet packages
       working-directory: ${{env.GITHUB_WORKSPACE}}
