@@ -63,7 +63,11 @@ class ServerClientTest(unittest.TestCase):
                              f"s_client failed: {client.stderr}")
         finally:
             server.terminate()
-            server.wait(timeout=5)
+            try:
+                server.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait()
 
 
 if __name__ == "__main__":

@@ -2101,8 +2101,8 @@ int checkStdin(void)
     }
     else {
         DWORD waitResult = WaitForSingleObject(stdinHandle, 0);
-        if (waitResult == WAIT_OBJECT_0) {
-            stop = 1; /* stdin has data or is closed */
+        if (waitResult != WAIT_TIMEOUT) {
+            stop = 1;
         }
     }
 #else
