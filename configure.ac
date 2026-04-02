@@ -57,6 +57,7 @@ AC_PROG_MAKE_SET
 AM_PROG_CC_C_O
 AM_PATH_PYTHON([3.0],, [:])
 AC_SUBST([PYTHON])
+AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != ":"])
 
 # Checks for headers/libraries
 AC_CHECK_HEADERS([sys/time.h string.h termios.h unistd.h])

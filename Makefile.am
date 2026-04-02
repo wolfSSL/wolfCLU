@@ -48,6 +48,7 @@ man_MANS+= manpages/wolfssl.1
 
 include src/include.am
 include wolfclu/include.am
+if HAVE_PYTHON
 include tests/dh/include.am
 include tests/dsa/include.am
 include tests/pkey/include.am
@@ -65,6 +66,7 @@ include tests/bench/include.am
 include tests/client/include.am
 include tests/server/include.am
 include tests/testEncDec/include.am
+endif
 include ide/include.am
 #####include data/include.am
 
