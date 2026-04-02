@@ -94,5 +94,17 @@ then
 fi
 
 
+# Test missing argument value for -in (must fail gracefully, not segfault)
+(./wolfssl -hash sha256 -in) 2>/dev/null
+RET=$?
+if [ $RET -eq 0 ]; then
+    echo "Expected failure for missing -in value"
+    exit 99
+fi
+if [ $RET -ge 129 ] && [ $RET -le 192 ]; then
+    echo "Missing -in value caused signal $(($RET - 128)), expected graceful error"
+    exit 99
+fi
+
 echo "Done"
 exit 0

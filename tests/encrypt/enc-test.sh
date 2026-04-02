@@ -341,5 +341,15 @@ if [ $? -eq 0 ]; then
     rm -f test-cam-toolong.enc test-cam-toolong.dec
 fi
 
+# Test encrypt with explicit hex IV and key (verifies XSTRLCPY size is correct)
+echo "testing explicit hex IV and key" > enc_hex_test.txt
+./wolfssl enc -aes-128-cbc -nosalt -in enc_hex_test.txt -out enc_hex_test.enc --key 00112233445566778899aabbccddeeff --iv 00112233445566778899aabb0011aab7
+if [ $? != 0 ]; then
+    echo "encrypt with explicit hex key/iv failed"
+    rm -f enc_hex_test.txt enc_hex_test.enc
+    exit 99
+fi
+rm -f enc_hex_test.txt enc_hex_test.enc
+
 echo "Done"
 exit 0

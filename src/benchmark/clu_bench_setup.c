@@ -74,7 +74,7 @@ int wolfCLU_benchSetup(int argc, char** argv)
     }
 
     ret = wolfCLU_checkForArg("-time", 5, argc, argv);
-    if (ret > 0) {
+    if (ret > 0 && ret + 1 < argc) {
         /* time for each test in seconds */
         time = XATOI(argv[ret+1]);
         if (time < 1 || time > 10) {

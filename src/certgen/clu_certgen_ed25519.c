@@ -62,6 +62,7 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
     }
     if (XFSEEK(keyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
         XFCLOSE(keyFile);
+        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return WOLFCLU_FAILURE;
     }
     XFCLOSE(keyFile);

@@ -94,5 +94,14 @@ run_fail "dgst -sha256 -verify ./certs/server-keyPub.pem -signature configure.si
 run "dgst -sha256 -verify ./certs/ecc-keyPub.pem -signature configure.sig configure.ac"
 rm -f configure.sig
 
+# Test that dgst -out creates output file and round-trips with -signature
+run "dgst -sha256 -sign ./certs/server-key.pem -out dgst-out-test.sig ./configure.ac"
+if [ ! -f dgst-out-test.sig ]; then
+    echo "dgst -out did not create output file"
+    exit 99
+fi
+run "dgst -sha256 -verify ./certs/server-keyPub.pem -signature dgst-out-test.sig ./configure.ac"
+rm -f dgst-out-test.sig
+
 echo "Done"
 exit 0

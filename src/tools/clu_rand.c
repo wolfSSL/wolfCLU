@@ -147,15 +147,19 @@ int wolfCLU_Rand(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
 
-        base64 = (byte*)XMALLOC(base64Sz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (base64 == NULL) {
-            wolfCLU_LogError("Error malloc'ing for base64");
-            ret = WOLFCLU_FATAL_ERROR;
+        if (ret == WOLFCLU_SUCCESS) {
+            base64 = (byte*)XMALLOC(base64Sz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (base64 == NULL) {
+                wolfCLU_LogError("Error malloc'ing for base64");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
 
-        if (Base64_Encode(buf, size, base64, &base64Sz) != 0) {
-            wolfCLU_LogError("Error base64 encoding");
-            ret = WOLFCLU_FATAL_ERROR;
+        if (ret == WOLFCLU_SUCCESS) {
+            if (Base64_Encode(buf, size, base64, &base64Sz) != 0) {
+                wolfCLU_LogError("Error base64 encoding");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
 
         if (ret == WOLFCLU_SUCCESS) {
