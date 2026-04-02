@@ -198,14 +198,6 @@ int wolfCLU_Client(int argc, char** argv)
                     }
                 }
 
-                /* Set SNI hostname so modern servers accept the connection.
-                 * Matches openssl s_client default; use -noservername to disable. */
-                if (ret == WOLFCLU_SUCCESS && host != NULL && !noservername) {
-                    ret = _addClientArg(clientArgv, sniFlag, &clientArgc);
-                    if (ret == WOLFCLU_SUCCESS) {
-                        ret = _addClientArg(clientArgv, host, &clientArgc);
-                    }
-                }
                 break;
 
             case WOLFCLU_STARTTLS:
@@ -253,6 +245,17 @@ int wolfCLU_Client(int argc, char** argv)
             default:
                 /* do nothing. */
                 (void)ret;
+        }
+    }
+
+    /* Set SNI hostname so modern servers accept the connection.
+     * Matches openssl s_client default; use -noservername to disable.
+     * Deferred until after option parsing so -noservername works
+     * regardless of argument order. */
+    if (ret == WOLFCLU_SUCCESS && host != NULL && !noservername) {
+        ret = _addClientArg(clientArgv, sniFlag, &clientArgc);
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _addClientArg(clientArgv, host, &clientArgc);
         }
     }
 
