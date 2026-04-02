@@ -218,7 +218,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 #ifdef HAVE_CAMELLIA
         if (alg == WOLFCLU_CAMELLIA128CBC || alg == WOLFCLU_CAMELLIA192CBC ||
                 alg == WOLFCLU_CAMELLIA256CBC) {
-            ret = wc_CamelliaSetKey(&camellia, key, block, iv);
+            ret = wc_CamelliaSetKey(&camellia, key, size / 8, iv);
             if (ret != 0) {
                 XFCLOSE(inFile);
                 wolfCLU_LogError("CamelliaSetKey failed.");
