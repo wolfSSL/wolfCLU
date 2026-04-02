@@ -9,7 +9,7 @@ import unittest
 
 # Allow importing the shared helper when run standalone or via the test runner
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
 
 
 class Base64Test(unittest.TestCase):
@@ -105,4 +105,4 @@ class Base64Test(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    test_main()

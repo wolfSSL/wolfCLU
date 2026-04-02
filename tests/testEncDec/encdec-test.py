@@ -7,7 +7,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import run_wolfssl
+from wolfclu_test import run_wolfssl, test_main
 
 # Small test input — created once, used by all tests
 INPUT_FILE = "encdec_input.txt"
@@ -120,4 +120,4 @@ class CamelliaCbcTest(EncDecRoundtripTest):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    test_main()

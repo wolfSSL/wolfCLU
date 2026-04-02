@@ -15,7 +15,7 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main
 
 HAS_OPENSSL = shutil.which("openssl") is not None
 OCSP_PORT_BASE = 6960
@@ -335,4 +335,4 @@ class TestOpensslClientOpensslResponder(_OCSPInteropBase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    test_main()

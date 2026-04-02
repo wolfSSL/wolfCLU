@@ -7,7 +7,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
 
 
 class Pkcs7Test(unittest.TestCase):
@@ -69,4 +69,4 @@ class Pkcs7Test(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    test_main()
