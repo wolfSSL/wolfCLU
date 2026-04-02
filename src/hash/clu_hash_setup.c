@@ -81,7 +81,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
     for (i = 0; i < (int)algsSz; ++i) {
         /* checks for acceptable algorithms */
-        if (XSTRNCMP(argv[2], algs[i], XSTRLEN(algs[i])) == 0) {
+        if (XSTRCMP(argv[2], algs[i]) == 0) {
             alg = argv[2];
             algCheck = 1;
         }
@@ -140,7 +140,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 #endif
 
 #ifndef NO_SHA
-    if (XSTRNCMP(alg, "sha", 3) == 0)
+    if ((XSTRNCMP(alg, "sha", 3) == 0) && (XSTRLEN(alg) == 3))
         size = WC_SHA_DIGEST_SIZE;
 #endif
 
