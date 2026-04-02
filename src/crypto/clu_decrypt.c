@@ -77,14 +77,13 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     length = (int)XFTELL(inFile);
     XFSEEK(inFile, 0, SEEK_SET);
 
-    /* if there is a remainder,
-     * round up else no round
-     */
-    if (length % MAX_LEN > 0) {
-        lastLoopFlag = (length/MAX_LEN) + 1;
+    /* Compute loop count from the encrypted payload size (excluding the
+     * salt and IV that are read separately before the loop). */
+    if ((length - saltAndIvSize) % MAX_LEN > 0) {
+        lastLoopFlag = ((length - saltAndIvSize) / MAX_LEN) + 1;
     }
     else {
-        lastLoopFlag =  length/MAX_LEN;
+        lastLoopFlag = (length - saltAndIvSize) / MAX_LEN;
     }
 
     input = (byte*) XMALLOC(MAX_LEN, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

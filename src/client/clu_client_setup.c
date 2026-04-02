@@ -72,7 +72,7 @@ static const char sniFlag[]       = "-S";
 int myoptind = 0;
 char* myoptarg = NULL;
 
-#define MAX_CLIENT_ARGS 17
+#define MAX_CLIENT_ARGS 32
 
 /* return WOLFCLU_SUCCESS on success */
 static int _addClientArg(const char** args, const char* in, int* idx)

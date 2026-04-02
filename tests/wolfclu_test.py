@@ -67,6 +67,6 @@ def test_main():
     result = prog.result
     if not result.wasSuccessful():
         sys.exit(1)
-    if result.testsRun == 0:
+    if result.testsRun == 0 or len(result.skipped) == result.testsRun:
         sys.exit(77)
     sys.exit(0)
