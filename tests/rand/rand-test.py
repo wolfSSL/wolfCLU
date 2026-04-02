@@ -6,7 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import run_wolfssl
+from wolfclu_test import run_wolfssl, test_main
 
 
 class RandTest(unittest.TestCase):
@@ -44,4 +44,4 @@ class RandTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    unittest.main()
+    test_main()
