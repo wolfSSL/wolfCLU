@@ -88,9 +88,9 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
 int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
                       int inForm)
 {
-    int ret;
+    int ret = WOLFCLU_FATAL_ERROR;
     int fSz;
-    XFILE f;
+    XFILE f = NULL;
     byte *data = NULL;
 
     f = XFOPEN(in, "rb");
@@ -98,20 +98,34 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
         wolfCLU_LogError("unable to open file %s", in);
         return BAD_FUNC_ARG;
     }
-    XFSEEK(f, 0, SEEK_END);
+
+    if (XFSEEK(f, 0, SEEK_END) != 0) {
+        wolfCLU_LogError("unable to seek to end of file %s", in);
+        ret = WOLFCLU_FATAL_ERROR;
+        goto cleanup;
+    }
+
     fSz = (int)XFTELL(f);
+    if (fSz < 0) {
+        wolfCLU_LogError("unable to determine file size for %s", in);
+        ret = WOLFCLU_FATAL_ERROR;
+        goto cleanup;
+    }
 
     data = (byte*)XMALLOC(fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (data == NULL) {
-        XFCLOSE(f);
-        return MEMORY_E;
+        ret = MEMORY_E;
+        goto cleanup;
     }
 
     if (XFSEEK(f, 0, SEEK_SET) != 0 || (int)XFREAD(data, 1, fSz, f) != fSz) {
-        XFCLOSE(f);
-        return WOLFCLU_FATAL_ERROR;
+        ret = WOLFCLU_FATAL_ERROR;
+        goto cleanup;
     }
+
+    /* data is now read in and stored in 'data' buffer, so can close file */
     XFCLOSE(f);
+    f = NULL;
 
     switch(keyType) {
 
@@ -147,7 +161,14 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+cleanup:
+    if (f != NULL) {
+        XFCLOSE(f);
+    }
+    if (data != NULL) {
+        XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
     return ret;
 }
 
