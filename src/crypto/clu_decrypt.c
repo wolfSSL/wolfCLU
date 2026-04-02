@@ -77,6 +77,13 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     length = (int)XFTELL(inFile);
     XFSEEK(inFile, 0, SEEK_SET);
 
+    /* Validate file is large enough for salt + IV header */
+    if (length < saltAndIvSize) {
+        wolfCLU_LogError("Input file too small (missing salt/IV).");
+        XFCLOSE(inFile);
+        return DECRYPT_ERROR;
+    }
+
     /* Compute loop count from the encrypted payload size (excluding the
      * salt and IV that are read separately before the loop). */
     if ((length - saltAndIvSize) % MAX_LEN > 0) {
