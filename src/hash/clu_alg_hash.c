@@ -40,6 +40,9 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
             alg = (char*)"md5";
             size = WC_MD5_DIGEST_SIZE;
             break;
+        #else
+            wolfCLU_LogError("MD5 not compiled in");
+            return NOT_COMPILED_IN;
         #endif
 
         case WOLFCLU_CERT_SHA256:
@@ -47,6 +50,9 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
             alg = (char*)"sha256";
             size = WC_SHA256_DIGEST_SIZE;
             break;
+        #else
+            wolfCLU_LogError("SHA-256 not compiled in");
+            return NOT_COMPILED_IN;
         #endif
 
         case WOLFCLU_CERT_SHA384:
@@ -54,6 +60,9 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
             alg = (char*)"sha384";
             size = WC_SHA384_DIGEST_SIZE;
             break;
+        #else
+            wolfCLU_LogError("SHA-384 not compiled in");
+            return NOT_COMPILED_IN;
         #endif
 
         case WOLFCLU_CERT_SHA512:
@@ -61,6 +70,9 @@ int wolfCLU_algHashSetup(int argc, char** argv, int algorithm)
             alg = (char*)"sha512";
             size = WC_SHA512_DIGEST_SIZE;
             break;
+        #else
+            wolfCLU_LogError("SHA-512 not compiled in");
+            return NOT_COMPILED_IN;
         #endif
 
         default:

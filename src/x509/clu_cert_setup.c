@@ -412,6 +412,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             ret = USER_INPUT_ERROR;
         }
         wolfSSL_BIO_free(keyIn);
+        keyIn = NULL;
     }
 
     if (ret == WOLFCLU_SUCCESS && extFile != NULL) {
@@ -774,7 +775,6 @@ int wolfCLU_certSetup(int argc, char** argv)
                 wolfSSL_BIO_write(out, info, (int)XSTRLEN(info));
 
             }
-            wolfSSL_EVP_PKEY_free(pkey);
         }
     }
 
@@ -844,6 +844,10 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (tmpOutBuf != NULL) {
         XFREE(tmpOutBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
+    if (keyIn != NULL)
+        wolfSSL_BIO_free(keyIn);
+    if (privkey != NULL)
+        wolfSSL_EVP_PKEY_free(privkey);
     wc_FreeDer(&derObj);
     wolfSSL_BIO_free(out);
     wolfSSL_X509_free(x509);
