@@ -40,7 +40,7 @@ class Pkcs12Test(unittest.TestCase):
         r = subprocess.run(
             [WOLFSSL_BIN, "pkcs12", "-nodes", "-nocerts",
              "-passin", "stdin", "-passout", "pass:", "-in", P12_FILE],
-            input=b"wolfSSL test", capture_output=True, text=False,
+            input=b"wolfSSL test\n", capture_output=True, text=False,
             timeout=60,
         )
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -50,7 +50,7 @@ class Pkcs12Test(unittest.TestCase):
         r = subprocess.run(
             [WOLFSSL_BIN, "pkcs12", "-nokeys",
              "-passin", "stdin", "-passout", "pass:", "-in", P12_FILE],
-            input=b"wolfSSL test", capture_output=True, text=False,
+            input=b"wolfSSL test\n", capture_output=True, text=False,
             timeout=60,
         )
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -65,7 +65,7 @@ class Pkcs12Test(unittest.TestCase):
         r = subprocess.run(
             [WOLFSSL_BIN, "pkcs12", "-passin", "stdin", "-passout", "pass:",
              "-in", P12_FILE, "-nocerts"],
-            input=b"wolfSSL test", capture_output=True, text=False,
+            input=b"wolfSSL test\n", capture_output=True, text=False,
             timeout=60,
         )
         self.assertEqual(r.returncode, 0, r.stderr)

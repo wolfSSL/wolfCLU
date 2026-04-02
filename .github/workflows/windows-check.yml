@@ -36,7 +36,12 @@ jobs:
         id: toolset
         run: |
           $major = (vswhere -latest -property installationVersion).Split('.')[0]
-          $ts = @{ "16" = "v142"; "17" = "v143"; "18" = "v144" }[$major]
+          $toolsets = @{ "16" = "v142"; "17" = "v143"; "18" = "v145" }
+          $ts = $toolsets[$major]
+          if (-not $ts) {
+            Write-Error "Unsupported Visual Studio major version '$major'."
+            exit 1
+          }
           echo "value=$ts" >> $env:GITHUB_OUTPUT
 
       - name: Build wolfSSL
@@ -44,7 +49,7 @@ jobs:
 
       - name: Build wolfCLU
         working-directory: wolfclu
-        run: msbuild /m /p:PlatformToolset=${{ steps.toolset.outputs.value }} /p:Platform=${{ env.BUILD_PLATFORM }} /p:Configuration=${{ env.BUILD_CONFIGURATION }} wolfclu.sln
+        run: msbuild /m /p:Platform=${{ env.BUILD_PLATFORM }} /p:Configuration=${{ env.BUILD_CONFIGURATION }} wolfclu.sln
 
       - name: Run tests
         working-directory: wolfclu

@@ -4,20 +4,23 @@ import os
 import platform
 import subprocess
 
+_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_TESTS_DIR)
+
 
 def _find_wolfssl_bin():
     """Locate the wolfssl binary, searching common build output paths."""
     if platform.system() == "Windows":
         candidates = [
-            os.path.join(".", "x64", "Debug", "wolfssl.exe"),
-            os.path.join(".", "x64", "Release", "wolfssl.exe"),
-            os.path.join(".", "Debug", "wolfssl.exe"),
-            os.path.join(".", "Release", "wolfssl.exe"),
-            os.path.join(".", "wolfssl.exe"),
+            os.path.join(_PROJECT_ROOT, "x64", "Debug", "wolfssl.exe"),
+            os.path.join(_PROJECT_ROOT, "x64", "Release", "wolfssl.exe"),
+            os.path.join(_PROJECT_ROOT, "Debug", "wolfssl.exe"),
+            os.path.join(_PROJECT_ROOT, "Release", "wolfssl.exe"),
+            os.path.join(_PROJECT_ROOT, "wolfssl.exe"),
         ]
     else:
         candidates = [
-            os.path.join(".", "wolfssl"),
+            os.path.join(_PROJECT_ROOT, "wolfssl"),
         ]
 
     for path in candidates:
@@ -29,7 +32,7 @@ def _find_wolfssl_bin():
 
 
 WOLFSSL_BIN = _find_wolfssl_bin()
-CERTS_DIR = os.path.join(".", "certs")
+CERTS_DIR = os.path.join(_PROJECT_ROOT, "certs")
 
 
 def run_wolfssl(*args, stdin_data=None, timeout=60):

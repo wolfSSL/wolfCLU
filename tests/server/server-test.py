@@ -36,7 +36,7 @@ class ServerClientTest(unittest.TestCase):
              "-key", os.path.join(CERTS_DIR, "server-key.pem"),
              "-cert", os.path.join(CERTS_DIR, "server-cert.pem"),
              "-noVerify", "-readyFile", readyfile],
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,
         )
 
@@ -64,8 +64,6 @@ class ServerClientTest(unittest.TestCase):
         finally:
             server.terminate()
             server.wait(timeout=5)
-            server.stdout.close()
-            server.stderr.close()
 
 
 if __name__ == "__main__":
