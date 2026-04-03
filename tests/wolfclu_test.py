@@ -8,6 +8,7 @@ import unittest
 
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_TESTS_DIR)
+PROJECT_ROOT = _PROJECT_ROOT
 
 
 def _find_wolfssl_bin():

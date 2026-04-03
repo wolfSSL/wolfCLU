@@ -7,12 +7,13 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, PROJECT_ROOT, run_wolfssl, test_main
 
-_SKIP_WIN = sys.platform == "win32"
-_WIN_REASON = "CA config file paths not supported on Windows UNC shares"
+# Use absolute forward-slash paths so wolfSSL recognizes them as absolute
+_R = PROJECT_ROOT.replace("\\", "/")
+_CERTS = CERTS_DIR.replace("\\", "/")
 
-CA_CONF = """\
+CA_CONF = f"""\
 [ ca ]
 default_ca = CA_default
 
@@ -25,12 +26,12 @@ authorityKeyIdentifier=keyid,issuer
 
 [ CA_default ]
 
-dir = ./certs
-database = ./index.txt
-new_certs_dir = ./
+dir = {_CERTS}
+database = {_R}/index.txt
+new_certs_dir = {_R}
 
-certificate = $dir/ca-cert.pem
-private_key = $dir/ca-key.pem
+certificate = {_CERTS}/ca-cert.pem
+private_key = {_CERTS}/ca-key.pem
 rand_serial = yes
 
 default_days = 365
@@ -47,7 +48,7 @@ commonName             = supplied
 emailAddress           = optional
 """
 
-CA_2_CONF = """\
+CA_2_CONF = f"""\
 [ ca ]
 default_ca = CA_default
 
@@ -59,13 +60,13 @@ authorityKeyIdentifier=keyid,issuer
 
 [ CA_default ]
 
-dir = ./certs
-database = ./index.txt
-new_certs_dir = ./
-certificate = $dir/ca-cert.pem
-private_key = $dir/ca-key.pem
-RANDFILE = ./rand-file-test
-serial   = ./serial-file-test
+dir = {_CERTS}
+database = {_R}/index.txt
+new_certs_dir = {_R}
+certificate = {_CERTS}/ca-cert.pem
+private_key = {_CERTS}/ca-key.pem
+RANDFILE = {_R}/rand-file-test
+serial   = {_R}/serial-file-test
 default_days = 365
 default_md = sha256
 unique_subject = yes
@@ -81,7 +82,7 @@ commonName             = supplied
 emailAddress           = optional
 """
 
-CA_MATCH_CONF = """\
+CA_MATCH_CONF = f"""\
 [ ca ]
 default_ca = CA_default
 
@@ -91,12 +92,12 @@ basicConstraints=CA:FALSE
 
 [ CA_default ]
 
-dir = ./certs
-database = ./index.txt
-new_certs_dir = ./
+dir = {_CERTS}
+database = {_R}/index.txt
+new_certs_dir = {_R}
 
-certificate = $dir/ca-cert.pem
-private_key = $dir/ca-key.pem
+certificate = {_CERTS}/ca-cert.pem
+private_key = {_CERTS}/ca-key.pem
 rand_serial = yes
 
 default_days = 365
@@ -112,12 +113,12 @@ organizationalUnitName = optional
 commonName             = match
 emailAddress           = optional
 
-crl_dir    = ./crls-test
-crlnumber  = ./crlnumber-test
-crl        = ./certs/crl.pem
+crl_dir    = {_R}/crls-test
+crlnumber  = {_R}/crlnumber-test
+crl        = {_CERTS}/crl.pem
 """
 
-CA_CRL_CONF = """\
+CA_CRL_CONF = f"""\
 [ ca ]
 default_ca = CA_default
 
@@ -127,12 +128,12 @@ basicConstraints=CA:FALSE
 
 [ CA_default ]
 
-dir = ./certs
-database = ./index.txt
-new_certs_dir = ./
+dir = {_CERTS}
+database = {_R}/index.txt
+new_certs_dir = {_R}
 
-certificate = $dir/ca-cert.pem
-private_key = $dir/ca-key.pem
+certificate = {_CERTS}/ca-cert.pem
+private_key = {_CERTS}/ca-key.pem
 rand_serial = yes
 
 default_days = 365
@@ -148,21 +149,21 @@ organizationalUnitName = optional
 commonName             = supplied
 emailAddress           = optional
 
-crl_dir    = ./crls-test
-crlnumber  = ./crlnumber-test
-crl        = ./certs/crl.pem
+crl_dir    = {_R}/crls-test
+crlnumber  = {_R}/crlnumber-test
+crl        = {_CERTS}/crl.pem
 """
 
-CA_OUTDIR_CONF_TEMPLATE = """\
+CA_OUTDIR_CONF_TEMPLATE = f"""\
 [ ca ]
 default_ca = CA_default
 
 [ CA_default ]
-dir = ./certs
-database = ./index.txt
-new_certs_dir = {new_certs_dir}
-certificate = $dir/ca-cert.pem
-private_key = $dir/ca-key.pem
+dir = {_CERTS}
+database = {_R}/index.txt
+new_certs_dir = {{new_certs_dir}}
+certificate = {_CERTS}/ca-cert.pem
+private_key = {_CERTS}/ca-key.pem
 rand_serial = yes
 default_days = 365
 default_md = sha256
@@ -176,6 +177,14 @@ organizationalUnitName = optional
 commonName             = supplied
 emailAddress           = optional
 """
+
+
+def _tmp(name):
+    """Return an absolute path for a temp file in the project root.
+
+    Uses forward slashes so wolfSSL's path handling recognizes the path
+    as absolute on Windows (it checks for leading '/')."""
+    return os.path.join(PROJECT_ROOT, name).replace("\\", "/")
 
 
 def _cleanup(*files):
@@ -210,17 +219,17 @@ class TestCAHelp(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestCASelfSign(unittest.TestCase):
     """ca -selfsign tests."""
 
     @classmethod
     def setUpClass(cls):
-        cls.conf = "ca_selfsign.conf"
-        with open(cls.conf, "w") as f:
+        cls.conf = _tmp("ca_selfsign.conf")
+        with open(cls.conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_CONF)
-        _touch("index.txt")
-        cls.csr = "ca_selfsign.csr"
+        _touch(_tmp("index.txt"))
+        cls.csr = _tmp("ca_selfsign.csr")
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
                         "-subj",
@@ -230,7 +239,7 @@ class TestCASelfSign(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        _cleanup(cls.conf, cls.csr, "index.txt")
+        _cleanup(cls.conf, cls.csr, _tmp("index.txt"))
 
     def _clean(self, *files):
         for f in files:
@@ -238,29 +247,31 @@ class TestCASelfSign(unittest.TestCase):
 
     def test_bad_config_fails(self):
         """Reading nonexistent config file should fail."""
-        r = run_wolfssl("ca", "-config", "ca-example.conf",
+        r = run_wolfssl("ca", "-config", _tmp("ca-example.conf"),
                         "-in", self.csr, "-out", "tmp_bad.pem",
                         "-md", "sha256", "-selfsign",
                         "-keyfile", os.path.join(CERTS_DIR, "ca-key.pem"))
-        self._clean("tmp_bad.pem")
+        self._clean(_tmp("tmp_bad.pem"))
         self.assertNotEqual(r.returncode, 0)
 
     def test_selfsign_key_mismatch_fails(self):
         """selfsign with wrong key (ca-key vs server-key CSR) should fail."""
-        out = "tmp_selfsign_mm.pem"
+        out_name = "tmp_selfsign_mm.pem"
+        out = _tmp(out_name)
         self._clean(out)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out,
+                        "-in", self.csr, "-out", out_name,
                         "-md", "sha256", "-selfsign",
                         "-keyfile", os.path.join(CERTS_DIR, "ca-key.pem"))
         self.assertNotEqual(r.returncode, 0)
 
     def test_selfsign_correct_key(self):
         """selfsign with matching key succeeds, subject == issuer."""
-        out = "test_ca_selfsign.pem"
+        out_name = "test_ca_selfsign.pem"
+        out = _tmp(out_name)
         self._clean(out)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out,
+                        "-in", self.csr, "-out", out_name,
                         "-md", "sha256", "-selfsign",
                         "-keyfile",
                         os.path.join(CERTS_DIR, "server-key.pem"))
@@ -273,10 +284,11 @@ class TestCASelfSign(unittest.TestCase):
 
     def test_selfsign_verify_fails_wrong_ca(self):
         """Self-signed cert should not verify with unrelated CAs."""
-        out = "test_ca_selfsign_vf.pem"
+        out_name = "test_ca_selfsign_vf.pem"
+        out = _tmp(out_name)
         self._clean(out)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out,
+                        "-in", self.csr, "-out", out_name,
                         "-md", "sha256", "-selfsign",
                         "-keyfile",
                         os.path.join(CERTS_DIR, "server-key.pem"))
@@ -291,18 +303,18 @@ class TestCASelfSign(unittest.TestCase):
         self.assertNotEqual(r2.returncode, 0)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestCACreateAndVerify(unittest.TestCase):
     """ca certificate creation and verification."""
 
     @classmethod
     def setUpClass(cls):
-        cls.conf = "ca_create.conf"
-        with open(cls.conf, "w") as f:
+        cls.conf = _tmp("ca_create.conf")
+        with open(cls.conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_CONF)
-        _cleanup("index.txt")
-        _touch("index.txt")
-        cls.csr = "ca_create.csr"
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
+        cls.csr = _tmp("ca_create.csr")
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
                         "-subj",
@@ -312,7 +324,7 @@ class TestCACreateAndVerify(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        _cleanup(cls.conf, cls.csr, "index.txt")
+        _cleanup(cls.conf, cls.csr, _tmp("index.txt"))
 
     def _clean(self, *files):
         for f in files:
@@ -320,10 +332,11 @@ class TestCACreateAndVerify(unittest.TestCase):
 
     def test_create_and_verify(self):
         """Create cert and verify with CA."""
-        out = "test_ca_cv.pem"
+        out_name = "test_ca_cv.pem"
+        out = _tmp(out_name)
         self._clean(out)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out)
+                        "-in", self.csr, "-out", out_name)
         self.assertEqual(r.returncode, 0, r.stderr)
 
         r2 = run_wolfssl("verify", "-CAfile",
@@ -331,18 +344,18 @@ class TestCACreateAndVerify(unittest.TestCase):
         self.assertEqual(r2.returncode, 0, r2.stderr)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestCAOverrideConfig(unittest.TestCase):
     """Override config options with command-line flags."""
 
     @classmethod
     def setUpClass(cls):
-        cls.conf = "ca_override.conf"
-        with open(cls.conf, "w") as f:
+        cls.conf = _tmp("ca_override.conf")
+        with open(cls.conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_CONF)
-        _cleanup("index.txt")
-        _touch("index.txt")
-        cls.csr = "ca_override.csr"
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
+        cls.csr = _tmp("ca_override.csr")
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
                         "-subj",
@@ -352,7 +365,7 @@ class TestCAOverrideConfig(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        _cleanup(cls.conf, cls.csr, "index.txt")
+        _cleanup(cls.conf, cls.csr, _tmp("index.txt"))
 
     def _clean(self, *files):
         for f in files:
@@ -360,10 +373,11 @@ class TestCAOverrideConfig(unittest.TestCase):
 
     def test_override_extensions_md_days_cert_keyfile(self):
         """Override -extensions, -md, -days, -cert, -keyfile."""
-        out = "test_ca_override.pem"
+        out_name = "test_ca_override.pem"
+        out = _tmp(out_name)
         self._clean(out)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out,
+                        "-in", self.csr, "-out", out_name,
                         "-extensions", "usr_cert",
                         "-md", "sha512",
                         "-days", "3650",
@@ -374,18 +388,18 @@ class TestCAOverrideConfig(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestCAKeyMismatch(unittest.TestCase):
     """ca with mismatched key should fail."""
 
     @classmethod
     def setUpClass(cls):
-        cls.conf = "ca_keymm.conf"
-        with open(cls.conf, "w") as f:
+        cls.conf = _tmp("ca_keymm.conf")
+        with open(cls.conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_CONF)
-        _cleanup("index.txt")
-        _touch("index.txt")
-        cls.csr = "ca_keymm.csr"
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
+        cls.csr = _tmp("ca_keymm.csr")
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
                         "-subj",
@@ -395,32 +409,34 @@ class TestCAKeyMismatch(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        _cleanup(cls.conf, cls.csr, "index.txt")
+        _cleanup(cls.conf, cls.csr, _tmp("index.txt"))
 
     def test_key_mismatch(self):
-        out = "test_ca_km.pem"
+        out_name = "test_ca_km.pem"
+        out = _tmp(out_name)
         self.addCleanup(lambda: _cleanup(out))
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out,
+                        "-in", self.csr, "-out", out_name,
                         "-keyfile",
                         os.path.join(CERTS_DIR, "ecc-key.pem"))
         self.assertNotEqual(r.returncode, 0)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestCAUniqueSubjectAndSerial(unittest.TestCase):
     """unique_subject enforcement and serial number handling."""
 
     def setUp(self):
-        self.conf = "ca_uniq.conf"
-        with open(self.conf, "w") as f:
+        self.conf = _tmp("ca_uniq.conf")
+        with open(self.conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_2_CONF)
-        _cleanup("index.txt", "serial-file-test", "rand-file-test")
-        _touch("index.txt")
-        with open("serial-file-test", "w") as f:
+        _cleanup(_tmp("index.txt"), _tmp("serial-file-test"),
+                 _tmp("rand-file-test"))
+        _touch(_tmp("index.txt"))
+        with open(_tmp("serial-file-test"), "w") as f:
             f.write("01\n")
-        _touch("rand-file-test")
-        self.csr = "ca_uniq.csr"
+        _touch(_tmp("rand-file-test"))
+        self.csr = _tmp("ca_uniq.csr")
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
                         "-subj",
@@ -429,8 +445,8 @@ class TestCAUniqueSubjectAndSerial(unittest.TestCase):
         assert r.returncode == 0, "CSR creation failed: " + r.stderr
 
     def tearDown(self):
-        _cleanup(self.conf, self.csr, "index.txt",
-                 "serial-file-test", "rand-file-test")
+        _cleanup(self.conf, self.csr, _tmp("index.txt"),
+                 _tmp("serial-file-test"), _tmp("rand-file-test"))
 
     def _clean(self, *files):
         for f in files:
@@ -438,23 +454,25 @@ class TestCAUniqueSubjectAndSerial(unittest.TestCase):
 
     def test_unique_subject_fail(self):
         """Creating same subject twice with unique_subject=yes should fail."""
-        out = "test_ca_uniq.pem"
+        out_name = "test_ca_uniq.pem"
+        out = _tmp(out_name)
         self._clean(out)
         # First cert succeeds
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out)
+                        "-in", self.csr, "-out", out_name)
         self.assertEqual(r.returncode, 0, r.stderr)
         # Second with same subject should fail
         r2 = run_wolfssl("ca", "-config", self.conf,
-                         "-in", self.csr, "-out", out)
+                         "-in", self.csr, "-out", out_name)
         self.assertNotEqual(r2.returncode, 0)
 
     def test_serial_number(self):
         """First cert should have serial=01."""
-        out = "test_ca_serial.pem"
+        out_name = "test_ca_serial.pem"
+        out = _tmp(out_name)
         self._clean(out)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out)
+                        "-in", self.csr, "-out", out_name)
         self.assertEqual(r.returncode, 0, r.stderr)
 
         r2 = run_wolfssl("x509", "-in", out, "-noout", "-serial")
@@ -463,20 +481,22 @@ class TestCAUniqueSubjectAndSerial(unittest.TestCase):
 
     def test_serial_increment(self):
         """Second cert should have serial=02."""
-        out1 = "test_ca_serial1.pem"
-        out2 = "test_ca_serial2.pem"
+        out1_name = "test_ca_serial1.pem"
+        out2_name = "test_ca_serial2.pem"
+        out1 = _tmp(out1_name)
+        out2 = _tmp(out2_name)
         self._clean(out1, out2)
 
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out1)
+                        "-in", self.csr, "-out", out1_name)
         self.assertEqual(r.returncode, 0, r.stderr)
 
         # Reset index for unique_subject
-        _cleanup("index.txt")
-        _touch("index.txt")
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
 
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out2)
+                        "-in", self.csr, "-out", out2_name)
         self.assertEqual(r.returncode, 0, r.stderr)
 
         r2 = run_wolfssl("x509", "-in", out2, "-noout", "-serial")
@@ -485,51 +505,54 @@ class TestCAUniqueSubjectAndSerial(unittest.TestCase):
 
     def test_rand_file_written(self):
         """Rand file should be 256 bytes after cert creation."""
-        out = "test_ca_rand.pem"
+        out_name = "test_ca_rand.pem"
+        out = _tmp(out_name)
         self._clean(out)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out)
+                        "-in", self.csr, "-out", out_name)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertTrue(os.path.isfile("rand-file-test"))
-        size = os.path.getsize("rand-file-test")
+        self.assertTrue(os.path.isfile(_tmp("rand-file-test")))
+        size = os.path.getsize(_tmp("rand-file-test"))
         self.assertEqual(size, 256,
                          "rand file is {} bytes, expected 256".format(size))
 
     def test_rand_file_changes(self):
         """Rand file should change between cert creations."""
-        out1 = "test_ca_randc1.pem"
-        out2 = "test_ca_randc2.pem"
+        out1_name = "test_ca_randc1.pem"
+        out2_name = "test_ca_randc2.pem"
+        out1 = _tmp(out1_name)
+        out2 = _tmp(out2_name)
         self._clean(out1, out2)
 
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out1)
+                        "-in", self.csr, "-out", out1_name)
         self.assertEqual(r.returncode, 0, r.stderr)
-        with open("rand-file-test", "rb") as f:
+        with open(_tmp("rand-file-test"), "rb") as f:
             rand1 = f.read()
 
-        _cleanup("index.txt")
-        _touch("index.txt")
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
 
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", self.csr, "-out", out2)
+                        "-in", self.csr, "-out", out2_name)
         self.assertEqual(r.returncode, 0, r.stderr)
-        with open("rand-file-test", "rb") as f:
+        with open(_tmp("rand-file-test"), "rb") as f:
             rand2 = f.read()
 
         self.assertNotEqual(rand1, rand2, "rand file did not change")
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestCAPolicy(unittest.TestCase):
     """Policy section enforcement."""
 
     @classmethod
     def setUpClass(cls):
-        cls.conf = "ca_policy.conf"
-        cls.match_conf = "ca_policy_match.conf"
-        with open(cls.conf, "w") as f:
+        cls.conf = _tmp("ca_policy.conf")
+        cls.match_conf = _tmp("ca_policy_match.conf")
+        with open(cls.conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_CONF)
-        with open(cls.match_conf, "w") as f:
+        with open(cls.match_conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_MATCH_CONF)
 
     @classmethod
@@ -537,11 +560,11 @@ class TestCAPolicy(unittest.TestCase):
         _cleanup(cls.conf, cls.match_conf)
 
     def setUp(self):
-        _cleanup("index.txt")
-        _touch("index.txt")
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
 
     def tearDown(self):
-        _cleanup("index.txt")
+        _cleanup(_tmp("index.txt"))
 
     def _clean(self, *files):
         for f in files:
@@ -549,8 +572,9 @@ class TestCAPolicy(unittest.TestCase):
 
     def test_no_common_name_supplied_fails(self):
         """CSR without commonName should fail when policy requires 'supplied'."""
-        csr = "ca_pol_nocn.csr"
-        out = "ca_pol_nocn.pem"
+        csr = _tmp("ca_pol_nocn.csr")
+        out_name = "ca_pol_nocn.pem"
+        out = _tmp(out_name)
         self._clean(csr, out)
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
@@ -558,15 +582,16 @@ class TestCAPolicy(unittest.TestCase):
                         "-out", csr)
         self.assertEqual(r.returncode, 0, r.stderr)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", csr, "-out", out,
+                        "-in", csr, "-out", out_name,
                         "-md", "sha256",
                         "-keyfile", os.path.join(CERTS_DIR, "ca-key.pem"))
         self.assertNotEqual(r.returncode, 0)
 
     def test_no_common_name_match_fails(self):
         """CSR without commonName should also fail with match policy."""
-        csr = "ca_pol_nocnm.csr"
-        out = "ca_pol_nocnm.pem"
+        csr = _tmp("ca_pol_nocnm.csr")
+        out_name = "ca_pol_nocnm.pem"
+        out = _tmp(out_name)
         self._clean(csr, out)
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
@@ -574,15 +599,16 @@ class TestCAPolicy(unittest.TestCase):
                         "-out", csr)
         self.assertEqual(r.returncode, 0, r.stderr)
         r = run_wolfssl("ca", "-config", self.match_conf,
-                        "-in", csr, "-out", out,
+                        "-in", csr, "-out", out_name,
                         "-md", "sha256",
                         "-keyfile", os.path.join(CERTS_DIR, "ca-key.pem"))
         self.assertNotEqual(r.returncode, 0)
 
     def test_common_name_supplied_succeeds(self):
         """CSR with commonName should pass policy_any."""
-        csr = "ca_pol_cn.csr"
-        out = "ca_pol_cn.pem"
+        csr = _tmp("ca_pol_cn.csr")
+        out_name = "ca_pol_cn.pem"
+        out = _tmp(out_name)
         self._clean(csr, out)
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
@@ -591,15 +617,16 @@ class TestCAPolicy(unittest.TestCase):
                         "-out", csr)
         self.assertEqual(r.returncode, 0, r.stderr)
         r = run_wolfssl("ca", "-config", self.conf,
-                        "-in", csr, "-out", out,
+                        "-in", csr, "-out", out_name,
                         "-md", "sha256",
                         "-keyfile", os.path.join(CERTS_DIR, "ca-key.pem"))
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_common_name_mismatch_fails(self):
         """CSR with non-matching commonName should fail policy_match."""
-        csr = "ca_pol_cnmm.csr"
-        out = "ca_pol_cnmm.pem"
+        csr = _tmp("ca_pol_cnmm.csr")
+        out_name = "ca_pol_cnmm.pem"
+        out = _tmp(out_name)
         self._clean(csr, out)
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
@@ -608,13 +635,13 @@ class TestCAPolicy(unittest.TestCase):
                         "-out", csr)
         self.assertEqual(r.returncode, 0, r.stderr)
         r = run_wolfssl("ca", "-config", self.match_conf,
-                        "-in", csr, "-out", out,
+                        "-in", csr, "-out", out_name,
                         "-md", "sha256",
                         "-keyfile", os.path.join(CERTS_DIR, "ca-key.pem"))
         self.assertNotEqual(r.returncode, 0)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestCAChimera(unittest.TestCase):
     """Chimera certificate (altextend) tests."""
 
@@ -622,8 +649,8 @@ class TestCAChimera(unittest.TestCase):
     def setUpClass(cls):
         if not _has_altextend():
             raise unittest.SkipTest("altextend not available")
-        cls.conf = "ca_chimera.conf"
-        with open(cls.conf, "w") as f:
+        cls.conf = _tmp("ca_chimera.conf")
+        with open(cls.conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_CONF)
 
     @classmethod
@@ -631,11 +658,11 @@ class TestCAChimera(unittest.TestCase):
         _cleanup(cls.conf)
 
     def setUp(self):
-        _cleanup("index.txt")
-        _touch("index.txt")
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
 
     def tearDown(self):
-        _cleanup("index.txt")
+        _cleanup(_tmp("index.txt"))
 
     def _clean(self, *files):
         for f in files:
@@ -643,11 +670,15 @@ class TestCAChimera(unittest.TestCase):
 
     def test_chimera_cert(self):
         """Create chimera (alt-extended) certificate chain."""
-        ca_cert = "tmp_chimera_ca.pem"
-        ca_chimera = "tmp_chimera_ca_chimera.pem"
-        server_csr = "tmp_chimera_server.csr"
-        server_cert = "tmp_chimera_server.pem"
-        server_chimera = "tmp_chimera_server_chimera.pem"
+        ca_cert_name = "tmp_chimera_ca.pem"
+        ca_chimera_name = "tmp_chimera_ca_chimera.pem"
+        server_cert_name = "tmp_chimera_server.pem"
+        server_chimera_name = "tmp_chimera_server_chimera.pem"
+        ca_cert = _tmp(ca_cert_name)
+        ca_chimera = _tmp(ca_chimera_name)
+        server_csr = _tmp("tmp_chimera_server.csr")
+        server_cert = _tmp(server_cert_name)
+        server_chimera = _tmp(server_chimera_name)
         self._clean(ca_cert, ca_chimera, server_csr, server_cert,
                     server_chimera)
 
@@ -664,11 +695,11 @@ class TestCAChimera(unittest.TestCase):
                         os.path.join(CERTS_DIR, "ca-mldsa44-key.pem"),
                         "-altpub",
                         os.path.join(CERTS_DIR, "ca-mldsa44-keyPub.pem"),
-                        "-out", ca_chimera)
+                        "-out", ca_chimera_name)
         self.assertEqual(r.returncode, 0, r.stderr)
 
-        _cleanup("index.txt")
-        _touch("index.txt")
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
 
         r = run_wolfssl("req", "-new",
                         "-key", os.path.join(CERTS_DIR, "server-ecc-key.pem"),
@@ -679,7 +710,7 @@ class TestCAChimera(unittest.TestCase):
 
         r = run_wolfssl("ca", "-in", server_csr,
                         "-keyfile", os.path.join(CERTS_DIR, "ca-ecc-key.pem"),
-                        "-cert", ca_cert, "-out", server_cert)
+                        "-cert", ca_cert, "-out", server_cert_name)
         self.assertEqual(r.returncode, 0, r.stderr)
 
         r = run_wolfssl(
@@ -689,25 +720,25 @@ class TestCAChimera(unittest.TestCase):
             "-altpub",
             os.path.join(CERTS_DIR, "server-mldsa44-keyPub.pem"),
             "-subjkey", os.path.join(CERTS_DIR, "server-ecc-key.pem"),
-            "-cert", ca_chimera, "-out", server_chimera)
+            "-cert", ca_chimera, "-out", server_chimera_name)
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestCAOutdirPath(unittest.TestCase):
     """Test path concatenation for -out with new_certs_dir."""
 
     def setUp(self):
-        self.outdir = "outdir-test"
-        self.outdir_certs = os.path.join(self.outdir, "certs")
+        self.outdir = _tmp("outdir-test")
+        self.outdir_certs = (self.outdir + "/certs")
         os.makedirs(self.outdir_certs, exist_ok=True)
-        self.conf = "ca_outdir.conf"
-        with open(self.conf, "w") as f:
+        self.conf = _tmp("ca_outdir.conf")
+        with open(self.conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(CA_OUTDIR_CONF_TEMPLATE.format(
-                new_certs_dir="./" + os.path.join(self.outdir, "certs")))
-        _cleanup("index.txt")
-        _touch("index.txt")
-        self.csr = "ca_outdir.csr"
+                new_certs_dir=self.outdir_certs))
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
+        self.csr = _tmp("ca_outdir.csr")
         r = run_wolfssl("req", "-key",
                         os.path.join(CERTS_DIR, "server-key.pem"),
                         "-subj",
@@ -716,12 +747,13 @@ class TestCAOutdirPath(unittest.TestCase):
         assert r.returncode == 0, "CSR creation failed: " + r.stderr
 
     def tearDown(self):
-        _cleanup(self.conf, self.csr, "index.txt", self.outdir)
+        _cleanup(self.conf, self.csr, _tmp("index.txt"), self.outdir)
 
+    @unittest.skipIf(sys.platform == "win32",
+                      "wolfSSL does not recognize drive-letter paths as absolute")
     def test_absolute_out_path(self):
         """Absolute -out path should override new_certs_dir."""
-        abs_out = os.path.abspath(
-            os.path.join(self.outdir, "absolute-out.pem"))
+        abs_out = (self.outdir + "/absolute-out.pem")
         self.addCleanup(lambda: _cleanup(abs_out))
 
         r = run_wolfssl("ca", "-config", self.conf,
@@ -735,8 +767,8 @@ class TestCAOutdirPath(unittest.TestCase):
 
     def test_relative_out_path(self):
         """Relative -out path should be appended to new_certs_dir."""
-        _cleanup("index.txt")
-        _touch("index.txt")
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
 
         r = run_wolfssl("ca", "-config", self.conf,
                         "-in", self.csr, "-out", "relative-out.pem")
