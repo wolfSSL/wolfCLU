@@ -72,6 +72,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
     ret = wc_InitRsaKey(&key, NULL);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize RsaKey\nRET: %d", ret);
+        wolfCLU_ForceZero(keyBuf, keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
@@ -80,6 +81,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
     ret = wc_InitRng(&rng);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
+        wolfCLU_ForceZero(keyBuf, keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_FreeRsaKey(&key);
         return ret;

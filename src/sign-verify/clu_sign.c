@@ -666,7 +666,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
-        return ret;
+        return WOLFCLU_FATAL_ERROR;
     }
     XFCLOSE(privKeyFile);
 
