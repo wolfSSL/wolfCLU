@@ -642,7 +642,8 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     XMEMSET(key, 0, sizeof(dilithium_key));
 
     /* init the dilithium key */
-    if (wc_dilithium_init(key) != 0) {
+    ret = wc_dilithium_init(key);
+    if (ret != 0) {
         wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

@@ -63,6 +63,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
     }
     if (XFSEEK(keyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
         XFCLOSE(keyFile);
+        wolfCLU_ForceZero(keyBuf, keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return WOLFCLU_FAILURE;
     }
@@ -86,6 +87,7 @@ int make_self_signed_rsa_certificate(char* keyPath, char* certOut, int oid)
     rngInit = 1;
 
     ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, keyFileSz);
+    wolfCLU_ForceZero(keyBuf, keyFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
         wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);

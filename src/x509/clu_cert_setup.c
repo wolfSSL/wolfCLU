@@ -759,7 +759,12 @@ int wolfCLU_certSetup(int argc, char** argv)
                     if (rsa != NULL) {
                         wolfSSL_RSA_get0_key(rsa, &num, NULL, NULL);
                     }
-                    hex = wolfSSL_BN_bn2hex(num);
+                    if (num == NULL) {
+                        wolfCLU_LogError("Modulus=unavailable");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    hex = (num != NULL) ?
+                        wolfSSL_BN_bn2hex(num) : NULL;
 
                     if (hex != NULL) {
                         if (wolfSSL_BIO_write(out, "Modulus=", (int)XSTRLEN("Modulus="))
