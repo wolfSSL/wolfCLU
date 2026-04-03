@@ -197,8 +197,8 @@ class TestReqNew(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
 
 
-    @unittest.skipIf(sys.platform == "win32",
-                      "wolfSSL IPv6 SAN parsing fails on Windows")
+
+
     def test_req_extensions_v3_alt_ca(self):
         """req with v3_alt_ca extensions sets CA:TRUE."""
         alt_crt = _tmp("test_req_alt.crt")
@@ -389,8 +389,8 @@ class TestX509ReqExtensions(unittest.TestCase):
         for f in files:
             self.addCleanup(lambda p=f: _cleanup(p))
 
-    @unittest.skipIf(sys.platform == "win32",
-                      "wolfSSL IPv6 SAN parsing fails on Windows")
+
+
     def test_extfile_v3_alt_ca(self):
         """x509 -req with -extfile and -extensions v3_alt_ca sets CA:TRUE."""
         out = _tmp("tmp_ext.cert")
@@ -592,8 +592,8 @@ class TestReqAltNamesFullSkip(unittest.TestCase):
     def tearDownClass(cls):
         _cleanup(cls.conf_file)
 
-    @unittest.skipIf(sys.platform == "win32",
-                      "wolfSSL IPv6 SAN parsing fails on Windows")
+
+
     def test_v3_alt_req_full_tenthname(self):
         """req with v3_alt_req_full includes tenthName."""
         tmp = _tmp("test_req_altfull.cert")
