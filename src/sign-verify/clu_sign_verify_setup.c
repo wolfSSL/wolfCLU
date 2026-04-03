@@ -115,7 +115,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
                "signing or verifying.");
         wolfCLU_signHelp(algCheck);
         wolfCLU_verifyHelp(algCheck);
-        return ret;
+        return USER_INPUT_ERROR;
     }
 
     ret = wolfCLU_checkForArg("-inform", 7, argc, argv);
@@ -191,7 +191,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
             XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (sig)
             XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return ret;
+        return USER_INPUT_ERROR;
     }
 
     ret = wolfCLU_checkForArg("-out", 4, argc, argv);

@@ -62,6 +62,7 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
     }
     if (XFSEEK(keyFile, 0, SEEK_SET) != 0 || (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
         XFCLOSE(keyFile);
+        wolfCLU_ForceZero(keyBuf, keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return WOLFCLU_FAILURE;
     }
@@ -85,6 +86,7 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
                                         ED25519_KEY_SIZE,
                                         keyBuf + ED25519_KEY_SIZE,
                                         ED25519_KEY_SIZE, &key);
+    wolfCLU_ForceZero(keyBuf, keyFileSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
         wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);

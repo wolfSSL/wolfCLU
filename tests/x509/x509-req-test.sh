@@ -181,15 +181,12 @@ rm -f tmp.cert
 run_success "x509 -req -in tmp.csr -days 3650 -sha1 -signkey ./certs/server-key.pem -out tmp.cert"
 rm -f tmp.cert
 run_success "x509 -req -in tmp.csr -days 3650 -sha224 -signkey ./certs/server-key.pem -out tmp.cert"
-# Verify SHA-224 cert uses sha224 signature algorithm, not sha256
+# Verify SHA-224 cert uses sha224 signature algorithm
 SIGALG=`./wolfssl x509 -in tmp.cert -text -noout 2>&1`
 echo "$SIGALG" | grep -i "sha224"
 if [ $? -ne 0 ]; then
-    echo "$SIGALG" | grep -i "sha256"
-    if [ $? -eq 0 ]; then
-        echo "SHA-224 cert incorrectly uses SHA-256 signature algorithm"
-        exit 99
-    fi
+    echo "SHA-224 cert does not report SHA-224 signature algorithm"
+    exit 99
 fi
 rm -f tmp.cert
 run_success "x509 -req -in tmp.csr -days 3650 -sha256 -signkey ./certs/server-key.pem -out tmp.cert"
