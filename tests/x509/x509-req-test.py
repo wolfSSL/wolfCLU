@@ -8,11 +8,17 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, PROJECT_ROOT, run_wolfssl, test_main
+
+
+def _tmp(name):
+    """Return an absolute path for a temp file in the project root.
+
+    Uses forward slashes so wolfSSL's path handling recognizes the path
+    as absolute on Windows (it checks for leading '/')."""
+    return os.path.join(PROJECT_ROOT, name).replace("\\", "/")
 
 HAS_OPENSSL = shutil.which("openssl") is not None
-_SKIP_WIN = sys.platform == "win32"
-_WIN_REASON = "config file paths not supported on Windows UNC shares"
 
 TEST_CONF = """\
 [ req ]
@@ -101,11 +107,11 @@ class TestReqNew(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf_file = "test_req.conf"
-        cls.prompt_conf_file = "test_req_prompt.conf"
-        with open(cls.conf_file, "w") as f:
+        cls.conf_file = _tmp("test_req.conf")
+        cls.prompt_conf_file = _tmp("test_req_prompt.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
-        with open(cls.prompt_conf_file, "w") as f:
+        with open(cls.prompt_conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_PROMPT_CONF)
 
     @classmethod
@@ -118,7 +124,7 @@ class TestReqNew(unittest.TestCase):
 
     def test_req_new_with_subj(self):
         """req -new -subj creates cert with correct subject."""
-        tmp = "test_req_subj.cert"
+        tmp = _tmp("test_req_subj.cert")
         self._clean(tmp)
         r = run_wolfssl("req", "-new", "-days", "3650",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
@@ -139,10 +145,10 @@ class TestReqNew(unittest.TestCase):
         self.assertEqual(subject_line, expected,
                          "Got: {!r}".format(subject_line))
 
-    @unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
     def test_req_with_prompt_config(self):
         """req with prompt config file creates CSR with SAN."""
-        tmp_csr = "test_req_prompt.csr"
+        tmp_csr = _tmp("test_req_prompt.csr")
         self._clean(tmp_csr)
         r = run_wolfssl("req", "-new",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
@@ -168,10 +174,10 @@ class TestReqNew(unittest.TestCase):
                 break
         self.assertTrue(found_san, "SAN not found in CSR output")
 
-    @unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
     def test_req_with_config(self):
         """req with config file succeeds."""
-        tmp_csr = "test_req_conf.csr"
+        tmp_csr = _tmp("test_req_conf.csr")
         self._clean(tmp_csr)
         r = run_wolfssl("req", "-new",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
@@ -180,20 +186,22 @@ class TestReqNew(unittest.TestCase):
                         stdin_data="US\n")
         self.assertEqual(r.returncode, 0, r.stderr)
 
-    @unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
     def test_req_extensions_not_found_fails(self):
         """req with nonexistent extensions section should fail."""
         r = run_wolfssl("req", "-new", "-extensions", "v3_alt_ca_not_found",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
                         "-config", self.conf_file,
-                        "-x509", "-out", "alt_nf.crt")
-        self._clean("alt_nf.crt")
+                        "-x509", "-out", _tmp("alt_nf.crt"))
+        self._clean(_tmp("alt_nf.crt"))
         self.assertNotEqual(r.returncode, 0)
 
-    @unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
+    @unittest.skipIf(sys.platform == "win32",
+                      "wolfSSL IPv6 SAN parsing fails on Windows")
     def test_req_extensions_v3_alt_ca(self):
         """req with v3_alt_ca extensions sets CA:TRUE."""
-        alt_crt = "test_req_alt.crt"
+        alt_crt = _tmp("test_req_alt.crt")
         self._clean(alt_crt)
         r = run_wolfssl("req", "-new", "-extensions", "v3_alt_ca",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
@@ -215,10 +223,10 @@ class TestReqPemDerRoundTrip(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf_file = "test_req_rt.conf"
-        with open(cls.conf_file, "w") as f:
+        cls.conf_file = _tmp("test_req_rt.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
-        cls.csr = "test_req_rt.csr"
+        cls.csr = _tmp("test_req_rt.csr")
         r = run_wolfssl("req", "-new",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
                         "-config", cls.conf_file,
@@ -232,8 +240,8 @@ class TestReqPemDerRoundTrip(unittest.TestCase):
 
     def test_pem_to_der_to_pem(self):
         """CSR PEM -> DER -> PEM round-trip produces identical output."""
-        der_file = "test_req_rt.csr.der"
-        pem_file = "test_req_rt.csr.pem"
+        der_file = _tmp("test_req_rt.csr.der")
+        pem_file = _tmp("test_req_rt.csr.pem")
         self._clean(der_file, pem_file)
 
         r = run_wolfssl("req", "-inform", "pem", "-outform", "der",
@@ -254,10 +262,10 @@ class TestX509ReqSign(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf_file = "test_x509req_sign.conf"
-        with open(cls.conf_file, "w") as f:
+        cls.conf_file = _tmp("test_x509req_sign.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
-        cls.csr = "test_x509req_sign.csr"
+        cls.csr = _tmp("test_x509req_sign.csr")
         r = run_wolfssl("req", "-new",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
                         "-config", cls.conf_file,
@@ -276,28 +284,28 @@ class TestX509ReqSign(unittest.TestCase):
     def test_x509_in_csr_no_req_flag_fails(self):
         """x509 -in csr without -req should fail."""
         r = run_wolfssl("x509", "-in", self.csr, "-days", "3650",
-                        "-out", "tmp_sign.cert")
-        self._clean("tmp_sign.cert")
+                        "-out", _tmp("tmp_sign.cert"))
+        self._clean(_tmp("tmp_sign.cert"))
         self.assertNotEqual(r.returncode, 0)
 
     def test_x509_req_without_signkey_fails(self):
         """x509 -req without -signkey should fail."""
         r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
-                        "-out", "tmp_sign.cert")
-        self._clean("tmp_sign.cert")
+                        "-out", _tmp("tmp_sign.cert"))
+        self._clean(_tmp("tmp_sign.cert"))
         self.assertNotEqual(r.returncode, 0)
 
     def test_x509_in_csr_signkey_no_req_fails(self):
         """x509 -in csr -signkey without -req should fail."""
         r = run_wolfssl("x509", "-in", self.csr, "-days", "3650",
                         "-signkey", os.path.join(CERTS_DIR, "server-key.pem"),
-                        "-out", "tmp_sign.cert")
-        self._clean("tmp_sign.cert")
+                        "-out", _tmp("tmp_sign.cert"))
+        self._clean(_tmp("tmp_sign.cert"))
         self.assertNotEqual(r.returncode, 0)
 
     def test_x509_req_signkey_succeeds(self):
         """x509 -req -signkey succeeds."""
-        out = "tmp_x509req_sign.cert"
+        out = _tmp("tmp_x509req_sign.cert")
         self._clean(out)
         r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
                         "-signkey",
@@ -311,10 +319,10 @@ class TestX509ReqHashAlgorithms(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf_file = "test_x509req_hash.conf"
-        with open(cls.conf_file, "w") as f:
+        cls.conf_file = _tmp("test_x509req_hash.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
-        cls.csr = "test_x509req_hash.csr"
+        cls.csr = _tmp("test_x509req_hash.csr")
         r = run_wolfssl("req", "-new",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
                         "-config", cls.conf_file,
@@ -331,7 +339,7 @@ class TestX509ReqHashAlgorithms(unittest.TestCase):
             self.addCleanup(lambda p=f: _cleanup(p))
 
     def _test_hash(self, algo):
-        out = "tmp_hash_{}.cert".format(algo)
+        out = _tmp("tmp_hash_{}.cert".format(algo))
         self._clean(out)
         r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
                         "-{}".format(algo),
@@ -356,16 +364,16 @@ class TestX509ReqHashAlgorithms(unittest.TestCase):
         self._test_hash("sha512")
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestX509ReqExtensions(unittest.TestCase):
     """Test extensions from config file for x509 -req."""
 
     @classmethod
     def setUpClass(cls):
-        cls.conf_file = "test_x509req_ext.conf"
-        with open(cls.conf_file, "w") as f:
+        cls.conf_file = _tmp("test_x509req_ext.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
-        cls.csr = "test_x509req_ext.csr"
+        cls.csr = _tmp("test_x509req_ext.csr")
         r = run_wolfssl("req", "-new",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
                         "-config", cls.conf_file,
@@ -381,9 +389,11 @@ class TestX509ReqExtensions(unittest.TestCase):
         for f in files:
             self.addCleanup(lambda p=f: _cleanup(p))
 
+    @unittest.skipIf(sys.platform == "win32",
+                      "wolfSSL IPv6 SAN parsing fails on Windows")
     def test_extfile_v3_alt_ca(self):
         """x509 -req with -extfile and -extensions v3_alt_ca sets CA:TRUE."""
-        out = "tmp_ext.cert"
+        out = _tmp("tmp_ext.cert")
         self._clean(out)
         r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
                         "-extfile", self.conf_file,
@@ -398,7 +408,7 @@ class TestX509ReqExtensions(unittest.TestCase):
         self.assertIn("CA:TRUE", r2.stdout)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestReqConfigSubject(unittest.TestCase):
     """Test subject from config file."""
 
@@ -408,10 +418,10 @@ class TestReqConfigSubject(unittest.TestCase):
 
     def test_subject_from_config(self):
         """req with config file produces correct subject."""
-        conf = "test_req_cfg_subj.conf"
-        tmp = "test_req_cfg_subj.cert"
+        conf = _tmp("test_req_cfg_subj.conf")
+        tmp = _tmp("test_req_cfg_subj.cert")
         self._clean(conf, tmp)
-        with open(conf, "w") as f:
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
 
         r = run_wolfssl("req", "-new",
@@ -440,7 +450,7 @@ class TestReqDefaultBasicConstraints(unittest.TestCase):
 
     def test_default_ca_true(self):
         """req -new -x509 sets CA:TRUE by default."""
-        tmp = "test_req_bc.cert"
+        tmp = _tmp("test_req_bc.cert")
         self._clean(tmp)
         r = run_wolfssl("req", "-new", "-x509",
                         "-key", os.path.join(CERTS_DIR, "server-key.pem"),
@@ -463,8 +473,8 @@ class TestReqFIPS(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf_file = "test_req_fips.conf"
-        with open(cls.conf_file, "w") as f:
+        cls.conf_file = _tmp("test_req_fips.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
 
     @classmethod
@@ -475,7 +485,7 @@ class TestReqFIPS(unittest.TestCase):
         """req -newkey rsa:2048 with -passout stdin produces ENCRYPTED key."""
         if _is_fips():
             self.skipTest("FIPS build")
-        tmp = "test_req_fips_passout.cert"
+        tmp = _tmp("test_req_fips_passout.cert")
         self._clean(tmp)
         r = run_wolfssl("req", "-new", "-newkey", "rsa:2048",
                         "-config", self.conf_file, "-x509",
@@ -488,8 +498,8 @@ class TestReqFIPS(unittest.TestCase):
         """req -newkey -keyout with -passout produces encrypted key."""
         if _is_fips():
             self.skipTest("FIPS build")
-        tmp = "test_req_fips_keyout.cert"
-        key = "test_req_fips_newkey.pem"
+        tmp = _tmp("test_req_fips_keyout.cert")
+        key = _tmp("test_req_fips_newkey.pem")
         self._clean(tmp, key)
         r = run_wolfssl("req", "-newkey", "rsa:2048", "-keyout", key,
                         "-config", self.conf_file, "-out", tmp,
@@ -505,8 +515,8 @@ class TestReqFIPS(unittest.TestCase):
         """req -newkey rsa:2048 -keyout with -passout stdin."""
         if _is_fips():
             self.skipTest("FIPS build")
-        tmp = "test_req_fips_ko2.cert"
-        key = "test_req_fips_ko2.pem"
+        tmp = _tmp("test_req_fips_ko2.cert")
+        key = _tmp("test_req_fips_ko2.pem")
         self._clean(tmp, key)
         r = run_wolfssl("req", "-new", "-newkey", "rsa:2048",
                         "-keyout", key, "-config", self.conf_file,
@@ -515,14 +525,14 @@ class TestReqFIPS(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestReqHashAndKeyAlgos(unittest.TestCase):
     """Test hash and key algorithm options for req."""
 
     @classmethod
     def setUpClass(cls):
-        cls.conf_file = "test_req_algo.conf"
-        with open(cls.conf_file, "w") as f:
+        cls.conf_file = _tmp("test_req_algo.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
 
     @classmethod
@@ -534,7 +544,7 @@ class TestReqHashAndKeyAlgos(unittest.TestCase):
             self.addCleanup(lambda p=f: _cleanup(p))
 
     def _test_algo(self, algo_flag):
-        tmp = "test_req_algo_{}.cert".format(algo_flag)
+        tmp = _tmp("test_req_algo_{}.cert".format(algo_flag))
         self._clean(tmp)
         r = run_wolfssl("req", "-new", "-days", "3650",
                         "-{}".format(algo_flag),
@@ -564,7 +574,7 @@ class TestReqHashAndKeyAlgos(unittest.TestCase):
         self._test_algo("sha512")
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestReqAltNamesFullSkip(unittest.TestCase):
     """Test full alt_names extension with skipped indices."""
 
@@ -574,17 +584,19 @@ class TestReqAltNamesFullSkip(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conf_file = "test_req_altfull.conf"
-        with open(cls.conf_file, "w") as f:
+        cls.conf_file = _tmp("test_req_altfull.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
 
     @classmethod
     def tearDownClass(cls):
         _cleanup(cls.conf_file)
 
+    @unittest.skipIf(sys.platform == "win32",
+                      "wolfSSL IPv6 SAN parsing fails on Windows")
     def test_v3_alt_req_full_tenthname(self):
         """req with v3_alt_req_full includes tenthName."""
-        tmp = "test_req_altfull.cert"
+        tmp = _tmp("test_req_altfull.cert")
         self._clean(tmp)
         r = run_wolfssl("req", "-new",
                         "-key", os.path.join(CERTS_DIR, "ca-key.pem"),
@@ -598,7 +610,7 @@ class TestReqAltNamesFullSkip(unittest.TestCase):
         self.assertIn("tenthName", r2.stdout)
 
 
-@unittest.skipIf(_SKIP_WIN, _WIN_REASON)
+
 class TestReqPromptValidation(unittest.TestCase):
     """Test prompt-based config validation."""
 
@@ -608,8 +620,8 @@ class TestReqPromptValidation(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.prompt_conf = "test_req_pv.conf"
-        with open(cls.prompt_conf, "w") as f:
+        cls.prompt_conf = _tmp("test_req_pv.conf")
+        with open(cls.prompt_conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_PROMPT_CONF)
 
     @classmethod
@@ -618,7 +630,7 @@ class TestReqPromptValidation(unittest.TestCase):
 
     def test_valid_country_code(self):
         """req with valid 2-letter country code succeeds."""
-        tmp = "test_req_pv_ok.cert"
+        tmp = _tmp("test_req_pv_ok.cert")
         self._clean(tmp)
         r = run_wolfssl("req", "-new", "-x509",
                         "-key", os.path.join(CERTS_DIR, "ca-key.pem"),
@@ -629,7 +641,7 @@ class TestReqPromptValidation(unittest.TestCase):
 
     def test_long_country_code_fails(self):
         """req with too-long country code should fail."""
-        tmp = "test_req_pv_fail.cert"
+        tmp = _tmp("test_req_pv_fail.cert")
         self._clean(tmp)
         r = run_wolfssl("req", "-new", "-x509",
                         "-key", os.path.join(CERTS_DIR, "ca-key.pem"),
@@ -673,10 +685,10 @@ class TestReqCSRVersion(unittest.TestCase):
 
     def test_csr_version(self):
         """CSR version should be 1 (0x0)."""
-        conf = "test_req_ver.conf"
-        csr = "test_req_ver.csr"
+        conf = _tmp("test_req_ver.conf")
+        csr = _tmp("test_req_ver.csr")
         self._clean(conf, csr)
-        with open(conf, "w") as f:
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
 
         r = run_wolfssl("req", "-new",
@@ -699,10 +711,10 @@ class TestReqCSRVersion(unittest.TestCase):
     @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
     def test_csr_version_openssl_interop(self):
         """OpenSSL should also see version 1 (0x0) in our CSR."""
-        conf = "test_req_ver_ossl.conf"
-        csr = "test_req_ver_ossl.csr"
+        conf = _tmp("test_req_ver_ossl.conf")
+        csr = _tmp("test_req_ver_ossl.csr")
         self._clean(conf, csr)
-        with open(conf, "w") as f:
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
             f.write(TEST_CONF)
 
         r = run_wolfssl("req", "-new",
