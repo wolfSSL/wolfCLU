@@ -884,7 +884,8 @@ cleanup:
     freeIndexEntries(indexEntries);
     XFREE(caCertDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     XFREE(signerCertDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    wolfCLU_ForceZero(signerKeyDer, signerKeyDerSz);
+    if (signerKeyDer != NULL && signerKeyDerSz > 0)
+        wolfCLU_ForceZero(signerKeyDer, signerKeyDerSz);
     XFREE(signerKeyDer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     XFREE(caSubject, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 

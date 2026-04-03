@@ -359,7 +359,7 @@ run3
 run4
 
 # Test x509 -modulus -noout does not crash
-(./wolfssl x509 -in ./certs/server-cert.pem -modulus -noout) 2>/dev/null
+./wolfssl x509 -in ./certs/server-cert.pem -modulus -noout
 if [ $? -ne 0 ]; then
     echo "x509 -modulus -noout crashed or failed"
     exit 99

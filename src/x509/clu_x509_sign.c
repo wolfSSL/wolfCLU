@@ -925,6 +925,12 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         wolfSSL_BIO_free(out);
     }
 
+    if (caKeyBuf != NULL)
+        wolfCLU_ForceZero(caKeyBuf, LARGE_TEMP_SZ);
+    if (altCaKeyBuf != NULL)
+        wolfCLU_ForceZero(altCaKeyBuf, LARGE_TEMP_SZ);
+    if (serverKeyBuf != NULL)
+        wolfCLU_ForceZero(serverKeyBuf, LARGE_TEMP_SZ);
     XFREE(caKeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     XFREE(altCaKeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     XFREE(sapkiBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -1270,70 +1276,32 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
     /* set hash for signature */
     if (ret == WOLFCLU_SUCCESS) {
-        switch (csign->hashType) {
-            case WC_HASH_TYPE_MD5:
-            #ifndef NO_MD5
-                md  = wolfSSL_EVP_md5();
-            #else
-                wolfCLU_LogError("MD5 not compiled in");
-                ret = WOLFCLU_FATAL_ERROR;
-            #endif
-                break;
-
-            case WC_HASH_TYPE_SHA:
-                md  = wolfSSL_EVP_sha1();
-                break;
-
-            case WC_HASH_TYPE_SHA224:
-                md  = wolfSSL_EVP_sha224();
-                break;
-
-            case WC_HASH_TYPE_SHA256:
-                md  = wolfSSL_EVP_sha256();
-                break;
-
-            case WC_HASH_TYPE_SHA384:
-                md  = wolfSSL_EVP_sha384();
-                break;
-
-            case WC_HASH_TYPE_SHA512:
-                md  = wolfSSL_EVP_sha512();
-                break;
-
-            case WC_HASH_TYPE_NONE:
-            case WC_HASH_TYPE_MD2:
-            case WC_HASH_TYPE_MD4:
-            case WC_HASH_TYPE_MD5_SHA:
-            case WC_HASH_TYPE_SHA3_224:
-            case WC_HASH_TYPE_SHA3_256:
-            case WC_HASH_TYPE_SHA3_384:
-            case WC_HASH_TYPE_SHA3_512:
-            case WC_HASH_TYPE_BLAKE2B:
-            case WC_HASH_TYPE_BLAKE2S:
-
-    #if LIBWOLFSSL_VERSION_HEX >= 0x05009000
-            case WC_HASH_TYPE_SHA512_224:
-            case WC_HASH_TYPE_SHA512_256:
-            case WC_HASH_TYPE_SHAKE128:
-            case WC_HASH_TYPE_SHAKE256:
-            case WC_HASH_TYPE_SM3:
-    #elif LIBWOLFSSL_VERSION_HEX > 0x05001000
-        #ifndef WOLFSSL_NOSHA512_224
-            case WC_HASH_TYPE_SHA512_224:
+        if (csign->hashType == WC_HASH_TYPE_MD5) {
+        #ifndef NO_MD5
+            md = wolfSSL_EVP_md5();
+        #else
+            wolfCLU_LogError("MD5 not compiled in");
+            ret = WOLFCLU_FATAL_ERROR;
         #endif
-        #ifndef WOLFSSL_NOSHA512_256
-            case WC_HASH_TYPE_SHA512_256:
-        #endif
-        #ifdef WOLFSSL_SHAKE128
-            case WC_HASH_TYPE_SHAKE128:
-        #endif
-        #ifdef WOLFSSL_SHAKE256
-            case WC_HASH_TYPE_SHAKE256:
-        #endif
-    #endif
-            default:
-                wolfCLU_LogError("Unsupported hash type");
-                ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA) {
+            md = wolfSSL_EVP_sha1();
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA224) {
+            md = wolfSSL_EVP_sha224();
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA256) {
+            md = wolfSSL_EVP_sha256();
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA384) {
+            md = wolfSSL_EVP_sha384();
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA512) {
+            md = wolfSSL_EVP_sha512();
+        }
+        else {
+            wolfCLU_LogError("Unsupported hash type");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 

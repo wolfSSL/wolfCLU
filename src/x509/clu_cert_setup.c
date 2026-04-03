@@ -326,12 +326,13 @@ int wolfCLU_certSetup(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            inBufRaw = (byte*)XMALLOC(inBufSz, HEAP_HINT,
+            inBufRaw = (byte*)XMALLOC(inBufSz + 1, HEAP_HINT,
                                       DYNAMIC_TYPE_TMP_BUFFER);
             if (inBufRaw == NULL) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
+                inBufRaw[inBufSz] = '\0';
                 if (wolfSSL_BIO_read(inMem, inBufRaw, inBufSz) != inBufSz) {
                     wolfCLU_LogError("Failed to read input.");
                     ret = WOLFCLU_FATAL_ERROR;
@@ -452,6 +453,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             }
         }
         wolfSSL_EVP_PKEY_free(privkey);
+        privkey = NULL;
     }
 
     /* try to open output file if set */
@@ -749,10 +751,14 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
         else {
             if (wolfSSL_EVP_PKEY_id(pkey) == EVP_PKEY_RSA) {
-                    const WOLFSSL_BIGNUM *num;
+                    const WOLFSSL_BIGNUM *num = NULL;
+                    WOLFSSL_RSA *rsa;
                     char *hex;
 
-                    wolfSSL_RSA_get0_key(EVP_PKEY_get0_RSA(pkey), &num, NULL, NULL);
+                    rsa = EVP_PKEY_get0_RSA(pkey);
+                    if (rsa != NULL) {
+                        wolfSSL_RSA_get0_key(rsa, &num, NULL, NULL);
+                    }
                     hex = wolfSSL_BN_bn2hex(num);
 
                     if (hex != NULL) {
@@ -775,6 +781,7 @@ int wolfCLU_certSetup(int argc, char** argv)
                 wolfSSL_BIO_write(out, info, (int)XSTRLEN(info));
 
             }
+            wolfSSL_EVP_PKEY_free(pkey);
         }
     }
 
