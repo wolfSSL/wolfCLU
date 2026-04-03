@@ -982,8 +982,7 @@ enum wc_HashType wolfCLU_StringToHashType(char* in)
     if (XSTRNCMP(in, "md5", 3) == 0) {
         ret = WC_HASH_TYPE_MD5;
     }
-
-    if (XSTRNCMP(in, "sha512", 6) == 0) {
+    else if (XSTRNCMP(in, "sha512", 6) == 0) {
         ret = WC_HASH_TYPE_SHA512;
     }
     else if (XSTRNCMP(in, "sha384", 6) == 0) {
@@ -1342,8 +1341,12 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                 wolfSSL_BN_free(bn);
             } while ((numBits % 8) == 7);
         }
-        if (ret == WOLFCLU_SUCCESS) {
+        if (ret == WOLFCLU_SUCCESS && s != NULL) {
             wolfSSL_X509_set_serialNumber(x509, s);
+        }
+        else if (ret == WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Failed to create serial number");
+            ret = WOLFCLU_FATAL_ERROR;
         }
         wolfSSL_ASN1_INTEGER_free(s);
     }

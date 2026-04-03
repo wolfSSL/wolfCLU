@@ -31,6 +31,7 @@ void free_things_ed25519(byte** a, byte** b, byte** c, ed25519_key* d, ed25519_k
 int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
 {
     int ret = 0;
+    int keyInit = 0, rngInit = 0;
 
     Cert newCert;
     ed25519_key key;
@@ -71,16 +72,21 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
     ret = wc_ed25519_init(&key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize ed25519 key\nRET: %d", ret);
+        wolfCLU_ForceZero(keyBuf, keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return ret;
     }
+    keyInit = 1;
 
     ret = wc_InitRng(&rng);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
+        wolfCLU_ForceZero(keyBuf, keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        wc_ed25519_free(&key);
         return ret;
     }
+    rngInit = 1;
 
     ret = wc_ed25519_import_private_key(keyBuf,
                                         ED25519_KEY_SIZE,
@@ -90,7 +96,7 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0 ) {
         wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
-        return ret;
+        goto cleanup;
     }
 
     wc_InitCert(&newCert);
@@ -105,36 +111,44 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
 
     WOLFCLU_LOG(WOLFCLU_L0, "Enter your countries 2 digit code (ex: United States -> US): ");
     if (XFGETS(country,CTC_NAME_SIZE, stdin) == NULL) {
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
+        goto cleanup;
     }
     country[CTC_NAME_SIZE-1] = '\0';
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of the province you are located at: ");
     if (XFGETS(province,CTC_NAME_SIZE, stdin) == NULL) {
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
+        goto cleanup;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of the city you are located at: ");
     if (XFGETS(city,CTC_NAME_SIZE, stdin) == NULL) {
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
+        goto cleanup;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of your orginization: ");
     if (XFGETS(org,CTC_NAME_SIZE, stdin) == NULL) {
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
+        goto cleanup;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the name of your unit: ");
     if (XFGETS(unit,CTC_NAME_SIZE, stdin) == NULL) {
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
+        goto cleanup;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the common name of your domain: ");
     if (XFGETS(commonName,CTC_NAME_SIZE, stdin) == NULL) {
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
+        goto cleanup;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter your email address: ");
     if (XFGETS(email,CTC_NAME_SIZE, stdin) == NULL) {
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
+        goto cleanup;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "Enter the number of days this certificate should be valid: ");
     if (XFGETS(daysValid,CTC_NAME_SIZE, stdin) == NULL) {
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
+        goto cleanup;
     }
 
     XSTRNCPY(newCert.subject.country, country, CTC_NAME_SIZE);
@@ -151,14 +165,15 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
     certBuf = (byte*)XMALLOC(FOURK_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (certBuf == NULL) {
         wolfCLU_LogError("Failed to initialize buffer to stort certificate.");
-        return -1;
+        ret = MEMORY_E;
+        goto cleanup;
     }
     XMEMSET(certBuf, 0, FOURK_SZ);
 
     ret = wc_MakeCert_ex(&newCert, certBuf, FOURK_SZ, ED25519_TYPE, &key, &rng);
     if (ret < 0) {
         wolfCLU_LogError("Failed to make certificate.");
-        return ret;
+        goto cleanup;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "MakeCert returned %d", ret);
 
@@ -166,7 +181,7 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
                                                       ED25519_TYPE, &key, &rng);
     if (ret < 0) {
         wolfCLU_LogError("Failed to sign certificate.");
-        return ret;
+        goto cleanup;
     }
     WOLFCLU_LOG(WOLFCLU_L0, "SignCert returned %d", ret);
 
@@ -178,7 +193,8 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
     file = XFOPEN(certOut, "wb");
     if (!file) {
         wolfCLU_LogError("failed to open file: %s", certOut);
-        return -1;
+        ret = WOLFCLU_FATAL_ERROR;
+        goto cleanup;
     }
 
     ret = (int)XFWRITE(certBuf, 1, certBufSz, file);
@@ -194,14 +210,16 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
     pemBuf = (byte*)XMALLOC(FOURK_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (pemBuf == NULL) {
         wolfCLU_LogError("Failed to initialize pem buffer.");
-        return -1;
+        ret = MEMORY_E;
+        goto cleanup;
     }
     XMEMSET(pemBuf, 0, FOURK_SZ);
 
     pemBufSz = wc_DerToPem(certBuf, certBufSz, pemBuf, FOURK_SZ, CERT_TYPE);
     if (pemBufSz < 0) {
         wolfCLU_LogError("Failed to convert from der to pem.");
-        return -1;
+        ret = pemBufSz;
+        goto cleanup;
     }
 
     WOLFCLU_LOG(WOLFCLU_L0, "Resulting pem buffer is %d bytes", pemBufSz);
@@ -209,15 +227,25 @@ int make_self_signed_ed25519_certificate(char* keyPath, char* certOut)
     pemFile = XFOPEN(certOut, "wb");
     if (!pemFile) {
         wolfCLU_LogError("failed to open file: %s", certOut);
-        return -1;
+        ret = WOLFCLU_FATAL_ERROR;
+        goto cleanup;
     }
     XFWRITE(pemBuf, 1, pemBufSz, pemFile);
     XFCLOSE(pemFile);
     WOLFCLU_LOG(WOLFCLU_L0, "Successfully converted the der to pem. Result is in:  %s\n",
                                                                  certOut);
+    ret = WOLFCLU_SUCCESS;
 
-    free_things_ed25519(&pemBuf, &certBuf, NULL, &key, NULL, &rng);
-    return 1;
+cleanup:
+    if (pemBuf != NULL)
+        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (certBuf != NULL)
+        XFREE(certBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (keyInit)
+        wc_ed25519_free(&key);
+    if (rngInit)
+        wc_FreeRng(&rng);
+    return ret;
 }
 
 void free_things_ed25519(byte** a, byte** b, byte** c, ed25519_key* d, ed25519_key* e,

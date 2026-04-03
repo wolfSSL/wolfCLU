@@ -355,7 +355,7 @@ if [ $RET -ge 129 ] && [ $RET -le 192 ]; then
     printf '%s\n' "Missing -inkey value caused signal $(($RET - 128)), expected graceful error" && exit 99
 fi
 
-# Test ECC DER key generation produces a reasonably sized file (not buffer-sized)
+# Test ECC sign/verify round-trip
 ./wolfssl -genkey ecc -out ecc-rt-test -outform der -output KEYPAIR
 RESULT=$?
 if [ $RESULT -eq 0 ]; then
@@ -363,7 +363,22 @@ if [ $RESULT -eq 0 ]; then
     if [ "$KEYSIZE" -gt 256 ]; then
         printf '%s\n' "ECC DER private key too large ($KEYSIZE bytes), may contain trailing garbage" && exit 99
     fi
-    rm -f ecc-rt-test.priv ecc-rt-test.pub
+
+    # sign and verify round-trip
+    printf '%s\n' "ECC round trip test data" > ecc-rt-data.txt
+    ./wolfssl -ecc -sign -inkey ecc-rt-test.priv -inform der -in ecc-rt-data.txt -out ecc-rt-test.sig
+    RESULT=$?
+    if [ $RESULT -eq 0 ]; then
+        ./wolfssl -ecc -verify -inkey ecc-rt-test.pub -pubin -inform der -sigfile ecc-rt-test.sig -in ecc-rt-data.txt
+        RESULT=$?
+        if [ $RESULT -ne 0 ]; then
+            printf '%s\n' "ECC sign/verify round-trip failed on verify" && exit 99
+        fi
+    else
+        printf '%s\n' "ECC sign/verify round-trip failed on sign" && exit 99
+    fi
+
+    rm -f ecc-rt-test.priv ecc-rt-test.pub ecc-rt-data.txt ecc-rt-test.sig
 fi
 
 # Test dilithium sign with nonexistent key file expects failure

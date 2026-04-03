@@ -786,6 +786,8 @@ int wolfCLU_certSetup(int argc, char** argv)
                 wolfSSL_BIO_write(out, info, (int)XSTRLEN(info));
 
             }
+            /* wolfSSL's X509_get0_pubkey maps to wolfSSL_X509_get_pubkey
+             * which allocates, unlike OpenSSL's borrowed-ref convention */
             wolfSSL_EVP_PKEY_free(pkey);
         }
     }

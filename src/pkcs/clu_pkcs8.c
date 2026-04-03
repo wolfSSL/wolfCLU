@@ -187,7 +187,6 @@ int wolfCLU_PKCS8(int argc, char** argv)
                 }
             }
         }
-        wolfCLU_ForceZero(keyBuffer, sizeof(keyBuffer));
     }
 
     if (ret == WOLFCLU_SUCCESS && pass == NULL) {

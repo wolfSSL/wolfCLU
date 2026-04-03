@@ -157,7 +157,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
 {
 #ifndef NO_RSA
     int ret;
-    int privFileSz;
+    int privFileSz = 0;
     word32 index = 0;
 
     XFILE privKeyFile = NULL;
@@ -283,6 +283,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     }
 
     if (keyBuf!= NULL) {
+        wolfCLU_ForceZero(keyBuf, privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (outBuf!= NULL) {
@@ -304,7 +305,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
 {
 #ifdef HAVE_ECC
     int ret;
-    int privFileSz;
+    int privFileSz = 0;
     word32 index = 0;
     word32 outLen;
 
@@ -445,6 +446,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     }
 
     if (keyBuf!= NULL) {
+        wolfCLU_ForceZero(keyBuf, privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (outBuf!= NULL) {
@@ -696,7 +698,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
-        return ret;
+        return WOLFCLU_FATAL_ERROR;
     }
     XFCLOSE(privKeyFile);
 
