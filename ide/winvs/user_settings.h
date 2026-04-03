@@ -10,6 +10,10 @@
 #define NO_MULTIBYTE_PRINT
 #define WC_NO_HARDEN
 
+/* wolfSSL's default Windows XINET_PTON casts to PCWSTR which breaks
+ * with narrow char* strings.  Use the narrow-string InetPtonA instead. */
+#define XINET_PTON(a,b,c) InetPtonA((a),(b),(c))
+
 #define WOLFSSL_KEY_GEN
 #define WOLFSSL_CERT_GEN
 #define WOLFSSL_CERT_REQ
@@ -20,6 +24,7 @@
 #define WOLFSSL_AES_COUNTER
 #define WOLFSSL_AES_DIRECT
 #define HAVE_AESGCM
+#define HAVE_CAMELLIA
 #define WOLFSSL_SHA224
 #define WOLFSSL_SHA384
 #define WOLFSSL_SHA512
