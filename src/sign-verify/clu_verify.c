@@ -579,8 +579,19 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     if (ret == 0) {
         XMEMSET(outBuf, 0, outBufSz);
 
-        /* verify data with Ecc public key */
-        ret = wc_ecc_verify_hash(sig, sigSz, hash, hashSz, &stat, &key);
+        /* wc_ecc_verify_hash expects a hash digest, not raw data */
+        {
+            byte hashDigest[WC_SHA256_DIGEST_SIZE];
+            ret = wc_Sha256Hash(hash, hashSz, hashDigest);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to hash data.\nRET: %d", ret);
+            }
+            else {
+                /* verify hash with Ecc public key */
+                ret = wc_ecc_verify_hash(sig, sigSz, hashDigest,
+                                         WC_SHA256_DIGEST_SIZE, &stat, &key);
+            }
+        }
         if (ret < 0) {
             wolfCLU_LogError("Failed to verify data with pub key.\nRET: %d", ret);
         }

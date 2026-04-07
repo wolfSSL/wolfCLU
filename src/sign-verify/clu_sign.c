@@ -389,9 +389,20 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     if (ret == 0) {
         XMEMSET(outBuf, 0, outBufSz);
 
-        /* signing input with ecc priv key to produce signature */
-        outLen = (word32)outBufSz;
-        ret = wc_ecc_sign_hash(data, fSz, outBuf, &outLen, &rng, &key);
+        /* wc_ecc_sign_hash expects a hash digest, not raw data */
+        {
+            byte hashBuf[WC_SHA256_DIGEST_SIZE];
+            ret = wc_Sha256Hash(data, fSz, hashBuf);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to hash data.\nRET: %d", ret);
+            }
+            else {
+                /* signing hash with ecc priv key to produce signature */
+                outLen = (word32)outBufSz;
+                ret = wc_ecc_sign_hash(hashBuf, WC_SHA256_DIGEST_SIZE,
+                                       outBuf, &outLen, &rng, &key);
+            }
+        }
         if (ret >= 0) {
             XFILE s;
             s = XFOPEN(out, "wb");
