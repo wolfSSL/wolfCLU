@@ -343,7 +343,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 
     /* open CA ecc private key */
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfSSL_BIO_get_fp(bioCaKey, &caKeyFp);
+        ret = (int)wolfSSL_BIO_get_fp(bioCaKey, &caKeyFp);
         if (ret != WOLFCLU_SUCCESS) {
             wolfCLU_LogError("Error cannot get CA key fd");
             ret = WOLFCLU_FATAL_ERROR;
@@ -364,7 +364,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 
     /* open server ecc private key */
     if (ret == WOLFCLU_SUCCESS && !isCA) {
-        ret = wolfSSL_BIO_get_fp(bioSubjKey, &serverKeyFp);
+        ret = (int)wolfSSL_BIO_get_fp(bioSubjKey, &serverKeyFp);
         if (ret != WOLFCLU_SUCCESS) {
             wolfCLU_LogError("Error cannot get server key fd");
             ret = WOLFCLU_FATAL_ERROR;
@@ -481,7 +481,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 
     /* load alternative CA public key */
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfSSL_BIO_get_fp(bioAltSubjPubKey, &altCaPubKeyFp);
+        ret = (int)wolfSSL_BIO_get_fp(bioAltSubjPubKey, &altCaPubKeyFp);
         if (ret != WOLFCLU_SUCCESS) {
             wolfCLU_LogError("Error get AltCAkey fd");
             ret = WOLFCLU_FATAL_ERROR;
@@ -530,7 +530,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfSSL_BIO_get_fp(bioAltCaKey, &altCaKeyFp);
+        ret = (int)wolfSSL_BIO_get_fp(bioAltCaKey, &altCaKeyFp);
         if (ret != WOLFCLU_SUCCESS) {
             wolfCLU_LogError("Error cannot get AltCA key fd");
             ret = WOLFCLU_FATAL_ERROR;
