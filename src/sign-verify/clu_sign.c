@@ -388,11 +388,34 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
         }
     }
     if (ret == 0) {
+        int keySz;
+        enum wc_HashType hashType;
+        int digestSz;
+        byte hashBuf[WC_MAX_DIGEST_SIZE];
+
         XMEMSET(outBuf, 0, outBufSz);
 
-        /* signing input with ecc priv key to produce signature */
-        outLen = (word32)outBufSz;
-        ret = wc_ecc_sign_hash(data, fSz, outBuf, &outLen, &rng, &key);
+        /* hash the input data before signing -- ECDSA signs a digest, not raw
+         * data.  Select a hash whose digest size matches the curve. */
+        keySz = wc_ecc_size(&key);
+        if (keySz <= 32) {
+            hashType = WC_HASH_TYPE_SHA256;
+        }
+        else if (keySz <= 48) {
+            hashType = WC_HASH_TYPE_SHA384;
+        }
+        else {
+            hashType = WC_HASH_TYPE_SHA512;
+        }
+        digestSz = wc_HashGetDigestSize(hashType);
+        ret = wc_Hash(hashType, data, fSz, hashBuf, digestSz);
+
+        /* signing the hash with ecc priv key to produce signature */
+        if (ret == 0) {
+            outLen = (word32)outBufSz;
+            ret = wc_ecc_sign_hash(hashBuf, digestSz, outBuf, &outLen,
+                                   &rng, &key);
+        }
         if (ret >= 0) {
             XFILE s;
             s = XFOPEN(out, "wb");

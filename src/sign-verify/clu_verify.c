@@ -566,10 +566,33 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         }
     }
     if (ret == 0) {
+        int keySz;
+        enum wc_HashType hashType;
+        int digestSz;
+        byte hashBuf[WC_MAX_DIGEST_SIZE];
+
         XMEMSET(outBuf, 0, outBufSz);
 
-        /* verify data with Ecc public key */
-        ret = wc_ecc_verify_hash(sig, sigSz, hash, hashSz, &stat, &key);
+        /* hash the input data before verifying -- ECDSA operates on a digest,
+         * not raw data.  Select a hash whose digest size matches the curve. */
+        keySz = wc_ecc_size(&key);
+        if (keySz <= 32) {
+            hashType = WC_HASH_TYPE_SHA256;
+        }
+        else if (keySz <= 48) {
+            hashType = WC_HASH_TYPE_SHA384;
+        }
+        else {
+            hashType = WC_HASH_TYPE_SHA512;
+        }
+        digestSz = wc_HashGetDigestSize(hashType);
+        ret = wc_Hash(hashType, hash, hashSz, hashBuf, digestSz);
+
+        /* verify the hash with Ecc public key */
+        if (ret == 0) {
+            ret = wc_ecc_verify_hash(sig, sigSz, hashBuf, digestSz,
+                                     &stat, &key);
+        }
         if (ret < 0) {
             wolfCLU_LogError("Failed to verify data with pub key.\nRET: %d", ret);
         }
