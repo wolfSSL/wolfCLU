@@ -258,7 +258,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     const char *altSigValOid        = "2.5.29.74";
 
     /*
-     * LARGE_TEMO_SZ defines the size of temporary buffers used for signature key,
+     * LARGE_TEMP_SZ defines the size of temporary buffers used for signature key,
      * verification key and signature value buffers.
      * The value 11264 is enough for P-521 and ML-DSA-87 PEM certs.
     */
@@ -1081,8 +1081,13 @@ int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
     if (ret == WOLFCLU_SUCCESS && csign->outDir != NULL && out != NULL) {
         int currentSz = (int)XSTRLEN(csign->outDir);
 
-        /* If out is an absolute path, use it directly instead of appending */
-        if (out[0] == '/') {
+        /* If out is an absolute path, use it directly instead of appending.
+         * Matches OpenSSL's ossl_is_absolute_path() behaviour. */
+        if (out[0] == '/'
+#ifdef _WIN32
+                || out[0] == '\\' || (out[0] != '\0' && out[1] == ':')
+#endif
+                ) {
             s = (char*)XMALLOC(outSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (s == NULL) {
                 ret = MEMORY_E;

@@ -654,26 +654,30 @@ class TestReqPromptValidation(unittest.TestCase):
 class TestReqCSRAttributes(unittest.TestCase):
     """Test CSR attribute printing."""
 
-    def test_attributes_csr(self):
-        """req -text on attributes-csr.pem shows expected attributes."""
+    def test_supported_attributes(self):
+        """req -text on a CSR with supported attributes shows them."""
+        csr_path = os.path.join(CERTS_DIR, "attributes-supported-csr.pem")
+        if not os.path.isfile(csr_path):
+            self.skipTest("attributes-supported-csr.pem not available")
+
+        r = run_wolfssl("req", "-text", "-noout", "-in", csr_path)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        output = r.stdout
+        self.assertIn("challengePassword", output)
+        self.assertIn("test123", output)
+        self.assertIn("unstructuredName", output)
+        self.assertIn("wolfSSL_test", output)
+
+    def test_unsupported_attributes_fail(self):
+        """req -text on a CSR with unsupported attributes should fail."""
         csr_path = os.path.join(CERTS_DIR, "attributes-csr.pem")
         if not os.path.isfile(csr_path):
             self.skipTest("attributes-csr.pem not available")
 
         r = run_wolfssl("req", "-text", "-noout", "-in", csr_path)
-        if r.returncode != 0:
-            self.skipTest("wolfSSL version does not support CSR attributes")
-
-        output = r.stdout
-        self.assertIn("initials", output)
-        self.assertIn("abc", output)
-        self.assertIn("dnQualifier", output)
-        self.assertIn("dn", output)
-        self.assertIn("challengePassword", output)
-        self.assertIn("test", output)
-        self.assertIn("givenName", output)
-        self.assertIn("Given Name", output)
-        self.assertIn("surname", output)
+        self.assertNotEqual(r.returncode, 0,
+                            "CSR with unsupported attributes should fail")
 
 
 class TestReqCSRVersion(unittest.TestCase):

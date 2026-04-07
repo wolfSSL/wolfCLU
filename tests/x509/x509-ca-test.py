@@ -749,8 +749,6 @@ class TestCAOutdirPath(unittest.TestCase):
     def tearDown(self):
         _cleanup(self.conf, self.csr, _tmp("index.txt"), self.outdir)
 
-    @unittest.skipIf(sys.platform == "win32",
-                      "wolfSSL does not recognize drive-letter paths as absolute")
     def test_absolute_out_path(self):
         """Absolute -out path should override new_certs_dir."""
         abs_out = (self.outdir + "/absolute-out.pem")
@@ -764,6 +762,34 @@ class TestCAOutdirPath(unittest.TestCase):
 
         # The file at the absolute location is the correct one;
         # just verify it was created (already checked above).
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows drive-letter test")
+    def test_absolute_drive_letter_out_path(self):
+        """On Windows, drive-letter paths (C:\\...) are treated as absolute."""
+        import tempfile
+        abs_out = os.path.join(tempfile.gettempdir(),
+                               "wolfclu_test_abs.pem").replace("\\", "/")
+        self.addCleanup(lambda: _cleanup(abs_out))
+
+        r = run_wolfssl("ca", "-config", self.conf,
+                        "-in", self.csr, "-out", abs_out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.isfile(abs_out),
+                        "File not found at {}".format(abs_out))
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows backslash test")
+    def test_absolute_backslash_out_path(self):
+        """On Windows, backslash paths (\\\\...) are treated as absolute."""
+        import tempfile
+        abs_out = os.path.join(tempfile.gettempdir(),
+                               "wolfclu_test_abs_bs.pem")
+        self.addCleanup(lambda: _cleanup(abs_out))
+
+        r = run_wolfssl("ca", "-config", self.conf,
+                        "-in", self.csr, "-out", abs_out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.isfile(abs_out),
+                        "File not found at {}".format(abs_out))
 
     def test_relative_out_path(self):
         """Relative -out path should be appended to new_certs_dir."""
