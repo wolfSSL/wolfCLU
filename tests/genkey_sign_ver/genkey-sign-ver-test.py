@@ -40,7 +40,7 @@ class _GenkeySignVerifyBase(unittest.TestCase):
                     raise unittest.SkipTest("filesystem support disabled")
 
         with open(cls.SIGN_FILE, "w") as f:
-            f.write("Sign this data\n")
+            f.write("Sign this test data\n")
 
     @classmethod
     def tearDownClass(cls):
@@ -137,6 +137,22 @@ class Ed25519Test(_GenkeySignVerifyBase):
 
 
 class EccTest(_GenkeySignVerifyBase):
+
+    # @classmethod
+    # def setUpClass(cls):
+    #     super().setUpClass()
+    #     # Quick smoke test: ECC sign can fail on smallstack wolfSSL builds
+    #     r = run_wolfssl("-genkey", "ecc", "-out", "ecc_probe",
+    #                     "-outform", "der", "KEYPAIR")
+    #     if r.returncode == 0:
+    #         r2 = run_wolfssl("-ecc", "-sign", "-inkey", "ecc_probe.priv",
+    #                          "-inform", "der", "-in", cls.SIGN_FILE,
+    #                          "-out", "ecc_probe.sig")
+    #         _cleanup_files(["ecc_probe.priv", "ecc_probe.pub",
+    #                         "ecc_probe.sig"])
+    #         if r2.returncode != 0:
+    #             raise unittest.SkipTest(
+    #                 "ECC sign not functional: " + r2.stderr.strip())
 
     def test_ecc_der(self):
         self._gen_sign_verify("ecc", "ecckey", "ecc-signed.sig", "der")
