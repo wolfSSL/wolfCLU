@@ -40,7 +40,7 @@ static const struct option dgst_options[] = {
     {"-sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
 
     {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
-    {"-out",       required_argument, 0, WOLFCLU_INFILE    },
+    {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"-signature", required_argument, 0, WOLFCLU_INFILE    },
     {"-verify",    required_argument, 0, WOLFCLU_VERIFY    },
     {"-sign",     required_argument, 0, WOLFCLU_SIGN      },
@@ -238,6 +238,10 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                             optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
+                break;
+
+            case WOLFCLU_OUTFILE:
+                sigFile = optarg;
                 break;
 
             case WOLFCLU_INFILE:

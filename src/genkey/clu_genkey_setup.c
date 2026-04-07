@@ -451,7 +451,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
         /* get the height argument */
         ret = wolfCLU_checkForArg("-height", 7, argc, argv);
-        if (ret > 0 || argv[ret+1] != NULL) {
+        if (ret > 0 && argv[ret+1] != NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", argv[ret+1]);
 
             if (XSTRNCMP(argv[ret+1], "20", 2) == 0
@@ -473,7 +473,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
         /* get the layer argument */
         ret = wolfCLU_checkForArg("-layer", 6, argc, argv);
-        if (ret > 0 || argv[ret+1] != NULL) {
+        if (ret > 0 && argv[ret+1] != NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "Layer: %s", argv[ret+1]);
 
             switch (height) {
@@ -610,7 +610,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
         /* get the height argument */
         ret = wolfCLU_checkForArg("-height", 7, argc, argv);
-        if (ret > 0 || argv[ret+1] != NULL) {
+        if (ret > 0 && argv[ret+1] != NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", argv[ret+1]);
 
             if (XSTRNCMP(argv[ret+1], "10", 2) == 0) {

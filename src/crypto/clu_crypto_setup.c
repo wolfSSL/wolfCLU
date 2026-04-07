@@ -186,14 +186,14 @@ int wolfCLU_setup(int argc, char** argv, char action)
                     return WOLFCLU_FATAL_ERROR;
                 }
                 else {
-                    ivString = (char*)XMALLOC(XSTRLEN(optarg), HEAP_HINT,
+                    ivString = (char*)XMALLOC(XSTRLEN(optarg) + 1, HEAP_HINT,
                         DYNAMIC_TYPE_TMP_BUFFER);
                     if (ivString == NULL) {
                         wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
                         return MEMORY_E;
                     }
 
-                    XSTRLCPY(ivString, optarg, XSTRLEN(optarg));
+                    XSTRLCPY(ivString, optarg, XSTRLEN(optarg) + 1);
                     ret = wolfCLU_hexToBin(ivString, &iv, &ivSize,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL,
@@ -268,14 +268,14 @@ int wolfCLU_setup(int argc, char** argv, char action)
             else {
                 char* keyString;
 
-                keyString = (char*)XMALLOC(XSTRLEN(optarg), HEAP_HINT,
+                keyString = (char*)XMALLOC(XSTRLEN(optarg) + 1, HEAP_HINT,
                         DYNAMIC_TYPE_TMP_BUFFER);
                 if (keyString == NULL) {
                     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
                     return MEMORY_E;
                 }
 
-                XSTRLCPY(keyString, optarg, XSTRLEN(optarg));
+                XSTRLCPY(keyString, optarg, XSTRLEN(optarg) + 1);
                 ret = wolfCLU_hexToBin(keyString, &key, &numBits,
                                        NULL, NULL, NULL,
                                        NULL, NULL, NULL,

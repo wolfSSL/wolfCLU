@@ -95,7 +95,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFORM:
-                outForm = wolfCLU_checkInform(optarg);
+                outForm = wolfCLU_checkOutform(optarg);
                 break;
 
             case WOLFCLU_INFORM:

@@ -263,30 +263,30 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
      * The value 11264 is enough for P-521 and ML-DSA-87 PEM certs.
     */
     const int LARGE_TEMP_SZ = 11264;
-    byte caKeyBuf[LARGE_TEMP_SZ];
+    byte* caKeyBuf = NULL;
     int  caKeySz   = LARGE_TEMP_SZ;
-    byte altCaKeyBuf[LARGE_TEMP_SZ];
+    byte* altCaKeyBuf = NULL;
     int  altCaKeySz = LARGE_TEMP_SZ;
-    byte sapkiBuf[LARGE_TEMP_SZ];
+    byte* sapkiBuf = NULL;
     int  sapkiSz = LARGE_TEMP_SZ;
-    byte altSigAlgBuf[LARGE_TEMP_SZ];
+    byte* altSigAlgBuf = NULL;
     int  altSigAlgSz = LARGE_TEMP_SZ;
-    byte scratchBuf[LARGE_TEMP_SZ];
+    byte* scratchBuf = NULL;
     int  scratchSz = LARGE_TEMP_SZ;
-    byte preTbsBuf[LARGE_TEMP_SZ];
+    byte* preTbsBuf = NULL;
     int  preTbsSz = LARGE_TEMP_SZ;
-    byte altSigValBuf[LARGE_TEMP_SZ];
+    byte* altSigValBuf = NULL;
     int  altSigValSz = LARGE_TEMP_SZ;
-    byte derBuf[LARGE_TEMP_SZ];
+    byte* derBuf = NULL;
     int  derSz = LARGE_TEMP_SZ;
-    byte outBuf[LARGE_TEMP_SZ];
+    byte* outBuf = NULL;
     int  outSz = LARGE_TEMP_SZ;
     DerBuffer *derObj = NULL;
 
     /* if generate server cert */
-    byte caCertBuf[LARGE_TEMP_SZ];
+    byte* caCertBuf = NULL;
     int  caCertSz = LARGE_TEMP_SZ;
-    byte serverKeyBuf[LARGE_TEMP_SZ];
+    byte* serverKeyBuf = NULL;
     int  serverKeySz = LARGE_TEMP_SZ;
 
     if (bioCaKey == NULL || bioAltCaKey == NULL || bioAltSubjPubKey == NULL
@@ -305,16 +305,39 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         ret = BAD_FUNC_ARG;
     }
 
-    XMEMSET(caKeyBuf,     0, caKeySz);
-    XMEMSET(altCaKeyBuf,  0, altCaKeySz);
-    XMEMSET(sapkiBuf,     0, sapkiSz);
-    XMEMSET(altSigAlgBuf, 0, altSigAlgSz);
-    XMEMSET(scratchBuf,   0, scratchSz);
-    XMEMSET(preTbsBuf,    0, preTbsSz);
-    XMEMSET(altSigValBuf, 0, altSigValSz);
-    XMEMSET(outBuf,       0, outSz);
-    XMEMSET(caCertBuf,    0, caCertSz);
-    XMEMSET(serverKeyBuf, 0, serverKeySz);
+    if (ret == WOLFCLU_SUCCESS) {
+        caKeyBuf     = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        altCaKeyBuf  = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        sapkiBuf     = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        altSigAlgBuf = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        scratchBuf   = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        preTbsBuf    = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        altSigValBuf = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        derBuf       = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        outBuf       = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        caCertBuf    = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        serverKeyBuf = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+
+        if (caKeyBuf == NULL || altCaKeyBuf == NULL || sapkiBuf == NULL ||
+            altSigAlgBuf == NULL || scratchBuf == NULL || preTbsBuf == NULL ||
+            altSigValBuf == NULL || derBuf == NULL || outBuf == NULL ||
+            caCertBuf == NULL || serverKeyBuf == NULL) {
+            ret = MEMORY_E;
+        }
+        else {
+            XMEMSET(caKeyBuf,     0, LARGE_TEMP_SZ);
+            XMEMSET(altCaKeyBuf,  0, LARGE_TEMP_SZ);
+            XMEMSET(sapkiBuf,     0, LARGE_TEMP_SZ);
+            XMEMSET(altSigAlgBuf, 0, LARGE_TEMP_SZ);
+            XMEMSET(scratchBuf,   0, LARGE_TEMP_SZ);
+            XMEMSET(preTbsBuf,    0, LARGE_TEMP_SZ);
+            XMEMSET(altSigValBuf, 0, LARGE_TEMP_SZ);
+            XMEMSET(derBuf,       0, LARGE_TEMP_SZ);
+            XMEMSET(outBuf,       0, LARGE_TEMP_SZ);
+            XMEMSET(caCertBuf,    0, LARGE_TEMP_SZ);
+            XMEMSET(serverKeyBuf, 0, LARGE_TEMP_SZ);
+        }
+    }
 
     if (ret == WOLFCLU_SUCCESS) {
         ret = wc_InitRng(&rng);
@@ -902,6 +925,24 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         wolfSSL_BIO_free(out);
     }
 
+    if (caKeyBuf != NULL)
+        wolfCLU_ForceZero(caKeyBuf, LARGE_TEMP_SZ);
+    if (altCaKeyBuf != NULL)
+        wolfCLU_ForceZero(altCaKeyBuf, LARGE_TEMP_SZ);
+    if (serverKeyBuf != NULL)
+        wolfCLU_ForceZero(serverKeyBuf, LARGE_TEMP_SZ);
+    XFREE(caKeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(altCaKeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(sapkiBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(altSigAlgBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(scratchBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(preTbsBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(altSigValBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(caCertBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    XFREE(serverKeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+
     if (ret != WOLFCLU_SUCCESS) {
         wolfCLU_LogError("Error in wolfCLU_ChimeraCertSignSetCA: %d", ret);
     }
@@ -942,24 +983,20 @@ enum wc_HashType wolfCLU_StringToHashType(char* in)
         ret = WC_HASH_TYPE_MD5;
     }
 
-    if (XSTRNCMP(in, "sha", 3) == 0) {
-        ret = WC_HASH_TYPE_SHA;
-    }
-
-    if (XSTRNCMP(in, "sha224", 6) == 0) {
-        ret = WC_HASH_TYPE_SHA256;
-    }
-
-    if (XSTRNCMP(in, "sha256", 6) == 0) {
-        ret = WC_HASH_TYPE_SHA256;
-    }
-
-    if (XSTRNCMP(in, "sha384", 6) == 0) {
-        ret = WC_HASH_TYPE_SHA384;
-    }
-
     if (XSTRNCMP(in, "sha512", 6) == 0) {
         ret = WC_HASH_TYPE_SHA512;
+    }
+    else if (XSTRNCMP(in, "sha384", 6) == 0) {
+        ret = WC_HASH_TYPE_SHA384;
+    }
+    else if (XSTRNCMP(in, "sha256", 6) == 0) {
+        ret = WC_HASH_TYPE_SHA256;
+    }
+    else if (XSTRNCMP(in, "sha224", 6) == 0) {
+        ret = WC_HASH_TYPE_SHA224;
+    }
+    else if (XSTRNCMP(in, "sha", 3) == 0) {
+        ret = WC_HASH_TYPE_SHA;
     }
     return ret;
 }
@@ -1112,8 +1149,14 @@ static int wolfCLU_CertSignLog(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
         subject = wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(x509),
                NULL, 0);
-        if (wolfSSL_BIO_write(csign->dataBase, subject, (int)XSTRLEN(subject))
-                <= 0) {
+        if (subject == NULL) {
+            wolfCLU_LogError("Unable to get subject name");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+
+        if (ret == WOLFCLU_SUCCESS &&
+                wolfSSL_BIO_write(csign->dataBase, subject,
+                    (int)XSTRLEN(subject)) <= 0) {
             wolfCLU_LogError("Unable to write to data base");
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -1233,76 +1276,38 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
     /* set hash for signature */
     if (ret == WOLFCLU_SUCCESS) {
-        switch (csign->hashType) {
-            case WC_HASH_TYPE_MD5:
-            #ifndef NO_MD5
-                md  = wolfSSL_EVP_md5();
-            #else
-                wolfCLU_LogError("MD5 not compiled in");
-                ret = WOLFCLU_FATAL_ERROR;
-            #endif
-                break;
-
-            case WC_HASH_TYPE_SHA:
-                md  = wolfSSL_EVP_sha1();
-                break;
-
-            case WC_HASH_TYPE_SHA224:
-                md  = wolfSSL_EVP_sha224();
-                break;
-
-            case WC_HASH_TYPE_SHA256:
-                md  = wolfSSL_EVP_sha256();
-                break;
-
-            case WC_HASH_TYPE_SHA384:
-                md  = wolfSSL_EVP_sha384();
-                break;
-
-            case WC_HASH_TYPE_SHA512:
-                md  = wolfSSL_EVP_sha512();
-                break;
-
-            case WC_HASH_TYPE_NONE:
-            case WC_HASH_TYPE_MD2:
-            case WC_HASH_TYPE_MD4:
-            case WC_HASH_TYPE_MD5_SHA:
-            case WC_HASH_TYPE_SHA3_224:
-            case WC_HASH_TYPE_SHA3_256:
-            case WC_HASH_TYPE_SHA3_384:
-            case WC_HASH_TYPE_SHA3_512:
-            case WC_HASH_TYPE_BLAKE2B:
-            case WC_HASH_TYPE_BLAKE2S:
-
-    #if LIBWOLFSSL_VERSION_HEX >= 0x05009000
-            case WC_HASH_TYPE_SHA512_224:
-            case WC_HASH_TYPE_SHA512_256:
-            case WC_HASH_TYPE_SHAKE128:
-            case WC_HASH_TYPE_SHAKE256:
-            case WC_HASH_TYPE_SM3:
-    #elif LIBWOLFSSL_VERSION_HEX > 0x05001000
-        #ifndef WOLFSSL_NOSHA512_224
-            case WC_HASH_TYPE_SHA512_224:
+        if (csign->hashType == WC_HASH_TYPE_MD5) {
+        #ifndef NO_MD5
+            md = wolfSSL_EVP_md5();
+        #else
+            wolfCLU_LogError("MD5 not compiled in");
+            ret = WOLFCLU_FATAL_ERROR;
         #endif
-        #ifndef WOLFSSL_NOSHA512_256
-            case WC_HASH_TYPE_SHA512_256:
-        #endif
-        #ifdef WOLFSSL_SHAKE128
-            case WC_HASH_TYPE_SHAKE128:
-        #endif
-        #ifdef WOLFSSL_SHAKE256
-            case WC_HASH_TYPE_SHAKE256:
-        #endif
-    #endif
-            default:
-                wolfCLU_LogError("Unsupported hash type");
-                ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA) {
+            md = wolfSSL_EVP_sha1();
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA224) {
+            md = wolfSSL_EVP_sha224();
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA256) {
+            md = wolfSSL_EVP_sha256();
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA384) {
+            md = wolfSSL_EVP_sha384();
+        }
+        else if (csign->hashType == WC_HASH_TYPE_SHA512) {
+            md = wolfSSL_EVP_sha512();
+        }
+        else {
+            wolfCLU_LogError("Unsupported hash type");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
     /* set serial number of certificate */
     if (ret == WOLFCLU_SUCCESS) {
-        WOLFSSL_ASN1_INTEGER* s;
+        WOLFSSL_ASN1_INTEGER* s = NULL;
         char buf[EXTERNAL_SERIAL_SIZE*2];
         int size = EXTERNAL_SERIAL_SIZE*2;
 
@@ -1325,6 +1330,8 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                     != WOLFSSL_SUCCESS) {
                     wolfCLU_LogError("Creating a random serial number fail");
                     ret = WOLFCLU_FATAL_ERROR;
+                    wolfSSL_BN_free(bn);
+                    break;
                 }
 
                 /* work around BN_to_ASN1_INTEGER check */
@@ -1335,7 +1342,9 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                 wolfSSL_BN_free(bn);
             } while ((numBits % 8) == 7);
         }
-        wolfSSL_X509_set_serialNumber(x509, s);
+        if (ret == WOLFCLU_SUCCESS) {
+            wolfSSL_X509_set_serialNumber(x509, s);
+        }
         wolfSSL_ASN1_INTEGER_free(s);
     }
 

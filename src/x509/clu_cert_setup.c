@@ -326,12 +326,13 @@ int wolfCLU_certSetup(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            inBufRaw = (byte*)XMALLOC(inBufSz, HEAP_HINT,
+            inBufRaw = (byte*)XMALLOC(inBufSz + 1, HEAP_HINT,
                                       DYNAMIC_TYPE_TMP_BUFFER);
             if (inBufRaw == NULL) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
+                inBufRaw[inBufSz] = '\0';
                 if (wolfSSL_BIO_read(inMem, inBufRaw, inBufSz) != inBufSz) {
                     wolfCLU_LogError("Failed to read input.");
                     ret = WOLFCLU_FATAL_ERROR;
@@ -412,6 +413,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             ret = USER_INPUT_ERROR;
         }
         wolfSSL_BIO_free(keyIn);
+        keyIn = NULL;
     }
 
     if (ret == WOLFCLU_SUCCESS && extFile != NULL) {
@@ -451,6 +453,7 @@ int wolfCLU_certSetup(int argc, char** argv)
             }
         }
         wolfSSL_EVP_PKEY_free(privkey);
+        privkey = NULL;
     }
 
     /* try to open output file if set */
@@ -748,11 +751,20 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
         else {
             if (wolfSSL_EVP_PKEY_id(pkey) == EVP_PKEY_RSA) {
-                    const WOLFSSL_BIGNUM *num;
+                    const WOLFSSL_BIGNUM *num = NULL;
+                    WOLFSSL_RSA *rsa;
                     char *hex;
 
-                    wolfSSL_RSA_get0_key(EVP_PKEY_get0_RSA(pkey), &num, NULL, NULL);
-                    hex = wolfSSL_BN_bn2hex(num);
+                    rsa = EVP_PKEY_get0_RSA(pkey);
+                    if (rsa != NULL) {
+                        wolfSSL_RSA_get0_key(rsa, &num, NULL, NULL);
+                    }
+                    if (num == NULL) {
+                        wolfCLU_LogError("Modulus=unavailable");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    hex = (num != NULL) ?
+                        wolfSSL_BN_bn2hex(num) : NULL;
 
                     if (hex != NULL) {
                         if (wolfSSL_BIO_write(out, "Modulus=", (int)XSTRLEN("Modulus="))
@@ -844,6 +856,10 @@ int wolfCLU_certSetup(int argc, char** argv)
     if (tmpOutBuf != NULL) {
         XFREE(tmpOutBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
+    if (keyIn != NULL)
+        wolfSSL_BIO_free(keyIn);
+    if (privkey != NULL)
+        wolfSSL_EVP_PKEY_free(privkey);
     wc_FreeDer(&derObj);
     wolfSSL_BIO_free(out);
     wolfSSL_X509_free(x509);

@@ -108,6 +108,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
     }
 
     if (XFSEEK(f, 0, SEEK_SET) != 0 || (int)XFREAD(data, 1, fSz, f) != fSz) {
+        XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         XFCLOSE(f);
         return WOLFCLU_FATAL_ERROR;
     }
@@ -234,9 +235,8 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     /* retrieving private key and storing in the RsaKey */
     if (ret == 0) {
         ret = wc_RsaPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
-        if (privFileSz < 0) {
+        if (ret != 0) {
             wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
-            ret = privFileSz;
         }
     }
 
@@ -373,9 +373,8 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     /* retrieving private key and storing in the Ecc Key */
     if (ret == 0) {
         ret = wc_EccPrivateKeyDecode(keyBuf, &index, &key, privFileSz);
-        if (privFileSz < 0) {
+        if (ret != 0) {
             wolfCLU_LogError("Failed to decode Ecc private key.\nRET: %d", ret);
-            ret = privFileSz;
         }
     }
 
@@ -390,9 +389,20 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     if (ret == 0) {
         XMEMSET(outBuf, 0, outBufSz);
 
-        /* signing input with ecc priv key to produce signature */
-        outLen = (word32)outBufSz;
-        ret = wc_ecc_sign_hash(data, fSz, outBuf, &outLen, &rng, &key);
+        /* wc_ecc_sign_hash expects a hash digest, not raw data */
+        {
+            byte hashBuf[WC_SHA256_DIGEST_SIZE];
+            ret = wc_Sha256Hash(data, fSz, hashBuf);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to hash data.\nRET: %d", ret);
+            }
+            else {
+                /* signing hash with ecc priv key to produce signature */
+                outLen = (word32)outBufSz;
+                ret = wc_ecc_sign_hash(hashBuf, WC_SHA256_DIGEST_SIZE,
+                                       outBuf, &outLen, &rng, &key);
+            }
+        }
         if (ret >= 0) {
             XFILE s;
             s = XFOPEN(out, "wb");
@@ -551,7 +561,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
                 ret = BAD_FUNC_ARG;
             }
             else {
-                XFWRITE(outBuf, 1, outBufSz, s);
+                XFWRITE(outBuf, 1, outLen, s);
                 XFCLOSE(s);
             }
         }
@@ -609,15 +619,18 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     dilithium_key key[1];
 #endif
 
+    /* zero before init for defensive security */
+    XMEMSET(key, 0, sizeof(dilithium_key));
+
     /* init the dilithium key */
-    if (wc_dilithium_init(key) != 0) {
+    ret = wc_dilithium_init(key);
+    if (ret != 0) {
         wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
         return WOLFCLU_FAILURE;
     }
-    XMEMSET(key, 0, sizeof(dilithium_key));
 
     if (wc_InitRng(&rng) != 0) {
         wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
@@ -637,7 +650,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
-        return ret;
+        return WOLFCLU_FATAL_ERROR;
     }
 
     XFSEEK(privKeyFile, 0, SEEK_END);
@@ -664,7 +677,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
-        return ret;
+        return WOLFCLU_FATAL_ERROR;
     }
     XFCLOSE(privKeyFile);
 

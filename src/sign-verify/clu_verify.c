@@ -165,6 +165,7 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
     }
     if (XFSEEK(f, 0, SEEK_SET) != 0 || (int)XFREAD(data, 1, fSz, f) != fSz) {
         XFCLOSE(f);
+        XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return WOLFCLU_FATAL_ERROR;
     }
     XFCLOSE(f);
@@ -194,6 +195,8 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
 
             if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
                 XFCLOSE(h);
+                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return WOLFCLU_FATAL_ERROR;
             }
             XFCLOSE(h);
@@ -222,6 +225,8 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
 
             if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
                 XFCLOSE(h);
+                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return WOLFCLU_FATAL_ERROR;
             }
             XFCLOSE(h);
@@ -254,6 +259,8 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
 
             if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
                 XFCLOSE(h);
+                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return WOLFCLU_FATAL_ERROR;
             }
             XFCLOSE(h);
@@ -286,6 +293,8 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
 
             if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
                 XFCLOSE(h);
+                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return WOLFCLU_FATAL_ERROR;
             }
             XFCLOSE(h);
@@ -316,6 +325,8 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
 
             if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
                 XFCLOSE(h);
+                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return WOLFCLU_FATAL_ERROR;
             }
             XFCLOSE(h);
@@ -568,8 +579,19 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     if (ret == 0) {
         XMEMSET(outBuf, 0, outBufSz);
 
-        /* verify data with Ecc public key */
-        ret = wc_ecc_verify_hash(sig, sigSz, hash, hashSz, &stat, &key);
+        /* wc_ecc_verify_hash expects a hash digest, not raw data */
+        {
+            byte hashDigest[WC_SHA256_DIGEST_SIZE];
+            ret = wc_Sha256Hash(hash, hashSz, hashDigest);
+            if (ret != 0) {
+                wolfCLU_LogError("Failed to hash data.\nRET: %d", ret);
+            }
+            else {
+                /* verify hash with Ecc public key */
+                ret = wc_ecc_verify_hash(sig, sigSz, hashDigest,
+                                         WC_SHA256_DIGEST_SIZE, &stat, &key);
+            }
+        }
         if (ret < 0) {
             wolfCLU_LogError("Failed to verify data with pub key.\nRET: %d", ret);
         }
@@ -758,6 +780,9 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     dilithium_key key[1];
 #endif
 
+    /* zero before init for defensive security */
+    XMEMSET(key, 0, sizeof(dilithium_key));
+
     /* init the dilithium key */
     ret = wc_dilithium_init(key);
     if (ret != 0) {
@@ -767,7 +792,6 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     #endif
         return ret;
     }
-    XMEMSET(key, 0, sizeof(dilithium_key));
 
     /* open and read public key */
     keyFile = XFOPEN(keyPath, "rb");

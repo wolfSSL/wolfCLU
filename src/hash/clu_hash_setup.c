@@ -94,7 +94,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
     /* returns location of the arg in question if present */
     ret = wolfCLU_checkForArg("-in", 3, argc, argv);
-    if (ret > 0) {
+    if (ret > 0 && ret + 1 < argc) {
         bioIn = wolfSSL_BIO_new_file(argv[ret+1], "rb");
         if (bioIn == NULL) {
             wolfCLU_LogError("unable to open file %s", argv[ret+1]);
@@ -104,7 +104,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
     }
 
     ret = wolfCLU_checkForArg("-out", 4, argc, argv);
-    if (ret > 0) {
+    if (ret > 0 && ret + 1 < argc) {
         bioOut = wolfSSL_BIO_new_file(argv[ret+1], "wb");
         if (bioOut == NULL) {
             wolfCLU_LogError("unable to open output file %s",
@@ -114,7 +114,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
     }
 
     ret = wolfCLU_checkForArg("-size", 5, argc, argv);
-    if (ret > 0) {
+    if (ret > 0 && ret + 1 < argc) {
         /* size of output */
 #ifndef HAVE_BLAKE2
         wolfCLU_LogError("%s: -size is only valid when blake2 is enabled.",
