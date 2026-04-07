@@ -574,7 +574,8 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         XMEMSET(outBuf, 0, outBufSz);
 
         /* hash the input data before verifying -- ECDSA operates on a digest,
-         * not raw data.  Select a hash whose digest size matches the curve. */
+         * not raw data.  Select a curve-appropriate hash paired with the curve
+         * strength; ECDSA will truncate the digest as needed. */
         keySz = wc_ecc_size(&key);
         if (keySz <= 32) {
             hashType = WC_HASH_TYPE_SHA256;
@@ -586,7 +587,12 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
             hashType = WC_HASH_TYPE_SHA512;
         }
         digestSz = wc_HashGetDigestSize(hashType);
-        ret = wc_Hash(hashType, hash, hashSz, hashBuf, digestSz);
+        if (digestSz > 0 && digestSz <= WC_MAX_DIGEST_SIZE) {
+            ret = wc_Hash(hashType, hash, hashSz, hashBuf, digestSz);
+        }
+        else {
+            ret = BAD_FUNC_ARG;
+        }
 
         /* verify the hash with Ecc public key */
         if (ret == 0) {

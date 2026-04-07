@@ -396,7 +396,8 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
         XMEMSET(outBuf, 0, outBufSz);
 
         /* hash the input data before signing -- ECDSA signs a digest, not raw
-         * data.  Select a hash whose digest size matches the curve. */
+         * data.  Select a curve-appropriate hash paired with the curve
+         * strength; ECDSA will truncate the digest as needed. */
         keySz = wc_ecc_size(&key);
         if (keySz <= 32) {
             hashType = WC_HASH_TYPE_SHA256;
@@ -408,7 +409,13 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
             hashType = WC_HASH_TYPE_SHA512;
         }
         digestSz = wc_HashGetDigestSize(hashType);
-        ret = wc_Hash(hashType, data, fSz, hashBuf, digestSz);
+        if (digestSz <= 0 || digestSz > WC_MAX_DIGEST_SIZE) {
+            wolfCLU_LogError("Invalid hash digest size: %d", digestSz);
+            ret = BAD_FUNC_ARG;
+        }
+        else {
+            ret = wc_Hash(hashType, data, fSz, hashBuf, digestSz);
+        }
 
         /* signing the hash with ecc priv key to produce signature */
         if (ret == 0) {
