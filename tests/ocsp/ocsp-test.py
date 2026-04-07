@@ -108,7 +108,11 @@ def _run_client(binary, port, extra_args=None):
 
 
 class _OCSPInteropBase(unittest.TestCase):
-    """Base class for a single client/responder combination."""
+    """Base class for a single client/responder combination.
+
+    Not intended to be run directly -- only concrete subclasses that
+    set CLIENT_BIN and RESPONDER_BIN are meaningful test classes.
+    """
 
     CLIENT_BIN = None
     RESPONDER_BIN = None
@@ -118,8 +122,6 @@ class _OCSPInteropBase(unittest.TestCase):
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-        if cls.CLIENT_BIN is None or cls.RESPONDER_BIN is None:
-            raise unittest.SkipTest("binary not configured")
         if not _ocsp_supported(cls.CLIENT_BIN):
             raise unittest.SkipTest(f"OCSP not supported by {cls.CLIENT_BIN}")
         if not _ocsp_supported(cls.RESPONDER_BIN):
@@ -332,6 +334,16 @@ class TestOpensslClientOpensslResponder(_OCSPInteropBase):
     CLIENT_BIN = "openssl"
     RESPONDER_BIN = "openssl"
     PORT = OCSP_PORT_BASE + 3
+
+
+def load_tests(loader, tests, pattern):
+    """Exclude the abstract _OCSPInteropBase from test discovery."""
+    suite = unittest.TestSuite()
+    for test_group in tests:
+        for test in test_group:
+            if type(test).mro()[0] is not _OCSPInteropBase:
+                suite.addTest(test)
+    return suite
 
 
 if __name__ == "__main__":
