@@ -212,11 +212,13 @@ fi
 # Regression tests for stack buffer overflow fix (scanf -> fgets)
 
 # Test: -in not provided, filename supplied via stdin to exercise the inName Path
+rm -f test-stdin-in.enc test-stdin-in.dec
 printf "certs/crl.der\n" | ./wolfssl enc -aes-128-cbc -out test-stdin-in.enc -k "testpass" > /dev/null 2>&1
 if [ $? != 0 ]; then
     echo "Failed: enc with stdin input (no -in flag)"
     exit 99
 fi
+rm -f test-stdin-in.dec
 ./wolfssl enc -d -aes-128-cbc -in test-stdin-in.enc -out test-stdin-in.dec -k "testpass" > /dev/null 2>&1
 diff certs/crl.der test-stdin-in.dec > /dev/null 2>&1
 if [ $? != 0 ]; then
