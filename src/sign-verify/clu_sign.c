@@ -618,16 +618,18 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 {
 #ifdef HAVE_DILITHIUM
     int ret = 0;
+    int privFileSz = 0;
+    word32 index = 0;
+
     XFILE privKeyFile = NULL;
     byte* privBuf = NULL;
-    int privFileSz = 0;
+
     word32 privBufSz = 0;
-    word32 index = 0;
     byte* outBuf = NULL;
     word32 outBufSz = 0;
 
     WC_RNG rng;
-    XMEMSET(&rng, 0, sizeof(rng));
+
 
 #ifdef WOLFSSL_SMALL_STACK
     dilithium_key* key;
@@ -641,6 +643,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 #endif
 
     /* zero before init for defensive security */
+    XMEMSET(&rng, 0, sizeof(rng));
     XMEMSET(key, 0, sizeof(dilithium_key));
 
     /* init the dilithium key */
@@ -650,146 +653,123 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     #endif
-        return WOLFCLU_FAILURE;
+        ret = WOLFCLU_FAILURE;
     }
 
-    if (wc_InitRng(&rng) != 0) {
-        wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return WOLFCLU_FAILURE;
+    /* initialize RNG */
+    if (ret == 0) {
+        ret = wc_InitRng(&rng);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to initialize rng.\nRET: %d", ret);
+        }
     }
 
     /* open and read private key */
-    privKeyFile = XFOPEN(privKey, "rb");
-    if (privKeyFile == NULL) {
-        wolfCLU_LogError("Faild to open Private key FILE.");
-        wc_FreeRng(&rng);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return WOLFCLU_FATAL_ERROR;
+    if (ret == 0) {
+        privKeyFile = XFOPEN(privKey, "rb");
+        if (privKeyFile == NULL) {
+            wolfCLU_LogError("Faild to open Private key FILE.");
+            ret = BAD_FUNC_ARG;
+        }
     }
-
-    XFSEEK(privKeyFile, 0, SEEK_END);
-    privFileSz = (int)XFTELL(privKeyFile);
-    privBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (privBuf == NULL) {
-        XFCLOSE(privKeyFile);
-        wc_FreeRng(&rng);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return MEMORY_E;
+    if (ret == 0) {
+        XFSEEK(privKeyFile, 0, SEEK_END);
+        privFileSz = (int)XFTELL(privKeyFile);
+        privBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
+                                                    DYNAMIC_TYPE_TMP_BUFFER);
+        if (privBuf == NULL) {
+            ret = MEMORY_E;
+        }
     }
-
-    XMEMSET(privBuf, 0, privFileSz+1);
-    privBufSz = privFileSz;
-    XFSEEK(privKeyFile, 0, SEEK_SET);
-    if (XFREAD(privBuf, 1, privBufSz, privKeyFile) != privBufSz) {
-        wolfCLU_Log(WOLFCLU_L0, "incorecct size: %d", privFileSz);
-        XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        wc_FreeRng(&rng);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return WOLFCLU_FATAL_ERROR;
+    if (ret == 0) {
+        XMEMSET(privBuf, 0, privFileSz+1);
+        privBufSz = privFileSz;
+        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
+            (int)XFREAD(privBuf, 1, privFileSz, privKeyFile) != privFileSz) {
+            wolfCLU_Log(WOLFCLU_L0, "incorecct size: %d", privFileSz);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
-    XFCLOSE(privKeyFile);
 
     /* convert PEM to DER if necessary */
-    if (inForm == PEM_FORM) {
+    if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&privBuf, privFileSz, 0);
         if (ret < 0) {
             wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            wc_FreeRng(&rng);
-            wc_dilithium_free(key);
-        #ifdef WOLFSSL_SMALL_STACK
-            XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        #endif
-            return ret;
         }
         else {
-            privFileSz = ret;
+            /* update privBuf and privFileSz with the converted DER data */
+            privBufSz = privFileSz = ret;
+            ret = 0;
         }
     }
 
-    /* retrieving private key and staoring in the Dilithium key */
-    ret = wc_Dilithium_PrivateKeyDecode(privBuf, &index, key, privBufSz);
-    XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (ret != 0) {
-        wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
-        wc_FreeRng(&rng);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return ret;
+    /* retrieving private key and storing in the Dilithium key */
+    if (ret == 0) {
+        ret = wc_Dilithium_PrivateKeyDecode(privBuf, &index, key, privBufSz);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to decode private key.\nRET: %d", ret);
+        }
     }
-
     /* malloc signature buffer */
-    outBufSz = wc_dilithium_sig_size(key);
-    outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (outBuf == NULL) {
-        wc_FreeRng(&rng);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return MEMORY_E;
+    if (ret == 0) {
+        outBufSz = wc_dilithium_sig_size(key);
+        outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (outBuf == NULL) {
+            wolfCLU_LogError("Failed to allocate signature"
+                                                    " buffer.\nRET: %d", ret);
+            ret = MEMORY_E;
+        }
     }
-
     /* sign the message usign Dilithium private key. Note that the context is
      * empty. This is for interoperability. */
-    ret = wc_dilithium_sign_ctx_msg(NULL, 0, data, dataSz, outBuf, &outBufSz,
-                                    key, &rng);
-    if (ret != 0) {
-        wolfCLU_LogError("Failed to sign data with Dilithium private key.\nRET: %d", ret);
-        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        wc_FreeRng(&rng);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return ret;
+    if (ret == 0) {
+        ret = wc_dilithium_sign_ctx_msg(NULL, 0, data, dataSz, outBuf,
+                                        &outBufSz, key, &rng);
+        if (ret != 0) {
+            wolfCLU_LogError("Failed to sign data with"
+                                " Dilithium private key.\nRET: %d", ret);
+         }
     }
-    else {
+
+    if (ret == 0) {
         XFILE outFile;
         outFile = XFOPEN(out, "wb");
+
         if (outFile == NULL) {
             wolfCLU_LogError("Failed to open output file %s", out);
-            XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            wc_FreeRng(&rng);
-            wc_dilithium_free(key);
-        #ifdef WOLFSSL_SMALL_STACK
-            XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        #endif
-            return BAD_FUNC_ARG;
+            ret = BAD_FUNC_ARG;
+        } else {
+            XFWRITE(outBuf, 1, outBufSz, outFile);
+            XFCLOSE(outFile);
         }
-        XFWRITE(outBuf, 1, outBufSz, outFile);
-        XFCLOSE(outFile);
     }
 
-    XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    wc_FreeRng(&rng);
-    wc_dilithium_free(key);
+    /* cleanup allocated resources */
+    if (privKeyFile != NULL)
+        XFCLOSE(privKeyFile);
 
+    if (privBuf != NULL) {
+        XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    if (outBuf != NULL) {
+        XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    wc_dilithium_free(key);
+    wc_FreeRng(&rng);
 #ifdef WOLFSSL_SMALL_STACK
     XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 #endif
 
-    return WOLFCLU_SUCCESS;
+    /* expected ret == WOLFCLU_SUCCESS */
+    return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 #else
     (void)data;
     (void)out;
     (void)dataSz;
-    (void) privKey;
+    (void)privKey;
     (void)inForm;
 
     return NOT_COMPILED_IN;
