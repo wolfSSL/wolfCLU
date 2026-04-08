@@ -650,10 +650,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     ret = wc_dilithium_init(key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        ret = WOLFCLU_FAILURE;
     }
 
     /* initialize RNG */
@@ -673,12 +669,24 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         }
     }
     if (ret == 0) {
-        XFSEEK(privKeyFile, 0, SEEK_END);
-        privFileSz = (int)XFTELL(privKeyFile);
-        privBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
+        if (XFSEEK(privKeyFile, 0, SEEK_END) != 0) {
+            wolfCLU_LogError("Failed to seek to end of file.");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ret == 0) {
+            privFileSz = (int)XFTELL(privKeyFile);
+            if (privFileSz > 0 &&
+                privFileSz <= DILITHIUM_MAX_BOTH_KEY_PEM_SIZE) {
+                privBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
                                                     DYNAMIC_TYPE_TMP_BUFFER);
-        if (privBuf == NULL) {
-            ret = MEMORY_E;
+                if (privBuf == NULL) {
+                    ret = MEMORY_E;
+                }
+            } else {
+                wolfCLU_LogError("Incorrect private key file size: %d",
+                                privFileSz);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
     if (ret == 0) {
@@ -686,7 +694,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         privBufSz = privFileSz;
         if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
             (int)XFREAD(privBuf, 1, privFileSz, privKeyFile) != privFileSz) {
-            wolfCLU_Log(WOLFCLU_L0, "incorecct size: %d", privFileSz);
+            wolfCLU_LogError("Incorrect private key file size: %d", privFileSz);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
