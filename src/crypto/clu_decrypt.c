@@ -81,6 +81,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     if (length < saltAndIvSize) {
         wolfCLU_LogError("Input file too small (missing salt/IV).");
         XFCLOSE(inFile);
+        XFCLOSE(outFile);
         return DECRYPT_ERROR;
     }
 
@@ -167,7 +168,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                     ret = 0; /* success */
                 }
                 else {
-                    wolfCLU_LogError("Input file does not exist.");
+                    wolfCLU_LogError("Error reading input file.");
                     ret = FREAD_ERROR;
                 }
             }

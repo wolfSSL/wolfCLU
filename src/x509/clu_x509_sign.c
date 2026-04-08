@@ -288,6 +288,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     int  caCertSz = LARGE_TEMP_SZ;
     byte serverKeyBuf[LARGE_TEMP_SZ];
     int  serverKeySz = LARGE_TEMP_SZ;
+    #undef LARGE_TEMP_SZ
 
     if (bioCaKey == NULL || bioAltCaKey == NULL || bioAltSubjPubKey == NULL
         || subject == NULL || outFileName == NULL) {
@@ -1049,7 +1050,9 @@ int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
          * Matches OpenSSL's ossl_is_absolute_path() behaviour. */
         if (out[0] == '/'
 #ifdef _WIN32
-                || out[0] == '\\' || (out[0] != '\0' && out[1] == ':')
+                || out[0] == '\\'
+                || (isalpha((unsigned char)out[0]) && out[1] == ':'
+                    && (out[2] == '\\' || out[2] == '/'))
 #endif
                 ) {
             s = (char*)XMALLOC(outSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
