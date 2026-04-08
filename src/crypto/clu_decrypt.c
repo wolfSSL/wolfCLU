@@ -81,6 +81,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     if (length < saltAndIvSize) {
         wolfCLU_LogError("Input file too small (missing salt/IV).");
         XFCLOSE(inFile);
+        XFCLOSE(outFile);
         return DECRYPT_ERROR;
     }
 

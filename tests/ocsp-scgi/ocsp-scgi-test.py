@@ -25,8 +25,11 @@ from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main
 
 HAS_OPENSSL = shutil.which("openssl") is not None
 
-SCGI_PORT = 6961
-HTTP_PORT = 8089
+def _find_free_port():
+    """Bind to port 0 to let the OS assign a free ephemeral port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 INDEX_VALID = (
     "V\t991231235959Z\t\t01\tunknown\t"
@@ -74,7 +77,7 @@ class _SCGIProxyHandler(http.server.BaseHTTPRequestHandler):
     """HTTP handler that proxies POST requests to an SCGI backend."""
 
     scgi_host = "127.0.0.1"
-    scgi_port = SCGI_PORT
+    scgi_port = None
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
@@ -138,7 +141,9 @@ class TestOCSPScgi(unittest.TestCase):
         cls._tmpdir = tempfile.mkdtemp()
         cls._wolfclu_proc = None
         cls._wolfclu_log = None
-        cls._proxy = _HTTPProxy(HTTP_PORT, SCGI_PORT)
+        cls._scgi_port = _find_free_port()
+        cls._http_port = _find_free_port()
+        cls._proxy = _HTTPProxy(cls._http_port, cls._scgi_port)
         cls._proxy.start()
 
     @classmethod
@@ -181,7 +186,7 @@ class TestOCSPScgi(unittest.TestCase):
         log_file = open(log_path, "w")
         proc = subprocess.Popen(
             [WOLFSSL_BIN, "ocsp", "-scgi",
-             "-port", str(SCGI_PORT),
+             "-port", str(self._scgi_port),
              "-index", index,
              "-rsigner", rsigner,
              "-rkey", rkey,
@@ -205,7 +210,7 @@ class TestOCSPScgi(unittest.TestCase):
              "-issuer", os.path.join(CERTS_DIR, "ca-cert.pem"),
              "-cert", os.path.join(CERTS_DIR, "server-cert.pem"),
              "-CAfile", os.path.join(CERTS_DIR, "ca-cert.pem"),
-             "-url", f"http://127.0.0.1:{HTTP_PORT}/ocsp"],
+             "-url", f"http://127.0.0.1:{self._http_port}/ocsp"],
             capture_output=True, text=True,
             stdin=subprocess.DEVNULL, timeout=30,
         )

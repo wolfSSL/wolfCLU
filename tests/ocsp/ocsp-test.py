@@ -8,6 +8,7 @@ test module. Tests all client/responder combinations (wolfssl, openssl).
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -18,7 +19,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main
 
 HAS_OPENSSL = shutil.which("openssl") is not None
-OCSP_PORT_BASE = 6960
+
+
+def _find_free_port():
+    """Bind to port 0 to let the OS assign a free ephemeral port."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 INDEX_VALID = (
     "V\t991231235959Z\t\t01\tunknown\t"
@@ -116,7 +123,7 @@ class _OCSPInteropBase(unittest.TestCase):
 
     CLIENT_BIN = None
     RESPONDER_BIN = None
-    PORT = OCSP_PORT_BASE
+    PORT = None
 
     @classmethod
     def setUpClass(cls):
@@ -128,6 +135,7 @@ class _OCSPInteropBase(unittest.TestCase):
             raise unittest.SkipTest(
                 f"OCSP not supported by {cls.RESPONDER_BIN}")
 
+        cls.PORT = _find_free_port()
         cls._tmpdir = tempfile.mkdtemp()
         cls._responder = None
 
@@ -307,33 +315,29 @@ class _OCSPInteropBase(unittest.TestCase):
 
 
 # Concrete test classes for each client/responder combination.
-# Each gets a unique port to avoid conflicts if run in parallel.
+# Each gets a dynamically assigned port in setUpClass to avoid conflicts.
 
 class TestWolfsslClientWolfsslResponder(_OCSPInteropBase):
     CLIENT_BIN = WOLFSSL_BIN
     RESPONDER_BIN = WOLFSSL_BIN
-    PORT = OCSP_PORT_BASE
 
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
 class TestWolfsslClientOpensslResponder(_OCSPInteropBase):
     CLIENT_BIN = WOLFSSL_BIN
     RESPONDER_BIN = "openssl"
-    PORT = OCSP_PORT_BASE + 1
 
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
 class TestOpensslClientWolfsslResponder(_OCSPInteropBase):
     CLIENT_BIN = "openssl"
     RESPONDER_BIN = WOLFSSL_BIN
-    PORT = OCSP_PORT_BASE + 2
 
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
 class TestOpensslClientOpensslResponder(_OCSPInteropBase):
     CLIENT_BIN = "openssl"
     RESPONDER_BIN = "openssl"
-    PORT = OCSP_PORT_BASE + 3
 
 
 def load_tests(loader, tests, pattern):
