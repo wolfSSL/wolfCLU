@@ -185,7 +185,8 @@ fi
 rm -f test-dec.der
 rm -f test-enc.der
 
-# camellia: decrypt file of exactly MAX_LEN bytes (non-EVP path)
+# camellia: decrypt file whose size is a multiple of MAX_LEN (2 x 1024 bytes)
+# to ensure the exact-boundary read case is covered (non-EVP path)
 if grep -q "HAVE_CAMELLIA" wolfssl/wolfssl/options.h 2>/dev/null; then
     dd if=/dev/urandom bs=2048 count=1 of=test_maxlen_camellia.bin 2>/dev/null
     ./wolfssl encrypt camellia-cbc-128 -pwd testpwd \
