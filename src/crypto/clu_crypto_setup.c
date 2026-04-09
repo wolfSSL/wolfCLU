@@ -365,9 +365,10 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 wolfCLU_LogError("input too long, please try again");
                 continue;
             }
-            inName[strcspn(inName, "\n")] = '\0';
+            inName[strcspn(inName, "\r\n")] = '\0';
             /* Do not accept an empty string as valid input */
             if (inName[0] == '\0') {
+                wolfCLU_LogError("empty input, please enter a file name");
                 continue;
             }
             ret = 1;
@@ -436,8 +437,9 @@ int wolfCLU_setup(int argc, char** argv, char action)
                         wolfCLU_LogError("input too long, please try again");
                         continue;
                     }
-                    outNameEnc[strcspn(outNameEnc, "\n")] = '\0';
+                    outNameEnc[strcspn(outNameEnc, "\r\n")] = '\0';
                     if (outNameEnc[0] == '\0') {
+                        wolfCLU_LogError("empty input, please enter a file name");
                         continue;
                     }
                     out = outNameEnc;
@@ -478,8 +480,9 @@ int wolfCLU_setup(int argc, char** argv, char action)
                         wolfCLU_LogError("input too long, please try again");
                         continue;
                     }
-                    outNameDec[strcspn(outNameDec, "\n")] = '\0';
+                    outNameDec[strcspn(outNameDec, "\r\n")] = '\0';
                     if (outNameDec[0] == '\0') {
+                        wolfCLU_LogError("empty input, please enter a file name");
                         continue;
                     }
                     out = outNameDec;

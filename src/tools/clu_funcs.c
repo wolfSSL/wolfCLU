@@ -1249,14 +1249,16 @@ void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid, char* str)
     WOLFSSL_X509_NAME_ENTRY *entry;
 
     if (str != NULL) {
-        /* strip off newline character if found at the end of str */
-        i = (int)XSTRLEN((const char*)str);
+        /* strip off newline/carriage-return characters at the end of str */
+        i = (int)XSTRLEN((const char*)str) - 1;
         while (i >= 0) {
-            if (str[i] == '\n') {
+            if (str[i] == '\n' || str[i] == '\r') {
                 str[i] = '\0';
+                i--;
+            }
+            else {
                 break;
             }
-            i--;
         }
 
         /* treats a '.' string as 'do not add' */
