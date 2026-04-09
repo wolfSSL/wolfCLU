@@ -554,21 +554,24 @@ WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name)
 
     if (ret == WOLFCLU_SUCCESS) {
         key = wolfSSL_EC_KEY_new();
-        if (key != NULL && name != NULL) {
+        if (key != NULL) {
             WOLFSSL_EC_GROUP *group = NULL;
             int nid;
+            /* Default to P-256 when no curve name is given so the
+             * EC_KEY group NID is always set before generate. */
+            const char* curveName = (lower != NULL) ? lower : "prime256v1";
 
-            WOLFCLU_LOG(WOLFCLU_L0, "Setting ECC group with curve %s", lower);
-            nid = wolfSSL_OBJ_txt2nid(lower);
+            WOLFCLU_LOG(WOLFCLU_L0, "Setting ECC group with curve %s",
+                    curveName);
+            nid = wolfSSL_OBJ_txt2nid(curveName);
             if (nid <= 0) {
                 wolfCLU_LogError("Error getting NID value for curve %s",
-                        lower);
+                        curveName);
                 ret = WOLFCLU_FATAL_ERROR;
             }
 
             if (ret == WOLFCLU_SUCCESS) {
-                group = wolfSSL_EC_GROUP_new_by_curve_name(
-                        wolfSSL_OBJ_txt2nid(lower));
+                group = wolfSSL_EC_GROUP_new_by_curve_name(nid);
                 if (group == NULL) {
                     wolfCLU_LogError("unable to set curve");
                     ret = WOLFCLU_FATAL_ERROR;

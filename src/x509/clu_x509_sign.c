@@ -258,11 +258,11 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     const char *altSigValOid        = "2.5.29.74";
 
     /*
-     * LARGE_TEMO_SZ defines the size of temporary buffers used for signature key,
+     * LARGE_TEMP_SZ defines the size of temporary buffers used for signature key,
      * verification key and signature value buffers.
      * The value 11264 is enough for P-521 and ML-DSA-87 PEM certs.
     */
-    const int LARGE_TEMP_SZ = 11264;
+    #define LARGE_TEMP_SZ 11264
     byte caKeyBuf[LARGE_TEMP_SZ];
     int  caKeySz   = LARGE_TEMP_SZ;
     byte altCaKeyBuf[LARGE_TEMP_SZ];
@@ -288,6 +288,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     int  caCertSz = LARGE_TEMP_SZ;
     byte serverKeyBuf[LARGE_TEMP_SZ];
     int  serverKeySz = LARGE_TEMP_SZ;
+    #undef LARGE_TEMP_SZ
 
     if (bioCaKey == NULL || bioAltCaKey == NULL || bioAltSubjPubKey == NULL
         || subject == NULL || outFileName == NULL) {
@@ -1045,8 +1046,15 @@ int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
     if (ret == WOLFCLU_SUCCESS && csign->outDir != NULL && out != NULL) {
         int currentSz = (int)XSTRLEN(csign->outDir);
 
-        /* If out is an absolute path, use it directly instead of appending */
-        if (out[0] == '/') {
+        /* If out is an absolute path, use it directly instead of appending.
+         * Matches OpenSSL's ossl_is_absolute_path() behaviour. */
+        if (out[0] == '/'
+#ifdef _WIN32
+                || out[0] == '\\'
+                || (isalpha((unsigned char)out[0]) && out[1] == ':'
+                    && (out[2] == '\\' || out[2] == '/'))
+#endif
+                ) {
             s = (char*)XMALLOC(outSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (s == NULL) {
                 ret = MEMORY_E;
@@ -1274,26 +1282,11 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             case WC_HASH_TYPE_BLAKE2B:
             case WC_HASH_TYPE_BLAKE2S:
 
-    #if LIBWOLFSSL_VERSION_HEX >= 0x05009000
             case WC_HASH_TYPE_SHA512_224:
             case WC_HASH_TYPE_SHA512_256:
             case WC_HASH_TYPE_SHAKE128:
             case WC_HASH_TYPE_SHAKE256:
             case WC_HASH_TYPE_SM3:
-    #elif LIBWOLFSSL_VERSION_HEX > 0x05001000
-        #ifndef WOLFSSL_NOSHA512_224
-            case WC_HASH_TYPE_SHA512_224:
-        #endif
-        #ifndef WOLFSSL_NOSHA512_256
-            case WC_HASH_TYPE_SHA512_256:
-        #endif
-        #ifdef WOLFSSL_SHAKE128
-            case WC_HASH_TYPE_SHAKE128:
-        #endif
-        #ifdef WOLFSSL_SHAKE256
-            case WC_HASH_TYPE_SHAKE256:
-        #endif
-    #endif
             default:
                 wolfCLU_LogError("Unsupported hash type");
                 ret = WOLFCLU_FATAL_ERROR;

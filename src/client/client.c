@@ -2091,10 +2091,21 @@ static void Usage(void)
 #endif
 }
 
-#ifndef USE_WINDOWS_API
 int checkStdin(void)
 {
     int stop = 0;
+#ifdef USE_WINDOWS_API
+    HANDLE stdinHandle = GetStdHandle(STD_INPUT_HANDLE);
+    if (stdinHandle == INVALID_HANDLE_VALUE || stdinHandle == NULL) {
+        stop = 1; /* no stdin available */
+    }
+    else {
+        DWORD waitResult = WaitForSingleObject(stdinHandle, 0);
+        if (waitResult != WAIT_TIMEOUT) {
+            stop = 1;
+        }
+    }
+#else
     fd_set readfds;
     struct timeval timeout;
     timeout.tv_sec = 0;
@@ -2107,11 +2118,9 @@ int checkStdin(void)
     if (select(1, &readfds, NULL, NULL, &timeout)){
         stop = 1;
     }
-
-    return stop;
-
-}
 #endif
+    return stop;
+}
 
 static int AlwaysAllow(int preverify, WOLFSSL_X509_STORE_CTX* store)
 {
@@ -4224,7 +4233,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         goto exit;
     }
 
-#ifndef USE_WINDOWS_API
     if (!disable_stdin_chk) {
         int stop = checkStdin();
 
@@ -4234,7 +4242,6 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
             goto exit;
         }
     }
-#endif
 
     err = ClientRead(ssl, reply, sizeof(reply)-1, 1, "", exitWithRet);
     if (exitWithRet && (err != 0)) {
