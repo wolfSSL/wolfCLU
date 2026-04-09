@@ -140,7 +140,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 #endif
 
 #ifndef NO_SHA
-    if ((XSTRNCMP(alg, "sha", 3) == 0) && (XSTRLEN(alg) == 3))
+    if (XSTRCMP(alg, "sha") == 0)
         size = WC_SHA_DIGEST_SIZE;
 #endif
 
