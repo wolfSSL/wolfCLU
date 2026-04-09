@@ -152,10 +152,14 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
                 const char* cp;
 
                 /* Validate hostname: only allow characters valid in DNS names
-                 * (RFC 1123) to prevent shell injection via popen(). */
+                 * (RFC 1123) to prevent shell injection via popen().
+                 * Use explicit ASCII ranges instead of isalnum() to avoid
+                 * locale-dependent behavior. */
                 for (cp = peer; *cp != '\0'; cp++) {
-                    if (!isalnum((unsigned char)*cp) &&
-                            *cp != '.' && *cp != '-') {
+                    if (!((*cp >= 'A' && *cp <= 'Z') ||
+                          (*cp >= 'a' && *cp <= 'z') ||
+                          (*cp >= '0' && *cp <= '9') ||
+                          *cp == '.' || *cp == '-')) {
                         err_sys("invalid character in hostname");
                         return;
                     }
