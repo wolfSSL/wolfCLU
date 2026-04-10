@@ -156,12 +156,17 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             }
             else {
                 ret = (int)XFREAD(input, 1, MAX_LEN, inFile);
-                if ((ret > 0 && ret != MAX_LEN) || feof(inFile)) {
+                if (ret > 0) {
                     tempMax = ret;
                     ret = 0; /* success */
                 }
                 else {
-                    wolfCLU_LogError("Input file does not exist.");
+                    if (feof(inFile)) {
+                        wolfCLU_LogError("Unexpected end of file.");
+                    }
+                    else {
+                        wolfCLU_LogError("File read error.");
+                    }
                     ret = FREAD_ERROR;
                 }
             }
