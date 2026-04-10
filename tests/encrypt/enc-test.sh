@@ -209,5 +209,137 @@ if grep -q "HAVE_CAMELLIA" wolfssl/wolfssl/options.h 2>/dev/null; then
     rm -f test_maxlen_camellia.bin test_maxlen_camellia.enc test_maxlen_camellia.dec
 fi
 
+# Regression tests for stack buffer overflow fix (scanf -> fgets)
+
+# Test: -in not provided, filename supplied via stdin to exercise the inName Path
+rm -f test-stdin-in.enc test-stdin-in.dec
+printf "certs/crl.der\n" | ./wolfssl enc -aes-128-cbc -out test-stdin-in.enc -k "testpass" > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "Failed: enc with stdin input (no -in flag)"
+    exit 99
+fi
+rm -f test-stdin-in.dec
+./wolfssl enc -d -aes-128-cbc -in test-stdin-in.enc -out test-stdin-in.dec -k "testpass" > /dev/null 2>&1
+diff certs/crl.der test-stdin-in.dec > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "Failed: stdin enc/dec roundtrip mismatch"
+    exit 99
+fi
+rm -f test-stdin-in.enc test-stdin-in.dec
+
+
+# Test: outNameEnc/outNameDec via stdin (non-EVP path, Camellia)
+./wolfssl enc -camellia-128-cbc -in certs/crl.der -out test-cam-probe.enc -k "testpass" > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    # outNameEnc: -out omitted, filename supplied via stdin
+    printf "test-cam-stdin.enc\n" | ./wolfssl enc -camellia-128-cbc -in certs/crl.der -k "testpass" > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia enc with stdin output name (no -out flag)"
+        exit 99
+    fi
+
+    # outNameDec: -out omitted, filename supplied via stdin
+    printf "test-cam-stdin.dec\n" | ./wolfssl enc -d -camellia-128-cbc -in test-cam-stdin.enc -k "testpass" > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia dec with stdin output name (no -out flag)"
+        exit 99
+    fi
+    diff certs/crl.der test-cam-stdin.dec > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia stdin outName enc/dec roundtrip mismatch"
+        exit 99
+    fi
+
+    rm -f test-cam-stdin.enc test-cam-stdin.dec
+fi
+
+rm -f test-cam-probe.enc
+
+# Test: inName empty line is rejected, re-prompt accepts valid filename
+printf "\ncerts/crl.der\n" | ./wolfssl enc -aes-128-cbc -out test-empty-in.enc -k "testpass" > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "Failed: enc should accept filename after empty line on stdin (-in path)"
+    exit 99
+fi
+./wolfssl enc -d -aes-128-cbc -in test-empty-in.enc -out test-empty-in.dec -k "testpass" > /dev/null 2>&1
+diff certs/crl.der test-empty-in.dec > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "Failed: enc/dec roundtrip mismatch after empty-line re-prompt (-in path)"
+    exit 99
+fi
+rm -f test-empty-in.enc test-empty-in.dec
+
+# Test: outNameEnc/outNameDec empty line is rejected (non-EVP path, Camellia)
+./wolfssl enc -camellia-128-cbc -in certs/crl.der -out test-cam-probe2.enc -k "testpass" > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    rm -f test-cam-probe2.enc
+
+    # outNameEnc: empty line rejected, then valid output name accepted
+    printf "\ntest-cam-empty.enc\n" | ./wolfssl enc -camellia-128-cbc -in certs/crl.der -k "testpass" > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia enc should accept output name after empty line (outNameEnc)"
+        exit 99
+    fi
+
+    # outNameDec: empty line rejected, then valid output name accepted
+    printf "\ntest-cam-empty.dec\n" | ./wolfssl enc -d -camellia-128-cbc -in test-cam-empty.enc -k "testpass" > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia dec should accept output name after empty line (outNameDec)"
+        exit 99
+    fi
+    diff certs/crl.der test-cam-empty.dec > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: enc/dec roundtrip mismatch after empty-line re-prompt (outNameEnc/Dec)"
+        exit 99
+    fi
+    rm -f test-cam-empty.enc test-cam-empty.dec
+fi
+
+# Test: 'input too long' path — inName buffer overflow prevention
+# Pipe a 255-char line (no newline within fgets buffer), triggering the
+# strchr(buf,'\n')==NULL flush branch, then supply a valid filename.
+LONG_INPUT=$(printf '%255s' ' ')
+printf "%s\ncerts/crl.der\n" "$LONG_INPUT" | \
+    ./wolfssl enc -aes-128-cbc -out test-toolong-in.enc -k "testpass" > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "Failed: enc should recover and accept filename after too-long input (-in path)"
+    exit 99
+fi
+./wolfssl enc -d -aes-128-cbc -in test-toolong-in.enc -out test-toolong-in.dec -k "testpass" > /dev/null 2>&1
+diff certs/crl.der test-toolong-in.dec > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "Failed: enc/dec roundtrip mismatch after too-long re-prompt (-in path)"
+    exit 99
+fi
+rm -f test-toolong-in.enc test-toolong-in.dec
+
+# Test: 'input too long' path — outNameEnc/outNameDec (non-EVP path, Camellia)
+./wolfssl enc -camellia-128-cbc -in certs/crl.der -out test-cam-probe3.enc -k "testpass" > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    rm -f test-cam-probe3.enc
+
+    # outNameEnc: too-long input flushed, then valid output name accepted
+    printf "%s\ntest-cam-toolong.enc\n" "$LONG_INPUT" | \
+        ./wolfssl enc -camellia-128-cbc -in certs/crl.der -k "testpass" > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia enc should recover after too-long output name (outNameEnc)"
+        exit 99
+    fi
+
+    # outNameDec: too-long input flushed, then valid output name accepted
+    printf "%s\ntest-cam-toolong.dec\n" "$LONG_INPUT" | \
+        ./wolfssl enc -d -camellia-128-cbc -in test-cam-toolong.enc -k "testpass" > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia dec should recover after too-long output name (outNameDec)"
+        exit 99
+    fi
+    diff certs/crl.der test-cam-toolong.dec > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: enc/dec roundtrip mismatch after too-long re-prompt (outNameEnc/Dec)"
+        exit 99
+    fi
+    rm -f test-cam-toolong.enc test-cam-toolong.dec
+fi
+
 echo "Done"
 exit 0

@@ -25,6 +25,35 @@
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
+/* Prompt for a filename on stdin with validation.
+ * Returns WOLFCLU_SUCCESS on success, WOLFCLU_FATAL_ERROR on EOF/read error.
+ * buf is filled with the stripped, non-empty filename on success. */
+static int wolfCLU_readFilename(char* buf, int bufSz, const char* prompt)
+{
+    while (1) {
+        WOLFCLU_LOG(WOLFCLU_L0, "%s", prompt);
+        if (fgets(buf, bufSz, stdin) == NULL) {
+            wolfCLU_LogError("failed to read file name");
+            return WOLFCLU_FATAL_ERROR;
+        }
+        /* If no newline, line was too long: flush remainder and re-prompt */
+        if (strchr(buf, '\n') == NULL) {
+            int ch;
+            do {
+                ch = getchar();
+            } while (ch != '\n' && ch != EOF);
+            wolfCLU_LogError("input too long, please try again");
+            continue;
+        }
+        buf[strcspn(buf, "\r\n")] = '\0';
+        if (buf[0] == '\0') {
+            wolfCLU_LogError("empty input, please enter a file name");
+            continue;
+        }
+        return WOLFCLU_SUCCESS;
+    }
+}
+
 static const struct option crypt_options[] = {
     {"-sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
     {"-sha224",    no_argument,       0, WOLFCLU_CERT_SHA224},
@@ -342,14 +371,15 @@ int wolfCLU_setup(int argc, char** argv, char action)
     }
 
     if (inCheck == 0 && encCheck == 1) {
-        ret = 0;
-        while (ret == 0) {
-            WOLFCLU_LOG(WOLFCLU_L0,
-                    "-in flag was not set, please enter a string or"
-                   "file name to be encrypted: ");
-            ret = (int) scanf("%s", inName);
+        ret = wolfCLU_readFilename(inName, sizeof(inName),
+                "-in flag was not set, please enter a string or"
+                " file name to be encrypted: ");
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+            if (mode != NULL)
+                XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            return WOLFCLU_FATAL_ERROR;
         }
-        in = inName;
         WOLFCLU_LOG(WOLFCLU_L0, "Encrypting :\"%s\"", inName);
         inCheck = 1;
     }
@@ -393,13 +423,15 @@ int wolfCLU_setup(int argc, char** argv, char action)
         }
         else {
             if (outCheck == 0) {
-                ret = 0;
-                while (ret == 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0,
-                            "Please enter a name for the output file: ");
-                    ret = (int) scanf("%s", outNameEnc);
-                    out = (ret > 0) ? outNameEnc : '\0';
+                ret = wolfCLU_readFilename(outNameEnc, sizeof(outNameEnc),
+                        "Please enter a name for the output file: ");
+                if (ret != WOLFCLU_SUCCESS) {
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    if (mode != NULL)
+                        XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    return WOLFCLU_FATAL_ERROR;
                 }
+                out = outNameEnc;
             }
             ret = wolfCLU_encrypt(alg, mode, pwdKey, key, keySize, in, out,
                 iv, block, ivCheck, inputHex);
@@ -415,13 +447,15 @@ int wolfCLU_setup(int argc, char** argv, char action)
         }
         else {
             if (outCheck == 0) {
-                ret = 0;
-                while (ret == 0) {
-                    WOLFCLU_LOG(WOLFCLU_L0,
-                            "Please enter a name for the output file: ");
-                    ret = (int) scanf("%s", outNameDec);
-                    out = (ret > 0) ? outNameDec : '\0';
+                ret = wolfCLU_readFilename(outNameDec, sizeof(outNameDec),
+                        "Please enter a name for the output file: ");
+                if (ret != WOLFCLU_SUCCESS) {
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    if (mode != NULL)
+                        XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    return WOLFCLU_FATAL_ERROR;
                 }
+                out = outNameDec;
             }
             ret = wolfCLU_decrypt(alg, mode, pwdKey, key, keySize, in, out,
                 iv, block, keyType);
