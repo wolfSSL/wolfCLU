@@ -295,5 +295,51 @@ if [ $? -eq 0 ]; then
     rm -f test-cam-empty.enc test-cam-empty.dec
 fi
 
+# Test: 'input too long' path — inName buffer overflow prevention
+# Pipe a 255-char line (no newline within fgets buffer), triggering the
+# strchr(buf,'\n')==NULL flush branch, then supply a valid filename.
+LONG_INPUT=$(printf '%255s' ' ')
+printf "%s\ncerts/crl.der\n" "$LONG_INPUT" | \
+    ./wolfssl enc -aes-128-cbc -out test-toolong-in.enc -k "testpass" > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "Failed: enc should recover and accept filename after too-long input (-in path)"
+    exit 99
+fi
+./wolfssl enc -d -aes-128-cbc -in test-toolong-in.enc -out test-toolong-in.dec -k "testpass" > /dev/null 2>&1
+diff certs/crl.der test-toolong-in.dec > /dev/null 2>&1
+if [ $? != 0 ]; then
+    echo "Failed: enc/dec roundtrip mismatch after too-long re-prompt (-in path)"
+    exit 99
+fi
+rm -f test-toolong-in.enc test-toolong-in.dec
+
+# Test: 'input too long' path — outNameEnc/outNameDec (non-EVP path, Camellia)
+./wolfssl enc -camellia-128-cbc -in certs/crl.der -out test-cam-probe3.enc -k "testpass" > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+    rm -f test-cam-probe3.enc
+
+    # outNameEnc: too-long input flushed, then valid output name accepted
+    printf "%s\ntest-cam-toolong.enc\n" "$LONG_INPUT" | \
+        ./wolfssl enc -camellia-128-cbc -in certs/crl.der -k "testpass" > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia enc should recover after too-long output name (outNameEnc)"
+        exit 99
+    fi
+
+    # outNameDec: too-long input flushed, then valid output name accepted
+    printf "%s\ntest-cam-toolong.dec\n" "$LONG_INPUT" | \
+        ./wolfssl enc -d -camellia-128-cbc -in test-cam-toolong.enc -k "testpass" > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: Camellia dec should recover after too-long output name (outNameDec)"
+        exit 99
+    fi
+    diff certs/crl.der test-cam-toolong.dec > /dev/null 2>&1
+    if [ $? != 0 ]; then
+        echo "Failed: enc/dec roundtrip mismatch after too-long re-prompt (outNameEnc/Dec)"
+        exit 99
+    fi
+    rm -f test-cam-toolong.enc test-cam-toolong.dec
+fi
+
 echo "Done"
 exit 0
