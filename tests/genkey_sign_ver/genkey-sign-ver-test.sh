@@ -50,6 +50,9 @@ cleanup_genkey_sign_ver(){
     rm rsa-sigout.private_result
     rm rsa-sigout.public_result
     rm mldsa-signed.sig
+    rm -f mldsa_bad_pubkey.sig
+    rm -f mldsa_bad_corrupt.sig
+    rm -f mldsakey_corrupt.priv
     rm xmss-signed.sig
     # rm xmssmt-signed.sig
     rm sign-this.txt
@@ -263,6 +266,26 @@ RESULT=$?
 RESULT=$?
 [ $RESULT -eq 0 ] && \
     printf '%s\n' "dilithium sign to invalid path should have failed" && exit 99
+
+# Dilithium sign with public key as inkey must fail gracefully
+./wolfssl -dilithium -sign -inkey mldsakey.pub -inform der \
+    -in sign-this.txt -out mldsa_bad_pubkey.sig
+RESULT=$?
+[ $RESULT -eq 0 ] && \
+    printf '%s\n' "dilithium sign with public key should have failed" && exit 99
+[ -f mldsa_bad_pubkey.sig ] && \
+    printf '%s\n' "dilithium sign with public key: output file must not be created" && exit 99
+
+# Dilithium sign with corrupted private key must fail gracefully
+printf '%s' "INVALID KEY DATA" > mldsakey_corrupt.priv
+./wolfssl -dilithium -sign -inkey mldsakey_corrupt.priv -inform der \
+    -in sign-this.txt -out mldsa_bad_corrupt.sig
+RESULT=$?
+[ $RESULT -eq 0 ] && \
+    printf '%s\n' "dilithium sign with corrupted key should have failed" && exit 99
+[ -f mldsa_bad_corrupt.sig ] && \
+    printf '%s\n' "dilithium sign with corrupted key: output file must not be created" && exit 99
+rm -f mldsakey_corrupt.priv
 fi
 
 # Check if xmss is availabe
