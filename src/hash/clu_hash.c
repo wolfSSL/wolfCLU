@@ -121,7 +121,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
     }
 #endif
 #ifndef NO_SHA
-    if (ret == WOLFCLU_SUCCESS && XSTRNCMP(alg, "sha", 3) == 0) {
+    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "sha") == 0) {
         ret = wc_ShaHash(input, inputSz, output);
     }
 #endif
