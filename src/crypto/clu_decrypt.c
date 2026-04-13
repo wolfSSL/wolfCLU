@@ -77,9 +77,11 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     length = (int)XFTELL(inFile);
     XFSEEK(inFile, 0, SEEK_SET);
 
-    /* Validate file is large enough for salt + IV header */
-    if (length < saltAndIvSize) {
-        wolfCLU_LogError("Input file too small (missing salt/IV).");
+    /* Validate file contains salt + IV header plus at least one byte of
+     * ciphertext. A length equal to saltAndIvSize means there is no
+     * encrypted payload to decrypt. */
+    if (length <= saltAndIvSize) {
+        wolfCLU_LogError("Input file too small (missing salt/IV or payload).");
         XFCLOSE(inFile);
         XFCLOSE(outFile);
         return DECRYPT_ERROR;

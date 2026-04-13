@@ -49,6 +49,11 @@ class ClientTest(unittest.TestCase):
             capture_output=True,
             timeout=60,
         )
+        self.assertEqual(x509_extract.returncode, 0,
+                         f"x509 extraction failed: {x509_extract.stderr}")
+        self.assertTrue(os.path.exists(tmp_crt),
+                        f"x509 did not create output file: "
+                        f"{x509_extract.stderr}")
 
         # Read back the cert
         result = run_wolfssl("x509", "-in", tmp_crt)
