@@ -1085,11 +1085,14 @@ int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
         int currentSz = (int)XSTRLEN(csign->outDir);
 
         /* If out is an absolute path, use it directly instead of appending.
-         * Matches OpenSSL's ossl_is_absolute_path() behaviour. */
+         * Matches OpenSSL's ossl_is_absolute_path() behaviour. A drive-letter
+         * path (e.g. "C:\" or "C:/") requires at least 3 characters, so guard
+         * the indexing with an explicit length check. */
         if (out[0] == '/'
 #ifdef _WIN32
                 || out[0] == '\\'
-                || (isalpha((unsigned char)out[0]) && out[1] == ':'
+                || (outSz >= 3 && isalpha((unsigned char)out[0])
+                    && out[1] == ':'
                     && (out[2] == '\\' || out[2] == '/'))
 #endif
                 ) {
