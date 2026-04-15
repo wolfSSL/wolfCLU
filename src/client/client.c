@@ -34,6 +34,8 @@
 #endif
 #include <wolfssl/wolfcrypt/settings.h>
 
+#include <ctype.h>
+
 #include <wolfssl/ssl.h>
 
 #include <wolfclu/clu_header_main.h>
@@ -147,6 +149,21 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
                 FILE* fp;
                 char host_out[100];
                 char cmd[100];
+                const char* cp;
+
+                /* Validate hostname: only allow characters valid in DNS names
+                 * (RFC 1123) to prevent shell injection via popen().
+                 * Use explicit ASCII ranges instead of isalnum() to avoid
+                 * locale-dependent behavior. */
+                for (cp = peer; *cp != '\0'; cp++) {
+                    if (!((*cp >= 'A' && *cp <= 'Z') ||
+                          (*cp >= 'a' && *cp <= 'z') ||
+                          (*cp >= '0' && *cp <= '9') ||
+                          *cp == '.' || *cp == '-')) {
+                        err_sys("invalid character in hostname");
+                        return;
+                    }
+                }
 
                 XSTRNCPY(cmd, "host ", 6);
                 XSTRNCAT(cmd, peer, 99 - XSTRLEN(cmd));

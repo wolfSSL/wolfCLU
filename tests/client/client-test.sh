@@ -25,5 +25,39 @@ fi
 
 rm tmp.crt
 
+# Regression tests: shell injection via hostname must not execute injected command.
+# Applies to the WOLFSSL_USE_POPEN_HOST path where peer is concatenated into a
+# popen() shell command.  On other builds, getaddrinfo/gethostbyname reject
+# these hostnames before any shell is involved, so the tests pass either way.
+INJFILE="clu_injection_probe.txt"
+rm -f "$INJFILE"
+
+# Semicolon: "evil.com;touch clu_injection_probe.txt" passed as peer
+./wolfssl s_client -connect 'evil.com;touch clu_injection_probe.txt:443' \
+    2>/dev/null
+if [ -f "$INJFILE" ]; then
+    echo "SECURITY FAILURE: command injection via hostname (semicolon)"
+    rm -f "$INJFILE"
+    exit 99
+fi
+
+# Command substitution: "$(touch clu_injection_probe.txt)" passed as peer
+./wolfssl s_client -connect 'evil$(touch clu_injection_probe.txt).com:443' \
+    2>/dev/null
+if [ -f "$INJFILE" ]; then
+    echo "SECURITY FAILURE: command injection via hostname (command substitution)"
+    rm -f "$INJFILE"
+    exit 99
+fi
+
+# Pipe: "evil.com|touch clu_injection_probe.txt" passed as peer
+./wolfssl s_client -connect 'evil.com|touch clu_injection_probe.txt:443' \
+    2>/dev/null
+if [ -f "$INJFILE" ]; then
+    echo "SECURITY FAILURE: command injection via hostname (pipe)"
+    rm -f "$INJFILE"
+    exit 99
+fi
+
 echo "Done"
 exit 0
