@@ -60,6 +60,54 @@ class ClientTest(unittest.TestCase):
         self.assertIn("-----BEGIN CERTIFICATE-----", result.stdout,
                       "Expected x509 PEM output not found")
 
+class ShellInjectionTest(unittest.TestCase):
+    """Regression tests for shell command injection via hostname.
+
+    Applies to the WOLFSSL_USE_POPEN_HOST path where peer is concatenated
+    into a popen() shell command. On other builds, getaddrinfo /
+    gethostbyname reject these hostnames before any shell is involved,
+    so the tests pass either way -- the injected command must never run.
+    """
+
+    INJECTION_PROBE = "clu_injection_probe.txt"
+
+    def setUp(self):
+        if os.path.exists(self.INJECTION_PROBE):
+            os.remove(self.INJECTION_PROBE)
+        self.addCleanup(lambda: os.remove(self.INJECTION_PROBE)
+                        if os.path.exists(self.INJECTION_PROBE) else None)
+
+    def _assert_no_injection(self, peer, description):
+        """Run s_client with the given -connect peer and verify that the
+        injected `touch` command did not execute."""
+        subprocess.run(
+            [WOLFSSL_BIN, "s_client", "-connect", peer],
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            timeout=30,
+        )
+        self.assertFalse(
+            os.path.exists(self.INJECTION_PROBE),
+            f"SECURITY FAILURE: command injection via hostname "
+            f"({description})")
+
+    def test_semicolon_injection(self):
+        """evil.com;touch probe:443 must not execute the touch command."""
+        self._assert_no_injection(
+            f"evil.com;touch {self.INJECTION_PROBE}:443",
+            "semicolon")
+
+    def test_command_substitution_injection(self):
+        """evil$(touch probe).com:443 must not execute the touch command."""
+        self._assert_no_injection(
+            f"evil$(touch {self.INJECTION_PROBE}).com:443",
+            "command substitution")
+
+    def test_pipe_injection(self):
+        """evil.com|touch probe:443 must not execute the touch command."""
+        self._assert_no_injection(
+            f"evil.com|touch {self.INJECTION_PROBE}:443",
+            "pipe")
 
 if __name__ == "__main__":
     test_main()
