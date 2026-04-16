@@ -7,10 +7,12 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, PROJECT_ROOT, run_wolfssl, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
 
-# Use absolute forward-slash paths so wolfSSL recognizes them as absolute
-_R = PROJECT_ROOT.replace("\\", "/")
+# Use absolute forward-slash paths so wolfSSL recognizes them as absolute.
+# Temporary artefacts go under the build directory (CWD under automake),
+# because the source tree is read-only during `make distcheck`.
+_R = os.path.abspath(os.getcwd()).replace("\\", "/")
 _CERTS = CERTS_DIR.replace("\\", "/")
 
 CA_CONF = f"""\
@@ -180,11 +182,13 @@ emailAddress           = optional
 
 
 def _tmp(name):
-    """Return an absolute path for a temp file in the project root.
+    """Return an absolute path for a temp file in the current working directory.
 
+    Tests run from the build directory, which may differ from the source
+    tree (e.g. under `make distcheck`, where the srcdir is read-only).
     Uses forward slashes so wolfSSL's path handling recognizes the path
     as absolute on Windows (it checks for leading '/')."""
-    return os.path.join(PROJECT_ROOT, name).replace("\\", "/")
+    return os.path.abspath(os.path.join(os.getcwd(), name)).replace("\\", "/")
 
 
 def _cleanup(*files):

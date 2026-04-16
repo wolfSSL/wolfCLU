@@ -9,7 +9,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
 
-DGST_DIR = os.path.join(".", "tests", "dgst")
+DGST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class DgstVerifyTest(unittest.TestCase):

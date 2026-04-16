@@ -8,15 +8,17 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, PROJECT_ROOT, run_wolfssl, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
 
 
 def _tmp(name):
-    """Return an absolute path for a temp file in the project root.
+    """Return an absolute path for a temp file in the current working directory.
 
+    Tests run from the build directory, which may differ from the source
+    tree (e.g. under `make distcheck`, where the srcdir is read-only).
     Uses forward slashes so wolfSSL's path handling recognizes the path
     as absolute on Windows (it checks for leading '/')."""
-    return os.path.join(PROJECT_ROOT, name).replace("\\", "/")
+    return os.path.abspath(os.path.join(os.getcwd(), name)).replace("\\", "/")
 
 HAS_OPENSSL = shutil.which("openssl") is not None
 

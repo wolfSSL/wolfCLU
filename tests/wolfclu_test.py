@@ -12,9 +12,18 @@ PROJECT_ROOT = _PROJECT_ROOT
 
 
 def _find_wolfssl_bin():
-    """Locate the wolfssl binary, searching common build output paths."""
+    """Locate the wolfssl binary, searching common build output paths.
+
+    Under `make distcheck`, the build directory differs from the source
+    directory, so the binary is produced next to where tests are invoked
+    (the current working directory) rather than under the source tree.
+    Honour WOLFCLU_BUILDDIR if set by the test harness, then fall back to
+    the current working directory, and finally the source tree.
+    """
+    builddir = os.environ.get("WOLFCLU_BUILDDIR") or os.getcwd()
     if platform.system() == "Windows":
         candidates = [
+            os.path.join(builddir, "wolfssl.exe"),
             os.path.join(_PROJECT_ROOT, "x64", "Debug", "wolfssl.exe"),
             os.path.join(_PROJECT_ROOT, "x64", "Release", "wolfssl.exe"),
             os.path.join(_PROJECT_ROOT, "Debug", "wolfssl.exe"),
@@ -23,6 +32,7 @@ def _find_wolfssl_bin():
         ]
     else:
         candidates = [
+            os.path.join(builddir, "wolfssl"),
             os.path.join(_PROJECT_ROOT, "wolfssl"),
         ]
 
@@ -34,8 +44,21 @@ def _find_wolfssl_bin():
     return candidates[0]
 
 
+def _find_certs_dir():
+    """Locate the certs directory (source tree or extracted tarball)."""
+    srcdir = os.environ.get("WOLFCLU_SRCDIR")
+    candidates = []
+    if srcdir:
+        candidates.append(os.path.join(srcdir, "certs"))
+    candidates.append(os.path.join(_PROJECT_ROOT, "certs"))
+    for path in candidates:
+        if os.path.isdir(path):
+            return path
+    return candidates[-1]
+
+
 WOLFSSL_BIN = _find_wolfssl_bin()
-CERTS_DIR = os.path.join(_PROJECT_ROOT, "certs")
+CERTS_DIR = _find_certs_dir()
 
 
 def run_wolfssl(*args, stdin_data=None, timeout=60):

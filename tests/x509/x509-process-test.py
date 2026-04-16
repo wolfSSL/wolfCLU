@@ -10,7 +10,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
 
-TESTS_X509_DIR = os.path.join(".", "tests", "x509")
+TESTS_X509_DIR = os.path.dirname(os.path.abspath(__file__))
 HAS_OPENSSL = shutil.which("openssl") is not None
 
 

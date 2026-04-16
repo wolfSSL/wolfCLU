@@ -21,6 +21,9 @@ dist_noinst_SCRIPTS=
 
 TEST_EXTENSIONS = .sh .py
 PY_LOG_COMPILER = $(PYTHON)
+AM_TESTS_ENVIRONMENT = \
+    WOLFCLU_BUILDDIR='$(abs_top_builddir)'; export WOLFCLU_BUILDDIR; \
+    WOLFCLU_SRCDIR='$(abs_top_srcdir)'; export WOLFCLU_SRCDIR;
 
 #includes additional rules from aminclude.am
 @INC_AMINCLUDE@
@@ -32,6 +35,7 @@ DISTCLEANFILES+= aminclude.am
 ACLOCAL_AMFLAGS= -I m4
 
 EXTRA_DIST+= tests
+EXTRA_DIST+= certs
 EXTRA_DIST+= manpages
 EXTRA_DIST+= README.md
 EXTRA_DIST+= LICENSE
@@ -75,6 +79,14 @@ TESTS += $(check_PROGRAMS)
 
 check_SCRIPTS+= $(dist_noinst_SCRIPTS)
 TESTS += $(check_SCRIPTS)
+
+# Automake's test driver writes .log/.trs files next to each test script.
+# When tests live in the source tree (no VPATH), those files land in tests/,
+# where EXTRA_DIST+=tests would otherwise sweep them into the tarball and
+# break `make distcheck` via stale VPATH lookups.
+dist-hook:
+	find $(distdir)/tests -name '*.log' -delete
+	find $(distdir)/tests -name '*.trs' -delete
 
 test: check
 #DISTCLEANFILES+= wolfssl-config

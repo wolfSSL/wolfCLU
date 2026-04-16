@@ -8,7 +8,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
 
-HASH_DIR = os.path.join(".", "tests", "hash")
+HASH_DIR = os.path.dirname(os.path.abspath(__file__))
 CERT_FILE = os.path.join(CERTS_DIR, "ca-cert.pem")
 
 
