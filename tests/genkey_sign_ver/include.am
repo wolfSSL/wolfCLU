@@ -2,5 +2,5 @@
 # included from top level Makefile.am
 # ALl path should be given relative to root directory
 
-dist_noinst_SCRIPTS+=tests/genkey_sign_ver/genkey-sign-ver-test.sh
+dist_noinst_SCRIPTS+=tests/genkey_sign_ver/genkey-sign-ver-test.py
 

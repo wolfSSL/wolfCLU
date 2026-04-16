@@ -77,14 +77,23 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     length = (int)XFTELL(inFile);
     XFSEEK(inFile, 0, SEEK_SET);
 
-    /* if there is a remainder,
-     * round up else no round
-     */
-    if (length % MAX_LEN > 0) {
-        lastLoopFlag = (length/MAX_LEN) + 1;
+    /* Validate file contains salt + IV header plus at least one byte of
+     * ciphertext. A length equal to saltAndIvSize means there is no
+     * encrypted payload to decrypt. */
+    if (length <= saltAndIvSize) {
+        wolfCLU_LogError("Input file too small (missing salt/IV or payload).");
+        XFCLOSE(inFile);
+        XFCLOSE(outFile);
+        return DECRYPT_ERROR;
+    }
+
+    /* Compute loop count from the encrypted payload size (excluding the
+     * salt and IV that are read separately before the loop). */
+    if ((length - saltAndIvSize) % MAX_LEN > 0) {
+        lastLoopFlag = ((length - saltAndIvSize) / MAX_LEN) + 1;
     }
     else {
-        lastLoopFlag =  length/MAX_LEN;
+        lastLoopFlag = (length - saltAndIvSize) / MAX_LEN;
     }
 
     input = (byte*) XMALLOC(MAX_LEN, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -177,7 +186,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 (alg == WOLFCLU_CAMELLIA128CBC ||
                  alg == WOLFCLU_CAMELLIA192CBC ||
                  alg == WOLFCLU_CAMELLIA256CBC)) {
-            ret = wc_CamelliaSetKey(&camellia, key, block, iv);
+            ret = wc_CamelliaSetKey(&camellia, key, size / 8, iv);
             if (ret == 0) {
                 wc_CamelliaCbcDecrypt(&camellia, output, input, tempMax);
             }

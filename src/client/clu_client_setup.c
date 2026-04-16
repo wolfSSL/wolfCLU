@@ -35,6 +35,7 @@ static const struct option client_options[] = {
     {"-CAfile",              required_argument, 0, WOLFCLU_CAFILE             },
     {"-verify_return_error", no_argument,       0, WOLFCLU_VERIFY_RETURN_ERROR},
     {"-disable_stdin_check", no_argument,       0, WOLFCLU_DISABLE_STDINCHK   },
+    {"-noservername",        no_argument,       0, WOLFCLU_NOSERVERNAME       },
     {"-help",                no_argument,       0, WOLFCLU_HELP               },
     {"-h",                   no_argument,       0, WOLFCLU_HELP               },
 
@@ -54,7 +55,8 @@ static void wolfCLU_ClientHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-starttls <proto, i.e. smtp>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-CAfile <ca file name>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-verify_return_error close connection on verification error");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-disable_stdin_check ")
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-disable_stdin_check ");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-noservername do not send Server Name Indication");
 }
 
 static const char hostFlag[]       = "-h";
@@ -65,11 +67,12 @@ static const char caFileFlag[]     = "-A";
 static const char noClientCert[]   = "-x";
 static const char startTLSFlag[]   = "-M";
 static const char disableCRLFlag[] = "-C";
+static const char sniFlag[]       = "-S";
 
 int myoptind = 0;
 char* myoptarg = NULL;
 
-#define MAX_CLIENT_ARGS 15
+#define MAX_CLIENT_ARGS 32
 
 /* return WOLFCLU_SUCCESS on success */
 static int _addClientArg(const char** args, const char* in, int* idx)
@@ -99,6 +102,7 @@ int wolfCLU_Client(int argc, char** argv)
     int   idx  = 0;
     /* Don't verify peer by default (same as OpenSSL). */
     int   verify = 0;
+    int   noservername = 0;
     char* ipv6 = NULL;
 
     int    clientArgc = 0;
@@ -193,6 +197,7 @@ int wolfCLU_Client(int argc, char** argv)
                                 &clientArgc);
                     }
                 }
+
                 break;
 
             case WOLFCLU_STARTTLS:
@@ -225,6 +230,10 @@ int wolfCLU_Client(int argc, char** argv)
                         &clientArgc);
                 }
                 break;
+
+            case WOLFCLU_NOSERVERNAME:
+                noservername = 1;
+                break;
             case WOLFCLU_HELP:
                 wolfCLU_ClientHelp();
                 return WOLFCLU_SUCCESS;
@@ -236,6 +245,17 @@ int wolfCLU_Client(int argc, char** argv)
             default:
                 /* do nothing. */
                 (void)ret;
+        }
+    }
+
+    /* Set SNI hostname so modern servers accept the connection.
+     * Matches openssl s_client default; use -noservername to disable.
+     * Deferred until after option parsing so -noservername works
+     * regardless of argument order. */
+    if (ret == WOLFCLU_SUCCESS && host != NULL && !noservername) {
+        ret = _addClientArg(clientArgv, sniFlag, &clientArgc);
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _addClientArg(clientArgv, host, &clientArgc);
         }
     }
 
@@ -264,6 +284,7 @@ int wolfCLU_Client(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
+        StartTCP();
         args.argv = (char**)clientArgv;
         args.argc = clientArgc;
 

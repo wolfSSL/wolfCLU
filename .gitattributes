@@ -1,0 +1,8 @@
+# Ensure cert/key files always use LF line endings so that hashes
+# remain consistent across platforms.
+*.pem eol=lf
+*.cnf eol=lf
+*.cfg eol=lf
+
+# DER files are binary and must never be transformed.
+*.der binary

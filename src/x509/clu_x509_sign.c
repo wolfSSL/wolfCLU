@@ -25,6 +25,8 @@
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
 #include <wolfclu/x509/clu_cert.h>
+
+#include <ctype.h>
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
 #endif  /* HAVE_DILITHIUM */
@@ -258,7 +260,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     const char *altSigValOid        = "2.5.29.74";
 
     /*
-     * LARGE_TEMO_SZ defines the size of temporary buffers used for signature key,
+     * LARGE_TEMP_SZ defines the size of temporary buffers used for signature key,
      * verification key and signature value buffers.
      * The value 11264 is enough for P-521 and ML-DSA-87 PEM certs.
     */
@@ -1081,8 +1083,18 @@ int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
     if (ret == WOLFCLU_SUCCESS && csign->outDir != NULL && out != NULL) {
         int currentSz = (int)XSTRLEN(csign->outDir);
 
-        /* If out is an absolute path, use it directly instead of appending */
-        if (out[0] == '/') {
+        /* If out is an absolute path, use it directly instead of appending.
+         * Matches OpenSSL's ossl_is_absolute_path() behaviour. A drive-letter
+         * path (e.g. "C:\" or "C:/") requires at least 3 characters, so guard
+         * the indexing with an explicit length check. */
+        if (out[0] == '/'
+#ifdef _WIN32
+                || out[0] == '\\'
+                || (outSz >= 3 && isalpha((unsigned char)out[0])
+                    && out[1] == ':'
+                    && (out[2] == '\\' || out[2] == '/'))
+#endif
+                ) {
             s = (char*)XMALLOC(outSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (s == NULL) {
                 ret = MEMORY_E;

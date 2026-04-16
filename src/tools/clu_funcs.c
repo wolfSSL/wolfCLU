@@ -219,7 +219,8 @@ void wolfCLU_verboseHelp(void)
 #ifndef NO_AES
     WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
 #endif
-#ifdef WOLFSSL_AES_COUNTER
+#if defined(WOLFSSL_AES_COUNTER) && \
+    LIBWOLFSSL_VERSION_HEX >= 0x05009000
     WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
 #endif
 #ifndef NO_DES3
@@ -253,7 +254,8 @@ void wolfCLU_encryptHelp(void)
 #ifndef NO_AES
     WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
 #endif
-#ifdef WOLFSSL_AES_COUNTER
+#if defined(WOLFSSL_AES_COUNTER) && \
+    LIBWOLFSSL_VERSION_HEX >= 0x05009000
     WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
 #endif
 #ifndef NO_DES3
@@ -299,7 +301,8 @@ void wolfCLU_decryptHelp(void)
 #ifndef NO_AES
     WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
 #endif
-#ifdef WOLFSSL_AES_COUNTER
+#if defined(WOLFSSL_AES_COUNTER) && \
+    LIBWOLFSSL_VERSION_HEX >= 0x05009000
     WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
 #endif
 #ifndef NO_DES3
