@@ -386,9 +386,10 @@ static int wolfCLU_ECC_write_priv_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
     }
 
     if (ret > 0) {
-        WOLFCLU_LOG(WOLFCLU_L0, "writing out %d bytes for private key", derSz);
-        ret = wolfSSL_BIO_write(out, der, derSz);
-        if (ret != derSz) {
+        int actualDerSz = ret;
+        WOLFCLU_LOG(WOLFCLU_L0, "writing out %d bytes for private key", actualDerSz);
+        ret = wolfSSL_BIO_write(out, der, actualDerSz);
+        if (ret != actualDerSz) {
             ret = WOLFCLU_FATAL_ERROR;
         }
         WOLFCLU_LOG(WOLFCLU_L0, "ret of write = %d", ret);

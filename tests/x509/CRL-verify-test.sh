@@ -87,6 +87,14 @@ if [ $? == 0 ]; then
     fi
 fi
 
+# Test -outform with invalid format gives outform-related error
+RESULT=`./wolfssl crl -in ./certs/crl.pem -outform INVALID 2>&1`
+echo "$RESULT" | grep -i "outform"
+if [ $? != 0 ]; then
+    echo "Expected outform error message for -outform INVALID"
+    exit 99
+fi
+
 echo "Done"
 exit 0
 

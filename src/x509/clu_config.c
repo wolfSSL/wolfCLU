@@ -48,7 +48,7 @@ static int wolfCLU_setAttributes(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                 MBSTRING_ASC, (const unsigned char*)current, currentSz);
     }
 
-    return WOLFCLU_FAILURE;
+    return WOLFCLU_SUCCESS;
 }
 
 
@@ -117,7 +117,7 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* in, int crit)
 
     for (word = XSTRTOK(str + idx, deli, &end); word != NULL;
             word = XSTRTOK(NULL, deli, &end)) {
-        if (word != NULL && XSTRNCMP(word, "CA", XSTRLEN(word)) == 0) {
+        if (word != NULL && XSTRCMP(word, "CA") == 0) {
             word = XSTRTOK(NULL, deli, &end);
             if (word != NULL) {
                 int z, wordSz;
@@ -125,13 +125,13 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* in, int crit)
                 wordSz = (int)XSTRLEN(word);
                 for (z = 0; z < wordSz; z++)
                     word[z] = toupper(word[z]);
-                if (XSTRNCMP(word, "TRUE", XSTRLEN(word)) == 0) {
+                if (XSTRCMP(word, "TRUE") == 0) {
                     obj->ca = 1;
                 }
             }
         }
 
-        if (word != NULL && XSTRNCMP(word, "pathlen", XSTRLEN(word)) == 0) {
+        if (word != NULL && XSTRCMP(word, "pathlen") == 0) {
             word = XSTRTOK(NULL, deli, &end);
             if (word != NULL) {
                 if (obj->pathlen != NULL)
@@ -237,40 +237,40 @@ static WOLFSSL_X509_EXTENSION* wolfCLU_parseKeyUsage(char* str, int crit,
             mxSz--;
         }
 
-        if (XSTRNCMP(word, "digitalSignature", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "digitalSignature") == 0) {
             keyUseFlag |= KEYUSE_DIGITAL_SIG;
         }
 
-        if (XSTRNCMP(word, "nonRepudiation", XSTRLEN(word)) == 0 ||
-                XSTRNCMP(word, "contentCommitment", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "nonRepudiation") == 0 ||
+                XSTRCMP(word, "contentCommitment") == 0) {
             keyUseFlag |= KEYUSE_CONTENT_COMMIT;
         }
 
-        if (XSTRNCMP(word, "keyEncipherment", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "keyEncipherment") == 0) {
             keyUseFlag |= KEYUSE_KEY_ENCIPHER;
         }
 
-        if (XSTRNCMP(word, "dataEncipherment", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "dataEncipherment") == 0) {
             keyUseFlag |= KEYUSE_DATA_ENCIPHER;
         }
 
-        if (XSTRNCMP(word, "keyAgreement", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "keyAgreement") == 0) {
             keyUseFlag |= KEYUSE_KEY_AGREE;
         }
 
-        if (XSTRNCMP(word, "keyCertSign", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "keyCertSign") == 0) {
             keyUseFlag |= KEYUSE_KEY_CERT_SIGN;
         }
 
-        if (XSTRNCMP(word, "cRLSign", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "cRLSign") == 0) {
             keyUseFlag |= KEYUSE_CRL_SIGN;
         }
 
-        if (XSTRNCMP(word, "encipherOnly", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "encipherOnly") == 0) {
             keyUseFlag |= KEYUSE_ENCIPHER_ONLY;
         }
 
-        if (XSTRNCMP(word, "decipherOnly", XSTRLEN(word)) == 0) {
+        if (XSTRCMP(word, "decipherOnly") == 0) {
             keyUseFlag |= KEYUSE_DECIPHER_ONLY;
         }
     }

@@ -317,4 +317,90 @@ if ./wolfssl xmss -help 2>&1 | grep -A6 "Available keys with current configure" 
 fi
 
 
+# Test ED25519 signature file is exactly 64 bytes
+./wolfssl -genkey ed25519 -out edkey-sztest -outform der -output KEYPAIR
+RESULT=$?
+if [ $RESULT -eq 0 ]; then
+    printf '%s\n' "Sign this data" > sign-this.txt
+    ./wolfssl -ed25519 -sign -inkey edkey-sztest.priv -inform der -in sign-this.txt -out ed-sz-test.sig
+    RESULT=$?
+    if [ $RESULT -eq 0 ]; then
+        SIGSIZE=$(wc -c < ed-sz-test.sig)
+        if [ "$SIGSIZE" -ne 64 ]; then
+            printf '%s\n' "ED25519 signature size is $SIGSIZE, expected 64" && exit 99
+        fi
+    fi
+    rm -f ed-sz-test.sig edkey-sztest.priv edkey-sztest.pub
+fi
+
+# Test signing with invalid key file expects error
+printf '%s\n' "Sign this data" > sign-this.txt
+./wolfssl -ecc -sign -inkey /dev/null -inform der -in sign-this.txt -out bad-sign.sig 2>/dev/null
+RESULT=$?
+[ $RESULT -eq 0 ] && printf '%s\n' "Signing with /dev/null key should have failed" && exit 99
+rm -f bad-sign.sig
+
+./wolfssl -rsa -sign -inkey /dev/null -inform der -in sign-this.txt -out bad-sign.sig 2>/dev/null
+RESULT=$?
+[ $RESULT -eq 0 ] && printf '%s\n' "RSA signing with /dev/null key should have failed" && exit 99
+rm -f bad-sign.sig
+
+# Test missing argument value for -inkey (must fail gracefully, not segfault)
+(./wolfssl -ecc -sign -inkey) 2>/dev/null
+RET=$?
+if [ $RET -eq 0 ]; then
+    printf '%s\n' "Expected failure for missing -inkey value" && exit 99
+fi
+if [ $RET -ge 129 ] && [ $RET -le 192 ]; then
+    printf '%s\n' "Missing -inkey value caused signal $(($RET - 128)), expected graceful error" && exit 99
+fi
+
+# Test ECC sign/verify round-trip
+./wolfssl -genkey ecc -out ecc-rt-test -outform der -output KEYPAIR
+RESULT=$?
+if [ $RESULT -eq 0 ]; then
+    KEYSIZE=$(wc -c < ecc-rt-test.priv)
+    if [ "$KEYSIZE" -gt 256 ]; then
+        printf '%s\n' "ECC DER private key too large ($KEYSIZE bytes), may contain trailing garbage" && exit 99
+    fi
+
+    # sign and verify round-trip
+    printf '%s\n' "ECC round trip test data" > ecc-rt-data.txt
+    ./wolfssl -ecc -sign -inkey ecc-rt-test.priv -inform der -in ecc-rt-data.txt -out ecc-rt-test.sig
+    RESULT=$?
+    if [ $RESULT -eq 0 ]; then
+        ./wolfssl -ecc -verify -inkey ecc-rt-test.pub -pubin -inform der -sigfile ecc-rt-test.sig -in ecc-rt-data.txt
+        RESULT=$?
+        if [ $RESULT -ne 0 ]; then
+            printf '%s\n' "ECC sign/verify round-trip failed on verify" && exit 99
+        fi
+    else
+        printf '%s\n' "ECC sign/verify round-trip failed on sign" && exit 99
+    fi
+
+    rm -f ecc-rt-test.priv ecc-rt-test.pub ecc-rt-data.txt ecc-rt-test.sig
+fi
+
+# Test dilithium sign with nonexistent key file expects failure
+if ./wolfssl -genkey -h 2>&1 | grep -A6 "Available keys with current configure" | grep -q dilithium; then
+    printf '%s\n' "Sign this data" > sign-this.txt
+    ./wolfssl -dilithium -sign -inkey /nonexistent/key.priv -inform der -in sign-this.txt -out bad-dil.sig 2>/dev/null
+    RESULT=$?
+    [ $RESULT -eq 0 ] && printf '%s\n' "Dilithium sign with nonexistent key should have failed" && exit 99
+    rm -f bad-dil.sig
+fi
+
+# Test XMSS genkey with missing -height value (must fail gracefully, not crash)
+if ./wolfssl xmss -help 2>&1 | grep -q xmss; then
+    (./wolfssl -genkey xmss -out xmss-bad -outform raw -output KEYPAIR -height) 2>/dev/null
+    RET=$?
+    if [ $RET -eq 0 ]; then
+        printf '%s\n' "Expected failure for missing -height value" && exit 99
+    fi
+    if [ $RET -ge 129 ] && [ $RET -le 192 ]; then
+        printf '%s\n' "Missing -height value caused signal $(($RET - 128)), expected graceful error" && exit 99
+    fi
+    rm -f xmss-bad.priv xmss-bad.pub
+fi
+
 exit 0

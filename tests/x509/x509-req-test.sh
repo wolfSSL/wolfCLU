@@ -181,6 +181,13 @@ rm -f tmp.cert
 run_success "x509 -req -in tmp.csr -days 3650 -sha1 -signkey ./certs/server-key.pem -out tmp.cert"
 rm -f tmp.cert
 run_success "x509 -req -in tmp.csr -days 3650 -sha224 -signkey ./certs/server-key.pem -out tmp.cert"
+# Verify SHA-224 cert uses sha224 signature algorithm
+SIGALG=`./wolfssl x509 -in tmp.cert -text -noout 2>&1`
+echo "$SIGALG" | grep -i "sha224"
+if [ $? -ne 0 ]; then
+    echo "SHA-224 cert does not report SHA-224 signature algorithm"
+    exit 99
+fi
 rm -f tmp.cert
 run_success "x509 -req -in tmp.csr -days 3650 -sha256 -signkey ./certs/server-key.pem -out tmp.cert"
 rm -f tmp.cert
@@ -332,7 +339,55 @@ fi
 rm -f tmp.cert
 rm -f tmp.csr
 
+# Test that abbreviated keyUsage values are rejected (e.g. "d" should not match "digitalSignature")
+cat << EOF > test-abbrev-ku.conf
+[ req ]
+distinguished_name = req_distinguished_name
+prompt = no
+x509_extensions = v3_req
+req_extensions = v3_req
+[ req_distinguished_name ]
+countryName = US
+stateOrProvinceName = Montana
+localityName = Bozeman
+organizationName = wolfSSL
+commonName = testing
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = d
+EOF
+
+# This should either fail or produce a cert without digitalSignature keyUsage
+RESULT=`./wolfssl req -new -key ./certs/server-key.pem -config ./test-abbrev-ku.conf -x509 -out tmp-ku.cert 2>&1`
+if [ $? -eq 0 ] && [ -f tmp-ku.cert ]; then
+    KUTEXT=`./wolfssl x509 -in tmp-ku.cert -text -noout 2>&1`
+    echo "$KUTEXT" | grep -i "Digital Signature"
+    if [ $? -eq 0 ]; then
+        echo "Abbreviated keyUsage 'd' should not match digitalSignature"
+        rm -f tmp-ku.cert test-abbrev-ku.conf
+        exit 99
+    fi
+fi
+rm -f tmp-ku.cert test-abbrev-ku.conf
+
+# Test req with config containing challengePassword attribute
+cat << EOF > test-attr.conf
+[ req ]
+distinguished_name = req_distinguished_name
+attributes = req_attributes
+prompt = no
+[ req_distinguished_name ]
+countryName = US
+stateOrProvinceName = Montana
+localityName = Bozeman
+organizationName = wolfSSL
+commonName = testing
+[ req_attributes ]
+challengePassword = testpass123
+EOF
+
+run_success "req -new -key ./certs/server-key.pem -config ./test-attr.conf -out tmp-attr.csr"
+rm -f tmp-attr.csr test-attr.conf
+
 echo "Done"
 exit 0
-
-
