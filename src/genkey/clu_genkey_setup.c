@@ -104,13 +104,13 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
-                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
                     ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PUB_ONLY_FILE,
                                                                      formatArg);
-                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
                     ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_ONLY_FILE,
                                                                      formatArg);
-                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
                     ret = wolfCLU_genKey_ED25519(&rng, keyOutFName,
                                                        PRIV_AND_PUB_FILES, formatArg);
             }
@@ -141,11 +141,11 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
-                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
                     directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
                     directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
                     directiveArg = PRIV_AND_PUB_FILES;
             }
         }
@@ -196,11 +196,11 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
-                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
                     directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
                     directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
                     directiveArg = PRIV_AND_PUB_FILES;
             }
         }
@@ -320,11 +320,11 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
-                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
                     directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
                     directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
                     directiveArg = PRIV_AND_PUB_FILES;
             }
         }
@@ -386,11 +386,11 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
-                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
                     directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
                     directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
                     directiveArg = PRIV_AND_PUB_FILES;
             }
         }
@@ -430,11 +430,11 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
-                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
                     directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
                     directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
                     directiveArg = PRIV_AND_PUB_FILES;
             }
         }
@@ -590,11 +590,11 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_checkForArg("-output", 7, argc, argv);
         if (ret > 0) {
             if (argv[ret+1] != NULL) {
-                if (XSTRNCMP(argv[ret+1], "pub", 3) == 0)
+                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
                     directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "priv", 4) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
                     directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCMP(argv[ret+1], "keypair", 7) == 0)
+                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
                     directiveArg = PRIV_AND_PUB_FILES;
             }
         }

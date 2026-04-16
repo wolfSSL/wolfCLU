@@ -74,6 +74,25 @@ class DgstVerifyTest(unittest.TestCase):
                         os.path.join(CERTS_DIR, "server-key.der"))
         self.assertNotEqual(r.returncode, 0)
 
+    def test_dgst_out_roundtrip(self):
+        """dgst -out creates the signature file; -signature round-trips."""
+        sig_file = "dgst-out-test.sig"
+        self.addCleanup(lambda: os.remove(sig_file)
+                        if os.path.exists(sig_file) else None)
+        input_file = os.path.join(CERTS_DIR, "server-key.der")
+
+        r = run_wolfssl("dgst", "-sha256", "-sign",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", sig_file, input_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.isfile(sig_file),
+                        "dgst -out did not create output file")
+
+        r = run_wolfssl("dgst", "-sha256", "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", sig_file, input_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
 
 class DgstLargeFileTest(unittest.TestCase):
 

@@ -135,6 +135,18 @@ class Ed25519Test(_GenkeySignVerifyBase):
     def test_ed25519_raw(self):
         self._gen_sign_verify("ed25519", "edkey", "ed-signed.sig", "raw")
 
+    def test_ed25519_signature_size(self):
+        """ED25519 signatures must be exactly 64 bytes."""
+        priv, pub = self._genkey("ed25519", "edkey-sztest", "der",
+                                 use_output_flag=True)
+        sig_file = "ed-sz-test.sig"
+        self._sign("ed25519", priv, "der", sig_file)
+
+        sig_size = os.path.getsize(sig_file)
+        self.assertEqual(sig_size, 64,
+                         "ED25519 signature size is {}, expected 64".format(
+                             sig_size))
+
 
 class EccTest(_GenkeySignVerifyBase):
 
@@ -159,6 +171,55 @@ class EccTest(_GenkeySignVerifyBase):
 
     def test_ecc_pem(self):
         self._gen_sign_verify("ecc", "ecckey", "ecc-signed.sig", "pem")
+
+    def test_ecc_der_key_size_and_roundtrip(self):
+        """Regression: ECC DER private key must be reasonably sized, and the
+        full sign/verify round-trip must succeed on the generated keypair."""
+        priv, pub = self._genkey("ecc", "ecc-rt-test", "der",
+                                 use_output_flag=True)
+
+        key_size = os.path.getsize(priv)
+        self.assertLessEqual(key_size, 256,
+                             "ECC DER private key too large ({} bytes), "
+                             "may contain trailing garbage".format(key_size))
+
+        data_file = "ecc-rt-data.txt"
+        sig_file = "ecc-rt-test.sig"
+        self._track(data_file, sig_file)
+        with open(data_file, "w") as f:
+            f.write("ECC round trip test data\n")
+
+        r = run_wolfssl("-ecc", "-sign", "-inkey", priv, "-inform", "der",
+                        "-in", data_file, "-out", sig_file)
+        self.assertEqual(r.returncode, 0,
+                         "ECC sign round-trip failed: {}".format(r.stderr))
+
+        r = run_wolfssl("-ecc", "-verify", "-inkey", pub, "-pubin",
+                        "-inform", "der", "-sigfile", sig_file,
+                        "-in", data_file)
+        self.assertEqual(r.returncode, 0,
+                         "ECC verify round-trip failed: {}".format(r.stderr))
+
+    def test_ecc_sign_invalid_key_fails(self):
+        """Signing with an empty key file must fail gracefully."""
+        bad_key = "bad-ecc-key.der"
+        bad_sig = "bad-ecc-sign.sig"
+        self._track(bad_key, bad_sig)
+        open(bad_key, "wb").close()
+
+        r = run_wolfssl("-ecc", "-sign", "-inkey", bad_key, "-inform", "der",
+                        "-in", self.SIGN_FILE, "-out", bad_sig)
+        self.assertNotEqual(r.returncode, 0,
+                            "ECC signing with empty key should have failed")
+
+    def test_ecc_sign_missing_inkey_value(self):
+        """-inkey with no value must fail gracefully (no segfault)."""
+        r = run_wolfssl("-ecc", "-sign", "-inkey")
+        self.assertNotEqual(r.returncode, 0,
+                            "expected failure for missing -inkey value")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "-inkey without value crashed with signal "
+                                "{}".format(r.returncode))
 
 
 class RsaTest(_GenkeySignVerifyBase):
@@ -196,6 +257,18 @@ class RsaTest(_GenkeySignVerifyBase):
                         "-output", "KEYPAIR")
         self.assertEqual(r.returncode, 0,
                          f"rsa genkey with -exponent failed: {r.stderr}")
+
+    def test_rsa_sign_invalid_key_fails(self):
+        """RSA signing with an empty key file must fail gracefully."""
+        bad_key = "bad-rsa-key.der"
+        bad_sig = "bad-rsa-sign.sig"
+        self._track(bad_key, bad_sig)
+        open(bad_key, "wb").close()
+
+        r = run_wolfssl("-rsa", "-sign", "-inkey", bad_key, "-inform", "der",
+                        "-in", self.SIGN_FILE, "-out", bad_sig)
+        self.assertNotEqual(r.returncode, 0,
+                            "RSA signing with empty key should have failed")
 
 
 @unittest.skipUnless(_has_algorithm("dilithium"),
@@ -252,6 +325,18 @@ class DilithiumTest(_GenkeySignVerifyBase):
         self.assertNotEqual(r.returncode, 0,
                             "sign to invalid path should have failed")
 
+    def test_sign_nonexistent_key_fails(self):
+        """Dilithium sign with nonexistent key file must fail gracefully."""
+        bad_sig = "bad-dil.sig"
+        self._track(bad_sig)
+        r = run_wolfssl("-dilithium", "-sign",
+                        "-inkey", os.path.join("nonexistent_dir", "key.priv"),
+                        "-inform", "der", "-in", self.SIGN_FILE,
+                        "-out", bad_sig)
+        self.assertNotEqual(r.returncode, 0,
+                            "Dilithium sign with nonexistent key should have "
+                            "failed")
+
 
 @unittest.skipUnless(_has_algorithm("xmss"), "xmss not available")
 class XmssTest(_GenkeySignVerifyBase):
@@ -263,6 +348,17 @@ class XmssTest(_GenkeySignVerifyBase):
             "xmss", keybase, "xmss-signed.sig", "raw",
             extra_genkey_args=["-height", "10"],
             skip_priv_verify=True, use_output_flag=True)
+
+    def test_xmss_missing_height_value(self):
+        """-height with no value must fail gracefully (no crash)."""
+        self._track("xmss-bad.priv", "xmss-bad.pub")
+        r = run_wolfssl("-genkey", "xmss", "-out", "xmss-bad",
+                        "-outform", "raw", "-output", "KEYPAIR", "-height")
+        self.assertNotEqual(r.returncode, 0,
+                            "expected failure for missing -height value")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "-height without value crashed with signal "
+                                "{}".format(r.returncode))
 
 
 if __name__ == "__main__":

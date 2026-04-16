@@ -140,6 +140,15 @@ class TestCRLVerify(unittest.TestCase):
         self.assertFalse(os.path.isfile(out),
                          "output file should not be created on failure")
 
+    def test_crl_invalid_outform_error_message(self):
+        """Invalid -outform value must produce an outform-related error."""
+        r = run_wolfssl("crl", "-in", os.path.join(CERTS_DIR, "crl.pem"),
+                        "-outform", "INVALID")
+        combined = (r.stdout + r.stderr).lower()
+        self.assertIn("outform", combined,
+                      "Expected 'outform' in error output, got: {}".format(
+                          combined))
+
 
 class TestCRLText(unittest.TestCase):
     """CRL -text output tests."""

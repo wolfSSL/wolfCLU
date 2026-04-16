@@ -504,5 +504,19 @@ class TestX509ProcessInvalidFiles(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
 
 
+class TestX509ModulusNoout(unittest.TestCase):
+    """Regression: x509 -modulus -noout must not crash."""
+
+    def test_modulus_noout(self):
+        r = run_wolfssl("x509", "-in",
+                        os.path.join(CERTS_DIR, "server-cert.pem"),
+                        "-modulus", "-noout")
+        self.assertEqual(r.returncode, 0,
+                         "x509 -modulus -noout failed: {}".format(r.stderr))
+        self.assertGreaterEqual(r.returncode, 0,
+                                "x509 -modulus -noout crashed with signal "
+                                "{}".format(r.returncode))
+
+
 if __name__ == "__main__":
     test_main()

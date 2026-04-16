@@ -130,6 +130,23 @@ class EncDecryptTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(small, dec, shallow=False),
                         "small file decryption mismatch")
 
+    def test_explicit_hex_key_iv(self):
+        """Regression: explicit --key/--iv hex strings must be copied correctly."""
+        src = "enc_hex_test.txt"
+        enc = "enc_hex_test.enc"
+        self._cleanup(src, enc)
+
+        with open(src, "w") as f:
+            f.write("testing explicit hex IV and key\n")
+
+        r = run_wolfssl("enc", "-aes-128-cbc", "-nosalt",
+                        "-in", src, "-out", enc,
+                        "--key", "00112233445566778899aabbccddeeff",
+                        "--iv", "00112233445566778899aabb0011aab7")
+        self.assertEqual(r.returncode, 0,
+                         "encrypt with explicit hex key/iv failed: "
+                         "{}".format(r.stderr))
+
 
 class EncInteropTest(unittest.TestCase):
     """Test interoperability with OpenSSL (skipped if openssl not available)."""

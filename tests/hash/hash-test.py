@@ -88,5 +88,18 @@ class HashShortcutTest(unittest.TestCase):
         self.assertEqual(r.stdout.strip(), _read_expected("sha512-expect.hex"))
 
 
+class HashArgErrorTest(unittest.TestCase):
+    """Argument-handling regression tests."""
+
+    def test_missing_in_value(self):
+        """-in with no value must fail gracefully (no segfault)."""
+        r = run_wolfssl("-hash", "sha256", "-in")
+        self.assertNotEqual(r.returncode, 0,
+                            "expected failure for missing -in value")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "-in without value crashed with signal "
+                                "{}".format(r.returncode))
+
+
 if __name__ == "__main__":
     test_main()

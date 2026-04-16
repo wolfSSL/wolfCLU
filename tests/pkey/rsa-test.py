@@ -3,11 +3,12 @@
 
 import filecmp
 import os
+import subprocess
 import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import CERTS_DIR, WOLFSSL_BIN, run_wolfssl, test_main
 
 RSA_PUBKEY_PEM = """\
 -----BEGIN PUBLIC KEY-----
@@ -137,6 +138,23 @@ class RsaTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("Modulus", r.stdout)
         self.assertNotIn("BEGIN", r.stdout)
+
+    def test_invalid_outform_error_message(self):
+        """Invalid -outform value must produce an outform-related error.
+
+        When the output is redirected to a file/pipe the command may also
+        emit the raw key bytes on stdout, so capture everything as bytes
+        and search the combined output for a human-readable error mention.
+        """
+        r = subprocess.run(
+            [WOLFSSL_BIN, "rsa", "-in",
+             os.path.join(CERTS_DIR, "server-key.pem"),
+             "-outform", "INVALID"],
+            capture_output=True, stdin=subprocess.DEVNULL, timeout=60)
+        combined = (r.stdout + r.stderr).lower()
+        self.assertIn(b"outform", combined,
+                      "Expected 'outform' in error output, got: {!r}".format(
+                          combined[:200]))
 
 
 if __name__ == "__main__":

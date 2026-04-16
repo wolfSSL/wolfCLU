@@ -365,6 +365,25 @@ class TestX509ReqHashAlgorithms(unittest.TestCase):
     def test_sha512(self):
         self._test_hash("sha512")
 
+    def test_sha224_sig_algorithm(self):
+        """Regression: -sha224 must produce a SHA-224 signature, not SHA-256."""
+        out = _tmp("tmp_sha224_sig.cert")
+        self._clean(out)
+        r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
+                        "-sha224",
+                        "-signkey",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        text = (r2.stdout + r2.stderr).lower()
+        if "sha224" not in text:
+            self.assertNotIn(
+                "sha256", text,
+                "SHA-224 cert incorrectly uses SHA-256 signature algorithm")
+
 
 
 class TestX509ReqExtensions(unittest.TestCase):
@@ -741,6 +760,85 @@ class TestReqCSRVersion(unittest.TestCase):
         self.assertTrue(found_version,
                         "Version not found in openssl output: {}".format(
                             r2.stdout))
+
+
+TEST_ABBREV_KU_CONF = """\
+[ req ]
+distinguished_name = req_distinguished_name
+prompt = no
+x509_extensions = v3_req
+req_extensions = v3_req
+[ req_distinguished_name ]
+countryName = US
+stateOrProvinceName = Montana
+localityName = Bozeman
+organizationName = wolfSSL
+commonName = testing
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = d
+"""
+
+TEST_ATTR_CONF = """\
+[ req ]
+distinguished_name = req_distinguished_name
+attributes = req_attributes
+prompt = no
+[ req_distinguished_name ]
+countryName = US
+stateOrProvinceName = Montana
+localityName = Bozeman
+organizationName = wolfSSL
+commonName = testing
+[ req_attributes ]
+challengePassword = testpass123
+"""
+
+
+class TestReqKeyUsageAbbrev(unittest.TestCase):
+    """Regression: abbreviated keyUsage names must not be accepted."""
+
+    def _clean(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: _cleanup(p))
+
+    def test_abbreviated_ku_rejected(self):
+        """keyUsage = d must not match digitalSignature."""
+        conf = _tmp("test-abbrev-ku.conf")
+        tmp = _tmp("tmp-ku.cert")
+        self._clean(conf, tmp)
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(TEST_ABBREV_KU_CONF)
+
+        r = run_wolfssl("req", "-new",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-config", conf, "-x509", "-out", tmp)
+        if r.returncode == 0 and os.path.isfile(tmp):
+            r2 = run_wolfssl("x509", "-in", tmp, "-text", "-noout")
+            self.assertEqual(r2.returncode, 0, r2.stderr)
+            self.assertNotIn(
+                "Digital Signature", r2.stdout,
+                "Abbreviated keyUsage 'd' should not match digitalSignature")
+
+
+class TestReqChallengePassword(unittest.TestCase):
+    """req config with challengePassword attribute must succeed."""
+
+    def _clean(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: _cleanup(p))
+
+    def test_challenge_password_attribute(self):
+        conf = _tmp("test-attr.conf")
+        csr = _tmp("tmp-attr.csr")
+        self._clean(conf, csr)
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(TEST_ATTR_CONF)
+
+        r = run_wolfssl("req", "-new",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-config", conf, "-out", csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
 
 
 if __name__ == "__main__":
