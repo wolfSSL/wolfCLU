@@ -290,7 +290,6 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     int  caCertSz = LARGE_TEMP_SZ;
     byte* serverKeyBuf = NULL;
     int  serverKeySz = LARGE_TEMP_SZ;
-    #undef LARGE_TEMP_SZ
 
     if (bioCaKey == NULL || bioAltCaKey == NULL || bioAltSubjPubKey == NULL
         || subject == NULL || outFileName == NULL) {
