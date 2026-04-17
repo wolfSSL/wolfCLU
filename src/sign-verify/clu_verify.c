@@ -450,13 +450,16 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
         /* write the output to the specified file */
         if (ret > 0) {
+            int writeSz = ret;
             XFILE s = XFOPEN(out, "wb");
             if (s == NULL) {
                 wolfCLU_LogError("Unable to open file %s", out);
                 ret = BAD_FUNC_ARG;
             }
             else {
-                XFWRITE(outBuf, 1, ret, s);
+                if ((int)XFWRITE(outBuf, 1, writeSz, s) <= 0) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
                 XFCLOSE(s);
             }
         }
@@ -814,7 +817,7 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     /* open and read public key */
     keyFile = XFOPEN(keyPath, "rb");
     if (keyFile == NULL) {
-        wolfCLU_LogError("Faild to open Private key FILE.");
+        wolfCLU_LogError("Failed to open public key FILE.");
         wc_dilithium_free(key);
     #ifdef WOLFSSL_SMALL_STACK
         XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -951,7 +954,7 @@ int wolfCLU_verify_signature_xmss(byte* sig, int sigSz,
         keyFile = XFOPEN(pubKey, "rb");
         if (keyFile == NULL) {
             ret = OUTPUT_FILE_ERROR;
-            wolfCLU_LogError("Faild to open Public key FILE.");
+            wolfCLU_LogError("Failed to open Public key FILE.");
         }
     }
 
@@ -1107,7 +1110,7 @@ int wolfCLU_verify_signature_xmssmt(byte* sig, int sigSz,
         keyFile = XFOPEN(pubKey, "rb");
         if (keyFile == NULL) {
             ret = OUTPUT_FILE_ERROR;
-            wolfCLU_LogError("Faild to open Public key FILE.");
+            wolfCLU_LogError("Failed to open Public key FILE.");
         }
     }
 
