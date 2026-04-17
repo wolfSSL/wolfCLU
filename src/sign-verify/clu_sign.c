@@ -205,11 +205,23 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
         }
     }
     if (ret == 0) {
-        XFSEEK(privKeyFile, 0, SEEK_END);
+        if (XFSEEK(privKeyFile, 0, SEEK_END) != 0) {
+            wolfCLU_LogError("Failed to seek to end of file.");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+    if (ret == 0) {
         privFileSz = (int)XFTELL(privKeyFile);
-        keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (keyBuf == NULL) {
-            ret = MEMORY_E;
+        if (privFileSz > 0 && privFileSz <= (RSA_MAX_SIZE / 8 * 16)) {
+            keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
+                                    DYNAMIC_TYPE_TMP_BUFFER);
+            if (keyBuf == NULL) {
+                ret = MEMORY_E;
+            }
+        }
+        else {
+            wolfCLU_LogError("Incorrect private key file size: %d", privFileSz);
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
     if (ret == 0) {
@@ -344,11 +356,23 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
         }
     }
     if (ret == 0) {
-        XFSEEK(privKeyFile, 0, SEEK_END);
+        if (XFSEEK(privKeyFile, 0, SEEK_END) != 0) {
+            wolfCLU_LogError("Failed to seek to end of file.");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+    if (ret == 0) {
         privFileSz = (int)XFTELL(privKeyFile);
-        keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (keyBuf == NULL) {
-            ret = MEMORY_E;
+        if (privFileSz > 0 && privFileSz <= (MAX_ECC_BITS_NEEDED / 8 * 16)) {
+            keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
+                                    DYNAMIC_TYPE_TMP_BUFFER);
+            if (keyBuf == NULL) {
+                ret = MEMORY_E;
+            }
+        }
+        else {
+            wolfCLU_LogError("Incorrect private key file size: %d", privFileSz);
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
     if (ret == 0) {
@@ -506,11 +530,23 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
         }
     }
     if (ret == 0) {
-        XFSEEK(privKeyFile, 0, SEEK_END);
+        if (XFSEEK(privKeyFile, 0, SEEK_END) != 0) {
+            wolfCLU_LogError("Failed to seek to end of file.");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+    if (ret == 0) {
         privFileSz = (int)XFTELL(privKeyFile);
-        keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (keyBuf == NULL) {
-            ret = MEMORY_E;
+        if (privFileSz > 0 && privFileSz <= (ED25519_PRV_KEY_SIZE * 16)) {
+            keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
+                                    DYNAMIC_TYPE_TMP_BUFFER);
+            if (keyBuf == NULL) {
+                ret = MEMORY_E;
+            }
+        }
+        else {
+            wolfCLU_LogError("Incorrect private key file size: %d", privFileSz);
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
     if (ret == 0) {
@@ -650,6 +686,10 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     ret = wc_dilithium_init(key);
     if (ret != 0) {
         wolfCLU_LogError("Failed to initialize Dilithium Key.\nRET: %d", ret);
+    #ifdef WOLFSSL_SMALL_STACK
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    #endif
+        return ret;
     }
 
     /* initialize RNG */

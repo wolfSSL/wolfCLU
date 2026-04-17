@@ -337,6 +337,37 @@ class DilithiumTest(_GenkeySignVerifyBase):
                             "Dilithium sign with nonexistent key should have "
                             "failed")
 
+    def test_sign_with_pub_key_fails(self):
+        """Signing with a public key instead of private key must fail gracefully."""
+        priv, pub = self._genkey("dilithium", "mldsakey", "der", ["-level", "2"])
+        bad_sig = "mldsa_bad_pubkey.sig"
+        self._track(bad_sig)
+        r = run_wolfssl("-dilithium", "-sign", "-inkey", pub,
+                        "-inform", "der", "-in", self.SIGN_FILE,
+                        "-out", bad_sig)
+        self.assertNotEqual(r.returncode, 0,
+                            "dilithium sign with public key should have failed")
+        self.assertFalse(os.path.exists(bad_sig),
+                         "output file must not be created when signing with "
+                         "public key")
+
+    def test_sign_corrupted_key_fails(self):
+        """Signing with a corrupted private key must fail gracefully."""
+        corrupt_key = "mldsakey_corrupt.priv"
+        bad_sig = "mldsa_bad_corrupt.sig"
+        self._track(corrupt_key, bad_sig)
+        with open(corrupt_key, "w") as f:
+            f.write("INVALID KEY DATA")
+        r = run_wolfssl("-dilithium", "-sign", "-inkey", corrupt_key,
+                        "-inform", "der", "-in", self.SIGN_FILE,
+                        "-out", bad_sig)
+        self.assertNotEqual(r.returncode, 0,
+                            "dilithium sign with corrupted key should have "
+                            "failed")
+        self.assertFalse(os.path.exists(bad_sig),
+                         "output file must not be created when signing with "
+                         "corrupted key")
+
 
 @unittest.skipUnless(_has_algorithm("xmss"), "xmss not available")
 class XmssTest(_GenkeySignVerifyBase):
