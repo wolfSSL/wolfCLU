@@ -1852,10 +1852,16 @@ int wolfCLU_genKey_PWDBASED(WC_RNG* rng, byte* pwdKey, int size, byte* salt,
         return ret;
 
     /* set first value of salt to let us know
-     * if message has padding or not
+     * if message has padding or not.
+     * salt[0] == 0 signals "no padding" to the decrypt side; any non-zero
+     * value means "padding applied". Force a non-zero marker when pad != 0
+     * to avoid a 1/256 collision where the random salt[0] is zero and the
+     * decrypt side skips the PKCS#7 pad strip.
      */
     if (pad == 0)
         salt[0] = 0;
+    else if (salt[0] == 0)
+        salt[0] = 1;
 
     /* stretches pwdKey */
     ret = (int) wc_PBKDF2(pwdKey, pwdKey, (int) XSTRLEN((const char*)pwdKey),
