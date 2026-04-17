@@ -81,7 +81,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
     for (i = 0; i < (int)algsSz; ++i) {
         /* checks for acceptable algorithms */
-        if (XSTRNCMP(argv[2], algs[i], XSTRLEN(algs[i])) == 0) {
+        if (XSTRCMP(argv[2], algs[i]) == 0) {
             alg = argv[2];
             algCheck = 1;
         }
@@ -135,27 +135,27 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
     /* sets default size of algorithm */
 #ifndef NO_MD5
-    if (XSTRNCMP(alg, "md5", 3) == 0)
+    if (XSTRCMP(alg, "md5") == 0)
         size = WC_MD5_DIGEST_SIZE;
 #endif
 
 #ifndef NO_SHA
-    if (XSTRNCMP(alg, "sha", 3) == 0)
+    if (XSTRCMP(alg, "sha") == 0)
         size = WC_SHA_DIGEST_SIZE;
 #endif
 
 #ifndef NO_SHA256
-    if (XSTRNCMP(alg, "sha256", 6) == 0)
+    if (XSTRCMP(alg, "sha256") == 0)
         size = WC_SHA256_DIGEST_SIZE;
 #endif
 
 #ifdef WOLFSSL_SHA384
-    if (XSTRNCMP(alg, "sha384", 6) == 0)
+    if (XSTRCMP(alg, "sha384") == 0)
         size = WC_SHA384_DIGEST_SIZE;
 #endif
 
 #ifdef WOLFSSL_SHA512
-    if (XSTRNCMP(alg, "sha512", 6) == 0)
+    if (XSTRCMP(alg, "sha512") == 0)
         size = WC_SHA512_DIGEST_SIZE;
 #endif
 
