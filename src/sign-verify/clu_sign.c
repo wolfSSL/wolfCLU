@@ -704,7 +704,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     if (ret == 0) {
         privKeyFile = XFOPEN(privKey, "rb");
         if (privKeyFile == NULL) {
-            wolfCLU_LogError("Faild to open Private key FILE.");
+            wolfCLU_LogError("Failed to open Private key FILE.");
             ret = BAD_FUNC_ARG;
         }
     }
@@ -764,9 +764,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         outBufSz = wc_dilithium_sig_size(key);
         outBuf = (byte*)XMALLOC(outBufSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (outBuf == NULL) {
+            ret = MEMORY_E;
             wolfCLU_LogError("Failed to allocate signature"
                                                     " buffer.\nRET: %d", ret);
-            ret = MEMORY_E;
         }
     }
     /* sign the message usign Dilithium private key. Note that the context is
