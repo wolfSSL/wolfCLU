@@ -81,11 +81,18 @@ class EncDecryptTest(unittest.TestCase):
                      password="test password")
         self.assertEqual(r.returncode, 0, r.stderr)
 
-        # Bad password should fail
+        # Bad password: AES-CBC with EVP_BytesToKey (no MAC) detects a wrong
+        # password only via PKCS#7 padding validation of the garbage plaintext.
+        # Random salt makes that check probabilistic (~1/256 false accept), so
+        # also verify the output does not match the original.
         r = run_enc("enc", "-base64", "-d", "-aes-256-cbc",
                      "-in", enc, "-out", dec,
                      password="bad password")
-        self.assertNotEqual(r.returncode, 0)
+        bad_recovered = (r.returncode == 0
+                         and os.path.exists(dec)
+                         and filecmp.cmp(orig, dec, shallow=False))
+        self.assertFalse(bad_recovered,
+                         "bad password must not recover original plaintext")
 
         r = run_enc("enc", "-base64", "-d", "-aes-256-cbc",
                      "-in", enc, "-out", dec,
