@@ -135,7 +135,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
     /* sets default size of algorithm */
 #ifndef NO_MD5
-    if (XSTRNCMP(alg, "md5", 3) == 0)
+    if (XSTRCMP(alg, "md5") == 0)
         size = WC_MD5_DIGEST_SIZE;
 #endif
 
@@ -145,17 +145,17 @@ int wolfCLU_hashSetup(int argc, char** argv)
 #endif
 
 #ifndef NO_SHA256
-    if (XSTRNCMP(alg, "sha256", 6) == 0)
+    if (XSTRCMP(alg, "sha256") == 0)
         size = WC_SHA256_DIGEST_SIZE;
 #endif
 
 #ifdef WOLFSSL_SHA384
-    if (XSTRNCMP(alg, "sha384", 6) == 0)
+    if (XSTRCMP(alg, "sha384") == 0)
         size = WC_SHA384_DIGEST_SIZE;
 #endif
 
 #ifdef WOLFSSL_SHA512
-    if (XSTRNCMP(alg, "sha512", 6) == 0)
+    if (XSTRCMP(alg, "sha512") == 0)
         size = WC_SHA512_DIGEST_SIZE;
 #endif
 
