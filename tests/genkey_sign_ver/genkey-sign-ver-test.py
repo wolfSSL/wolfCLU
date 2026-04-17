@@ -356,8 +356,8 @@ class DilithiumTest(_GenkeySignVerifyBase):
         corrupt_key = "mldsakey_corrupt.priv"
         bad_sig = "mldsa_bad_corrupt.sig"
         self._track(corrupt_key, bad_sig)
-        with open(corrupt_key, "w") as f:
-            f.write("INVALID KEY DATA")
+        with open(corrupt_key, "wb") as f:
+            f.write(b"INVALID KEY DATA")
         r = run_wolfssl("-dilithium", "-sign", "-inkey", corrupt_key,
                         "-inform", "der", "-in", self.SIGN_FILE,
                         "-out", bad_sig)

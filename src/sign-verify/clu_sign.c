@@ -280,7 +280,9 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
                 ret = BAD_FUNC_ARG;
             }
             else {
-                XFWRITE(outBuf, 1, outBufSz, s);
+                if ((int)XFWRITE(outBuf, 1, outBufSz, s) <= 0) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
                 XFCLOSE(s);
             }
         }
@@ -455,7 +457,9 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
                 ret = BAD_FUNC_ARG;
             }
             else {
-                XFWRITE(outBuf, 1, outLen, s);
+                if ((int)XFWRITE(outBuf, 1, outLen, s) <= 0) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
                 XFCLOSE(s);
             }
         }
@@ -618,7 +622,9 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
                 ret = BAD_FUNC_ARG;
             }
             else {
-                XFWRITE(outBuf, 1, outLen, s);
+                if ((int)XFWRITE(outBuf, 1, outLen, s) <= 0) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
                 XFCLOSE(s);
             }
         }
@@ -734,7 +740,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         privBufSz = privFileSz;
         if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
             (int)XFREAD(privBuf, 1, privFileSz, privKeyFile) != privFileSz) {
-            wolfCLU_LogError("Incorrect private key file size: %d", privFileSz);
+            wolfCLU_LogError("Failed to read private key file.");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -788,7 +794,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
             wolfCLU_LogError("Failed to open output file %s", out);
             ret = BAD_FUNC_ARG;
         } else {
-            XFWRITE(outBuf, 1, outBufSz, outFile);
+            if ((int)XFWRITE(outBuf, 1, outBufSz, outFile) <= 0) {
+                ret = OUTPUT_FILE_ERROR;
+            }
             XFCLOSE(outFile);
         }
     }
