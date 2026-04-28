@@ -505,7 +505,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
 {
 #ifdef HAVE_ED25519
     int ret;
-    int privFileSz;
+    int privFileSz = 0;
     word32 index = 0;
     word32 outLen;
 
