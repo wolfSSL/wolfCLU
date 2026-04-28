@@ -25,6 +25,15 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/genkey/clu_genkey.h>  /* for xmss callback functions */
 
+/* Fallback for older wolfSSL builds that have HAVE_DILITHIUM but predate the
+ * PEM size constants. DILITHIUM_LEVEL5_BOTH_KEY_PEM_SIZE (10267) is the
+ * largest possible key PEM size and is used as a safe upper bound. */
+#ifdef HAVE_DILITHIUM
+#ifndef DILITHIUM_MAX_BOTH_KEY_PEM_SIZE
+#define DILITHIUM_MAX_BOTH_KEY_PEM_SIZE 10267
+#endif
+#endif
+
 #ifndef WOLFCLU_NO_FILESYSTEM
 
 int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
@@ -639,6 +648,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     }
 
     if (keyBuf!= NULL) {
+        wolfCLU_ForceZero(keyBuf, privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (outBuf!= NULL) {
@@ -806,6 +816,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         XFCLOSE(privKeyFile);
 
     if (privBuf != NULL) {
+        wolfCLU_ForceZero(privBuf, privBufSz);
         XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
@@ -814,6 +825,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     }
 
     wc_dilithium_free(key);
+    /* rng was zeroed via XMEMSET before wc_InitRng, so wc_FreeRng is safe
+     * even if wc_InitRng failed: wolfSSL checks rng->drbg != NULL internally
+     * before freeing any resources. */
     wc_FreeRng(&rng);
 #ifdef WOLFSSL_SMALL_STACK
     XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
