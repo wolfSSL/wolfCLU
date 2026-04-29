@@ -128,7 +128,12 @@ int wolfCLU_PKCS7(int argc, char** argv)
     /* currently only supporting PKCS7 parsing, input is expected */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
         bioIn = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
-        wolfSSL_BIO_set_fp(bioIn, stdin, BIO_NOCLOSE);
+        if (bioIn == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            wolfSSL_BIO_set_fp(bioIn, stdin, BIO_NOCLOSE);
+        }
     }
 
     /* read the input bio to a temporary buffer and convert to PKCS7 */

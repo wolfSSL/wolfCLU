@@ -137,6 +137,20 @@ class EncDecryptTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(small, dec, shallow=False),
                         "small file decryption mismatch")
 
+    def test_enc_to_stdout(self):
+        """enc with no -out writes ciphertext to stdout."""
+        src = "enc_stdout_test.bin"
+        self._cleanup(src)
+        with open(src, "wb") as f:
+            f.write(b"plaintext\n")
+
+        r = subprocess.run(
+            [WOLFSSL_BIN, "enc", "-aes-128-cbc", "-in", src,
+             "-pass", "pass:test"],
+            capture_output=True, stdin=subprocess.DEVNULL, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(len(r.stdout) > 0)
+
     def test_explicit_hex_key_iv(self):
         """Regression: explicit --key/--iv hex strings must be copied correctly."""
         src = "enc_hex_test.txt"

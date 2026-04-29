@@ -139,6 +139,21 @@ class RsaTest(unittest.TestCase):
         self.assertIn("Modulus", r.stdout)
         self.assertNotIn("BEGIN", r.stdout)
 
+    def test_pubin_der(self):
+        """-pubin -inform DER round-trip prints the modulus."""
+        der_path = "test_pubkey.der"
+        self._cleanup(der_path)
+
+        r = run_wolfssl("rsa", "-in",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-pubin", "-outform", "DER", "-out", der_path)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("rsa", "-in", der_path, "-inform", "DER",
+                        "-pubin", "-noout", "-modulus")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("Modulus", r.stdout)
+
     def test_invalid_outform_error_message(self):
         """Invalid -outform value must produce an outform-related error.
 
