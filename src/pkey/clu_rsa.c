@@ -177,7 +177,7 @@ int wolfCLU_RSA(int argc, char** argv)
                     }
 
                     if (ret == WOLFCLU_SUCCESS) {
-                        /* d2i may advance *pp; preserve base for XFREE */
+                        /* d2i may advance *p; preserve base for XFREE */
                         p = der;
                         rsa = wolfSSL_d2i_RSAPublicKey(NULL, &p, derSz);
                     }

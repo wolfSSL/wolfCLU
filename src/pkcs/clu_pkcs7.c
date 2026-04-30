@@ -129,6 +129,7 @@ int wolfCLU_PKCS7(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
         bioIn = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bioIn == NULL) {
+            wolfCLU_LogError("unable to create BIO for stdin input");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {

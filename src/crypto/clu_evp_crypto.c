@@ -227,7 +227,12 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             }
         }
         if (out == NULL) {
-            wolfCLU_LogError("unable to open output file %s", fileOut);
+            if (fileOut != NULL) {
+                wolfCLU_LogError("unable to open output file %s", fileOut);
+            }
+            else {
+                wolfCLU_LogError("unable to open stdout for output");
+            }
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

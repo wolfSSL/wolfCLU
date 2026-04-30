@@ -1483,7 +1483,7 @@ int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
 
     XMEMSET(password, 0, *passwordSz);
     if (XSTRNCMP(arg, "stdin", 5) == 0) {
-        if (XFGETS(password, MAX_PASSWORD_SIZE, stdin) == NULL) {
+        if (XFGETS(password, *passwordSz, stdin) == NULL) {
             wolfCLU_LogError("error getting password");
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -1517,7 +1517,8 @@ int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
         }
     }
     else if (XSTRNCMP(arg, "pass:", 5) == 0) {
-        XSTRNCPY(password, arg + 5, MAX_PASSWORD_SIZE);
+        XSTRNCPY(password, arg + 5, *passwordSz - 1);
+        password[*passwordSz - 1] = '\0';
         if (ret == WOLFCLU_SUCCESS) {
             *passwordSz = (int)XSTRLEN(password);
         }

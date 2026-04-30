@@ -148,8 +148,8 @@ class EncDecryptTest(unittest.TestCase):
             [WOLFSSL_BIN, "enc", "-aes-128-cbc", "-in", src,
              "-pass", "pass:test"],
             capture_output=True, stdin=subprocess.DEVNULL, timeout=60)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertTrue(len(r.stdout) > 0)
+        self.assertEqual(r.returncode, 0, r.stderr.decode(errors="replace"))
+        self.assertGreater(len(r.stdout), 0)
 
     def test_explicit_hex_key_iv(self):
         """Regression: explicit --key/--iv hex strings must be copied correctly."""
