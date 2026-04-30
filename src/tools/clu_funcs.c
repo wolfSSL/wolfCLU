@@ -1477,7 +1477,7 @@ int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
 {
     int ret = WOLFCLU_SUCCESS;
 
-    if (password == NULL || passwordSz == NULL) {
+    if (password == NULL || passwordSz == NULL || *passwordSz <= 0) {
         return WOLFCLU_FATAL_ERROR;
     }
 
