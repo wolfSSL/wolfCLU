@@ -87,6 +87,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
     char password[MAX_PASSWORD_SIZE];
     int passwordSz = MAX_PASSWORD_SIZE;
     byte* pass = NULL;
+    byte* stdinKeyBuf = NULL;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -155,35 +156,44 @@ int wolfCLU_PKCS8(int argc, char** argv)
 
     /* currently only supporting PKCS8 parsing, input is expected */
     if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
-        byte keyBuffer[MAX_STDINSZ];
         word32 keyLen = 0;
 
-        XMEMSET(keyBuffer, 0, MAX_STDINSZ);
-        keyLen = (int)XFREAD(keyBuffer, 1, sizeof(keyBuffer) - 1, stdin);
-        if (keyLen <= 0) {
-            WOLFCLU_LOG(WOLFCLU_E0, "Error reading private key from stdin");
-            ret = WOLFCLU_FATAL_ERROR;
+        /* Heap-allocate so the buffer outlives this block; the BIO created
+         * below stores a pointer to it and is freed at function exit. */
+        stdinKeyBuf = (byte*)XMALLOC(MAX_STDINSZ, HEAP_HINT,
+                DYNAMIC_TYPE_TMP_BUFFER);
+        if (stdinKeyBuf == NULL) {
+            ret = MEMORY_E;
         }
         else {
-            /* Null-terminate the key buffer */
-            keyBuffer[keyLen] = '\0';
-
-            bioIn = wolfSSL_BIO_new_mem_buf(keyBuffer, keyLen);
-
-            if (bioIn == NULL) {
-                wolfCLU_LogError("Unable to open pkcs8 file %s",
-                        optarg);
-                ret = MEMORY_E;
+            XMEMSET(stdinKeyBuf, 0, MAX_STDINSZ);
+            keyLen = (int)XFREAD(stdinKeyBuf, 1, MAX_STDINSZ - 1, stdin);
+            if (keyLen <= 0) {
+                WOLFCLU_LOG(WOLFCLU_E0,
+                        "Error reading private key from stdin");
+                ret = WOLFCLU_FATAL_ERROR;
             }
-            else if (pass == NULL) {
-            /* Reopen terminal since we might get password data
-             * from stdin later */
-            #ifdef USE_WINDOWS_API
-                if (freopen("CON", "r", stdin) == NULL) {
-            #else
-                if (freopen("/dev/tty", "r", stdin) == NULL) {
-            #endif
-                    ret = WOLFCLU_FATAL_ERROR;
+            else {
+                /* Null-terminate the key buffer */
+                stdinKeyBuf[keyLen] = '\0';
+
+                bioIn = wolfSSL_BIO_new_mem_buf(stdinKeyBuf, keyLen);
+
+                if (bioIn == NULL) {
+                    wolfCLU_LogError("Unable to open pkcs8 file %s",
+                            optarg);
+                    ret = MEMORY_E;
+                }
+                else if (pass == NULL) {
+                /* Reopen terminal since we might get password data
+                 * from stdin later */
+                #ifdef USE_WINDOWS_API
+                    if (freopen("CON", "r", stdin) == NULL) {
+                #else
+                    if (freopen("/dev/tty", "r", stdin) == NULL) {
+                #endif
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                 }
             }
         }
@@ -282,6 +292,10 @@ int wolfCLU_PKCS8(int argc, char** argv)
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_EVP_PKEY_free(pkey);
+    if (stdinKeyBuf != NULL) {
+        wolfCLU_ForceZero(stdinKeyBuf, MAX_STDINSZ);
+        XFREE(stdinKeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
 
     return ret;
 #else

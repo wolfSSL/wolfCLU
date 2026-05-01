@@ -224,7 +224,7 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
                 XSTRLCAT(scratch, buf, MAX_WIDTH);
 
                 int crit = wolfSSL_X509_EXTENSION_get_critical(ext) ? 1 : 0;
-                XSTRLCAT(scratch, crit ? ": Critical\n" : ":\n", crit ? 11 : 2);
+                XSTRLCAT(scratch, crit ? ": Critical\n" : ":\n", MAX_WIDTH);
                 (void)crit;
 
                 wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));

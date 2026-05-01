@@ -381,6 +381,8 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
     byte genKey = 0;
     byte check  = 0;
     byte noOut  = 0;
+    byte rngInited = 0;
+    byte dhInited  = 0;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
 
@@ -457,10 +459,19 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
         }
     }
 
-    /* try initializing both because both get free'd regardless at the end */
-    if (wc_InitRng(&rng) != 0 || wc_InitDhKey(&dh) != 0) {
-        wolfCLU_LogError("Unable to initialize rng and dh");
+    if (wc_InitRng(&rng) != 0) {
+        wolfCLU_LogError("Unable to initialize rng");
         ret = WOLFCLU_FATAL_ERROR;
+    }
+    else {
+        rngInited = 1;
+    }
+    if (ret == WOLFCLU_SUCCESS && wc_InitDhKey(&dh) != 0) {
+        wolfCLU_LogError("Unable to initialize dh");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+    else if (ret == WOLFCLU_SUCCESS) {
+        dhInited = 1;
     }
 
     /* read in parameters */
@@ -789,8 +800,10 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
 
-    wc_FreeDhKey(&dh);
-    wc_FreeRng(&rng);
+    if (dhInited)
+        wc_FreeDhKey(&dh);
+    if (rngInited)
+        wc_FreeRng(&rng);
 
     return ret;
 #else
