@@ -162,7 +162,7 @@ int wolfCLU_RSA(int argc, char** argv)
         else {
             if (pubIn) {
                 unsigned char *der;
-                const unsigned char **pp;
+                const unsigned char *p;
                 long derSz;
 
                 derSz = wolfSSL_BIO_get_len(bioIn);
@@ -177,8 +177,9 @@ int wolfCLU_RSA(int argc, char** argv)
                     }
 
                     if (ret == WOLFCLU_SUCCESS) {
-                        pp = (const unsigned char**)&der;
-                        rsa = wolfSSL_d2i_RSAPublicKey(NULL, pp, derSz);
+                        /* d2i may advance *p; preserve base for XFREE */
+                        p = der;
+                        rsa = wolfSSL_d2i_RSAPublicKey(NULL, &p, derSz);
                     }
                     XFREE(der, HEAP_HINT, DYNAMIC_TYPE_PUBLIC_KEY);
                 }

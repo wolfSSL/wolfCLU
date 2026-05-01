@@ -256,7 +256,12 @@ int wolfCLU_CRLVerify(int argc, char** argv)
         WOLFSSL_CERT_MANAGER* cm;
 
         cm = wolfSSL_CertManagerNew();
-        if (wolfSSL_CertManagerLoadCA(cm, caCert, NULL) != WOLFSSL_SUCCESS) {
+        if (cm == NULL) {
+            wolfCLU_LogError("Failed to create CertManager");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (wolfSSL_CertManagerLoadCA(cm, caCert, NULL)
+                != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Unable to open CA file");
             ret = WOLFCLU_FATAL_ERROR;
         }

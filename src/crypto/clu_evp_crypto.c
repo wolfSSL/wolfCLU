@@ -222,10 +222,17 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         else {
             /* write to stdout if no file provided  */
             out = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
-            wolfSSL_BIO_set_fp(out, stdout, BIO_NOCLOSE);
+            if (out != NULL) {
+                wolfSSL_BIO_set_fp(out, stdout, BIO_NOCLOSE);
+            }
         }
         if (out == NULL) {
-            wolfCLU_LogError("unable to open output file %s", fileOut);
+            if (fileOut != NULL) {
+                wolfCLU_LogError("unable to open output file %s", fileOut);
+            }
+            else {
+                wolfCLU_LogError("unable to open stdout for output");
+            }
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

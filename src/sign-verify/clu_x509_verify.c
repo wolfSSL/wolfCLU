@@ -241,7 +241,9 @@ int wolfCLU_x509Verify(int argc, char** argv)
             wolfCLU_LogError("Failed to create untrusted chain stack");
             ret = WOLFCLU_FATAL_ERROR;
         }
-         wolfSSL_sk_X509_push(intermStack, intermediate);
+        else {
+            wolfSSL_sk_X509_push(intermStack, intermediate);
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
