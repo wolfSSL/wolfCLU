@@ -392,5 +392,18 @@ class XmssTest(_GenkeySignVerifyBase):
                                 "{}".format(r.returncode))
 
 
+class GenkeyArgvTest(unittest.TestCase):
+    """Argument-bounds checks for the genkey subcommand entry point."""
+
+    def test_genkey_no_keytype(self):
+        """`wolfssl genkey` with no key-type argument must not deref argv[2]."""
+        r = run_wolfssl("genkey")
+        self.assertNotEqual(r.returncode, 0,
+                            "expected failure with no key type")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "genkey with no key type crashed with signal "
+                                "{}".format(r.returncode))
+
+
 if __name__ == "__main__":
     test_main()

@@ -135,6 +135,19 @@ class EcparamTest(unittest.TestCase):
         self.assertFalse(os.path.exists("tmp_ecparam.key"),
                          "key file should not be created for bad curve")
 
+    def test_fail_overlong_curve_name(self):
+        """Curve name >= ECC_MAXNAME bytes must not crash (no over-read)."""
+        self._cleanup("tmp_ecparam.key")
+
+        long_name = "A" * 256
+        r = run_wolfssl("ecparam", "-genkey", "-name", long_name,
+                        "-out", "tmp_ecparam.key")
+        self.assertNotEqual(r.returncode, 0,
+                            "expected failure for overlong curve name")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "overlong curve name crashed with signal "
+                                "{}".format(r.returncode))
+
     def test_all_curves_genkey(self):
         """Re-run curve test using the genkey command."""
         names = _get_curve_names()
