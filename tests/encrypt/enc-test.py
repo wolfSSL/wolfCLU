@@ -249,6 +249,62 @@ class EncInteropTest(unittest.TestCase):
         self.assertEqual(ossl.returncode, 0, ossl.stderr)
         self.assertTrue(filecmp.cmp(orig, dec, shallow=False))
 
+    def test_explicit_key_iv_wolfssl_to_openssl(self):
+        """Proves the user-supplied -key actually reaches the cipher.
+
+        Without keyType plumbed into the EVP path, wolfCLU silently runs
+        BytesToKey/PBKDF2 over an empty password and overwrites the
+        user's key, so a same-tool round-trip succeeds while interop with
+        openssl on the same hex key fails."""
+        key_hex = "00112233445566778899aabbccddeeff"\
+                  "00112233445566778899aabbccddeeff"
+        iv_hex  = "0123456789abcdef0123456789abcdef"
+        enc = "wolfssl_key_iv.enc"
+        dec = "wolfssl_key_iv.dec"
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        self._cleanup(enc, dec)
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", orig, "-out", enc,
+                        "-key", key_hex, "-iv", iv_hex)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        ossl = subprocess.run(
+            ["openssl", "enc", "-d", "-aes-256-cbc", "-nosalt",
+             "-K", key_hex, "-iv", iv_hex,
+             "-in", enc, "-out", dec],
+            capture_output=True, timeout=60)
+        self.assertEqual(ossl.returncode, 0,
+                         "openssl could not decrypt wolfCLU output with "
+                         "the same -K/-iv: " + ossl.stderr.decode(
+                             errors="replace"))
+        self.assertTrue(filecmp.cmp(orig, dec, shallow=False),
+                        "wolfCLU -> openssl interop failed")
+
+    def test_explicit_key_iv_openssl_to_wolfssl(self):
+        """Reverse interop: openssl encrypts with -K/-iv, wolfCLU decrypts."""
+        key_hex = "00112233445566778899aabbccddeeff"\
+                  "00112233445566778899aabbccddeeff"
+        iv_hex  = "0123456789abcdef0123456789abcdef"
+        enc = "openssl_key_iv.enc"
+        dec = "openssl_key_iv.dec"
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        self._cleanup(enc, dec)
+
+        ossl = subprocess.run(
+            ["openssl", "enc", "-aes-256-cbc", "-nosalt",
+             "-K", key_hex, "-iv", iv_hex,
+             "-in", orig, "-out", enc],
+            capture_output=True, timeout=60)
+        self.assertEqual(ossl.returncode, 0, ossl.stderr)
+
+        r = run_wolfssl("-decrypt", "-aes-cbc-256",
+                        "-in", enc, "-out", dec,
+                        "-key", key_hex, "-iv", iv_hex)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(filecmp.cmp(orig, dec, shallow=False),
+                        "openssl -> wolfCLU interop failed")
+
     def test_pbkdf2_wolfssl_pass_flag(self):
         enc = "test-enc.der"
         dec = "test-dec.der"
@@ -487,6 +543,289 @@ class EncStdinInputTest(unittest.TestCase):
                          f"name: {r.stderr}")
         self.assertTrue(filecmp.cmp(orig, dec, shallow=False),
                         "Camellia roundtrip mismatch after too-long reprompt")
+
+
+class EncKeyInputTest(unittest.TestCase):
+    """Tests for the -key (hex on CLI) and -inkey (key from file) flags."""
+
+    # AES-256 key/iv used across the tests.
+    KEY_HEX = "00112233445566778899aabbccddeeff"\
+              "00112233445566778899aabbccddeeff"
+    IV_HEX  = "0123456789abcdef0123456789abcdef"
+
+    @classmethod
+    def setUpClass(cls):
+        if not os.path.isdir(CERTS_DIR):
+            raise unittest.SkipTest("certs directory not found")
+
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+
+    def _cleanup(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: os.remove(p)
+                            if os.path.exists(p) else None)
+
+    def _orig(self):
+        return os.path.join(CERTS_DIR, "server-key.der")
+
+    def test_key_hex_cli_roundtrip(self):
+        """`-key <hex>` accepts a hex key on the command line."""
+        enc = "key_cli.enc"
+        dec = "key_cli.dec"
+        self._cleanup(enc, dec)
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-key", self.KEY_HEX, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "encrypt with -key hex failed: " + r.stderr)
+
+        r = run_wolfssl("-decrypt", "-aes-cbc-256",
+                        "-in", enc, "-out", dec,
+                        "-key", self.KEY_HEX, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "decrypt with -key hex failed: " + r.stderr)
+        self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
+                        "round-trip with -key hex did not recover plaintext")
+
+    def test_inkey_hex_file_roundtrip(self):
+        """`-inkey <file>` reads a hex-encoded key from a file."""
+        keyfile = "key_inkey_hex.txt"
+        enc = "inkey_hex.enc"
+        dec = "inkey_hex.dec"
+        self._cleanup(keyfile, enc, dec)
+
+        # Write hex with a trailing newline (typical of `echo > file`).
+        with open(keyfile, "w") as f:
+            f.write(self.KEY_HEX + "\n")
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "encrypt with -inkey hex file failed: " + r.stderr)
+
+        r = run_wolfssl("-decrypt", "-aes-cbc-256",
+                        "-in", enc, "-out", dec,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "decrypt with -inkey hex file failed: " + r.stderr)
+        self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
+                        "round-trip with -inkey hex file mismatched")
+
+    def test_inkey_raw_binary_file_roundtrip(self):
+        """`-inkey <file>` reads a raw binary key from a file."""
+        keyfile = "key_inkey_bin.key"
+        enc = "inkey_bin.enc"
+        dec = "inkey_bin.dec"
+        self._cleanup(keyfile, enc, dec)
+
+        with open(keyfile, "wb") as f:
+            f.write(bytes.fromhex(self.KEY_HEX))
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "encrypt with -inkey raw binary file failed: "
+                         + r.stderr)
+
+        r = run_wolfssl("-decrypt", "-aes-cbc-256",
+                        "-in", enc, "-out", dec,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "decrypt with -inkey raw binary file failed: "
+                         + r.stderr)
+        self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
+                        "round-trip with -inkey raw binary file mismatched")
+
+    def test_inkey_hex_file_with_embedded_whitespace(self):
+        """Embedded whitespace inside a hex key file is ignored."""
+        keyfile = "key_inkey_ws.txt"
+        enc = "inkey_ws.enc"
+        dec = "inkey_ws.dec"
+        self._cleanup(keyfile, enc, dec)
+
+        # Split the hex key across two lines with a leading space.
+        chunked = " " + self.KEY_HEX[:32] + "\n" + self.KEY_HEX[32:] + "\n"
+        with open(keyfile, "w") as f:
+            f.write(chunked)
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "encrypt with whitespace-formatted hex file failed: "
+                         + r.stderr)
+
+        r = run_wolfssl("-decrypt", "-aes-cbc-256",
+                        "-in", enc, "-out", dec,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "decrypt with whitespace-formatted hex file failed: "
+                         + r.stderr)
+        self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
+                        "round-trip with whitespace-formatted hex file failed")
+
+    def test_inkey_missing_file_falls_back_to_hex(self):
+        """When the file path doesn't exist, -inkey falls back to hex parse."""
+        enc = "inkey_fallback.enc"
+        # Defensive: a stale file matching the hex key would silently flip
+        # the test from "fall back to hex" to "read this file as a key".
+        if os.path.exists(self.KEY_HEX):
+            os.remove(self.KEY_HEX)
+        self._cleanup(enc)
+
+        # Filename that does not exist; arg happens to be a valid hex key.
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", self.KEY_HEX, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "backward-compat hex via -inkey failed: " + r.stderr)
+        # The deprecation warning should appear in the output.
+        combined = (r.stdout or "") + (r.stderr or "")
+        self.assertIn("warning", combined.lower(),
+                      "expected a deprecation warning when -inkey arg is "
+                      "treated as a hex string")
+
+    def test_inkey_missing_file_non_hex_errors(self):
+        """A non-existent path that isn't a hex key must not silently fall
+        back to a hex parse — that path masks user typos."""
+        enc = "inkey_bad.enc"
+        self._cleanup(enc)
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", "no-such-file.key", "-iv", self.IV_HEX)
+        self.assertNotEqual(r.returncode, 0,
+                            "missing non-hex file must error out")
+        self.assertFalse(os.path.exists(enc),
+                         "no output should be produced on missing key file")
+
+    def test_inkey_raw_binary_trailing_whitespace_byte(self):
+        """Regression: a 32-byte raw binary key whose last byte is 0x0A must
+        not be silently truncated by trailing-whitespace handling."""
+        keyfile = "key_inkey_lf.bin"
+        enc = "inkey_lf.enc"
+        dec = "inkey_lf.dec"
+        self._cleanup(keyfile, enc, dec)
+
+        # 31 random-looking bytes (chosen so hex detection routes to raw)
+        # followed by 0x0A as the terminal byte.
+        key_bytes = bytes(range(0x80, 0x80 + 31)) + b"\x0a"
+        self.assertEqual(len(key_bytes), 32)
+        with open(keyfile, "wb") as f:
+            f.write(key_bytes)
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "raw key ending in 0x0A must not be truncated: "
+                         + r.stderr)
+
+        r = run_wolfssl("-decrypt", "-aes-cbc-256",
+                        "-in", enc, "-out", dec,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "decrypt with 0x0A-terminated raw key failed: "
+                         + r.stderr)
+        self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
+                        "round-trip with 0x0A-terminated raw key mismatched")
+
+    def test_inkey_wrong_length_raw_binary_errors(self):
+        """A raw binary file whose byte length doesn't match must error."""
+        keyfile = "key_inkey_short.bin"
+        enc = "inkey_short.enc"
+        self._cleanup(keyfile, enc)
+
+        # 16 bytes, but algorithm requires 32 (AES-256).
+        with open(keyfile, "wb") as f:
+            f.write(bytes(range(16)))
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertNotEqual(r.returncode, 0,
+                            "wrong-size raw binary key must error out")
+        self.assertFalse(os.path.exists(enc),
+                         "no output should be produced on key size mismatch")
+
+    def test_key_without_iv_errors(self):
+        """`-key`/`-inkey` requires `-iv` (no salt-based derivation runs)."""
+        enc = "key_no_iv.enc"
+        self._cleanup(enc)
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-key", self.KEY_HEX)
+        self.assertNotEqual(r.returncode, 0,
+                            "-key with no -iv must fail")
+        combined = (r.stdout or "") + (r.stderr or "")
+        self.assertIn("-iv", combined,
+                      "validation error should mention -iv")
+
+    def test_iv_without_key_error_mentions_inkey(self):
+        """The -iv-without-key error now references both -key and -inkey."""
+        enc = "iv_only.enc"
+        self._cleanup(enc)
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-iv", self.IV_HEX)
+        self.assertNotEqual(r.returncode, 0,
+                            "-iv without a key must fail")
+        combined = (r.stdout or "") + (r.stderr or "")
+        self.assertIn("-inkey", combined,
+                      "validation error should mention -inkey alongside -key")
+
+    def test_key_invalid_hex_does_not_crash(self):
+        """Regression for double-free: a -key arg with the right length but
+        invalid hex characters must error cleanly, not abort/segfault."""
+        enc = "key_bad_hex.enc"
+        self._cleanup(enc)
+
+        bad_hex = "gg" + ("11" * 31)  # 64 chars, contains non-hex
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-key", bad_hex, "-iv", self.IV_HEX)
+        self.assertNotEqual(r.returncode, 0,
+                            "invalid hex must produce an error")
+        # Process aborts (SIGABRT/-6 on POSIX, large unsigned on Windows)
+        # would surface here; assert we got a clean wolfCLU error code.
+        self.assertGreater(r.returncode, 0,
+                           "expected a normal error exit, got signal: "
+                           + str(r.returncode))
+
+    def test_rand_hex_to_inkey_workflow(self):
+        """End-to-end: generate hex key with `rand -hex` and use via -inkey."""
+        keyfile = "rand_hex_key.hex"
+        enc = "rand_hex.enc"
+        dec = "rand_hex.dec"
+        self._cleanup(keyfile, enc, dec)
+
+        r = run_wolfssl("rand", "-hex", "-out", keyfile, "32")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "encrypt with rand-generated hex key failed: "
+                         + r.stderr)
+
+        r = run_wolfssl("-decrypt", "-aes-cbc-256",
+                        "-in", enc, "-out", dec,
+                        "-inkey", keyfile, "-iv", self.IV_HEX)
+        self.assertEqual(r.returncode, 0,
+                         "decrypt with rand-generated hex key failed: "
+                         + r.stderr)
+        self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
+                        "rand-hex -> -inkey workflow did not round-trip")
 
 
 if __name__ == "__main__":

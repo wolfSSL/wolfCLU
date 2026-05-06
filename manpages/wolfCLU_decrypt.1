@@ -4,7 +4,7 @@
 .SH NAME
 decrypt \- cipher routines
 .SH SYNOPSIS
-wolfssl -decrypt <-algorithm> <-in filename> [-out filename] [-pwd password] [-iv IV] [-key key]
+wolfssl -decrypt <-algorithm> <-in filename> [-out filename] [-pwd password] [-iv IV] [-key hex] [-inkey filename]
 .SH DESCRIPTION
 This command allows data to be decrypted using ciphers and keys based on passwords if not explicitly provided
 .SH ALGORITHMS
@@ -44,7 +44,32 @@ This command allows data to be decrypted using ciphers and keys based on passwor
                       Must be provided in hex
 .br
 .LP
--key Key              the actual key to use. Must be in hex
+-key hex              the actual key to use, supplied as a hex string on the
+.br
+                      command line. Length must match the algorithm key size.
+.br
+                      Requires -iv: when an explicit key is supplied, no
+.br
+                      salt-based key/iv derivation runs, so the IV must be
+.br
+                      provided directly.
+.br
+.LP
+-inkey filename       read the key from a file. The file may contain either a
+.br
+                      hex-encoded key (whitespace within the file is ignored)
+.br
+                      or a raw binary key whose byte length matches the
+.br
+                      algorithm key size. For backward compatibility, if the
+.br
+                      argument does not name an existing file but is a hex
+.br
+                      string of the right length it is parsed as hex with a
+.br
+                      deprecation warning; new scripts should use -key for
+.br
+                      hex input on the command line.
 .SH BUGS
 No known bugs at this time.
 .SH AUTHOR

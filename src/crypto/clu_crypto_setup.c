@@ -25,6 +25,62 @@
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
+/* Decode a hex key string into the caller-provided keyOut buffer.
+ *
+ * Wraps wolfCLU_hexToBin so the caller's pre-allocated key buffer is not
+ * replaced by hexToBin's internal allocation (which would leak the original
+ * and, on hexToBin failure, leave the caller pointing at a freed buffer).
+ *
+ * Returns WOLFCLU_SUCCESS on success, WOLFCLU_FATAL_ERROR on length mismatch
+ * or hex decode failure, MEMORY_E on allocation failure. */
+static int wolfCLU_loadHexKeyInto(byte* keyOut, int keyBytes,
+                                   const char* hex, word32 hexLen)
+{
+    byte*  tmp = NULL;
+    word32 tmpSz = 0;
+    char*  hexCopy;
+    int    ret;
+
+    if (hexLen != (word32)keyBytes * 2) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Length of key provided was: %u.",
+                (unsigned int)(hexLen * 4));
+        WOLFCLU_LOG(WOLFCLU_L0, "Length of key expected was: %d.",
+                keyBytes * 8);
+        WOLFCLU_LOG(WOLFCLU_E0,
+                "Invalid Key. Must match algorithm key size.");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    hexCopy = (char*)XMALLOC(hexLen + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (hexCopy == NULL) {
+        return MEMORY_E;
+    }
+    XMEMCPY(hexCopy, hex, hexLen);
+    hexCopy[hexLen] = '\0';
+
+    ret = wolfCLU_hexToBin(hexCopy, &tmp, &tmpSz,
+                           NULL, NULL, NULL,
+                           NULL, NULL, NULL,
+                           NULL, NULL, NULL);
+    wolfCLU_ForceZero(hexCopy, hexLen);
+    XFREE(hexCopy, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+
+    if (ret != WOLFCLU_SUCCESS) {
+        WOLFCLU_LOG(WOLFCLU_E0,
+                "failed during conversion of Key, ret = %d", ret);
+        /* On failure wolfCLU_hexToBin frees its own internal buffer; do not
+         * touch tmp here. */
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    XMEMCPY(keyOut, tmp, keyBytes);
+    wolfCLU_ForceZero(tmp, tmpSz);
+    /* tmp was allocated by wolfCLU_hexToBin with a NULL heap hint
+     * (see src/tools/clu_hex_to_bin.c); free it with the same hint. */
+    XFREE(tmp, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    return WOLFCLU_SUCCESS;
+}
+
 /* Prompt for a filename on stdin with validation.
  * Returns WOLFCLU_SUCCESS on success, WOLFCLU_FATAL_ERROR on EOF/read error.
  * buf is filled with the stripped, non-empty filename on success. */
@@ -121,7 +177,6 @@ int wolfCLU_setup(int argc, char** argv, char action)
     const WOLFSSL_EVP_CIPHER* cphr = NULL;
     word32   ivSize     =   0;  /* IV if provided should be 2*block since
                                  * reading a hex string passed in */
-    word32   numBits    =   0;  /* number of bits in argument from the user */
     int      option;
     int      longIndex = 1;
 
@@ -162,6 +217,10 @@ int wolfCLU_setup(int argc, char** argv, char action)
     }
     XMEMSET(iv, 0, block);
 
+    /* keySize is in bits, but the legacy non-EVP wolfCLU_encrypt path
+     * writes keySize *bytes* into this buffer (it conflates the two units
+     * internally), so over-allocate to keySize bytes to keep that path
+     * safe. The cleanup below also zeros the full allocation. */
     key = (byte*)XMALLOC(keySize, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (key == NULL) {
         wolfCLU_freeBins(pwdKey, iv, NULL, NULL, NULL);
@@ -205,7 +264,21 @@ int wolfCLU_setup(int argc, char** argv, char action)
             noSalt = 1;
             break;
 
-        case WOLFCLU_KEY: /* Key if used must be in hex */
+        case WOLFCLU_KEY: /* hex key string from the command line */
+            if (optarg == NULL) {
+                wolfCLU_LogError("no key passed in..");
+                wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                return WOLFCLU_FATAL_ERROR;
+            }
+
+            ret = wolfCLU_loadHexKeyInto(key, (keySize + 7) / 8,
+                    optarg, (word32)XSTRLEN(optarg));
+            if (ret != WOLFCLU_SUCCESS) {
+                wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                return ret;
+            }
+            keyCheck = 1;
+            keyType = 2;
             break;
 
         case WOLFCLU_IV:  /* IV if used must be in hex */
@@ -274,48 +347,164 @@ int wolfCLU_setup(int argc, char** argv, char action)
             break;
 
         case WOLFCLU_INKEY:
-            if (optarg == NULL) {
-                wolfCLU_LogError("no key passed in..");
-                wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                return WOLFCLU_FATAL_ERROR;
-            }
+            {
+                WOLFSSL_BIO* keyBio = NULL;
+                byte* fileBuf = NULL;
+                int   fileLen = 0;
+                int   keyBytes = (keySize + 7) / 8;
+                int   isHex = 1;
+                int   i;
 
-            /* 2 characters = 1 byte. 1 byte = 8 bits
-             */
-            numBits = (word32)(XSTRLEN(optarg) * 4);
-            /* Key for encryption */
-            if ((int)numBits != keySize) {
-                WOLFCLU_LOG(WOLFCLU_L0,
-                        "Length of key provided was: %d.", numBits);
-                WOLFCLU_LOG(WOLFCLU_L0,
-                        "Length of key expected was: %d.", keySize);
-                WOLFCLU_LOG(WOLFCLU_E0,
-                        "Invalid Key. Must match algorithm key size.");
-                wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                return WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                char* keyString;
+                if (optarg == NULL) {
+                    wolfCLU_LogError("no key file passed in..");
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    return WOLFCLU_FATAL_ERROR;
+                }
 
-                keyString = (char*)XMALLOC(XSTRLEN(optarg) + 1, HEAP_HINT,
+                keyBio = wolfSSL_BIO_new_file(optarg, "rb");
+                if (keyBio == NULL) {
+                    /* Backward compatibility: prior versions accepted a hex
+                     * string directly via -inkey. Fall back to that path
+                     * only when optarg is plausibly hex of the right length
+                     * (so a wrong filename doesn't get silently parsed as a
+                     * key). */
+                    word32 argLen = (word32)XSTRLEN(optarg);
+                    int    argIsHex = (argLen == (word32)keyBytes * 2);
+                    if (argIsHex) {
+                        for (i = 0; (word32)i < argLen; i++) {
+                            char c = optarg[i];
+                            if (!((c >= '0' && c <= '9') ||
+                                  (c >= 'a' && c <= 'f') ||
+                                  (c >= 'A' && c <= 'F'))) {
+                                argIsHex = 0;
+                                break;
+                            }
+                        }
+                    }
+                    if (!argIsHex) {
+                        wolfCLU_LogError("could not open key file '%s'",
+                                optarg);
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        return WOLFCLU_FATAL_ERROR;
+                    }
+
+                    WOLFCLU_LOG(WOLFCLU_L0,
+                        "warning: -inkey treating argument as a hex key"
+                        " string (no such file). Use -key for hex on the"
+                        " command line.");
+
+                    ret = wolfCLU_loadHexKeyInto(key, keyBytes,
+                            optarg, argLen);
+                    if (ret != WOLFCLU_SUCCESS) {
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        return ret;
+                    }
+                    keyCheck = 1;
+                    keyType = 2;
+                    break;
+                }
+
+                fileLen = wolfSSL_BIO_get_len(keyBio);
+                if (fileLen <= 0) {
+                    wolfCLU_LogError("key file '%s' is empty or unreadable",
+                            optarg);
+                    wolfSSL_BIO_free(keyBio);
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    return WOLFCLU_FATAL_ERROR;
+                }
+
+                fileBuf = (byte*)XMALLOC(fileLen, HEAP_HINT,
                         DYNAMIC_TYPE_TMP_BUFFER);
-                if (keyString == NULL) {
+                if (fileBuf == NULL) {
+                    wolfSSL_BIO_free(keyBio);
                     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
                     return MEMORY_E;
                 }
 
-                XSTRLCPY(keyString, optarg, XSTRLEN(optarg) + 1);
-                ret = wolfCLU_hexToBin(keyString, &key, &numBits,
-                                       NULL, NULL, NULL,
-                                       NULL, NULL, NULL,
-                                       NULL, NULL, NULL);
-                XFREE(keyString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                if (ret != WOLFCLU_SUCCESS) {
-                    WOLFCLU_LOG(WOLFCLU_E0,
-                            "failed during conversion of Key, ret = %d", ret);
+                if (wolfSSL_BIO_read(keyBio, fileBuf, fileLen) != fileLen) {
+                    wolfCLU_LogError("failed to read key file '%s'", optarg);
+                    wolfCLU_ForceZero(fileBuf, fileLen);
+                    XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    wolfSSL_BIO_free(keyBio);
                     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
                     return WOLFCLU_FATAL_ERROR;
                 }
+                wolfSSL_BIO_free(keyBio);
+
+                /* Decide hex vs raw by inspecting every byte. Whitespace
+                 * (\r \n space tab) is allowed inside hex files as a
+                 * separator; any non-hex non-whitespace byte means the
+                 * file is raw binary. fileLen is left unmodified so a
+                 * raw-binary key whose last byte is 0x09/0x0A/0x0D/0x20
+                 * still round-trips correctly. */
+                for (i = 0; i < fileLen; i++) {
+                    byte c = fileBuf[i];
+                    if (c == '\r' || c == '\n' || c == ' ' || c == '\t') {
+                        continue;
+                    }
+                    if (!((c >= '0' && c <= '9') ||
+                          (c >= 'a' && c <= 'f') ||
+                          (c >= 'A' && c <= 'F'))) {
+                        isHex = 0;
+                        break;
+                    }
+                }
+
+                if (isHex) {
+                    char* keyString;
+                    int   j = 0;
+
+                    keyString = (char*)XMALLOC(fileLen + 1, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (keyString == NULL) {
+                        wolfCLU_ForceZero(fileBuf, fileLen);
+                        XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        return MEMORY_E;
+                    }
+                    /* Copy out hex characters, skipping any embedded
+                     * whitespace so block-formatted hex files work. */
+                    for (i = 0; i < fileLen; i++) {
+                        byte c = fileBuf[i];
+                        if (c == '\r' || c == '\n' || c == ' ' || c == '\t') {
+                            continue;
+                        }
+                        keyString[j++] = (char)c;
+                    }
+                    keyString[j] = '\0';
+
+                    ret = wolfCLU_loadHexKeyInto(key, keyBytes,
+                            keyString, (word32)j);
+                    wolfCLU_ForceZero(keyString, j);
+                    XFREE(keyString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    wolfCLU_ForceZero(fileBuf, fileLen);
+                    XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    if (ret != WOLFCLU_SUCCESS) {
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        return ret;
+                    }
+                }
+                else {
+                    /* Raw binary key. Length must match the algorithm. */
+                    if (fileLen != keyBytes) {
+                        WOLFCLU_LOG(WOLFCLU_L0,
+                                "Length of key provided was: %d bits.",
+                                fileLen * 8);
+                        WOLFCLU_LOG(WOLFCLU_L0,
+                                "Length of key expected was: %d bits.",
+                                keySize);
+                        WOLFCLU_LOG(WOLFCLU_E0,
+                                "Invalid Key. Must match algorithm key size.");
+                        wolfCLU_ForceZero(fileBuf, fileLen);
+                        XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                        return WOLFCLU_FATAL_ERROR;
+                    }
+                    XMEMCPY(key, fileBuf, fileLen);
+                    wolfCLU_ForceZero(fileBuf, fileLen);
+                    XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                }
+
                 keyCheck = 1;
                 keyType = 2;
             }
@@ -400,12 +589,24 @@ int wolfCLU_setup(int argc, char** argv, char action)
     if (ivCheck == 1) {
         if (keyCheck == 0) {
             WOLFCLU_LOG(WOLFCLU_E0,
-                    "-iv was explicitly set, but no -key was set. User"
-                    " needs to provide a non-password based key when setting"
-                    " the -iv flag.");
+                    "-iv was explicitly set, but no -key or -inkey was"
+                    " provided. A non-password based key must be supplied"
+                    " when setting the -iv flag.");
             wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
             return WOLFCLU_FATAL_ERROR;
         }
+    }
+
+    /* When the user supplies an explicit -key/-inkey, no salt-based
+     * key/iv derivation runs. The cipher therefore needs an explicit -iv:
+     * silently using the all-zero buffer would produce ciphertext that no
+     * one (including this tool on a later run) can decrypt safely. */
+    if (keyCheck == 1 && ivCheck == 0) {
+        WOLFCLU_LOG(WOLFCLU_E0,
+                "-key/-inkey requires -iv to be set: an IV must be"
+                " supplied alongside an explicit key.");
+        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+        return WOLFCLU_FATAL_ERROR;
     }
 
     if (pwdKeyChk == 1 && keyCheck == 1) {
@@ -419,7 +620,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
         if (cphr != NULL) {
             ret = wolfCLU_evp_crypto(cphr, mode, pwdKey, key, (keySize+7)/8, in,
                   out, NULL, iv, 0, 1, pbkVersion, hashType, verbose, isBase64,
-                  noSalt);
+                  noSalt, keyType);
         }
         else {
             if (outCheck == 0) {
@@ -443,7 +644,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
         if (cphr != NULL) {
             ret = wolfCLU_evp_crypto(cphr, mode, pwdKey, key, (keySize+7)/8, in,
                     out, NULL, iv, 0, 0, pbkVersion, hashType, verbose,
-                    isBase64, noSalt);
+                    isBase64, noSalt, keyType);
         }
         else {
             if (outCheck == 0) {
@@ -464,7 +665,9 @@ int wolfCLU_setup(int argc, char** argv, char action)
     else {
         wolfCLU_help();
     }
-    /* clear and free data */
+    /* clear and free data — zero the full allocation, not just the
+     * keyBytes actually used, so any future code path that writes past
+     * the cipher key length doesn't leak material across XFREE. */
     XMEMSET(key, 0, keySize);
     XMEMSET(pwdKey, 0, keySize + block);
     XMEMSET(iv, 0, block);

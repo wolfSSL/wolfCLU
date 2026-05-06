@@ -26,6 +26,7 @@
 static const struct option rand_options[] = {
     {"-out",    required_argument, 0, WOLFCLU_OUTFILE},
     {"-base64", no_argument,       0, WOLFCLU_BASE64 },
+    {"-hex",    no_argument,       0, WOLFCLU_HEX    },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -35,6 +36,7 @@ static void wolfCLU_RandHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl rand <num bytes>");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-out the file to output data to (default to stdout)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-base64 output the results in base64 encoding");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-hex output the results in hex encoding");
 }
 
 
@@ -43,14 +45,19 @@ int wolfCLU_Rand(int argc, char** argv)
 #ifndef WC_NO_RNG
     int ret       = WOLFCLU_SUCCESS;
     int useBase64 = 0;
+    int useHex    = 0;
+    int outIsStdout = 0;
     int size      = 0;
     int option;
     int longIndex = 1;
     WOLFSSL_BIO *bioOut = NULL;
     byte *buf = NULL;
 
-    /* last parameter is the rand bytes output size */
-    if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
+    /* last parameter is the rand bytes output size. Match -h/-help exactly
+     * so other -h-prefixed flags (e.g. -hex) aren't swallowed as a help
+     * request. */
+    if (XSTRCMP("-h", argv[argc-1]) == 0 ||
+            XSTRCMP("-help", argv[argc-1]) == 0) {
         wolfCLU_RandHelp();
         return WOLFCLU_SUCCESS;
     }
@@ -70,6 +77,10 @@ int wolfCLU_Rand(int argc, char** argv)
         switch (option) {
             case WOLFCLU_BASE64:
                 useBase64 = 1;
+                break;
+
+            case WOLFCLU_HEX:
+                useHex = 1;
                 break;
 
             case WOLFCLU_OUTFILE:
@@ -101,6 +112,11 @@ int wolfCLU_Rand(int argc, char** argv)
     }
 
 
+    if (ret == WOLFCLU_SUCCESS && useBase64 && useHex) {
+        wolfCLU_LogError("-base64 and -hex are mutually exclusive");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
     if (ret == WOLFCLU_SUCCESS) {
         buf = (byte*)XMALLOC(size, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (buf == NULL) {
@@ -125,6 +141,7 @@ int wolfCLU_Rand(int argc, char** argv)
 
     /* setup output bio to stdout if not set */
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
+        outIsStdout = 1;
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bioOut == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
@@ -134,6 +151,29 @@ int wolfCLU_Rand(int argc, char** argv)
                     != WOLFSSL_SUCCESS) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
+        }
+    }
+
+    /* check and convert to hex */
+    if (ret == WOLFCLU_SUCCESS && useHex) {
+        static const char hexChars[] = "0123456789abcdef";
+        word32 hexSz = (word32)size * 2;
+        byte*  hex = (byte*)XMALLOC(hexSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        int    i;
+
+        if (hex == NULL) {
+            wolfCLU_LogError("Error malloc'ing for hex");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            for (i = 0; i < size; i++) {
+                hex[2 * i]     = hexChars[(buf[i] >> 4) & 0x0F];
+                hex[2 * i + 1] = hexChars[buf[i] & 0x0F];
+            }
+            wolfCLU_ForceZero(buf, size);
+            XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            buf  = hex;
+            size = (int)hexSz;
         }
     }
 
@@ -178,6 +218,11 @@ int wolfCLU_Rand(int argc, char** argv)
         if (wolfSSL_BIO_write(bioOut, buf, size) != size) {
             wolfCLU_LogError("Error writing out RNG data");
             ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (useHex && outIsStdout) {
+            /* Match `openssl rand -hex` and avoid the next shell prompt
+             * landing on the same line as the hex output. */
+            (void)wolfSSL_BIO_write(bioOut, "\n", 1);
         }
     }
 
