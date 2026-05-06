@@ -76,6 +76,15 @@ class RandTest(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0,
                             "-hex with -base64 must error out")
 
+    def test_hex_size_overflow_rejected(self):
+        """`-hex` must reject sizes that would overflow size*2 rather than
+        silently allocating an undersized buffer and writing past it."""
+        # 2^30 fits in int but 2^30 * 2 == 2^31 wraps signed int. The
+        # binary should refuse this size, not crash or silently truncate.
+        r = run_wolfssl("rand", "-hex", str(2**30))
+        self.assertNotEqual(r.returncode, 0,
+                            "rand -hex with overflow-prone size must error")
+
     def test_hex_flag_not_swallowed_by_help_check(self):
         """Regression: `-hex` must not match the `-h`/`-help` prefix detector.
 

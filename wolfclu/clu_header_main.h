@@ -396,6 +396,13 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
  * @param pbkVersion WOLFCLU_PBKDF2 or WOLFCLU_PBKDF1
  * @param hashType the hash type to use with key/iv generation
  * @param printOut set to 1 for debug print outs
+ * @param isBase64 set to 1 if the input/output should be base64 encoded
+ * @param noSalt set to 1 to skip the Salted__ header and salt-based
+ *               key/iv derivation (no salt written on encrypt, none read
+ *               on decrypt)
+ * @param keyType 1 for password-derived key, 2 for an explicit key/iv
+ *                supplied by the caller (skips PBKDF2/BytesToKey
+ *                derivation and forces noSalt semantics)
  */
 int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         byte* key, int keySz, char* fileIn, char* fileOut, char* hexIn,

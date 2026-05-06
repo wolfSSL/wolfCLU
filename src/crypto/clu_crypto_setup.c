@@ -69,8 +69,10 @@ static int wolfCLU_loadHexKeyInto(byte* keyOut, int keyBytes,
         WOLFCLU_LOG(WOLFCLU_E0,
                 "failed during conversion of Key, ret = %d", ret);
         /* On failure wolfCLU_hexToBin frees its own internal buffer; do not
-         * touch tmp here. */
-        return WOLFCLU_FATAL_ERROR;
+         * touch tmp here. Propagate MEMORY_E unchanged so callers (and the
+         * documented contract above) can distinguish allocation failure
+         * from a generic decode error. */
+        return (ret == MEMORY_E) ? MEMORY_E : WOLFCLU_FATAL_ERROR;
     }
 
     XMEMCPY(keyOut, tmp, keyBytes);
@@ -175,8 +177,6 @@ int wolfCLU_setup(int argc, char** argv, char action)
     const WOLFSSL_EVP_MD* hashType = wolfSSL_EVP_sha256();
 
     const WOLFSSL_EVP_CIPHER* cphr = NULL;
-    word32   ivSize     =   0;  /* IV if provided should be 2*block since
-                                 * reading a hex string passed in */
     int      option;
     int      longIndex = 1;
 
@@ -283,32 +283,48 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
         case WOLFCLU_IV:  /* IV if used must be in hex */
             {
-                char* ivString;
+                char*  ivString;
+                byte*  ivTmp = NULL;
+                word32 ivTmpSz = 0;
                 if (optarg == NULL) {
                     return WOLFCLU_FATAL_ERROR;
                 }
-                else {
-                    ivString = (char*)XMALLOC(XSTRLEN(optarg) + 1, HEAP_HINT,
+                ivString = (char*)XMALLOC(XSTRLEN(optarg) + 1, HEAP_HINT,
                         DYNAMIC_TYPE_TMP_BUFFER);
-                    if (ivString == NULL) {
-                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                        return MEMORY_E;
-                    }
-
-                    XSTRLCPY(ivString, optarg, XSTRLEN(optarg) + 1);
-                    ret = wolfCLU_hexToBin(ivString, &iv, &ivSize,
-                                       NULL, NULL, NULL,
-                                       NULL, NULL, NULL,
-                                       NULL, NULL, NULL);
-                    XFREE(ivString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                    if (ret != WOLFCLU_SUCCESS) {
-                        WOLFCLU_LOG(WOLFCLU_E0,
-                            "failed during conversion of IV, ret = %d", ret);
-                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                        return WOLFCLU_FATAL_ERROR;
-                    }
-                    ivCheck = 1;
+                if (ivString == NULL) {
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    return MEMORY_E;
                 }
+                XSTRLCPY(ivString, optarg, XSTRLEN(optarg) + 1);
+
+                /* Decode into a temporary so the pre-allocated `iv` buffer
+                 * (block bytes) isn't replaced by hexToBin's internal
+                 * allocation, which would leak the original. */
+                ret = wolfCLU_hexToBin(ivString, &ivTmp, &ivTmpSz,
+                                   NULL, NULL, NULL,
+                                   NULL, NULL, NULL,
+                                   NULL, NULL, NULL);
+                XFREE(ivString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                if (ret != WOLFCLU_SUCCESS) {
+                    WOLFCLU_LOG(WOLFCLU_E0,
+                        "failed during conversion of IV, ret = %d", ret);
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    return WOLFCLU_FATAL_ERROR;
+                }
+                if ((int)ivTmpSz != block) {
+                    WOLFCLU_LOG(WOLFCLU_E0,
+                        "IV length mismatch: expected %d bytes, got %u",
+                        block, (unsigned int)ivTmpSz);
+                    wolfCLU_ForceZero(ivTmp, ivTmpSz);
+                    XFREE(ivTmp, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    return WOLFCLU_FATAL_ERROR;
+                }
+                XMEMCPY(iv, ivTmp, ivTmpSz);
+                wolfCLU_ForceZero(ivTmp, ivTmpSz);
+                /* hexToBin allocates with NULL heap hint; free with same. */
+                XFREE(ivTmp, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+                ivCheck = 1;
             }
             break;
 

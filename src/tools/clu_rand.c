@@ -117,6 +117,15 @@ int wolfCLU_Rand(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
+    /* Fail fast on a size that would overflow the hex buffer length
+     * (size * 2). Validate before the RNG allocation so an over-large
+     * request does not first burn an O(GB) malloc and the matching
+     * RNG fill. */
+    if (ret == WOLFCLU_SUCCESS && useHex && size > INT_MAX / 2) {
+        wolfCLU_LogError("requested size too large for -hex output");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
     if (ret == WOLFCLU_SUCCESS) {
         buf = (byte*)XMALLOC(size, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         if (buf == NULL) {
@@ -154,7 +163,7 @@ int wolfCLU_Rand(int argc, char** argv)
         }
     }
 
-    /* check and convert to hex */
+    /* check and convert to hex (size * 2 was already bounded above) */
     if (ret == WOLFCLU_SUCCESS && useHex) {
         static const char hexChars[] = "0123456789abcdef";
         word32 hexSz = (word32)size * 2;

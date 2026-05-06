@@ -42,7 +42,7 @@ ENCRYPTION
         -aes-cbc-[128|192|256]
             uses AES algorithm with designated key size.
         -aes-ctr-[128|192|256]
-            uses AES Counter with designated key size. Only available if ./congigure settings support
+            uses AES Counter with designated key size. Only available if ./configure settings support
         -3des-cbc-[056|112|168]
             uses 3DES algorithm with designated key size.
         -camellia-cbc-[128|192|256]
@@ -65,7 +65,7 @@ DECRYPTION
         -aes-cbc-[128|192|256]
             uses AES algorithm with designated key size.
         -aes-ctr-[128|192|256]
-            uses AES Counter with designated key size. Only available if ./congigure settings support
+            uses AES Counter with designated key size. Only available if ./configure settings support
         -3des-cbc-[056|112|168]
             uses 3DES algorithm with designated key size.
         -camellia-cbc-[128|192|256]
