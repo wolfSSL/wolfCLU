@@ -317,6 +317,9 @@ int wolfCLU_hexToBin(const char* h1, byte** b1, word32* b1Sz,
                     const char* h3, byte** b3, word32* b3Sz,
                     const char* h4, byte** b4, word32* b4Sz);
 
+/* Return 1 if c is an ASCII hex digit ([0-9a-fA-F]), 0 otherwise. */
+int wolfCLU_isHexDigit(byte c);
+
 /* A function to free MALLOCED buffers
  *
  * @param b1 a buffer to be freed, can be set to NULL
@@ -371,8 +374,9 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
  * @param out the filename to output following en/de cryption
  * @param iv if entered must be in hex otherwise generated at run time
  * @param block size of block as determined by the algorithm being used
- * @param keyType let's decrypt know if it's using a password based key or a
- *        hexidecimal, user specified key.
+ * @param keyType selects between password-derived and explicit user key;
+ *        one of WOLFCLU_KEYTYPE_PASSWORD or WOLFCLU_KEYTYPE_USER (see
+ *        clu_optargs.h).
  */
 int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                     char* in, char* out, byte* iv, int block, int keyType);
@@ -400,9 +404,10 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
  * @param noSalt set to 1 to skip the Salted__ header and salt-based
  *               key/iv derivation (no salt written on encrypt, none read
  *               on decrypt)
- * @param keyType 1 for password-derived key, 2 for an explicit key/iv
- *                supplied by the caller (skips PBKDF2/BytesToKey
- *                derivation and forces noSalt semantics)
+ * @param keyType WOLFCLU_KEYTYPE_PASSWORD for a password-derived key, or
+ *                WOLFCLU_KEYTYPE_USER for an explicit key/iv supplied by
+ *                the caller (skips PBKDF2/BytesToKey derivation and forces
+ *                noSalt semantics). See clu_optargs.h.
  */
 int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         byte* key, int keySz, char* fileIn, char* fileOut, char* hexIn,

@@ -158,5 +158,11 @@ enum {
 #define WOLFCLU_PBKDF2 2
 #define WOLFCLU_PBKDF1 1
 
+/* keyType values used by wolfCLU_setup / wolfCLU_evp_crypto / wolfCLU_decrypt
+ * to distinguish password-derived keys from explicit user-supplied keys. */
+#define WOLFCLU_KEYTYPE_NONE     0  /* no key set yet */
+#define WOLFCLU_KEYTYPE_PASSWORD 1  /* derive key from -pwd / -pass */
+#define WOLFCLU_KEYTYPE_USER     2  /* explicit -key / -inkey supplied */
+
 #endif /* WOLFCLU_OPTARGS_H */
 

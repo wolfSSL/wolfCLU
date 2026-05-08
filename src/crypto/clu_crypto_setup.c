@@ -169,9 +169,10 @@ int wolfCLU_setup(int argc, char** argv, char action)
     int      encCheck   =   0;  /* if user is encrypting data */
     int      decCheck   =   0;  /* if user is decrypting data */
     int      inputHex   =   0;  /* if user is encrypting hexidecimal data */
-    int      keyType    =   0;  /* tells Decrypt which key it will be using
-                                 * 1 = password based key, 2 = user set key
-                                 */
+    int      keyType    = WOLFCLU_KEYTYPE_NONE;
+                                /* tells Decrypt which key it will be using;
+                                 * one of the WOLFCLU_KEYTYPE_* values from
+                                 * clu_optargs.h (NONE / PASSWORD / USER) */
     int      verbose   =   0;  /* flag to print out key/iv/salt */
     int      pbkVersion =   1;
     const WOLFSSL_EVP_MD* hashType = wolfSSL_EVP_sha256();
@@ -238,7 +239,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
             passwordSz = keySize;
             ret = wolfCLU_GetPassword((char*)pwdKey, &passwordSz, optarg);
             pwdKeyChk = 1;
-            keyType   = 1;
+            keyType   = WOLFCLU_KEYTYPE_PASSWORD;
             break;
 
         case WOLFCLU_PASSWORD:
@@ -248,7 +249,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
             else {
                 XSTRLCPY((char*)pwdKey, optarg, keySize);
                 pwdKeyChk = 1;
-                keyType   = 1;
+                keyType   = WOLFCLU_KEYTYPE_PASSWORD;
             }
             break;
 
@@ -278,7 +279,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 return ret;
             }
             keyCheck = 1;
-            keyType = 2;
+            keyType = WOLFCLU_KEYTYPE_USER;
             break;
 
         case WOLFCLU_IV:  /* IV if used must be in hex */
@@ -377,47 +378,14 @@ int wolfCLU_setup(int argc, char** argv, char action)
                     return WOLFCLU_FATAL_ERROR;
                 }
 
+                /* -inkey is "input file for key" (matches the help text and
+                 * openssl convention). The argument must name a real file;
+                 * use -key for a hex key on the command line. */
                 keyBio = wolfSSL_BIO_new_file(optarg, "rb");
                 if (keyBio == NULL) {
-                    /* Backward compatibility: prior versions accepted a hex
-                     * string directly via -inkey. Fall back to that path
-                     * only when optarg is plausibly hex of the right length
-                     * (so a wrong filename doesn't get silently parsed as a
-                     * key). */
-                    word32 argLen = (word32)XSTRLEN(optarg);
-                    int    argIsHex = (argLen == (word32)keyBytes * 2);
-                    if (argIsHex) {
-                        for (i = 0; (word32)i < argLen; i++) {
-                            char c = optarg[i];
-                            if (!((c >= '0' && c <= '9') ||
-                                  (c >= 'a' && c <= 'f') ||
-                                  (c >= 'A' && c <= 'F'))) {
-                                argIsHex = 0;
-                                break;
-                            }
-                        }
-                    }
-                    if (!argIsHex) {
-                        wolfCLU_LogError("could not open key file '%s'",
-                                optarg);
-                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                        return WOLFCLU_FATAL_ERROR;
-                    }
-
-                    WOLFCLU_LOG(WOLFCLU_L0,
-                        "warning: -inkey treating argument as a hex key"
-                        " string (no such file). Use -key for hex on the"
-                        " command line.");
-
-                    ret = wolfCLU_loadHexKeyInto(key, keyBytes,
-                            optarg, argLen);
-                    if (ret != WOLFCLU_SUCCESS) {
-                        wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                        return ret;
-                    }
-                    keyCheck = 1;
-                    keyType = 2;
-                    break;
+                    wolfCLU_LogError("could not open key file '%s'", optarg);
+                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    return WOLFCLU_FATAL_ERROR;
                 }
 
                 fileLen = wolfSSL_BIO_get_len(keyBio);
@@ -458,9 +426,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                     if (c == '\r' || c == '\n' || c == ' ' || c == '\t') {
                         continue;
                     }
-                    if (!((c >= '0' && c <= '9') ||
-                          (c >= 'a' && c <= 'f') ||
-                          (c >= 'A' && c <= 'F'))) {
+                    if (!wolfCLU_isHexDigit(c)) {
                         isHex = 0;
                         break;
                     }
@@ -522,7 +488,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 }
 
                 keyCheck = 1;
-                keyType = 2;
+                keyType = WOLFCLU_KEYTYPE_USER;
             }
             break;
 

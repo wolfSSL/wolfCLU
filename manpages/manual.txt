@@ -53,7 +53,7 @@ ENCRYPTION
         -pwd password           password to derive the key from. prompts if password option is not provided. If used, iv isn't needed
         -iv IV                  the actual iv to use. If not provided, one is randomly generated. Must be provided in hex
         -key hex                the actual key to use, supplied as a hex string on the command line. Length must match the algorithm key size. Requires -iv: when an explicit key is supplied, no salt-based key/iv derivation runs and no Salted__ header is written.
-        -inkey filename         read the key from a file. The file may hold either a hex-encoded key (whitespace within the file is ignored) or a raw binary key whose byte length matches the algorithm key size. For backward compatibility, if the argument does not name an existing file but is a hex string of the right length it is parsed as hex with a deprecation warning; new scripts should use -key for hex input on the command line.
+        -inkey filename         read the key from a file. The file may hold either a hex-encoded key (whitespace within the file is ignored) or a raw binary key whose byte length matches the algorithm key size. The argument must name a real file; use -key to pass a hex key on the command line.
 
 DECRYPTION
 
@@ -76,7 +76,7 @@ DECRYPTION
         -pwd password           password to derive the key from. prompts if password option is not provided. If used, iv isn't needed
         -iv IV                  the actual iv to use. If not provided, one is randomly generated. Must be provided in hex
         -key hex                the actual key to use, supplied as a hex string on the command line. Length must match the algorithm key size. Requires -iv: when an explicit key is supplied, no salt-based key/iv derivation runs, so the IV must be provided directly.
-        -inkey filename         read the key from a file. The file may hold either a hex-encoded key (whitespace within the file is ignored) or a raw binary key whose byte length matches the algorithm key size. For backward compatibility, if the argument does not name an existing file but is a hex string of the right length it is parsed as hex with a deprecation warning; new scripts should use -key for hex input on the command line.
+        -inkey filename         read the key from a file. The file may hold either a hex-encoded key (whitespace within the file is ignored) or a raw binary key whose byte length matches the algorithm key size. The argument must name a real file; use -key to pass a hex key on the command line.
 
 HASH
 

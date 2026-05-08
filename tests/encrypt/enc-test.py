@@ -671,30 +671,10 @@ class EncKeyInputTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
                         "round-trip with whitespace-formatted hex file failed")
 
-    def test_inkey_missing_file_falls_back_to_hex(self):
-        """When the file path doesn't exist, -inkey falls back to hex parse."""
-        enc = "inkey_fallback.enc"
-        # Defensive: a stale file matching the hex key would silently flip
-        # the test from "fall back to hex" to "read this file as a key".
-        if os.path.exists(self.KEY_HEX):
-            os.remove(self.KEY_HEX)
-        self._cleanup(enc)
-
-        # Filename that does not exist; arg happens to be a valid hex key.
-        r = run_wolfssl("-encrypt", "-aes-cbc-256",
-                        "-in", self._orig(), "-out", enc,
-                        "-inkey", self.KEY_HEX, "-iv", self.IV_HEX)
-        self.assertEqual(r.returncode, 0,
-                         "backward-compat hex via -inkey failed: " + r.stderr)
-        # The deprecation warning should appear in the output.
-        combined = (r.stdout or "") + (r.stderr or "")
-        self.assertIn("warning", combined.lower(),
-                      "expected a deprecation warning when -inkey arg is "
-                      "treated as a hex string")
-
-    def test_inkey_missing_file_non_hex_errors(self):
-        """A non-existent path that isn't a hex key must not silently fall
-        back to a hex parse — that path masks user typos."""
+    def test_inkey_missing_file_errors(self):
+        """-inkey requires an actual file. A missing path must error;
+        the previous "fall back to hex parse" behavior was removed because
+        it ambiguously interpreted typo'd filenames as keys."""
         enc = "inkey_bad.enc"
         self._cleanup(enc)
 
@@ -702,9 +682,19 @@ class EncKeyInputTest(unittest.TestCase):
                         "-in", self._orig(), "-out", enc,
                         "-inkey", "no-such-file.key", "-iv", self.IV_HEX)
         self.assertNotEqual(r.returncode, 0,
-                            "missing non-hex file must error out")
+                            "missing key file must error out")
         self.assertFalse(os.path.exists(enc),
                          "no output should be produced on missing key file")
+        # And specifically: even a 64-char hex string that happens to be a
+        # missing path must NOT be silently parsed as a hex key — use -key
+        # for that.
+        if os.path.exists(self.KEY_HEX):
+            os.remove(self.KEY_HEX)
+        r = run_wolfssl("-encrypt", "-aes-cbc-256",
+                        "-in", self._orig(), "-out", enc,
+                        "-inkey", self.KEY_HEX, "-iv", self.IV_HEX)
+        self.assertNotEqual(r.returncode, 0,
+                            "-inkey hex string must error (use -key instead)")
 
     def test_inkey_raw_binary_trailing_whitespace_byte(self):
         """Regression: a 32-byte raw binary key whose last byte is 0x0A must

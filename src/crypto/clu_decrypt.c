@@ -124,7 +124,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         ret = FREAD_ERROR;
     }
     /* replicates old pwdKey if pwdKeys match */
-    if (ret == 0 && keyType == 1) {
+    if (ret == 0 && keyType == WOLFCLU_KEYTYPE_PASSWORD) {
         if (wc_PBKDF2(key, pwdKey, (int) XSTRLEN((const char*)pwdKey),
                       salt, SALT_SIZE, CLU_4K_TYPE, size,
                       CLU_SHA256) != 0) {
@@ -132,7 +132,7 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             ret = ENCRYPT_ERROR;
         }
     }
-    else if (ret == 0 && keyType == 2) {
+    else if (ret == 0 && keyType == WOLFCLU_KEYTYPE_USER) {
         for (i = 0; i < size; i++) {
 
             /* ensure key is set */

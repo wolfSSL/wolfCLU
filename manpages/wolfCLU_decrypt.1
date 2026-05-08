@@ -61,15 +61,9 @@ This command allows data to be decrypted using ciphers and keys based on passwor
 .br
                       or a raw binary key whose byte length matches the
 .br
-                      algorithm key size. For backward compatibility, if the
+                      algorithm key size. The argument must name a real
 .br
-                      argument does not name an existing file but is a hex
-.br
-                      string of the right length it is parsed as hex with a
-.br
-                      deprecation warning; new scripts should use -key for
-.br
-                      hex input on the command line.
+                      file; use -key to pass a hex key on the command line.
 .SH BUGS
 No known bugs at this time.
 .SH AUTHOR

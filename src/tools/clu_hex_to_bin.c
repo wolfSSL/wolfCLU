@@ -29,6 +29,17 @@
 
 #include <wolfclu/clu_header_main.h>
 
+/* Return 1 if c is an ASCII hex digit, 0 otherwise. Provided as a shared
+ * predicate for the per-character hex-class checks in wolfCLU; paths that
+ * decode whole strings should still use wolfCLU_hexToBin / Base16_Decode
+ * rather than open-coding their own scan. */
+int wolfCLU_isHexDigit(byte c)
+{
+    return (c >= '0' && c <= '9') ||
+           (c >= 'a' && c <= 'f') ||
+           (c >= 'A' && c <= 'F');
+}
+
 /* free up to 5 binary buffers using wolfssl abstraction layer */
 void wolfCLU_freeBins(byte* b1, byte* b2, byte* b3, byte* b4, byte* b5)
 {

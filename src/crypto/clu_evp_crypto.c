@@ -38,12 +38,12 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         const WOLFSSL_EVP_MD* hashType, int printOut, int isBase64, int noSalt,
         int keyType)
 {
-    /* keyType == 2 means the caller supplied -key/-inkey (and -iv): the
-     * key+iv buffers already hold the user's material, and the cipher must
-     * use them directly with no salt-based PBKDF2/BytesToKey derivation
+    /* WOLFCLU_KEYTYPE_USER means the caller supplied -key/-inkey (and -iv):
+     * the key+iv buffers already hold the user's material, and the cipher
+     * must use them directly with no salt-based PBKDF2/BytesToKey derivation
      * and no Salted__ header in the output. Treat this case like an
      * implicit -nosalt for everything except the algorithm choice. */
-    int userKey = (keyType == 2);
+    int userKey = (keyType == WOLFCLU_KEYTYPE_USER);
     if (userKey) {
         noSalt = 1;
     }
