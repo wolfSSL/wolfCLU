@@ -434,6 +434,18 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
         int size);
 
 
+/* stream-hash data read from a BIO using wc_HashInit/Update/Final
+ *
+ * @param bioIn       input BIO to read data from in MAX_IO_CHUNK_SZ chunks
+ * @param hashType    wolfCrypt hash type (e.g. WC_HASH_TYPE_SHA256)
+ * @param outDigest   buffer that receives the digest
+ * @param outDigestSz on entry, capacity of outDigest; on success, the actual
+ *                    digest length
+ */
+int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
+        byte* outDigest, word32* outDigestSz);
+
+
 /**
  * @brief Used to create a hash from a specified algorithm
  *

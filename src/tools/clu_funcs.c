@@ -1659,3 +1659,66 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
     return WOLFCLU_FATAL_ERROR;
 
 }
+
+
+/* Stream-hash data read from bioIn using hashType and write the digest to
+ * outDigest. On entry *outDigestSz is the capacity of outDigest; on success
+ * it is updated to the actual digest length. */
+int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
+        byte* outDigest, word32* outDigestSz)
+{
+    byte chunk[MAX_IO_CHUNK_SZ];
+    wc_HashAlg hashAlg;
+    int hashInit = 0;
+    int bytesRead;
+    int dsz;
+    int ret = WOLFCLU_SUCCESS;
+
+    if (bioIn == NULL || outDigest == NULL || outDigestSz == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    dsz = wc_HashGetDigestSize(hashType);
+    if (dsz <= 0 || (word32)dsz > *outDigestSz) {
+        wolfCLU_LogError("Bad digest size for selected hash");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    if (wc_HashInit(&hashAlg, hashType) != 0) {
+        wolfCLU_LogError("Unable to initialize hash");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    hashInit = 1;
+
+    while (ret == WOLFCLU_SUCCESS) {
+        bytesRead = wolfSSL_BIO_read(bioIn, chunk, sizeof(chunk));
+        if (bytesRead < 0) {
+            wolfCLU_LogError("Error reading data");
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+        else if (bytesRead == 0) {
+            break;
+        }
+        if (wc_HashUpdate(&hashAlg, hashType, chunk, (word32)bytesRead) != 0) {
+            wolfCLU_LogError("Hash update failed");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wc_HashFinal(&hashAlg, hashType, outDigest) != 0) {
+            wolfCLU_LogError("Hash finalization failed");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            *outDigestSz = (word32)dsz;
+        }
+    }
+
+    if (hashInit) {
+        wc_HashFree(&hashAlg, hashType);
+    }
+
+    return ret;
+}

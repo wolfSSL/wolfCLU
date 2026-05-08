@@ -27,157 +27,250 @@
 
 /*
  * hashing function
- * If bioIn is null then read 8192 max bytes from stdin
- * If bioOut is null then print to stdout
- *
+ * Stream stdin in MAX_IO_CHUNK_SZ blocks. On fallback to base64 enc/dec:
+ * If bioIn is null then read 8192 max bytes from stdin. If bioOut is null then
+ * print to stdout
  */
 int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
         int size)
 {
 #ifdef HAVE_BLAKE2
     Blake2b hash;               /* blake2b declaration */
+    byte    chunk[MAX_IO_CHUNK_SZ];
 #endif
-    byte*   input;              /* input buffer */
-    byte*   output;             /* output buffer */
-
-    int     i  =   0;           /* loop variable */
+    byte*   input = NULL;
+    byte*   output = NULL;
     int     ret = WOLFCLU_SUCCESS;
-    int     inputSz = MAX_STDINSZ;
+    int     outSz;
+    int     handled = 0;
+    enum wc_HashType hashType = WC_HASH_TYPE_NONE;
     WOLFSSL_BIO* tmp;
 
     if (bioIn == NULL) {
         tmp = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
-        if (tmp != NULL)
-            wolfSSL_BIO_set_fp(tmp, stdin, BIO_NOCLOSE);
+        if (tmp == NULL) {
+            return MEMORY_E;
+        }
+        wolfSSL_BIO_set_fp(tmp, stdin, BIO_NOCLOSE);
     }
     else {
-        /* get data size using raw FILE pointer and seek */
-        XFILE f;
         tmp = bioIn;
-        if (wolfSSL_BIO_get_fp(tmp, &f) != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Unable to get raw file pointer");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS && XFSEEK(f, 0, XSEEK_END) != 0) {
-            wolfCLU_LogError("Unable to seek end of file");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS) {
-            inputSz = (word32)XFTELL(f);
-            wolfSSL_BIO_reset(tmp);
-        }
     }
 
-    input = (byte*)XMALLOC(inputSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (input == NULL) {
+    /* Output buffer size: digest size for hash algorithms (default is
+     * WC_MAX_DIGEST_SIZE), or caller-provided size for base64. */
+    outSz = (size == 0) ? WC_MAX_DIGEST_SIZE : size;
+    output = (byte*)XMALLOC(outSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (output == NULL) {
         if (bioIn == NULL)
             wolfSSL_BIO_free(tmp);
         return MEMORY_E;
     }
-    inputSz = wolfSSL_BIO_read(tmp, input, inputSz);
-    if (bioIn == NULL)
-        wolfSSL_BIO_free(tmp);
+    XMEMSET(output, 0, outSz);
 
-    /* if size not provided then use input length to find max possible size */
-    if (size == 0) {
-    #ifndef NO_CODING
-        if (Base64_Encode(input, inputSz, NULL, (word32*)&size) !=
-                LENGTH_ONLY_E) {
-            wolfCLU_freeBins(input, NULL, NULL, NULL, NULL);
-            return BAD_FUNC_ARG;
-        }
-    #endif
-        size = (size < WC_MAX_DIGEST_SIZE) ? WC_MAX_DIGEST_SIZE : size;
-    }
+    /* Chunked reads fed to Init/Update/Final. No upfront file-size
+     * determination, so files larger than UINT32_MAX are handled correctly. */
 
-    output = XMALLOC(size, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (output == NULL) {
-        wolfCLU_freeBins(input, NULL, NULL, NULL, NULL);
-        return MEMORY_E;
-    }
-    XMEMSET(output, 0, size);
-
-    /* hashes using accepted algorithm */
 #ifndef NO_MD5
-    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "md5") == 0) {
-        ret = wc_Md5Hash(input, inputSz, output);
-    }
-#endif
-#ifndef NO_SHA256
-    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "sha256") == 0) {
-        ret = wc_Sha256Hash(input, inputSz, output);
-    }
-#endif
-#ifdef WOLFSSL_SHA384
-    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "sha384") == 0) {
-        ret = wc_Sha384Hash(input, inputSz, output);
-    }
-#endif
-#ifdef WOLFSSL_SHA512
-    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "sha512") == 0) {
-        ret = wc_Sha512Hash(input, inputSz, output);
-    }
+    if (XSTRCMP(alg, "md5") == 0)
+        hashType = WC_HASH_TYPE_MD5;
 #endif
 #ifndef NO_SHA
-    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "sha") == 0) {
-        ret = wc_ShaHash(input, inputSz, output);
-    }
+    if (XSTRCMP(alg, "sha") == 0)
+        hashType = WC_HASH_TYPE_SHA;
 #endif
+#ifndef NO_SHA256
+    if (XSTRCMP(alg, "sha256") == 0)
+        hashType = WC_HASH_TYPE_SHA256;
+#endif
+#ifdef WOLFSSL_SHA384
+    if (XSTRCMP(alg, "sha384") == 0)
+        hashType = WC_HASH_TYPE_SHA384;
+#endif
+#ifdef WOLFSSL_SHA512
+    if (XSTRCMP(alg, "sha512") == 0)
+        hashType = WC_HASH_TYPE_SHA512;
+#endif
+
+    if (hashType != WC_HASH_TYPE_NONE) {
+        word32 digestSz = (word32)outSz;
+        ret = wolfCLU_streamHashBio(tmp, hashType, output, &digestSz);
+        if (ret == WOLFCLU_SUCCESS) {
+            outSz = (int)digestSz;
+        }
+        handled = 1;
+    }
+
 #ifdef HAVE_BLAKE2
-    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "blake2b") == 0) {
-        ret = wc_InitBlake2b(&hash, size);
-        if (ret != 0) return ret;
-        ret = wc_Blake2bUpdate(&hash, input, inputSz);
-        if (ret != 0) return ret;
-        ret = wc_Blake2bFinal(&hash, output, size);
-        if (ret != 0) return ret;
+    if (!handled && ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "blake2b") == 0) {
+        int bytesRead;
+        if (wc_InitBlake2b(&hash, outSz) != 0) {
+            wolfCLU_LogError("Unable to initialize blake2b");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        while (ret == WOLFCLU_SUCCESS) {
+            bytesRead = wolfSSL_BIO_read(tmp, chunk, sizeof(chunk));
+            if (bytesRead < 0) {
+                wolfCLU_LogError("Error reading data");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
+            else if (bytesRead == 0) {
+                break;
+            }
+            if (wc_Blake2bUpdate(&hash, chunk, (word32)bytesRead) != 0) {
+                wolfCLU_LogError("Blake2b update failed");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        if (ret == WOLFCLU_SUCCESS) {
+            if (wc_Blake2bFinal(&hash, output, outSz) != 0) {
+                wolfCLU_LogError("Blake2b finalization failed");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        handled = 1;
     }
 #endif
 
 #ifndef NO_CODING
+    /* Buffered fall-back for base64 enc/dec (not a hash, so streaming
+     * Init/Update/Final doesn't apply). size is taken from XFTELL
+     * but bounded to INT_MAX */
+    if (!handled && ret == WOLFCLU_SUCCESS) {
+        long fileLen = MAX_STDINSZ;
+        int  inputSz = MAX_STDINSZ;
+        XFILE f;
+
+        if (bioIn != NULL) {
+            if (wolfSSL_BIO_get_fp(tmp, &f) != WOLFSSL_SUCCESS) {
+                wolfCLU_LogError("Unable to get raw file pointer");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            if (ret == WOLFCLU_SUCCESS && XFSEEK(f, 0, XSEEK_END) != 0) {
+                wolfCLU_LogError("Unable to seek end of file");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            if (ret == WOLFCLU_SUCCESS) {
+                fileLen = XFTELL(f);
+                wolfSSL_BIO_reset(tmp);
+                if (fileLen < 0 || fileLen > INT_MAX) {
+                    wolfCLU_LogError("Input too large for base64 buffer");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    inputSz = (int)fileLen;
+                }
+            }
+        }
+
+        if (ret == WOLFCLU_SUCCESS) {
+            input = (byte*)XMALLOC(inputSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (input == NULL) {
+                ret = MEMORY_E;
+            }
+        }
+        if (ret == WOLFCLU_SUCCESS) {
+            inputSz = wolfSSL_BIO_read(tmp, input, inputSz);
+            if (inputSz < 0) {
+                wolfCLU_LogError("Error reading data");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+
 #ifdef WOLFSSL_BASE64_ENCODE
-    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "base64enc") == 0) {
-        ret = Base64_Encode(input, inputSz, output, (word32*)&size);
-    }
+        if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "base64enc") == 0) {
+            if (size == 0) {
+                if (Base64_Encode(input, inputSz, NULL, (word32*)&outSz)
+                        != LENGTH_ONLY_E) {
+                    ret = BAD_FUNC_ARG;
+                }
+                else {
+                    XFREE(output, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    output = (byte*)XMALLOC(outSz, HEAP_HINT,
+                                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (output == NULL) {
+                        ret = MEMORY_E;
+                    }
+                    else {
+                        XMEMSET(output, 0, outSz);
+                    }
+                }
+            }
+            if (ret == WOLFCLU_SUCCESS) {
+                if (Base64_Encode(input, inputSz, output, (word32*)&outSz)
+                        != 0) {
+                    wolfCLU_LogError("Base64 encode failed");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                handled = 1;
+            }
+        }
 #endif /* WOLFSSL_BASE64_ENCODE */
-    if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "base64dec") == 0) {
-        ret = Base64_Decode(input, inputSz, output, (word32*)&size);
+        if (ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "base64dec") == 0) {
+            if (size == 0) {
+                XFREE(output, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                outSz = inputSz;
+                output = (byte*)XMALLOC(outSz, HEAP_HINT,
+                                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (output == NULL) {
+                    ret = MEMORY_E;
+                }
+                else {
+                    XMEMSET(output, 0, outSz);
+                }
+            }
+            if (ret == WOLFCLU_SUCCESS) {
+                if (Base64_Decode(input, inputSz, output, (word32*)&outSz)
+                        != 0) {
+                    wolfCLU_LogError("Base64 decode failed");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                handled = 1;
+            }
+        }
     }
 #endif /* !NO_CODING */
 
-    if (ret == 0) {
+    if (bioIn == NULL) {
+        wolfSSL_BIO_free(tmp);
+    }
+
+    if (ret == WOLFCLU_SUCCESS && handled) {
         if (bioOut != NULL) {
-            if (wolfSSL_BIO_write(bioOut, output, size) == size) {
-                ret = WOLFCLU_SUCCESS;
-            }
-            else {
+            if (wolfSSL_BIO_write(bioOut, output, outSz) != outSz) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         else {
+            int i;
             /* write hashed output to terminal */
             tmp = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
-            if (tmp != NULL) {
-                wolfSSL_BIO_set_fp(tmp, stdout, BIO_NOCLOSE);
-
-                for (i = 0; i < size; i++)
-                    wolfSSL_BIO_printf(tmp, "%02x", output[i]);
-                wolfSSL_BIO_printf(tmp, "\n");
-                wolfSSL_BIO_free(tmp);
-                ret = WOLFCLU_SUCCESS;
+            if (tmp == NULL) {
+                ret = MEMORY_E;
             }
             else {
-                ret = MEMORY_E;
+                wolfSSL_BIO_set_fp(tmp, stdout, BIO_NOCLOSE);
+                for (i = 0; i < outSz; i++) {
+                    wolfSSL_BIO_printf(tmp, "%02x", output[i]);
+                }
+                wolfSSL_BIO_printf(tmp, "\n");
+                wolfSSL_BIO_free(tmp);
             }
         }
     }
+    else if (!handled && ret == WOLFCLU_SUCCESS) {
+        wolfCLU_LogError("Unrecognized algorithm: %s", alg);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
 
-    /* closes the opened files and frees the memory */
-    XMEMSET(input, 0, inputSz);
-    XMEMSET(output, 0, size);
-    wolfCLU_freeBins(input, output, NULL, NULL, NULL);
+    if (input != NULL) {
+        XFREE(input, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (output != NULL) {
+        XMEMSET(output, 0, outSz);
+        XFREE(output, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
     return ret;
 }
 
