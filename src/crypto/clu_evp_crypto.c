@@ -35,8 +35,18 @@
 int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         byte* key, int keySz, char* fileIn, char* fileOut, char* hexIn,
         byte* iv, int hexOut, int enc, int pbkVersion,
-        const WOLFSSL_EVP_MD* hashType, int printOut, int isBase64, int noSalt)
+        const WOLFSSL_EVP_MD* hashType, int printOut, int isBase64, int noSalt,
+        int keyType)
 {
+    /* WOLFCLU_KEYTYPE_USER means the caller supplied -key/-inkey (and -iv):
+     * the key+iv buffers already hold the user's material, and the cipher
+     * must use them directly with no salt-based PBKDF2/BytesToKey derivation
+     * and no Salted__ header in the output. Treat this case like an
+     * implicit -nosalt for everything except the algorithm choice. */
+    int userKey = (keyType == WOLFCLU_KEYTYPE_USER);
+    if (userKey) {
+        noSalt = 1;
+    }
     WOLFSSL_BIO *out = NULL;
     WOLFSSL_BIO *in  = NULL;
     WOLFSSL_BIO *tmp = NULL;
@@ -157,8 +167,10 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         }
     }
 
-    /* stretches pwdKey */
-    if (ret == WOLFCLU_SUCCESS) {
+    /* stretches pwdKey (skipped when the caller supplied an explicit key
+     * via -key/-inkey: there is no password to derive from, and the key/iv
+     * buffers already hold the user's material). */
+    if (ret == WOLFCLU_SUCCESS && !userKey) {
         if (pbkVersion == WOLFCLU_PBKDF2) {
         #ifdef HAVE_FIPS
             if (XSTRLEN((const char*)pwdKey) < HMAC_FIPS_MIN_KEY) {
