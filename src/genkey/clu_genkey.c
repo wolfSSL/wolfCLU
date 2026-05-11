@@ -1182,10 +1182,14 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 XFCLOSE(file);
                 file = NULL;
+                wolfCLU_ForceZero(derBuf, keySz);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 derBuf = NULL;
-                XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
-                pemBuf = NULL;
+                if (pemBuf != NULL) {
+                    wolfCLU_ForceZero(pemBuf, pemBufSz);
+                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+                    pemBuf = NULL;
+                }
 
                 FALL_THROUGH;
             case PUB_ONLY_FILE:
@@ -1426,10 +1430,14 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 XFCLOSE(file);
                 file = NULL;
+                wolfCLU_ForceZero(derBuf, keySz);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 derBuf = NULL;
-                XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
-                pemBuf = NULL;
+                if (pemBuf != NULL) {
+                    wolfCLU_ForceZero(pemBuf, pemBufSz);
+                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+                    pemBuf = NULL;
+                }
 
                 FALL_THROUGH;
             case PUB_ONLY_FILE:
@@ -1437,10 +1445,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                 WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
-                /* free any prior derBuf (from PRIV path or initial alloc)
-                 * before reallocating for the public key */
                 if (derBuf != NULL) {
-                    wolfCLU_ForceZero(derBuf, keySz);
                     XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     derBuf = NULL;
                 }

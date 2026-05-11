@@ -180,8 +180,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
                 bioIn = wolfSSL_BIO_new_mem_buf(stdinKeyBuf, keyLen);
 
                 if (bioIn == NULL) {
-                    wolfCLU_LogError("Unable to open pkcs8 file %s",
-                            optarg);
+                    wolfCLU_LogError("Error creating BIO for stdin key buf");
                     ret = MEMORY_E;
                 }
                 else if (pass == NULL) {
