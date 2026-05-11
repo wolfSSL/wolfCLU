@@ -124,6 +124,7 @@ extern "C" {
 #define MAX_TERM_WIDTH 80
 #define MAX_THREADS 64
 #define MAX_STDINSZ 8192
+#define MAX_IO_CHUNK_SZ 4096   /* I/O chunk size for streaming reads */
 #ifndef MAX_FILENAME_SZ
     #define MAX_FILENAME_SZ 256
 #endif
