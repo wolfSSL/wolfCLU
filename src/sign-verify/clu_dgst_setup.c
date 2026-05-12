@@ -173,10 +173,6 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     void* key  = NULL;
     byte digest[MAX_DER_DIGEST_SZ];
     word32 digestSz = 0;
-    wc_HashAlg hashAlg;
-    byte chunk[MAX_IO_CHUNK_SZ];
-    int chunkBytes;
-    int dsz;
     word32 sigSz  = 0;
     int keySz  = 0;
     int option;

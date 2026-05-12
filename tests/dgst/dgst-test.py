@@ -3,7 +3,9 @@
 
 import filecmp
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -187,6 +189,107 @@ class DgstLargeFileTest(unittest.TestCase):
 
         self.assertTrue(filecmp.cmp(self.LARGE_FILE, dec_file, shallow=False),
                         "Decryption of large file failed")
+
+
+class LargeFileDgstTest(unittest.TestCase):
+    """A signature over a >4 GiB file must NOT verify a tampered copy.
+
+    Guards against truncating the file size to word32 in clu_dgst_setup.c,
+    which caused only the first 4 GiB to be hashed before sign/verify.
+
+    Defaults to sha256 + RSA. Override with:
+      WOLFCLU_LARGE_DGST_ALG=<alg|all>   (md5, sha, sha256, sha384, sha512)
+      WOLFCLU_LARGE_DGST_KEY=<rsa|ecc|all>
+    """
+
+    LARGE_FILE_SIZE = 4_831_838_208  # 4.5 GiB, well above UINT32_MAX
+    CANDIDATE_ALGS = ["md5", "sha", "sha256", "sha384", "sha512"]
+    DEFAULT_ALG = "sha256"
+    KEY_PAIRS = {
+        "rsa": ("server-key.pem", "server-keyPub.pem"),
+        "ecc": ("ecc-key.pem", "ecc-keyPub.pem"),
+    }
+    DEFAULT_KEY = "rsa"
+
+    @classmethod
+    def _probe_supported(cls, algs):
+        probe_input = os.path.join(CERTS_DIR, "ca-cert.pem")
+        supported = []
+        for alg in algs:
+            r = run_wolfssl(alg, probe_input)
+            if r.returncode == 0:
+                supported.append(alg)
+        return supported
+
+    @classmethod
+    def setUpClass(cls):
+        if not os.path.isdir(CERTS_DIR):
+            raise unittest.SkipTest("certs directory not found")
+
+        requested_alg = os.environ.get("WOLFCLU_LARGE_DGST_ALG",
+                                       cls.DEFAULT_ALG)
+        if requested_alg == "all":
+            cls.algs = cls._probe_supported(cls.CANDIDATE_ALGS)
+        else:
+            cls.algs = cls._probe_supported([requested_alg])
+        if not cls.algs:
+            raise unittest.SkipTest(
+                "no supported hash algorithm for "
+                "WOLFCLU_LARGE_DGST_ALG={}".format(requested_alg))
+
+        requested_key = os.environ.get("WOLFCLU_LARGE_DGST_KEY",
+                                       cls.DEFAULT_KEY)
+        if requested_key == "all":
+            cls.key_kinds = list(cls.KEY_PAIRS.keys())
+        elif requested_key in cls.KEY_PAIRS:
+            cls.key_kinds = [requested_key]
+        else:
+            raise unittest.SkipTest(
+                "unknown WOLFCLU_LARGE_DGST_KEY={}".format(requested_key))
+
+        cls._tmpdir = tempfile.mkdtemp(prefix="wolfclu-large-dgst-")
+        cls.original = os.path.join(cls._tmpdir, "original.bin")
+        cls.tampered = os.path.join(cls._tmpdir, "tampered.bin")
+        try:
+            for p in (cls.original, cls.tampered):
+                with open(p, "wb") as f:
+                    f.truncate(cls.LARGE_FILE_SIZE)
+            with open(cls.tampered, "r+b") as f:
+                f.seek(-1, os.SEEK_END)
+                f.write(b"X")
+        except OSError as e:
+            shutil.rmtree(cls._tmpdir, ignore_errors=True)
+            raise unittest.SkipTest("could not create sparse files: {}".format(e))
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(getattr(cls, "_tmpdir", ""), ignore_errors=True)
+
+    def test_tampered_last_byte_fails_verify(self):
+        for alg in self.algs:
+            for key_kind in self.key_kinds:
+                priv_name, pub_name = self.KEY_PAIRS[key_kind]
+                priv_key = os.path.join(CERTS_DIR, priv_name)
+                pub_key = os.path.join(CERTS_DIR, pub_name)
+                sig_file = os.path.join(
+                    self._tmpdir, "{}-{}.sig".format(alg, key_kind))
+                with self.subTest(alg=alg, key=key_kind):
+                    r = run_wolfssl(
+                        "dgst", "-" + alg, "-sign", priv_key,
+                        "-out", sig_file, self.original, timeout=1800)
+                    self.assertEqual(r.returncode, 0, r.stderr)
+
+                    r = run_wolfssl(
+                        "dgst", "-" + alg, "-verify", pub_key,
+                        "-signature", sig_file, self.original,
+                        timeout=1800)
+                    self.assertEqual(r.returncode, 0, r.stderr)
+
+                    r = run_wolfssl(
+                        "dgst", "-" + alg, "-verify", pub_key,
+                        "-signature", sig_file, self.tampered,
+                        timeout=1800)
+                    self.assertNotEqual(r.returncode, 0)
 
 
 class DgstSignVerifyRoundtripTest(unittest.TestCase):
