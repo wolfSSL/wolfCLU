@@ -1182,10 +1182,14 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 XFCLOSE(file);
                 file = NULL;
+                wolfCLU_ForceZero(derBuf, keySz);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 derBuf = NULL;
-                XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
-                pemBuf = NULL;
+                if (pemBuf != NULL) {
+                    wolfCLU_ForceZero(pemBuf, pemBufSz);
+                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+                    pemBuf = NULL;
+                }
 
                 FALL_THROUGH;
             case PUB_ONLY_FILE:
@@ -1426,10 +1430,14 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 XFCLOSE(file);
                 file = NULL;
+                wolfCLU_ForceZero(derBuf, keySz);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 derBuf = NULL;
-                XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
-                pemBuf = NULL;
+                if (pemBuf != NULL) {
+                    wolfCLU_ForceZero(pemBuf, pemBufSz);
+                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+                    pemBuf = NULL;
+                }
 
                 FALL_THROUGH;
             case PUB_ONLY_FILE:
@@ -1437,6 +1445,10 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                 WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
+                if (derBuf != NULL) {
+                    XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    derBuf = NULL;
+                }
                 derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
                                 DYNAMIC_TYPE_TMP_BUFFER);
                 if (derBuf == NULL) {
@@ -1564,6 +1576,7 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
     if (n_write != privSz) {
         fprintf(stderr, "error: wrote %zu, expected %d: %d\n", n_write, privSz,
                 ferror(file));
+        fclose(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
@@ -1584,6 +1597,7 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
     buff = malloc(privSz);
     if (buff == NULL) {
         fprintf(stderr, "error: malloc(%d) failed\n", privSz);
+        fclose(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
@@ -1595,6 +1609,7 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
         fprintf(stderr, "error: read %zu, expected %zu: %d\n", n_read, n_write,
                 ferror(file));
         free(buff);
+        fclose(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
@@ -1604,6 +1619,7 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
 
     if (n_cmp != 0) {
         fprintf(stderr, "error: write data was corrupted: %d\n", n_cmp);
+        fclose(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
@@ -1641,6 +1657,7 @@ enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte * priv,
     if (n_read != privSz) {
         fprintf(stderr, "error: read %zu, expected %d: %d\n", n_read, privSz,
                 ferror(file));
+        fclose(file);
         return WC_XMSS_RC_READ_FAIL;
     }
 

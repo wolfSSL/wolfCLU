@@ -47,6 +47,11 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
     XMEMSET(keyOutFName, 0, MAX_FILENAME_SZ);
 
+    if (argc < 3) {
+        wolfCLU_LogError("ERROR: missing key type argument");
+        wolfCLU_genKeyHelp();
+        return USER_INPUT_ERROR;
+    }
     keyType = argv[2];
 
     ret = wc_InitRng(&rng);

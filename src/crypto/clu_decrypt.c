@@ -217,8 +217,10 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                 wolfCLU_LogError("bad length %d found", length);
                 ret = -1;
             }
-            /* reset tempMax for smaller decryption */
-            XFWRITE(output, 1, length, outFile);
+            else {
+                /* reset tempMax for smaller decryption */
+                XFWRITE(output, 1, length, outFile);
+            }
         }
         else {
             if (output != NULL)
