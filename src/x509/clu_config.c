@@ -408,9 +408,29 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                     token = XSTRTOK(c->value, ".", &ptr);
 
                     while (token != NULL) {
-                        decoded[decodedCount] = XATOI(token);
+                        int n;
+
+                        if (decodedCount >= ASN1_OID_DOTTED_MAX_SZ) {
+                            wolfCLU_LogError("RID has too many components "
+                                    "(max %d): %s",
+                                    ASN1_OID_DOTTED_MAX_SZ, c->value);
+                            ret = WOLFCLU_FATAL_ERROR;
+                            break;
+                        }
+                        n = XATOI(token);
+                        if (n < 0 || n > 0xFFFF) {
+                            wolfCLU_LogError("RID component out of range "
+                                    "[0, 65535]: %s", token);
+                            ret = WOLFCLU_FATAL_ERROR;
+                            break;
+                        }
+                        decoded[decodedCount] = (word16)n;
                         decodedCount++;
                         token = XSTRTOK(NULL, ".", &ptr);
+                    }
+
+                    if (ret != WOLFCLU_SUCCESS) {
+                        break;
                     }
 
                     if (wc_EncodeObjectId(decoded, decodedCount, oid, &oidSz)

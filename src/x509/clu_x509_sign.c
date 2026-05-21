@@ -657,7 +657,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
                 key   = XSTRTOK(token, "=", &saveptr);
                 value = XSTRTOK(NULL,  "=", &saveptr);
 
-                if (!(key == NULL && value ==NULL)) {
+                if (key != NULL && value != NULL) {
                     if (XSTRCMP(key, "C") == 0) {
                         XSTRLCPY(newCert.subject.country, value, CTC_NAME_SIZE);
                     }
@@ -1416,10 +1416,15 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             }
 
             current = wolfCLU_ParseX509NameString(subj, (int)XSTRLEN(subj));
-            if (wolfSSL_X509_NAME_cmp(subject, current) == 0) {
+            if (current != NULL &&
+                wolfSSL_X509_NAME_cmp(subject, current) == 0) {
+                wolfSSL_X509_NAME_free(current);
                 wolfCLU_LogError("Subject name already exists");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
+            }
+            if (current != NULL) {
+                wolfSSL_X509_NAME_free(current);
             }
         }
     }
