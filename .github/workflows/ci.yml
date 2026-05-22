@@ -52,7 +52,11 @@ jobs:
         working-directory: ./wolfssl
         run: |
           ./autogen.sh
-          ./configure ${{ matrix.config }} ${{ matrix.sanitize }} --prefix=$GITHUB_WORKSPACE/build-dir
+          # Lower the WC_SIG_MIN_HASH_TYPE floor (default SHA-256 on master
+          # post-PR-10496) back to MD5 for test cases.
+          ./configure ${{ matrix.config }} ${{ matrix.sanitize }} \
+              CPPFLAGS="-DWC_SIG_MIN_HASH_TYPE=WC_HASH_TYPE_MD5" \
+              --prefix=$GITHUB_WORKSPACE/build-dir
           make -j
           make install
 

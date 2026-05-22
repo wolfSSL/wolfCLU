@@ -407,12 +407,18 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     /* if not signing then do verification */
     if (ret == WOLFCLU_SUCCESS && signing == 0) {
-        if (wc_SignatureVerify(hashType, sigType, (const byte*)data, dataSz,
-                    (const byte*)sig, sigSz, key, keySz) == 0) {
+        int verifyRet = wc_SignatureVerify(hashType, sigType,
+                    (const byte*)data, dataSz, (const byte*)sig, sigSz,
+                    key, keySz);
+        if (verifyRet == 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "Verify OK");
         }
         else {
             wolfCLU_LogError("Verification failure");
+            if (hashType == WC_HASH_TYPE_MD5 && verifyRet == BAD_FUNC_ARG) {
+                WOLFCLU_LOG(WOLFCLU_L0,
+                    "Note: MD5 below default min sig hash on wolfSSL > 5.9.1");
+            }
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -446,11 +452,17 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             }
         }
 
-        if (ret == WOLFCLU_SUCCESS &&
-                wc_SignatureGenerate(hashType, sigType, (const byte*)data,
-                    dataSz, sig, &sigSz, key, keySz, &rng) != 0) {
-            wolfCLU_LogError("Error getting signature");
-            ret = WOLFCLU_FATAL_ERROR;
+        if (ret == WOLFCLU_SUCCESS) {
+            int signRet = wc_SignatureGenerate(hashType, sigType,
+                    (const byte*)data, dataSz, sig, &sigSz, key, keySz, &rng);
+            if (signRet != 0) {
+                wolfCLU_LogError("Error getting signature");
+                if (hashType == WC_HASH_TYPE_MD5 && signRet == BAD_FUNC_ARG) {
+                    WOLFCLU_LOG(WOLFCLU_L0,
+                        "Note: MD5 below default min sig hash on wolfSSL > 5.9.1");
+                }
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
 
         /* write out the signature */
