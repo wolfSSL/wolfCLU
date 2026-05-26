@@ -10,6 +10,10 @@
 #define NO_MULTIBYTE_PRINT
 #define WC_NO_HARDEN
 
+/* Lower the wc_Signature min-hash floor back to MD5 for the dgst MD5
+ * test cases. */
+#define WC_SIG_MIN_HASH_TYPE WC_HASH_TYPE_MD5
+
 /* wolfSSL's default Windows XINET_PTON casts to PCWSTR which breaks
  * with narrow char* strings.  Use the narrow-string InetPtonA instead. */
 #define XINET_PTON(a,b,c) InetPtonA((a),(b),(c))

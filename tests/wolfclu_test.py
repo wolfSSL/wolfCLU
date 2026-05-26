@@ -77,6 +77,12 @@ def run_wolfssl(*args, stdin_data=None, timeout=60):
     return subprocess.run(cmd, **kwargs)
 
 
+def is_fips():
+    """True when linked against a FIPS wolfSSL build (per `wolfssl -v`)."""
+    r = run_wolfssl("-v")
+    return "FIPS" in (r.stdout + r.stderr)
+
+
 def test_main():
     """Run tests with automake-compatible exit codes.
 

@@ -8,7 +8,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
 
 
 def _tmp(name):
@@ -91,11 +91,6 @@ RID.2 = surname
 email.1 = facts@wolfssl.com
 URI.1 = facts@wolfssl.com
 """
-
-
-def _is_fips():
-    r = run_wolfssl("-v")
-    return "FIPS" in (r.stdout + r.stderr)
 
 
 def _cleanup(*files):
@@ -504,7 +499,7 @@ class TestReqFIPS(unittest.TestCase):
 
     def test_newkey_with_passout_stdin(self):
         """req -newkey rsa:2048 with -passout stdin produces ENCRYPTED key."""
-        if _is_fips():
+        if is_fips():
             self.skipTest("FIPS build")
         tmp = _tmp("test_req_fips_passout.cert")
         self._clean(tmp)
@@ -517,7 +512,7 @@ class TestReqFIPS(unittest.TestCase):
 
     def test_newkey_keyout_with_passout(self):
         """req -newkey -keyout with -passout produces encrypted key."""
-        if _is_fips():
+        if is_fips():
             self.skipTest("FIPS build")
         tmp = _tmp("test_req_fips_keyout.cert")
         key = _tmp("test_req_fips_newkey.pem")
@@ -534,7 +529,7 @@ class TestReqFIPS(unittest.TestCase):
 
     def test_newkey_with_passout_keyout(self):
         """req -newkey rsa:2048 -keyout with -passout stdin."""
-        if _is_fips():
+        if is_fips():
             self.skipTest("FIPS build")
         tmp = _tmp("test_req_fips_ko2.cert")
         key = _tmp("test_req_fips_ko2.pem")
