@@ -404,13 +404,62 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                 if ((ridObj = wolfSSL_OBJ_txt2obj(c->value, 0)) == NULL) {
             #if defined(HAVE_OID_ENCODING) && !defined(NO_WC_ENCODE_OBJECT_ID)
                     /* If RID value is not named OID, manually encode
-                     * dotted OID into byte array */
-                    token = XSTRTOK(c->value, ".", &ptr);
+                     * dotted OID into byte array. Tokenize a copy so the
+                     * original c->value stays intact for error messages. */
+                    int   ridLen = (int)XSTRLEN(c->value);
+                    char* ridDup = (char*)XMALLOC(ridLen + 1, NULL,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (ridDup == NULL) {
+                        wolfCLU_LogError("Failed to allocate memory for RID");
+                        ret = MEMORY_E;
+                        break;
+                    }
+                    XMEMCPY(ridDup, c->value, ridLen + 1);
+
+                    token = XSTRTOK(ridDup, ".", &ptr);
 
                     while (token != NULL) {
-                        decoded[decodedCount] = XATOI(token);
+                        char* digit;
+                        int n;
+
+                        if (decodedCount >= ASN1_OID_DOTTED_MAX_SZ) {
+                            wolfCLU_LogError("RID has too many components "
+                                    "(max %d): %s",
+                                    ASN1_OID_DOTTED_MAX_SZ, c->value);
+                            ret = WOLFCLU_FATAL_ERROR;
+                            break;
+                        }
+                        /* require decimal-digits-only token so that things
+                         * like "1a" or "abc" are rejected instead of being
+                         * silently coerced by XATOI */
+                        for (digit = token; *digit != '\0'; digit++) {
+                            if (*digit < '0' || *digit > '9') {
+                                wolfCLU_LogError("Non-numeric RID "
+                                        "component '%s' in: %s", token,
+                                        c->value);
+                                ret = WOLFCLU_FATAL_ERROR;
+                                break;
+                            }
+                        }
+                        if (ret != WOLFCLU_SUCCESS) {
+                            break;
+                        }
+                        n = XATOI(token);
+                        if (n < 0 || n > 0xFFFF) {
+                            wolfCLU_LogError("RID component out of range "
+                                    "[0, 65535]: %s", token);
+                            ret = WOLFCLU_FATAL_ERROR;
+                            break;
+                        }
+                        decoded[decodedCount] = (word16)n;
                         decodedCount++;
                         token = XSTRTOK(NULL, ".", &ptr);
+                    }
+
+                    XFREE(ridDup, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+
+                    if (ret != WOLFCLU_SUCCESS) {
+                        break;
                     }
 
                     if (wc_EncodeObjectId(decoded, decodedCount, oid, &oidSz)

@@ -83,7 +83,8 @@ static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
 
         if (derSz >= 0) {
             if (isPrivate) {
-                tmpPkey = wolfSSL_d2i_PrivateKey_EVP(NULL, &der, derSz);
+                unsigned char *p = der;
+                tmpPkey = wolfSSL_d2i_PrivateKey_EVP(NULL, &p, derSz);
             }
             else {
                 const unsigned char *p = der;

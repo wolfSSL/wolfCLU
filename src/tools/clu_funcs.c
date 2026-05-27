@@ -975,7 +975,12 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
 
     wolfCLU_oldAlgo(argc, argv);
     XMEMSET(name, 0, sizeof(name));
-    XSTRLCPY(name, argv[2], XSTRLEN(argv[2])+1);
+    if (XSTRLEN(argv[2]) >= sizeof(name)) {
+        wolfCLU_LogError("ERROR: algorithm name too long (max %d)",
+                         (int)sizeof(name) - 1);
+        return USER_INPUT_ERROR;
+    }
+    XSTRLCPY(name, argv[2], sizeof(name));
     ret = wolfCLU_parseAlgo(name, alg, mode, size);
 
     /* next check for -cipher option passed through args */

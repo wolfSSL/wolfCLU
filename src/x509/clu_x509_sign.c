@@ -652,40 +652,45 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         else {
             XMEMCPY(subj, subject, subjSz);
             token = XSTRTOK(subj, "/", &slash);
-            while (token != NULL) {
+            while (token != NULL && ret == WOLFCLU_SUCCESS) {
                 saveptr = NULL;
                 key   = XSTRTOK(token, "=", &saveptr);
                 value = XSTRTOK(NULL,  "=", &saveptr);
 
-                if (!(key == NULL && value ==NULL)) {
-                    if (XSTRCMP(key, "C") == 0) {
-                        XSTRLCPY(newCert.subject.country, value, CTC_NAME_SIZE);
-                    }
-                    else if (XSTRCMP(key, "ST") == 0) {
-                        XSTRLCPY(newCert.subject.state, value, CTC_NAME_SIZE);
-                    }
-                    else if (XSTRCMP(key, "L") == 0) {
-                        XSTRLCPY(newCert.subject.locality, value, CTC_NAME_SIZE);
-                    }
-                    else if (XSTRCMP(key, "O") == 0) {
-                        XSTRLCPY(newCert.subject.org, value, CTC_NAME_SIZE);
-                    }
-                    else if (XSTRCMP(key, "OU") == 0) {
-                        XSTRLCPY(newCert.subject.unit, value, CTC_NAME_SIZE);
-                    }
-                    else if (XSTRCMP(key, "CN") == 0) {
-                        XSTRLCPY(newCert.subject.commonName, value, CTC_NAME_SIZE);
-                    }
-                    else if (XSTRCMP(key, "emailAddress") == 0) {
-                        XSTRLCPY(newCert.subject.email, value, CTC_NAME_SIZE);
-                    }
+                if (key == NULL || value == NULL) {
+                    wolfCLU_LogError("Malformed subject component in -subj: "
+                            "expected key=value");
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+                }
+
+                if (XSTRCMP(key, "C") == 0) {
+                    XSTRLCPY(newCert.subject.country, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "ST") == 0) {
+                    XSTRLCPY(newCert.subject.state, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "L") == 0) {
+                    XSTRLCPY(newCert.subject.locality, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "O") == 0) {
+                    XSTRLCPY(newCert.subject.org, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "OU") == 0) {
+                    XSTRLCPY(newCert.subject.unit, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "CN") == 0) {
+                    XSTRLCPY(newCert.subject.commonName, value, CTC_NAME_SIZE);
+                }
+                else if (XSTRCMP(key, "emailAddress") == 0) {
+                    XSTRLCPY(newCert.subject.email, value, CTC_NAME_SIZE);
                 }
 
                 token = XSTRTOK(NULL, "/", &slash);
             }
 
             XMEMSET(subj, 0, subjSz);
-            XFREE(subj, HEAP_HINT, NULL);
+            XFREE(subj, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             subj = NULL;
         }
     }
@@ -1416,11 +1421,19 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             }
 
             current = wolfCLU_ParseX509NameString(subj, (int)XSTRLEN(subj));
+            if (current == NULL) {
+                wolfCLU_LogError("Error parsing existing subject name from "
+                        "database");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
             if (wolfSSL_X509_NAME_cmp(subject, current) == 0) {
+                wolfSSL_X509_NAME_free(current);
                 wolfCLU_LogError("Subject name already exists");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
             }
+            wolfSSL_X509_NAME_free(current);
         }
     }
 

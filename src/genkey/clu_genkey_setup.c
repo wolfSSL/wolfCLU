@@ -63,7 +63,13 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     ret = wolfCLU_checkForArg("-out", 4, argc, argv);
     if (ret > 0) {
         if (argv[ret+1] != NULL) {
-            XSTRLCPY(keyOutFName, argv[ret+1], XSTRLEN(argv[ret+1])+1);
+            if (XSTRLEN(argv[ret+1]) >= sizeof(keyOutFName)) {
+                wolfCLU_LogError("ERROR: -out filename too long (max %d)",
+                                 (int)sizeof(keyOutFName) - 1);
+                wc_FreeRng(&rng);
+                return USER_INPUT_ERROR;
+            }
+            XSTRLCPY(keyOutFName, argv[ret+1], sizeof(keyOutFName));
         }
         else {
             wolfCLU_LogError("ERROR: No output file name specified");
@@ -449,7 +455,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         /* set XMSS Param head */
-        XMEMSET(xmssmtParam, 0, XSTRLEN(xmssmtParam));
+        XMEMSET(xmssmtParam, 0, sizeof(xmssmtParam));
         WOLFCLU_LOG(WOLFCLU_L0, "XMSS Param Head: %s\nLength: %d",
                     xmssmtParamHead, xmssmtHeadLen);
         XMEMCPY(xmssmtParam, xmssmtParamHead, xmssmtHeadLen);
@@ -609,7 +615,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         /* set XMSS Param head */
-        XMEMSET(xmssParam, 0, XSTRLEN(xmssParam));
+        XMEMSET(xmssParam, 0, sizeof(xmssParam));
         WOLFCLU_LOG(WOLFCLU_L0, "XMSS Param Head: %s", xmssParamHead);
         XMEMCPY(xmssParam, xmssParamHead, xmssHeadLen);
 
