@@ -330,7 +330,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     int ret;
     int privFileSz = 0;
     word32 index = 0;
-    word32 outLen;
+    word32 outLen = 0;
 
     byte* keyBuf = NULL;
     XFILE privKeyFile = NULL;
@@ -507,7 +507,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     int ret;
     int privFileSz = 0;
     word32 index = 0;
-    word32 outLen;
+    word32 outLen = 0;
 
     XFILE privKeyFile = NULL;
     byte* keyBuf = NULL;
