@@ -690,7 +690,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             }
 
             XMEMSET(subj, 0, subjSz);
-            XFREE(subj, HEAP_HINT, NULL);
+            XFREE(subj, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             subj = NULL;
         }
     }
