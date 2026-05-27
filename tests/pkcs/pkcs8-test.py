@@ -8,12 +8,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
-
-
-def _is_fips():
-    r = run_wolfssl("-v")
-    return "FIPS" in (r.stdout + r.stderr)
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
 
 
 class Pkcs8Test(unittest.TestCase):
@@ -36,7 +31,7 @@ class Pkcs8Test(unittest.TestCase):
         if "Recompile wolfSSL with PKCS8 support" in combined:
             raise unittest.SkipTest("PKCS8 support not compiled in")
 
-        cls.is_fips = _is_fips()
+        cls.is_fips = is_fips()
 
     def _cleanup(self, *files):
         for f in files:
@@ -77,7 +72,7 @@ class Pkcs8Test(unittest.TestCase):
                         pkcs1_pem, shallow=False),
             "server-key.pem -traditional check failed")
 
-    @unittest.skipIf(_is_fips(), "skipped in FIPS builds")
+    @unittest.skipIf(is_fips(), "skipped in FIPS builds")
     def test_stdin_input(self):
         pem_path = os.path.join(CERTS_DIR, "server-keyEnc.pem")
         with open(pem_path, "rb") as f:
@@ -90,21 +85,21 @@ class Pkcs8Test(unittest.TestCase):
         )
         self.assertIn(b"BEGIN PRIVATE", r.stdout + r.stderr)
 
-    @unittest.skipIf(_is_fips(), "skipped in FIPS builds")
+    @unittest.skipIf(is_fips(), "skipped in FIPS builds")
     def test_fail_wrong_input(self):
         r = run_wolfssl("pkcs8", "-in",
                         os.path.join(CERTS_DIR, "server-cert.pem"),
                         "-passin", "pass:yassl123")
         self.assertNotEqual(r.returncode, 0)
 
-    @unittest.skipIf(_is_fips(), "skipped in FIPS builds")
+    @unittest.skipIf(is_fips(), "skipped in FIPS builds")
     def test_fail_wrong_password(self):
         r = run_wolfssl("pkcs8", "-in",
                         os.path.join(CERTS_DIR, "server-keyEnc.pem"),
                         "-passin", "pass:wrongPass")
         self.assertNotEqual(r.returncode, 0)
 
-    @unittest.skipIf(_is_fips(), "skipped in FIPS builds")
+    @unittest.skipIf(is_fips(), "skipped in FIPS builds")
     def test_fail_wrong_format(self):
         r = run_wolfssl("pkcs8", "-in",
                         os.path.join(CERTS_DIR, "server-keyEnc.pem"),

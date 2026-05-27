@@ -7,7 +7,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import CERTS_DIR, is_fips, run_wolfssl, test_main
 
 DGST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -32,6 +32,7 @@ class DgstVerifyTest(unittest.TestCase):
                         os.path.join(CERTS_DIR, "server-key.der"))
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    @unittest.skipIf(is_fips(), "MD5 not allowed in FIPS builds")
     def test_verify_md5_rsa(self):
         r = run_wolfssl("dgst", "-md5", "-verify",
                         os.path.join(CERTS_DIR, "server-keyPub.pem"),

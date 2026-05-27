@@ -7,7 +7,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
 
 P12_FILE = os.path.join(CERTS_DIR, "test-servercert.p12")
 
@@ -25,9 +25,7 @@ class Pkcs12Test(unittest.TestCase):
                 if "disable-filesystem" in f.read():
                     raise unittest.SkipTest("filesystem support disabled")
 
-        # Skip FIPS builds
-        r = run_wolfssl("-v")
-        if "FIPS" in (r.stdout + r.stderr):
+        if is_fips():
             raise unittest.SkipTest("FIPS build")
 
         r = run_wolfssl("pkcs12", "-nodes", "-passin", 'pass:wolfSSL test',

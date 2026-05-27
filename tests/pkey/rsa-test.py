@@ -8,7 +8,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, WOLFSSL_BIN, run_wolfssl, test_main
+from wolfclu_test import CERTS_DIR, WOLFSSL_BIN, is_fips, run_wolfssl, test_main
 
 RSA_PUBKEY_PEM = """\
 -----BEGIN PUBLIC KEY-----
@@ -20,11 +20,6 @@ UQy9VLPhbV8cvCNz0QkDiRTSELlkwyrQoZZKvOHUGlvHoMDBY3gPRDcwMpaAMiOV
 oXe6E9KXc+JdJclqDcM5YKS0sGlCQgnp2Ai8MyCzWCKnquvE4eZhg8XSlt/Z0E+t
 1wIDAQAB
 -----END PUBLIC KEY-----"""
-
-
-def _is_fips():
-    r = run_wolfssl("-v")
-    return "FIPS" in (r.stdout + r.stderr)
 
 
 class RsaTest(unittest.TestCase):
@@ -40,7 +35,7 @@ class RsaTest(unittest.TestCase):
                 if "disable-filesystem" in f.read():
                     raise unittest.SkipTest("filesystem support disabled")
 
-        cls.is_fips = _is_fips()
+        cls.is_fips = is_fips()
 
     def _cleanup(self, *files):
         for f in files:
@@ -116,21 +111,21 @@ class RsaTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), RSA_PUBKEY_PEM)
 
-    @unittest.skipIf(_is_fips(), "skipped in FIPS builds")
+    @unittest.skipIf(is_fips(), "skipped in FIPS builds")
     def test_encrypted_key(self):
         r = run_wolfssl("rsa", "-in",
                         os.path.join(CERTS_DIR, "server-keyEnc.pem"),
                         "-passin", "pass:yassl123")
         self.assertEqual(r.returncode, 0, r.stderr)
 
-    @unittest.skipIf(_is_fips(), "skipped in FIPS builds")
+    @unittest.skipIf(is_fips(), "skipped in FIPS builds")
     def test_fail_wrong_password(self):
         r = run_wolfssl("rsa", "-in",
                         os.path.join(CERTS_DIR, "server-keyEnc.pem"),
                         "-passin", "pass:yassl12")
         self.assertNotEqual(r.returncode, 0)
 
-    @unittest.skipIf(_is_fips(), "skipped in FIPS builds")
+    @unittest.skipIf(is_fips(), "skipped in FIPS builds")
     def test_modulus_noout(self):
         r = run_wolfssl("rsa", "-in",
                         os.path.join(CERTS_DIR, "server-keyEnc.pem"),
