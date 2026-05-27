@@ -549,6 +549,7 @@ static int CheckDisName(WOLFSSL_CONF* conf, char* sect, WOLFSSL_X509_NAME* name,
     char* deflt = NULL;
     char   *in = NULL;
     size_t  inSz;
+    int     lineRet;
 
     char* deflt_str = NULL;
     char* mn_str = NULL;
@@ -602,30 +603,36 @@ static int CheckDisName(WOLFSSL_CONF* conf, char* sect, WOLFSSL_X509_NAME* name,
             deflt = wolfSSL_NCONF_get_string(conf, sect, deflt_str);
             fprintf(fout, "%s [%s] : ", curnt, (deflt)?deflt:"");
 
-            if (wolfCLU_getline(&in, &inSz, fin) > 1) {
-                deflt = in;
+            lineRet = wolfCLU_getline(&in, &inSz, fin);
+            if (lineRet == WOLFCLU_FATAL_ERROR) {
+                ret = WOLFCLU_FATAL_ERROR;
             }
-
-            if (deflt && XSTRCMP(deflt, ".") != 0) {
-                if (wolfSSL_NCONF_get_number(conf, sect, mx_str, &mx) ==
-                        WOLFSSL_SUCCESS && (long)XSTRLEN(deflt) > mx) {
-                    WOLFCLU_LOG(WOLFCLU_E0,
-                            "Name %s is larger than max %ld", deflt, mx);
-                    ret = WOLFCLU_FATAL_ERROR;
+            else {
+                if (lineRet > 0) {
+                    deflt = in;
                 }
 
-                if (wolfSSL_NCONF_get_number(conf, sect, mn_str, &mn) ==
-                        WOLFSSL_SUCCESS && (long)XSTRLEN(deflt) < mn) {
-                    WOLFCLU_LOG(WOLFCLU_E0,
-                            "Name %s is smaller than min %ld", deflt, mn);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                if (deflt && XSTRCMP(deflt, ".") != 0) {
+                    if (wolfSSL_NCONF_get_number(conf, sect, mx_str, &mx) ==
+                            WOLFSSL_SUCCESS && (long)XSTRLEN(deflt) > mx) {
+                        WOLFCLU_LOG(WOLFCLU_E0,
+                                "Name %s is larger than max %ld", deflt, mx);
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
 
-                if (ret == WOLFCLU_SUCCESS) {
-                    wolfCLU_AddNameEntry(name, strType, nid, deflt);
+                    if (wolfSSL_NCONF_get_number(conf, sect, mn_str, &mn) ==
+                            WOLFSSL_SUCCESS && (long)XSTRLEN(deflt) < mn) {
+                        WOLFCLU_LOG(WOLFCLU_E0,
+                                "Name %s is smaller than min %ld", deflt, mn);
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+
+                    if (ret == WOLFCLU_SUCCESS) {
+                        wolfCLU_AddNameEntry(name, strType, nid, deflt);
+                    }
                 }
             }
-            free(in); in = NULL;
+            XFREE(in, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER); in = NULL;
         }
     }
 

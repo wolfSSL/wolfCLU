@@ -880,8 +880,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
             ret = MEMORY_E;
         }
         else {
-            wolfCLU_CreateX509Name(name);
-            wolfSSL_X509_REQ_set_subject_name(x509, name);
+            ret = wolfCLU_CreateX509Name(name);
+            if (ret == WOLFCLU_SUCCESS) {
+                wolfSSL_X509_REQ_set_subject_name(x509, name);
+            }
             wolfSSL_X509_NAME_free(name);
         }
     }

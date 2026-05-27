@@ -1349,46 +1349,55 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
     return ret;
 }
 
-size_t wolfCLU_getline(char **lineptr, size_t *len, FILE *fp)
+int wolfCLU_getline(char **lineptr, size_t *len, FILE *fp)
 {
-
-    char line[MAX_ENTRY_NAME];
+    char  line[MAX_ENTRY_NAME];
+    char *tmp;
 
     *len = sizeof(line);
-
     *lineptr = NULL;
+
     if ((*lineptr = (char*)XMALLOC(*len, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER))
             == NULL) {
-        XFREE(*lineptr, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return 0;
+        *len = 0;
+        return WOLFCLU_FATAL_ERROR;
     }
-
     (*lineptr)[0] = '\0';
 
-    while(fgets(line, sizeof(line), fp) != NULL) {
-        size_t len_used = XSTRLEN(*lineptr);
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        size_t len_used  = XSTRLEN(*lineptr);
         size_t line_used = XSTRLEN(line);
 
-        if(*len - len_used < line_used) {
-            *len *= 2;
-
-            if((*lineptr = XREALLOC(*lineptr, *len, HEAP_HINT,
-                            DYNAMIC_TYPE_TMP_BUFFER)) == NULL) {
-                 return -1;
+        if (*len - len_used <= line_used) {
+            if (*len > (size_t)(INT_MAX / 2)) {
+                XFREE(*lineptr, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                *lineptr = NULL;
+                *len = 0;
+                return WOLFCLU_FATAL_ERROR;
             }
+            *len *= 2;
+            tmp = XREALLOC(*lineptr, *len, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (tmp == NULL) {
+                XFREE(*lineptr, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                *lineptr = NULL;
+                *len = 0;
+                return WOLFCLU_FATAL_ERROR;
+            }
+            *lineptr = tmp;
         }
 
         XMEMCPY(*lineptr + len_used, line, line_used);
         len_used += line_used;
         (*lineptr)[len_used] = '\0';
 
-        if((*lineptr)[len_used - 1] == '\n') {
-            (*lineptr)[len_used - 1]='\0';
-            return len_used;
+        if (len_used > 0 && (*lineptr)[len_used - 1] == '\n') {
+            (*lineptr)[len_used - 1] = '\0';
+            return (int)(len_used - 1);
         }
     }
 
-    return -1;
+    /* EOF without newline: return accumulated length (0 if nothing was read) */
+    return (int)XSTRLEN(*lineptr);
 }
 
 /* returns WOLFCLU_SUCCESS on success */
@@ -1396,7 +1405,7 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 {
     char   *in = NULL;
     size_t  inSz;
-    size_t  ret;
+    int     ret;
     FILE *fout = stdout;
     FILE *fin = stdin; /* defaulting to stdin but using a fd variable to make it
                         * easy for expanding to other inputs */
@@ -1405,6 +1414,9 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
             "skipped.\nExamples of inputs are provided as [*]\n");
     fprintf(fout, "Country [US] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
+    if (ret == WOLFCLU_FATAL_ERROR) {
+        return WOLFCLU_FATAL_ERROR;
+    }
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_PRINTABLE, NID_countryName, in);
     }
@@ -1412,6 +1424,9 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 
     fprintf(fout, "State or Province [Montana] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
+    if (ret == WOLFCLU_FATAL_ERROR) {
+        return WOLFCLU_FATAL_ERROR;
+    }
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_stateOrProvinceName, in);
     }
@@ -1419,6 +1434,9 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 
     fprintf(fout, "Locality [Bozeman] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
+    if (ret == WOLFCLU_FATAL_ERROR) {
+        return WOLFCLU_FATAL_ERROR;
+    }
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_localityName, in);
     }
@@ -1426,6 +1444,9 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 
     fprintf(fout, "Organization Name [wolfSSL] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
+    if (ret == WOLFCLU_FATAL_ERROR) {
+        return WOLFCLU_FATAL_ERROR;
+    }
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationName, in);
     }
@@ -1433,6 +1454,9 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 
     fprintf(fout, "Organization Unit [engineering] : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
+    if (ret == WOLFCLU_FATAL_ERROR) {
+        return WOLFCLU_FATAL_ERROR;
+    }
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_organizationalUnitName, in);
     }
@@ -1440,6 +1464,9 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 
     fprintf(fout, "Common Name : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
+    if (ret == WOLFCLU_FATAL_ERROR) {
+        return WOLFCLU_FATAL_ERROR;
+    }
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_commonName, in);
     }
@@ -1447,6 +1474,9 @@ int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* name)
 
     fprintf(fout, "Email Address : ");
     ret = wolfCLU_getline(&in, &inSz, fin);
+    if (ret == WOLFCLU_FATAL_ERROR) {
+        return WOLFCLU_FATAL_ERROR;
+    }
     if (ret > 0) {
         wolfCLU_AddNameEntry(name, CTC_UTF8, NID_emailAddress, in);
     }

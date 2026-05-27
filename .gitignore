@@ -45,3 +45,12 @@ x64/
 .vs/
 __pycache__/
 CLAUDE.md
+
+# x509 test runtime artifacts (generated in cwd by tests/x509/*.py)
+/ca_*.conf
+/test_req_rt.conf
+/test_x509req_*.conf
+/*.csr
+/index.txt
+/serial-file-test
+/rand-file-test

@@ -455,8 +455,11 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options, const struct opti
 
 /**
  * @brief wolfCLU getline() implementation
+ *
+ * @return length of the line read (>= 0) on success, or WOLFCLU_FATAL_ERROR
+ *         if a buffer allocation fails
  */
-size_t wolfCLU_getline(char **line, size_t *len, FILE *fp);
+int wolfCLU_getline(char **line, size_t *len, FILE *fp);
 
 /*
  * generic function to check for a specific input argument. Return the
@@ -506,6 +509,7 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz);
  *
  *  @param x509 the name structure to be filled in
  *  @return WOLFCLU_SUCCESS On successfully setting the name
+ *  @return WOLFCLU_FATAL_ERROR if reading an input field fails to allocate
  */
 int wolfCLU_CreateX509Name(WOLFSSL_X509_NAME* x509);
 
