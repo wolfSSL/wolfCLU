@@ -2,7 +2,9 @@
 """Hash tests for wolfCLU."""
 
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -86,6 +88,73 @@ class HashShortcutTest(unittest.TestCase):
         r = run_wolfssl("sha512", CERT_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), _read_expected("sha512-expect.hex"))
+
+
+class LargeFileHashTest(unittest.TestCase):
+    """Two >4 GiB files differing only in the last byte must hash differently.
+
+    Guards against truncating the file size to word32 in clu_hash.c, which
+    caused files past the 4 GiB boundary to collide.
+
+    Defaults to sha256. Set WOLFCLU_LARGE_HASH_ALG=<alg> to test a single
+    different algorithm, or WOLFCLU_LARGE_HASH_ALG=all to test every
+    supported algorithm.
+    """
+
+    LARGE_FILE_SIZE = 4_831_838_208  # 4.5 GiB, well above UINT32_MAX
+    CANDIDATE_ALGS = ["md5", "sha", "sha256", "sha384", "sha512"]
+    DEFAULT_ALG = "sha256"
+
+    @classmethod
+    def _probe_supported(cls, algs):
+        supported = []
+        for alg in algs:
+            r = run_wolfssl(alg, CERT_FILE)
+            if r.returncode == 0:
+                supported.append(alg)
+        return supported
+
+    @classmethod
+    def setUpClass(cls):
+        if not os.path.isdir(CERTS_DIR):
+            raise unittest.SkipTest("certs directory not found")
+
+        requested = os.environ.get("WOLFCLU_LARGE_HASH_ALG", cls.DEFAULT_ALG)
+        if requested == "all":
+            cls.algs = cls._probe_supported(cls.CANDIDATE_ALGS)
+        else:
+            cls.algs = cls._probe_supported([requested])
+        if not cls.algs:
+            raise unittest.SkipTest(
+                "no supported hash algorithm for "
+                "WOLFCLU_LARGE_HASH_ALG={}".format(requested))
+
+        cls._tmpdir = tempfile.mkdtemp(prefix="wolfclu-large-hash-")
+        cls.original = os.path.join(cls._tmpdir, "original.bin")
+        cls.tampered = os.path.join(cls._tmpdir, "tampered.bin")
+        try:
+            for p in (cls.original, cls.tampered):
+                with open(p, "wb") as f:
+                    f.truncate(cls.LARGE_FILE_SIZE)
+            with open(cls.tampered, "r+b") as f:
+                f.seek(-1, os.SEEK_END)
+                f.write(b"X")
+        except OSError as e:
+            shutil.rmtree(cls._tmpdir, ignore_errors=True)
+            raise unittest.SkipTest("could not create sparse files: {}".format(e))
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(getattr(cls, "_tmpdir", ""), ignore_errors=True)
+
+    def test_tampered_last_byte_changes_hash(self):
+        for alg in self.algs:
+            with self.subTest(alg=alg):
+                r1 = run_wolfssl(alg, self.original, timeout=1800)
+                r2 = run_wolfssl(alg, self.tampered, timeout=1800)
+                self.assertEqual(r1.returncode, 0, r1.stderr)
+                self.assertEqual(r2.returncode, 0, r2.stderr)
+                self.assertNotEqual(r1.stdout.strip(), r2.stdout.strip())
 
 
 class HashArgErrorTest(unittest.TestCase):

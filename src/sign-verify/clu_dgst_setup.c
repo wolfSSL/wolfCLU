@@ -169,10 +169,10 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     WOLFSSL_EVP_PKEY *pkey = NULL;
     int     ret = WOLFCLU_SUCCESS;
     byte* sig  = NULL;
-    char* data = NULL;
     char* sigFile = NULL;
     void* key  = NULL;
-    word32 dataSz = 0;
+    byte digest[MAX_DER_DIGEST_SZ];
+    word32 digestSz = 0;
     word32 sigSz  = 0;
     int keySz  = 0;
     int option;
@@ -277,71 +277,29 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         }
     }
 
+    /* Stream the data file through a hash to produce a digest, then pass
+     * the digest to wc_Signature{Generate,Verify}Hash below. */
     if (ret == WOLFCLU_SUCCESS) {
-        XFILE f;
+        digestSz = WC_MAX_DIGEST_SIZE;
+        ret = wolfCLU_streamHashBio(dataBio, hashType, digest, &digestSz);
+    }
 
-        /* get data size using raw FILE pointer and seek */
-        if (wolfSSL_BIO_get_fp(dataBio, &f) != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Unable to get raw file pointer");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS && XFSEEK(f, 0, XSEEK_END) != 0) {
-            wolfCLU_LogError("Unable to seek end of file");
+    if (ret == WOLFCLU_SUCCESS && signing == 0) {
+        sigBio = wolfSSL_BIO_new_file(sigFile, "rb");
+        if (sigBio == NULL) {
+            wolfCLU_LogError("Unable to read signature file %s", sigFile);
             ret = WOLFCLU_FATAL_ERROR;
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            dataSz = (word32)XFTELL(f);
-            wolfSSL_BIO_reset(dataBio);
-        }
-
-        if (signing == 0) {
-            sigBio = wolfSSL_BIO_new_file(sigFile, "rb");
-            if (sigBio == NULL) {
-                wolfCLU_LogError("Unable to read signature file %s",
-                        sigFile);
+            ret = wolfSSL_BIO_get_len(sigBio);
+            if (ret <= 0) {
+                wolfCLU_LogError("Unable to get signature size");
                 ret = WOLFCLU_FATAL_ERROR;
             }
-
-            if (ret == WOLFCLU_SUCCESS) {
-                ret = wolfSSL_BIO_get_len(sigBio);
-                if (ret <= 0) {
-                    wolfCLU_LogError("Unable to get signature size");
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
-                else {
-                    sigSz = (word32)ret;
-                    ret = WOLFCLU_SUCCESS;
-                }
-            }
-        }
-
-        if (dataSz <= 0 || (sigSz <= 0 && signing == 0)) {
-            wolfCLU_LogError("No signature or data");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-
-    /* create buffers and fill them */
-    if (ret == WOLFCLU_SUCCESS) {
-        data = (char*)XMALLOC(dataSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (data == NULL) {
-            ret = MEMORY_E;
-        }
-        else {
-            word32 totalRead = 0;
-
-            /* read in 4k at a time because file could be larger than int type
-             * restriction on size input for wolfSSL_BIO_read */
-            while (totalRead < dataSz) {
-                int sz = min(dataSz - totalRead, 4096);
-                if (wolfSSL_BIO_read(dataBio, data + totalRead, sz) != sz) {
-                    wolfCLU_LogError("Error reading data");
-                    ret = WOLFCLU_FATAL_ERROR;
-                    break;
-                }
-                totalRead += sz;
+            else {
+                sigSz = (word32)ret;
+                ret = WOLFCLU_SUCCESS;
             }
         }
     }
@@ -405,10 +363,34 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         }
     }
 
+    /* For RSA with PKCS#1 v1.5 encoding, wc_Signature{Generate,Verify}Hash
+     * expect the digest already wrapped in DER. The non-Hash variants did
+     * this internally. ECC signs the raw digest, so no wrap. */
+#ifndef NO_RSA
+    if (ret == WOLFCLU_SUCCESS && sigType == WC_SIGNATURE_TYPE_RSA_W_ENC) {
+        int oid = wc_HashGetOID(hashType);
+        word32 enc;
+        if (oid < 0) {
+            wolfCLU_LogError("Unable to get hash OID for DER encoding");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            enc = wc_EncodeSignature(digest, digest, digestSz, oid);
+            if (enc == 0) {
+                wolfCLU_LogError("Unable to DER-encode digest");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                digestSz = enc;
+            }
+        }
+    }
+#endif
+
     /* if not signing then do verification */
     if (ret == WOLFCLU_SUCCESS && signing == 0) {
-        int verifyRet = wc_SignatureVerify(hashType, sigType,
-                    (const byte*)data, dataSz, (const byte*)sig, sigSz,
+        int verifyRet = wc_SignatureVerifyHash(hashType, sigType,
+                    digest, digestSz, (const byte*)sig, sigSz,
                     key, keySz);
         if (verifyRet == 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "Verify OK");
@@ -453,8 +435,8 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            int signRet = wc_SignatureGenerate(hashType, sigType,
-                    (const byte*)data, dataSz, sig, &sigSz, key, keySz, &rng);
+            int signRet = wc_SignatureGenerateHash(hashType, sigType,
+                    digest, digestSz, sig, &sigSz, key, keySz, &rng);
             if (signRet != 0) {
                 wolfCLU_LogError("Error getting signature");
                 if (hashType == WC_HASH_TYPE_MD5 && signRet == BAD_FUNC_ARG) {
@@ -504,8 +486,6 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         }
     }
 
-    if (data != NULL)
-        XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (sig != NULL)
         XFREE(sig, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
