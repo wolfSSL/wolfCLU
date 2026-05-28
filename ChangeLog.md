@@ -1,3 +1,60 @@
+# wolfCLU v0.2.0 (May 28, 2026)
+
+### New Features
+- Add generating Chimera (dual-algorithm) certificates, enabling conventional
+  and post-quantum signatures on a single X.509 cert by @Yu-Ma28051503 (PR 182)
+- Implement OCSP client and OCSP responder with both HTTP and SCGI transports,
+  allowing the responder to be fronted by nginx in production by @julek-wolfssl
+  (PR 200)
+- Port shell-based tests to Python (unittest) so the test suite can run on
+  Windows in addition to Linux/macOS by @julek-wolfssl (PR 215)
+- Support passing an explicit key file to the enc command instead of deriving
+  the key from a password by @embhorn (PR 224)
+
+### Fixes and Enhancements
+- Improve x509-req test coverage by @kojiws (PR 188)
+- Fix README examples and setting of the subject name in the req command by
+  @Yu-Ma28051503 (PR 191)
+- Check that the keystring is present before use to avoid a segfault in the
+  pkey command by @anhu (PR 192)
+- Fix enc command handling of the legacy algorithm name format
+  (e.g. aes-128-cbc) by @lealem47 (PR 193)
+- Remove redundant manual null-termination already added by the compiler for
+  string literals by @anhu (PR 194)
+- Sign/verify with ML-DSA now passes a context for interop with OpenSSL
+  signatures by @anhu (PR 195)
+- Fix path concatenation in wolfCLU_CertSignAppendOut so generated output paths
+  are well-formed by @kojo1 (PR 197)
+- Document build prerequisites (autoconf, automake, libtool) in the README by
+  @kareem-wolfssl (PR 201)
+- Fix out-of-bounds writes when processing argv by @miyazakh (PR 202)
+- Fix wrong variable used when storing the RSA exponent by @miyazakh (PR 203)
+- Fix potential double-free by @miyazakh (PR 204)
+- Fix null pointer check by @miyazakh (PR 205)
+- Fix XFWRITE being called with a negative size by @miyazakh (PR 206)
+- Fix use-after-free by @miyazakh (PR 207)
+- Fix unreachable if condition by @miyazakh (PR 208)
+- Update post-quantum groups list to match the latest wolfSSL by @Frauschi
+  (PR 209)
+- Fixes from static analysis @yosuke-wolfssl (PR 210)
+- Fix compile and unit test failures by @miyazakh (PR 211)
+- Fix stack buffer overflow in encryption setup by @miyazakh (PR 212)
+- Fix shell command injection by @miyazakh (PR 213)
+- Fix read of exactly MAX_LEN bytes being treated as an error by
+  @miyazakh (PR 214)
+- Fix SHA-1 prefix match overwriting SHA-256/384/512 output selection
+  by @miyazakh (PR 216)
+- Fix issues uncovered by wolfCLU Fenrir fuzz testing by @aidangarske (PR 218)
+- Fix wolfCLU_sign_data_ecc and wolfCLU_verify_signature_ecc by @embhorn
+  (PR 219)
+- Fix potential heap buffer over-read by @miyazakh (PR 220)
+- Fix flaky test_encrypt_decrypt_base64 bad-password check by @julek-wolfssl
+  (PR 221)
+- Additional sanity checks on input arguments based on static analysis results
+  by @JacobBarthelmeh (PR 222)
+- Fixes for closing file descriptors, sanity checks on init calls, buffer
+  scope, and sanity checks on arguments passed in by @JacobBarthelmeh (PR 223)
+
 # wolfCLU v0.1.9 (July 24, 2025)
 - Fix client and server KEM macro (PR 177)
 - Implementing PKCS8 and Base64 commands (PR 178)
