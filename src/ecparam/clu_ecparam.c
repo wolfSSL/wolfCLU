@@ -88,6 +88,8 @@ int wolfCLU_ecparam(int argc, char** argv)
     WOLFSSL_BIO* bioOut = NULL;
     WOLFSSL_EC_KEY* key = NULL;
 
+    XMEMSET(&rng, 0, sizeof(rng));
+
     if (wolfCLU_checkForArg("-h", 2, argc, argv) > 0) {
         wolfCLU_ecparamHelp();
         return WOLFCLU_SUCCESS;

@@ -71,6 +71,8 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     char    inputString[WOLFCLU_MAX_BUFFER];       /* the input string */
     const char isSalted[] = "Salted__";
 
+    XMEMSET(&rng, 0, sizeof(rng));
+
     if (cphr == NULL) {
         return BAD_FUNC_ARG;
     }

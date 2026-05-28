@@ -166,6 +166,8 @@ static int wolfCLU_DerToEncryptedPEM(WOLFSSL_BIO* bio, byte* key, word32 keySz,
     int itt       = WC_PKCS12_ITT_DEFAULT;
     void* heap    = NULL;
 
+    XMEMSET(&rng, 0, sizeof(rng));
+
     if (wc_InitRng(&rng) != 0) {
         ret = WOLFCLU_FATAL_ERROR;
     }

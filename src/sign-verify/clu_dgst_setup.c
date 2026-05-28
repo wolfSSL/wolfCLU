@@ -183,6 +183,9 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     enum wc_HashType      hashType = WC_HASH_TYPE_NONE;
     enum wc_SignatureType sigType  = WC_SIGNATURE_TYPE_NONE;
 
+    XMEMSET(&ecc, 0, sizeof(ecc));
+    XMEMSET(&rsa, 0, sizeof(rsa));
+
     /* signed file should be the last arg */
     if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
         wolfCLU_dgstHelp();
@@ -426,6 +429,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     /* create the signature if requested */
     if (ret == WOLFCLU_SUCCESS && signing == 1) {
         WC_RNG rng;
+        XMEMSET(&rng, 0, sizeof(rng));
 
         if (wc_InitRng(&rng) != 0) {
             wolfCLU_LogError("Error initializing RNG");

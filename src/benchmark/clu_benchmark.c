@@ -59,7 +59,11 @@ int wolfCLU_benchmark(int timer, int* option)
 
     byte*           digest;         /* message digest */
 
-    wc_InitRng(&rng);
+    XMEMSET(&rng, 0, sizeof(rng));
+
+    if (wc_InitRng(&rng) != 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
 
     /* @fragile:
      * this function assumes that it perfectly knows the order and length of
