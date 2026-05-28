@@ -1305,11 +1305,10 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
         wolfCLU_LogError("error allocating name structure");
         return NULL;
     }
-
     for (word = strtok_r((char*)n, deli, &end); word != NULL;
             word = strtok_r(NULL, deli, &end)) {
         tagSz = (int)strcspn(word, "=");
-        if (tagSz <= 0) {
+        if (tagSz <= 0 || word[tagSz] != '=') {
             wolfCLU_LogError("error finding '=' char in name");
             wolfSSL_X509_NAME_free(ret);
             ret = NULL;
