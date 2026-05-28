@@ -137,6 +137,7 @@ int wolfCLU_RSA(int argc, char** argv)
 
             case WOLFCLU_HELP:
                 wolfCLU_RSAHelp();
+                wolfCLU_ForceZero(password, MAX_PASSWORD_SIZE);
                 return WOLFCLU_SUCCESS;
 
             case ':':
@@ -295,6 +296,7 @@ int wolfCLU_RSA(int argc, char** argv)
         }
     }
 
+    wolfCLU_ForceZero(password, MAX_PASSWORD_SIZE);
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_RSA_free(rsa);
