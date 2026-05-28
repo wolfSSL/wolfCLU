@@ -58,6 +58,8 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     int     tempMax = MAX_LEN;              /* equal to MAX_LEN until feof */
     int     saltAndIvSize = SALT_SIZE + block; /* size of salt and iv together */
 
+    XMEMSET(&rng, 0, sizeof(rng));
+
     /* opens input file */
     inFile = XFOPEN(in, "rb");
     if (inFile == NULL) {
