@@ -3,7 +3,6 @@
  * Copyright (C) 2006-2025 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
- *
  * wolfSSL is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 3 of the License, or
@@ -1061,7 +1060,7 @@ int wolfCLU_CertSignSetOut(WOLFCLU_CERT_SIGN* csign, char* out)
 int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
 {
     int ret = WOLFCLU_SUCCESS;
-    int outSz;
+    int outSz = 0;
     char* s = NULL;
 
     if (csign == NULL) {
@@ -1070,6 +1069,13 @@ int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
 
     if (ret == WOLFCLU_SUCCESS && out != NULL) {
         outSz = (int)XSTRLEN(out);
+    }
+    /* case where outDir is set to an empty string we want to treat it as
+     * a null pointer in the rest of the function logic so free it
+     * then set it to a null ptr.*/
+    if (ret == WOLFCLU_SUCCESS && csign->outDir != NULL
+            && csign->outDir[0] == '\0') {
+        ret = wolfCLU_CertSignSetOut(csign, NULL);
     }
 
     /* case 1 where no dir is set and just using 'out' */
