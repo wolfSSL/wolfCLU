@@ -842,6 +842,7 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
         (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
         wolfCLU_LogError("Failed to read public key.\nRET: %d", ret);
+        XFCLOSE(keyFile);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         wc_dilithium_free(key);
     #ifdef WOLFSSL_SMALL_STACK
