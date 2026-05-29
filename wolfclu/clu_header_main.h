@@ -461,6 +461,16 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options, const struct opti
  */
 int wolfCLU_getline(char **line, size_t *len, FILE *fp);
 
+/**
+ * @brief Parse a digits-only string into [minVal, maxVal] without overflow.
+ *        Rejects sign, whitespace, empty and trailing text. Because only
+ *        non-negative digit strings are accepted, the parsed value is always
+ *        >= 0, so a negative minVal can never reject a valid input.
+ * @return WOLFCLU_SUCCESS (sets *out), or WOLFCLU_FATAL_ERROR
+ */
+int wolfCLU_parseDecimalBounded(const char* str, long minVal, long maxVal,
+                                long* out);
+
 /*
  * generic function to check for a specific input argument. Return the
  * argv[i] where argument was found. Useful for getting following value after
