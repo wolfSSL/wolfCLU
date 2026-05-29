@@ -257,6 +257,11 @@ SOCKET_T wolfCLU_ServerAccept(SOCKET_T serverfd)
  * @param buffer buffer to store request
  * @param bufferSz size of buffer
  * @return number of bytes received, or negative on error
+ *
+ * @note If Content-Length is larger than receive buffer,
+ * contentLen is clamped to available space. Callers must
+ * re-validate the body length against the advertised
+ * Content-Length (see wolfCLU_HttpServerParseRequest).
  */
 int wolfCLU_HttpServerRecv(SOCKET_T clientfd, byte* buffer, int bufferSz)
 {
@@ -285,11 +290,14 @@ int wolfCLU_HttpServerRecv(SOCKET_T clientfd, byte* buffer, int bufferSz)
                     contentLen = XATOI(cl + 15);
                     if (contentLen < 0)
                         contentLen = 0;
+                    /* Clamp to the space the buffer can hold */
+                    if (contentLen > bufferSz - 1 - headerSz)
+                        contentLen = bufferSz - 1 - headerSz;
                 }
             }
         }
-        /* Check if we have the full body */
-        if (headerSz > 0 && totalLen >= headerSz + contentLen)
+        /* Check for the full body. */
+        if (headerSz > 0 && totalLen - headerSz >= contentLen)
             break;
     }
     return totalLen;
