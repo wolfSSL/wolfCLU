@@ -99,6 +99,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
 {
     int ret;
     int fSz;
+    long fTell;
     XFILE f;
     byte *data = NULL;
 
@@ -107,8 +108,18 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
         wolfCLU_LogError("unable to open file %s", in);
         return BAD_FUNC_ARG;
     }
-    XFSEEK(f, 0, SEEK_END);
-    fSz = (int)XFTELL(f);
+    if (XFSEEK(f, 0, SEEK_END) != 0) {
+        wolfCLU_LogError("Failed to seek to end of file.");
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    fTell = XFTELL(f);
+    if (fTell <= 0 || fTell > INT_MAX) {
+        wolfCLU_LogError("Incorrect input file size: %ld", fTell);
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    fSz = (int)fTell;
 
     data = (byte*)XMALLOC(fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (data == NULL) {
