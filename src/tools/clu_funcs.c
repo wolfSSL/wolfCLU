@@ -1164,6 +1164,48 @@ int wolfCLU_version(void)
     return WOLFCLU_SUCCESS;
 }
 
+/* parse digits-only string into [minVal, maxVal] without overflow; rejects
+ * sign, whitespace, empty and trailing text. only non-negative digit strings
+ * are accepted, so the parsed value is always >= 0 and a negative minVal can
+ * never reject a valid input. returns WOLFCLU_SUCCESS (sets *out) or
+ * WOLFCLU_FATAL_ERROR. */
+int wolfCLU_parseDecimalBounded(const char* str, long minVal, long maxVal,
+                                long* out)
+{
+    const char* p;
+    long val = 0;
+    int over = 0;
+
+    if (str == NULL || out == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    /* check the bound before multiplying so val never overflows; once over,
+     * stop accumulating but keep scanning to reject non-digits */
+    for (p = str; *p != '\0'; p++) {
+        int digit;
+        if (*p < '0' || *p > '9') {
+            return WOLFCLU_FATAL_ERROR;
+        }
+        digit = *p - '0';
+        if (!over) {
+            if (maxVal < digit || val > (maxVal - digit) / 10) {
+                over = 1;
+            }
+            else {
+                val = (val * 10) + digit;
+            }
+        }
+    }
+
+    if (over || p == str || val < minVal || val > maxVal) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    *out = val;
+    return WOLFCLU_SUCCESS;
+}
+
 /* return 0 for not found and index found at otherwise */
 int wolfCLU_checkForArg(const char* searchTerm, int length, int argc,
         char** argv)
