@@ -1675,6 +1675,12 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
             /* if index matches *opt_index at first position or if index is found */
             if (index == *opt_index+1 || (*opt_index !=0 && index > 0)) {
                 if (long_options[i].has_arg == 1) {
+                    /* required_argument binds the value as the token directly
+                     * following the option. The positional rescan in
+                     * clu_rand.c (wolfCLU_Rand) re-derives this same binding by
+                     * hand; any change here to how/when optarg is bound (e.g.
+                     * adding --opt=value handling, optional_argument support, or
+                     * argv permutation) must be reflected there too. */
                     optarg=argv[index+1];
                 }
                 return long_options[i].val;
