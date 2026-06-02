@@ -53,6 +53,34 @@ class Pkcs7Test(unittest.TestCase):
         )
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_help(self):
+        for flag in ("-help", "-h"):
+            r = run_wolfssl("pkcs7", flag)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("wolfssl pkcs7", r.stdout + r.stderr)
+
+    def test_bad_argument_shows_help(self):
+        r = run_wolfssl("pkcs7", "-not-a-real-option")
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_out_to_file(self):
+        out = "pkcs7-out.pem"
+        self.addCleanup(lambda: os.remove(out) if os.path.exists(out) else None)
+
+        r = run_wolfssl("pkcs7", "-inform", "DER",
+                        "-in", os.path.join(CERTS_DIR, "signed.p7b"),
+                        "-outform", "PEM", "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.isfile(out), "pkcs7 -out did not create file")
+        with open(out, "r") as f:
+            self.assertIn("BEGIN PKCS7", f.read())
+
+    def test_out_bad_path_fails(self):
+        r = run_wolfssl("pkcs7", "-inform", "DER",
+                        "-in", os.path.join(CERTS_DIR, "signed.p7b"),
+                        "-out", os.path.join("no-such-dir", "out.pem"))
+        self.assertNotEqual(r.returncode, 0)
+
     @unittest.skipIf(sys.platform == "win32",
                       "binary DER stdin is unreliable on Windows")
     def test_stdin_input(self):

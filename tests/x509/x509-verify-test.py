@@ -73,6 +73,28 @@ class TestX509Verify(unittest.TestCase):
                         os.path.join(CERTS_DIR, "server-cert.pem"))
         self.assertNotEqual(r.returncode, 0)
 
+    def test_help_trailing_h(self):
+        """verify -h (as the final argument) prints usage and exits 0."""
+        r = run_wolfssl("verify", "-h")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("wolfssl verify", r.stdout + r.stderr)
+
+    def test_help_flag(self):
+        """verify -help <cert> prints usage and exits 0."""
+        r = run_wolfssl("verify", "-help",
+                        os.path.join(CERTS_DIR, "server-cert.pem"))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("wolfssl verify", r.stdout + r.stderr)
+
+    def test_verify_der_cert(self):
+        """A DER-encoded cert is loaded via the DER fallback path."""
+        der_cert = os.path.join(CERTS_DIR, "ca-cert.der")
+        if not os.path.isfile(der_cert):
+            self.skipTest("ca-cert.der not present")
+        r = run_wolfssl("verify", "-partial_chain", "-CAfile",
+                        os.path.join(CERTS_DIR, "ca-cert.pem"), der_cert)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_verify_partial_chain(self):
         """verify with -partial_chain allows self as CA."""
         r = run_wolfssl("verify", "-partial_chain", "-CAfile",

@@ -998,7 +998,7 @@ int wolfCLU_verify_signature_xmss(byte* sig, int sigSz,
     }
 
     if (ret == 0) {
-        for (int i = 0; i < XMSS_OID_LEN; i++) {
+        for (unsigned int i = 0; i < XMSS_OID_LEN; i++) {
             oid = (oid << 8) | keyBuf[i];
         }
 
@@ -1153,7 +1153,7 @@ int wolfCLU_verify_signature_xmssmt(byte* sig, int sigSz,
     }
 
     if (ret == 0) {
-        for (int i = 0; i < XMSS_OID_LEN; i++) {
+        for (unsigned int i = 0; i < XMSS_OID_LEN; i++) {
             oid = (oid << 8) | keyBuf[i];
         }
 

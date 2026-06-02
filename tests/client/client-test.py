@@ -60,6 +60,12 @@ class ClientTest(unittest.TestCase):
         self.assertIn("-----BEGIN CERTIFICATE-----", result.stdout,
                       "Expected x509 PEM output not found")
 
+    def test_client_help(self):
+        """ run help command for client """
+        r = run_wolfssl("s_client", "-help")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("s_client" , r.stderr, "help menu was not printed")
+
 class ShellInjectionTest(unittest.TestCase):
     """Regression tests for shell command injection via hostname.
 

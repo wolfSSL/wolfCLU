@@ -24,8 +24,23 @@ class ServerClientTest(unittest.TestCase):
                 if "disable-filesystem" in f.read():
                     raise unittest.SkipTest("filesystem support disabled")
 
+    def test_help(self):
+        """s_server -help prints usage and exits cleanly."""
+        for flag in ("-help", "-h"):
+            r = subprocess.run(
+                [WOLFSSL_BIN, "s_server", flag],
+                capture_output=True, text=True, stdin=subprocess.DEVNULL,
+                timeout=30,
+            )
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("s_server", r.stdout + r.stderr)
+
     def test_server_client(self):
-        """Start s_server, connect with s_client, verify handshake."""
+        """Start s_server, connect with s_client, verify handshake.
+
+        Exercises the -CAfile, -version, -naccept and -www argument-parsing
+        branches in clu_server_setup.c in addition to the basic handshake.
+        """
         readyfile = "readyfile"
         if os.path.exists(readyfile):
             os.remove(readyfile)
@@ -35,6 +50,8 @@ class ServerClientTest(unittest.TestCase):
             [WOLFSSL_BIN, "s_server", "-port", "11111",
              "-key", os.path.join(CERTS_DIR, "server-key.pem"),
              "-cert", os.path.join(CERTS_DIR, "server-cert.pem"),
+             "-CAfile", os.path.join(CERTS_DIR, "ca-cert.pem"),
+             "-version", "3", "-naccept", "1", "-www",
              "-noVerify", "-readyFile", readyfile],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             stdin=subprocess.DEVNULL,

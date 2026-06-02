@@ -981,19 +981,18 @@ int wolfCLU_requestSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && doVerify) {
-        WOLFSSL_EVP_PKEY* pubKey = pkey;
 
         /* get public key from req if not passed in */
-        if (pubKey == NULL) {
-            pubKey = wolfSSL_X509_get_pubkey(x509);
+        if (pkey == NULL) {
+            pkey = wolfSSL_X509_get_pubkey(x509);
         }
 
-        if (pubKey == NULL) {
+        if (pkey == NULL) {
             wolfCLU_LogError("Error getting the public key to verify");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            if (wolfSSL_X509_REQ_verify(x509, pubKey) == 1) {
+            if (wolfSSL_X509_REQ_verify(x509, pkey) == 1) {
                 WOLFCLU_LOG(WOLFCLU_L0, "verify OK");
             }
             else {

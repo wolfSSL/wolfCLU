@@ -103,6 +103,17 @@ class Base64Test(unittest.TestCase):
         self.assertEqual(result.returncode, 0,
                          "Couldn't parse input from stdin")
 
+    def test_help(self):
+        """ Test help flag """
+        result = subprocess.run(
+            [WOLFSSL_BIN, "base64", "-h"],
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        self.assertGreater(len(result.stderr), 0, "output was not completed")
+
+
 
 if __name__ == "__main__":
     test_main()

@@ -59,6 +59,32 @@ class Pkcs12Test(unittest.TestCase):
                         "-passout", "pass:", "-in", P12_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_help(self):
+        for flag in ("-help", "-h"):
+            r = run_wolfssl("pkcs12", flag)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("wolfssl pkcs12", r.stdout + r.stderr)
+
+    def test_bad_argument_fails(self):
+        r = run_wolfssl("pkcs12", "-not-a-real-option", "-in", P12_FILE)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_out_to_file(self):
+        out = "pkcs12-out.pem"
+        self.addCleanup(lambda: os.remove(out) if os.path.exists(out) else None)
+        r = run_wolfssl("pkcs12", "-nodes", "-passin", 'pass:wolfSSL test',
+                        "-passout", "pass:", "-in", P12_FILE, "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.isfile(out), "pkcs12 -out did not create file")
+        with open(out, "r") as f:
+            self.assertIn("BEGIN ", f.read())
+
+    def test_out_bad_path_fails(self):
+        r = run_wolfssl("pkcs12", "-nodes", "-passin", 'pass:wolfSSL test',
+                        "-passout", "pass:", "-in", P12_FILE,
+                        "-out", os.path.join("no-such-dir", "out.pem"))
+        self.assertNotEqual(r.returncode, 0)
+
     def test_nocerts_with_passout(self):
         r = subprocess.run(
             [WOLFSSL_BIN, "pkcs12", "-passin", "stdin", "-passout", "pass:",

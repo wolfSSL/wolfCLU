@@ -77,6 +77,38 @@ class DgstVerifyTest(unittest.TestCase):
                         os.path.join(CERTS_DIR, "server-key.der"))
         self.assertNotEqual(r.returncode, 0)
 
+    def test_help(self):
+        for flag in ("-help", "-h"):
+            r = run_wolfssl("dgst", flag)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("dgst", r.stdout + r.stderr)
+
+    def test_sign_verify_all_hash_algs(self):
+        """Sign/verify round-trip for each supported hash algorithm.
+
+        Covers the per-algorithm digest-selection branches in
+        clu_dgst_setup.c. -md5 is skipped under FIPS.
+        """
+        algs = ["sha", "sha224", "sha256", "sha384", "sha512"]
+        if not is_fips():
+            algs.append("md5")
+        input_file = os.path.join(CERTS_DIR, "server-key.der")
+
+        for alg in algs:
+            with self.subTest(alg=alg):
+                sig_file = "dgst-{}.sig".format(alg)
+                self.addCleanup(lambda p=sig_file: os.remove(p)
+                                if os.path.exists(p) else None)
+                r = run_wolfssl("dgst", "-" + alg, "-sign",
+                                os.path.join(CERTS_DIR, "server-key.pem"),
+                                "-out", sig_file, input_file)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                r = run_wolfssl("dgst", "-" + alg, "-verify",
+                                os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                                "-signature", sig_file, input_file)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_dgst_out_roundtrip(self):
         """dgst -out creates the signature file; -signature round-trips."""
         sig_file = "dgst-out-test.sig"
