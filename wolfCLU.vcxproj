@@ -144,8 +144,6 @@
   <ItemGroup>
     <ClCompile Include="src\benchmark\clu_benchmark.c" />
     <ClCompile Include="src\benchmark\clu_bench_setup.c" />
-    <ClCompile Include="src\certgen\clu_certgen_ed25519.c" />
-    <ClCompile Include="src\certgen\clu_certgen_rsa.c" />
     <ClCompile Include="src\client\client.c" />
     <ClCompile Include="src\client\clu_client_setup.c" />
     <ClCompile Include="src\clu_log.c" />

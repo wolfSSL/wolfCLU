@@ -33,8 +33,6 @@
 
 #define MAX_ENTRY_NAME 64
 
-static int loop = 0;
-
 static const struct option crypt_algo_options[] = {
     /* AES */
     {"-aes-128-ctr", no_argument, 0, WOLFCLU_AES128CTR},
@@ -1059,27 +1057,6 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
     }
 
     return ret;
-}
-
-
-/*
- * adds character to end of string
- */
-void wolfCLU_append(char* s, char c)
-{
-    int len = (int) XSTRLEN(s); /* length of string*/
-
-    s[len] = c;
-    s[len+1] = '\0';
-}
-
-/*
- * resets benchmarking loop
- */
-void wolfCLU_stop(int signo)
-{
-    (void) signo; /* type cast to void for unused variable */
-    loop = 0;
 }
 
 /*

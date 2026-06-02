@@ -23,7 +23,3 @@ enum {
     SHA_HASH384,
     SHA_HASH512
 };
-
-int make_self_signed_rsa_certificate(char*, char*, int);
-
-int make_self_signed_ed25519_certificate(char*, char*);
