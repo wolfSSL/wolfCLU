@@ -83,6 +83,10 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "ecc            Ecc signing and signature verification");
     WOLFCLU_LOG(WOLFCLU_L0, "ecparam        Generate an ECC key and parameters");
     WOLFCLU_LOG(WOLFCLU_L0, "ed25519        Ed25519 signing and signature verification");
+#ifdef HAVE_DILITHIUM
+    WOLFCLU_LOG(WOLFCLU_L0, "ml-dsa         ML-DSA signing and signature verification");
+    WOLFCLU_LOG(WOLFCLU_L0, "dilithium      Alias for ml-dsa");
+#endif
     WOLFCLU_LOG(WOLFCLU_L0, "enc / encrypt  Encrypt a file or some user input");
     WOLFCLU_LOG(WOLFCLU_L0, "hash           Hash a file or input");
     WOLFCLU_LOG(WOLFCLU_L0, "md5            Creates an MD5 hash");
@@ -138,6 +142,9 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "For ED25519 sign/ver: wolfssl -ed25519 -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For XMSS sign/ver: wolfssl -xmss -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For XMSS^MT sign/ver: wolfssl -xmssmt -help");
+#ifdef HAVE_DILITHIUM
+    WOLFCLU_LOG(WOLFCLU_L0, "For ML-DSA sign/ver: wolfssl -ml-dsa -help (or -dilithium -help)");
+#endif
  }
 
 /*
@@ -473,8 +480,8 @@ void wolfCLU_genKeyHelp(void)
         ,"ecc"
     #endif
     #ifdef HAVE_DILITHIUM
-        ,"dilithium"
         ,"ml-dsa"
+        ,"dilithium"
     #endif
     #ifdef WOLFSSL_HAVE_XMSS
         ,"xmss"
@@ -496,8 +503,12 @@ void wolfCLU_genKeyHelp(void)
 #ifdef HAVE_DILITHIUM
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
            "[2|3|5] -out mykey -outform der -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
+           "[2|3|5] -out mykey -outform pem -output KEYPAIR");
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
            "[2|3|5] -out mykey -outform der -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
+           "[2|3|5] -out mykey -outform pem -output KEYPAIR");
 #endif
 #ifdef WOLFSSL_HAVE_XMSS
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmss -height [10|16|20] -out mykey -outform raw"
@@ -528,6 +539,10 @@ void wolfCLU_signHelp(int keyType)
         #ifdef HAVE_ECC
         ,"ecc"
         #endif
+        #ifdef HAVE_DILITHIUM
+        ,"ml-dsa"
+        ,"dilithium"
+        #endif
         #ifdef WOLFSSL_HAVE_XMSS
         ,"xmss"
         ,"xmssmt"
@@ -545,6 +560,20 @@ void wolfCLU_signHelp(int keyType)
             case RSA_SIG_VER:
                 WOLFCLU_LOG(WOLFCLU_L0, "RSA Sign Usage: \nwolfssl -rsa -sign -inkey <priv_key>"
                        " -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            #ifdef HAVE_DILITHIUM
+            case DILITHIUM_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "ML-DSA (Dilithium) Sign Usage:\n"
+                       "wolfssl -ml-dsa -sign -inkey <priv_key> -inform <pem|der>\n"
+                       "                -in <file_to_sign> -out <signature_file>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "  -level [2|3|5] is set at key generation, not here.\n"
+                       "  PEM keys require '-inform pem' (default is der).\n"
+                       "  'dilithium' is accepted as an alias for 'ml-dsa'.\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "EXAMPLE:\n"
+                       "wolfssl -ml-dsa -sign -inkey ml-dsa-key-A.priv -inform pem\n"
+                       "                -in input.txt -out input.sign\n");
                 WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
             #endif
@@ -591,6 +620,10 @@ void wolfCLU_verifyHelp(int keyType) {
         #ifdef HAVE_ECC
         ,"ecc"
         #endif
+        #ifdef HAVE_DILITHIUM
+        ,"ml-dsa"
+        ,"dilithium"
+        #endif
         #ifdef WOLFSSL_HAVE_XMSS
         ,"xmss"
         ,"xmssmt"
@@ -613,6 +646,21 @@ void wolfCLU_verifyHelp(int keyType) {
                 WOLFCLU_LOG(WOLFCLU_L0, "RSA Verify with Public Key"
                        "wolfssl -rsa -verify -inkey <pub_key>"
                        " -sigfile <filename> -out <filename> -pubin\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            #ifdef HAVE_DILITHIUM
+            case DILITHIUM_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "ML-DSA (Dilithium) Verify Usage:\n"
+                       "wolfssl -ml-dsa -verify -inkey <pub_key> -inform <pem|der>\n"
+                       "                -in <original_file> -sigfile <signature_file>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "  Verifies with the public key (.pub).\n"
+                       "  PEM keys require '-inform pem' (default is der).\n"
+                       "  'dilithium' is accepted as an alias for 'ml-dsa'.\n"
+                       "  (-pubin is not applicable; verification always uses the public key)\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "EXAMPLE:\n"
+                       "wolfssl -ml-dsa -verify -inkey ml-dsa-key-A.pub -inform pem\n"
+                       "                -in input.txt -sigfile input.sign\n");
                 WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
             #endif

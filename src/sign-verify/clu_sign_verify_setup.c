@@ -56,6 +56,9 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     else if (wolfCLU_checkForArg("dilithium", 9, argc, argv) > 0) {
         algCheck = DILITHIUM_SIG_VER;
     }
+    else if (wolfCLU_checkForArg("ml-dsa", 6, argc, argv) > 0) {
+        algCheck = DILITHIUM_SIG_VER;
+    }
     else if (wolfCLU_checkForArg("xmss", 4, argc, argv) > 0) {
         algCheck = XMSS_SIG_VER;
     }
@@ -227,7 +230,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
         }
         else if (algCheck == DILITHIUM_SIG_VER && verifyCheck == 0) {
             WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
-                    "signing with Dilithium.");
+                    "signing with ML-DSA (Dilithium).");
             wolfCLU_signHelp(algCheck);
             if (priv)
                 XFREE(priv, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
