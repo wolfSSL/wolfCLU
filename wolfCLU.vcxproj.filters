@@ -203,6 +203,9 @@
     <ClInclude Include="wolfclu\x509\clu_x509_sign.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="wolfclu\asn1\clu_asn1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\wolfssl\IDE\WIN\USER_SETTINGS.H">
       <Filter>Header Files</Filter>
     </ClInclude>
