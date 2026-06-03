@@ -1,0 +1,87 @@
+.\" Manpage for wolfssl asn1parse.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl asn1parse man page"
+.SH NAME
+wolfssl-asn1parse, asn1parse \- ASN.1 parsing utility
+.SH SYNOPSIS
+wolfssl asn1parse [-in file] [-inform DER|PEM|B64] [-out file] [-oid file] [-offset n] [-length n] [-strparse n[,n...]] [-i] [-dump] [-noout] [-help]
+.SH DESCRIPTION
+Parses an ASN.1 encoded structure (for example a certificate, key, or CRL)
+and prints a human readable listing of its tags, lengths, and contents.
+Input may be read in DER, PEM, or Base64 form.
+.SH GENERAL OPTIONS
+-help                 print the asn1parse help summary and exit.
+.br
+.LP
+-oid file             file of extra OID definitions. Each line uses the
+.br
+                      format: <oid> <shortName> <long name with spaces>.
+.br
+                      To use the built in OID table, configure wolfCLU with
+.br
+                      --enable-oid-table.
+.SH I/O OPTIONS
+-in file              input file to read the ASN.1 structure from.
+.br
+.LP
+-inform DER|PEM|B64   input file format. One of DER, PEM, or B64 (Base64).
+.br
+.LP
+-out file             output file for the ASN.1 DER data after processing.
+.br
+                      Best used with -strparse.
+.br
+.LP
+-noout                do not print the parsed output.
+.br
+.LP
+-offset n             offset into the file at which to begin parsing.
+.br
+.LP
+-length n             number of bytes to parse.
+.br
+.LP
+-strparse n[,n...]    offset to an OCTET/BIT STRING to parse. A comma
+.br
+                      separated list may be given, e.g. -strparse 702,64.
+.SH FORMATTING OPTIONS
+-i                    indent the output according to structure depth.
+.br
+.LP
+-dump                 print unknown data in hex form.
+.SH OUTPUT
+Each line is formatted as:
+.RS
+                     0: 4 [1187]  (0) SEQUENCE
+.RE
+.LP
+where the first number is the offset, the second is the header length, the
+value in brackets is the data length, and the value in parentheses is the
+depth. Brackets indicate constructed types and a plus indicates a primitive
+type.
+.SH EXAMPLES
+Parse a DER encoded certificate with indented output:
+.RS
+wolfssl asn1parse -inform DER -in cert.der -i
+.RE
+.LP
+Parse a PEM file and dump unknown data as hex:
+.RS
+wolfssl asn1parse -in cert.pem -inform PEM -dump
+.RE
+.SH SEE ALSO
+.BR wolfssl-x509(1) ", " wolfssl-req(1)
+.SH NOTES
+Available only when wolfSSL is built with WOLFSSL_ASN_PRINT and without
+NO_FILESYSTEM. The -oid option additionally requires object id encoding
+support (NO_WC_ENCODE_OBJECT_ID must not be defined). For OpenSSL
+compatibility the tool reserves additional flags (e.g. -genstr, -genconf,
+-item, -strictpem, -dlimit) that are not yet implemented.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

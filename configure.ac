@@ -90,6 +90,19 @@ AC_ARG_ENABLE([manpages],
 
 AM_CONDITIONAL([ENABLE_MANPAGES], [test "x$ENABLED_MANPAGES" != "xno"])
 
+# OID Name Table Build
+ENABLED_OIDTABLE_DEFAULT=no
+AC_ARG_ENABLE([oid-table],
+    [AS_HELP_STRING([--enable-oid-table],[Enable OID-to-name lookup table (default: disabled)])],
+    [ ENABLED_OIDTABLE=$enableval ],
+    [ ENABLED_OIDTABLE=$ENABLED_OIDTABLE_DEFAULT ]
+    )
+
+if test "$ENABLED_OIDTABLE" = "yes"
+then
+    AM_CFLAGS="$AM_CFLAGS -DHAVE_OID_TABLE"
+fi
+
 
 #wolfssl
 AC_MSG_CHECKING([for wolfSSL])
@@ -135,6 +148,21 @@ AC_CHECK_FUNC([wolfSSL_X509_REQ_print],
 AC_CHECK_FUNC([wc_EncodeObjectId],
     [],
     [AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
+
+# wc_EncodeObjectId is not usable in libwolfssl <= 5.9.2, so disable it based
+# on the version when the symbol is present but too old.
+AC_MSG_CHECKING([whether libwolfssl version supports wc_EncodeObjectId])
+AC_COMPILE_IFELSE(
+    [AC_LANG_PROGRAM(
+        [[#include <wolfssl/version.h>]],
+        [[
+        #if LIBWOLFSSL_VERSION_HEX <= 0x05009002
+        #error "libwolfssl version too old for wc_EncodeObjectId"
+        #endif
+        ]])],
+    [AC_MSG_RESULT([yes])],
+    [AC_MSG_RESULT([no])
+     AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
 
 
 ###############################################
@@ -198,3 +226,4 @@ echo "   * C Compiler:                $CC_VERSION"
 echo "   * C Flags:                   $CFLAGS"
 echo "   * CPP Flags:                 $CPPFLAGS"
 echo "   * LIB Flags:                 $LIB"
+echo "   * OID Name Table:            $ENABLED_OIDTABLE"

@@ -11,7 +11,7 @@ config.log
 config.status
 configure
 configure~
-clu_src/config.h.in*
+wolfclu/config.h.in*
 *.lo
 *.Plo
 *.o
