@@ -89,7 +89,7 @@ subjectAltName = @alt_names
 RID.1 = 1.1.1.1
 RID.2 = surname
 email.1 = facts@wolfssl.com
-URI.1 = facts@wolfssl.com
+URI.1 = https://www.wolfssl.com
 """
 
 
