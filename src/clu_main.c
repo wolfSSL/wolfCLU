@@ -29,6 +29,7 @@
 #include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 #include <wolfclu/sign-verify/clu_verify.h>
+#include <wolfclu/asn1/clu_asn1.h>
 
 #ifdef _WIN32
 char* optarg;
@@ -75,6 +76,7 @@ static const struct option mode_options[] = {
     {"rand",      no_argument,       0, WOLFCLU_RAND        },
     {"dsaparam",  no_argument,       0, WOLFCLU_DSA         },
     {"dhparam",   no_argument,       0, WOLFCLU_DH          },
+    {"asn1parse", no_argument,       0, WOLFCLU_ASN1        },
 #if defined(HAVE_OCSP) && defined(HAVE_OCSP_RESPONDER)
     {"ocsp",      no_argument,       0, WOLFCLU_OCSP        },
 #endif
@@ -331,6 +333,10 @@ int main(int argc, char** argv)
 
         case WOLFCLU_BASE64:
             ret = wolfCLU_Base64Setup(argc, argv);
+            break;
+
+        case WOLFCLU_ASN1:
+            ret = wolfCLU_Asn1Setup(argc, argv);
             break;
 
         case WOLFCLU_HELP:
