@@ -71,6 +71,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "-help           Help, print out this help menu");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "Only set one of the following.\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "asn1parse      Used for parsing certificates as ASN1");
     WOLFCLU_LOG(WOLFCLU_L0, "ca             Used for signing certificates");
     WOLFCLU_LOG(WOLFCLU_L0, "crl            Used for parsing CRL files");
     WOLFCLU_LOG(WOLFCLU_L0, "bench          Benchmark one of the algorithms");
@@ -1761,6 +1762,35 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
 
     return WOLFCLU_FATAL_ERROR;
 
+}
+
+/* Parse a base-10 string into a outSz number, rejecting non-digits and overflow.
+ * On success *out is set; on failure *out is left unchanged. Callers log
+ * their own context-specific error message.
+ */
+int wolfCLU_StrToWord32(const char* arg, unsigned long strSz, word32* out)
+{
+    word32 val = 0;
+    if (arg == NULL || out == NULL || strSz == 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    for (word32 i = 0; i < strSz; i++) {
+        word32 digit;
+        if (*arg < '0' || *arg > '9') {
+            return WOLFCLU_FATAL_ERROR;
+        }
+        digit = (word32)(*arg - '0');
+        /* Detect word32 overflow before val = val * 10 + digit. */
+        if (val > (0xFFFFFFFFU - digit) / 10) {
+            return WOLFCLU_FATAL_ERROR;
+        }
+        val = (val * 10) + digit;
+        arg++;
+    }
+
+    *out = val;
+    return WOLFCLU_SUCCESS;
 }
 
 
