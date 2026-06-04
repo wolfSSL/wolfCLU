@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
@@ -55,7 +56,7 @@ int wolfCLU_Base64Setup(int argc, char** argv)
     int ret = WOLFCLU_SUCCESS;
     int decode = 0;
     int isPEM = 0;
-    word32 inputSz = 8000;
+    sword32 inputSz = 8000;
     word32 outputSz = 0;
     int option;
     int longIndex = 1;
@@ -128,7 +129,7 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            inputSz = (word32)XFTELL(f);
+            inputSz = (sword32)XFTELL(f);
             wolfSSL_BIO_reset(bioIn);
         }
     }
@@ -142,13 +143,18 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         else {
             inputSz = wolfSSL_BIO_read(bioIn, input, inputSz);
 
+            if (inputSz < 0) {
+                wolfCLU_LogError("Could not read input.");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
             /* For decoding, check if input is in PEM format */
-            if (decode && inputSz > 11) {
+            else if (decode && inputSz > 11) {
                 /* Check if the input starts with a PEM header */
                 if (XMEMCMP(input, "-----BEGIN", 10) == 0) {
                     isPEM = 1;
                 }
             }
+
         }
     }
 
@@ -199,7 +205,7 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         else {
             /* For regular base64 decoding */
             /* Calculate output size */
-            outputSz = (inputSz * 3) / 4 + 1;
+            outputSz = (inputSz / 4) * 3 + (inputSz % 4) * 3 / 4 + 1;
 
             /* Allocate output buffer */
             output = (byte*)XMALLOC(outputSz, HEAP_HINT,
