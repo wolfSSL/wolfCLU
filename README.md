@@ -154,6 +154,15 @@ uqGDApXWYuBdjheL4Ysoq6YXtt6dnm8DkBVrnt+gAMCBFbBNPXxy2MODBDqya907
 iky6IRTUzkBy1fssv3Gr/jOsyN8J565NST3RpQ==
 -----END CERTIFICATE-----
 ```
+A self-signed certificate can also be generated with a pure post-quantum
+ML-DSA (FIPS 204) key. `ml-dsa` and `dilithium` are interchangeable, and the
+level (`2`/`3`/`5`) selects ML-DSA-44/65/87. This needs wolfSSL built with
+`--enable-dilithium --enable-experimental`.
+```
+wolfssl req -x509 -newkey ml-dsa:2 -keyout ml-dsa-key -days 3650 \
+    -subj /CN=wolfSSL -out ml-dsa.cert
+```
+
 ### DGST Sign and Verify
 
 The commands below sign this README then verify it with the resulting signature.

@@ -44,7 +44,6 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
     if (pubIn == 0) {
         ret = wc_KeyPemToDer(keyBuf, pkeySz, NULL, 0, NULL);
         if (ret > 0) {
-            wolfCLU_Log(WOLFCLU_L0, "DER size: %d", ret);
             int derSz = ret;
             der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             if (der == NULL) {
@@ -54,7 +53,6 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
             else {
                 ret = wc_KeyPemToDer(keyBuf, pkeySz, der, derSz, NULL);
                 if (ret > 0) {
-                    wolfCLU_Log(WOLFCLU_L0, "DER size2: %d", ret);
                     /* replace incoming pkeyBuf with new der buf */
                     XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     *pkeyBuf = der;
@@ -66,7 +64,6 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
                 }
             }
         }
-        wolfCLU_Log(WOLFCLU_L0, "DER size3: %d", ret);
     }
     else {
         ret = wc_PubKeyPemToDer(keyBuf, pkeySz, NULL, 0);
@@ -121,13 +118,14 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
     }
     fSz = (int)fTell;
 
-    data = (byte*)XMALLOC(fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    data = (byte*)XMALLOC((size_t)fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (data == NULL) {
         XFCLOSE(f);
         return MEMORY_E;
     }
 
-    if (XFSEEK(f, 0, SEEK_SET) != 0 || (int)XFREAD(data, 1, fSz, f) != fSz) {
+    if (XFSEEK(f, 0, SEEK_SET) != 0 ||
+            XFREAD(data, 1, (size_t)fSz, f) != (size_t)fSz) {
         XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         XFCLOSE(f);
         return WOLFCLU_FATAL_ERROR;
@@ -137,29 +135,31 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
     switch(keyType) {
 
     case RSA_SIG_VER:
-        ret = wolfCLU_sign_data_rsa(data, out, fSz, privKey, inForm);
+        ret = wolfCLU_sign_data_rsa(data, out, (word32)fSz, privKey, inForm);
         break;
 
     case ECC_SIG_VER:
-        ret = wolfCLU_sign_data_ecc(data, out, fSz, privKey, inForm);
+        ret = wolfCLU_sign_data_ecc(data, out, (word32)fSz, privKey, inForm);
         break;
 
     case ED25519_SIG_VER:
-        ret = wolfCLU_sign_data_ed25519(data, out, fSz, privKey, inForm);
+        ret = wolfCLU_sign_data_ed25519(data, out, (word32)fSz, privKey,
+                                        inForm);
         break;
 
 #ifdef HAVE_DILITHIUM
     case DILITHIUM_SIG_VER:
-        ret = wolfCLU_sign_data_dilithium(data, out, fSz, privKey, inForm);
+        ret = wolfCLU_sign_data_dilithium(data, out, (word32)fSz, privKey,
+                                          inForm);
         break;
 #endif
 
 #ifdef WOLFSSL_HAVE_XMSS
     case XMSS_SIG_VER:
-        ret = wolfCLU_sign_data_xmss(data, out, fSz, privKey);
+        ret = wolfCLU_sign_data_xmss(data, out, (int)fSz, privKey);
         break;
     case XMSSMT_SIG_VER:
-        ret = wolfCLU_sign_data_xmssmt(data, out, fSz, privKey);
+        ret = wolfCLU_sign_data_xmssmt(data, out, (int)fSz, privKey);
         break;
 #endif
 

@@ -1286,8 +1286,8 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 #endif /* HAVE_DILITHIUM */
 }
 
-int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
-                            int keySz, int level, int withAlg)
+int wolfCLU_genKey_ML_DSA(WC_RNG* rng, const char* fName, int directive,
+                            int fmt, int keySz, int level, int withAlg)
 {
 #ifdef HAVE_DILITHIUM
     int    ret = WOLFCLU_SUCCESS;
