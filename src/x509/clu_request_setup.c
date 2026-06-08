@@ -56,6 +56,7 @@ static const struct option req_options[] = {
     {"-passout",   required_argument, 0, WOLFCLU_PASSWORD_OUT },
     {"-noout",     no_argument,       0, WOLFCLU_NOOUT },
     {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
+    {"-addext",    required_argument, 0, WOLFCLU_ADDEXT },
     {"-nodes",     no_argument,       0, WOLFCLU_NODES },
     {"-h",         no_argument,       0, WOLFCLU_HELP },
     {"-help",      no_argument,       0, WOLFCLU_HELP },
@@ -554,6 +555,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     char*   config = NULL;
     char*   subj = NULL;
     char*   ext = NULL;
+    char*   addExt = NULL;
     char*   keyType = NULL;
     char*   keyInfo = NULL;
     char*   keyOut  = NULL;
@@ -587,6 +589,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
         switch (option) {
             case WOLFCLU_EXTENSIONS:
                 ext = optarg;
+                break;
+
+            case WOLFCLU_ADDEXT:
+                addExt = optarg;
                 break;
 
             case WOLFCLU_NODES:
@@ -872,6 +878,12 @@ int wolfCLU_requestSetup(int argc, char** argv)
             wolfCLU_certgenHelp();
             ret = USER_INPUT_ERROR;
         }
+    }
+
+    /* apply the -addext extension, if present */
+    if (ret == WOLFCLU_SUCCESS && addExt != NULL) {
+        ret = wolfCLU_parseAddExt(x509, addExt);
+        reSign = 1; /* re-sign after extension change */
     }
 
     /* if no configure is passed in then get input from command line */

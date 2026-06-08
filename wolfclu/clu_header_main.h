@@ -558,6 +558,12 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext);
 int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect);
 
 /**
+ * @brief parse a command line "-addext name=value" argument and apply it to
+ *  'x509'.
+ */
+int wolfCLU_parseAddExt(WOLFSSL_X509* x509, char* addExt);
+
+/**
  * @brief used to get an object for a given NID and set it to the given
  *  extension
  */

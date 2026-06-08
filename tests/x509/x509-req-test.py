@@ -211,6 +211,32 @@ class TestReqNew(unittest.TestCase):
         self.assertIn("CA:TRUE", r2.stdout)
 
 
+    def test_req_x509_addext_subject_alt_name(self):
+        """req -x509 -addext subjectAltName adds IP and DNS alt names."""
+        crt = _tmp("test_req_addext.crt")
+        self._clean(crt)
+        r = run_wolfssl("req", "-new", "-days", "3650",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", "CN=192.168.1.2",
+                        "-addext",
+                        "subjectAltName=IP:192.168.1.2,DNS:example.com",
+                        "-x509", "-out", crt)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r2 = run_wolfssl("x509", "-in", crt, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        found_san = False
+        lines = r2.stdout.splitlines()
+        for i, line in enumerate(lines):
+            if "X509v3 Subject Alternative Name" in line:
+                found_san = True
+                san_line = lines[i + 1]
+                self.assertIn("IP Address:192.168.1.2", san_line)
+                self.assertIn("DNS:example.com", san_line)
+                break
+        self.assertTrue(found_san, "SAN not found in cert output")
+
+
 class TestReqPemDerRoundTrip(unittest.TestCase):
     """Test PEM <-> DER round-trip for CSR."""
 
