@@ -321,6 +321,7 @@ int wolfCLU_Rand(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS) {
         WC_RNG rng;
+        XMEMSET(&rng, 0, sizeof(rng));
         if (wc_InitRng(&rng) != 0) {
             wolfCLU_LogError("Unable to initialize RNG");
             ret = WOLFCLU_FATAL_ERROR;

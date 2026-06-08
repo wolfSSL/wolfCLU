@@ -987,5 +987,483 @@ class TestReqChallengePassword(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+def _has_dilithium():
+    """Return True if the current build supports Dilithium/ML-DSA."""
+    r = run_wolfssl("-genkey", "-h")
+    return "dilithium" in (r.stdout + r.stderr)
+
+
+@unittest.skipUnless(_has_dilithium(), "ML-DSA (Dilithium) not available")
+class TestReqMLDSACert(unittest.TestCase):
+    """End-to-end tests for `req -x509 -newkey ml-dsa:N` certificate generation.
+
+    Guards the wolfCLU_MakeMLDSACert code path, including:
+      - the isMLDSA guard that was missing from wolfCLU_requestSetup
+      - wolfCLU_KeyPemToDer probe cleanup with correct DER buffer size
+    """
+
+    def _clean(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: _cleanup(p))
+
+    def _test_newkey_level(self, level):
+        cert = _tmp("mldsa{}_cert.pem".format(level))
+        priv = _tmp("mldsa{}_key".format(level))
+        self._clean(cert, priv + ".priv", priv + ".pub")
+
+        r = run_wolfssl("req", "-x509",
+                        "-newkey", "ml-dsa:{}".format(level),
+                        "-keyout", priv,
+                        "-subj", "/CN=wolfCLU-ML-DSA-{}/O=wolfSSL".format(level),
+                        "-days", "1",
+                        "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "req -x509 -newkey ml-dsa:{} failed: {}".format(
+                             level, r.stderr))
+        self.assertTrue(os.path.isfile(cert),
+                        "cert file not created for ml-dsa:{}".format(level))
+        self.assertGreater(os.path.getsize(cert), 0,
+                           "cert file is empty for ml-dsa:{}".format(level))
+
+        # Self-signed cert must verify against itself (implicitly parses too).
+        r2 = run_wolfssl("verify", "-CAfile", cert, cert)
+        self.assertEqual(r2.returncode, 0,
+                         "verify failed for self-signed ml-dsa:{} cert: "
+                         "{}".format(level, r2.stderr))
+
+        # If OpenSSL supports ML-DSA, confirm the signature algorithm name.
+        if HAS_OPENSSL:
+            import subprocess as _sp
+            r3 = _sp.run(
+                ["openssl", "x509", "-in", cert, "-text", "-noout"],
+                capture_output=True, text=True, timeout=60)
+            if r3.returncode == 0:
+                self.assertIn("ML-DSA", r3.stdout,
+                              "ML-DSA not found in openssl cert text")
+
+    def test_newkey_level2(self):
+        """ML-DSA level 2 cert: creation, parse, and self-verify."""
+        self._test_newkey_level(2)
+
+    def test_newkey_level3(self):
+        """ML-DSA level 3 cert: creation, parse, and self-verify."""
+        self._test_newkey_level(3)
+
+    def test_newkey_level5(self):
+        """ML-DSA level 5 cert: creation, parse, and self-verify."""
+        self._test_newkey_level(5)
+
+    def test_invalid_level_fails(self):
+        """ml-dsa:4 is not a valid level and must fail."""
+        cert = _tmp("mldsa_bad_level.pem")
+        priv = _tmp("mldsa_bad_level_key")
+        self._clean(cert, priv + ".priv", priv + ".pub")
+        r = run_wolfssl("req", "-x509",
+                        "-newkey", "ml-dsa:4",
+                        "-keyout", priv,
+                        "-subj", "/CN=bad",
+                        "-days", "1",
+                        "-out", cert)
+        self.assertNotEqual(r.returncode, 0,
+                            "ml-dsa:4 should fail but returned 0")
+
+    def test_newkey_der_output(self):
+        """ML-DSA cert in DER form must be parseable by wolfssl x509."""
+        cert = _tmp("mldsa5_cert.der")
+        priv = _tmp("mldsa5_key_der")
+        self._clean(cert, priv + ".priv", priv + ".pub")
+
+        r = run_wolfssl("req", "-x509",
+                        "-newkey", "ml-dsa:5",
+                        "-keyout", priv,
+                        "-subj", "/CN=wolfCLU-ML-DSA-5-DER/O=wolfSSL",
+                        "-days", "1",
+                        "-outform", "DER",
+                        "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "req -x509 -newkey ml-dsa:5 -outform DER failed: "
+                         + r.stderr)
+        self.assertGreater(os.path.getsize(cert), 0,
+                           "DER cert file is empty")
+
+    def test_existing_key(self):
+        """req -x509 -key <existing ml-dsa key>: create and self-verify."""
+        priv = _tmp("mldsa_existing_key")
+        cert = _tmp("mldsa_existing_cert.pem")
+        self._clean(priv + ".priv", priv + ".pub", cert)
+
+        r = run_wolfssl("-genkey", "dilithium", "-level", "2",
+                        "-out", priv, "-outform", "pem")
+        if r.returncode != 0:
+            self.skipTest("key generation failed: " + r.stderr)
+
+        r = run_wolfssl("req", "-x509",
+                        "-key", priv + ".priv",
+                        "-subj", "/CN=wolfCLU-ML-DSA-existing/O=wolfSSL",
+                        "-days", "1",
+                        "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "req -x509 with existing ml-dsa key failed: "
+                         + r.stderr)
+        self.assertTrue(os.path.isfile(cert),
+                        "cert not created from existing ml-dsa key")
+
+        r2 = run_wolfssl("verify", "-CAfile", cert, cert)
+        self.assertEqual(r2.returncode, 0,
+                         "verify failed for existing-key ml-dsa cert: "
+                         + r2.stderr)
+
+    def test_newkey_without_x509_fails(self):
+        """ML-DSA -newkey without -x509 is rejected before any key files are
+        written — the -x509 requirement is checked prior to keygen."""
+        priv = _tmp("mldsa_csr_key")
+        csr = _tmp("mldsa_csr.pem")
+        self._clean(priv + ".priv", priv + ".pub", csr)
+
+        r = run_wolfssl("req",
+                        "-newkey", "ml-dsa:2",
+                        "-keyout", priv,
+                        "-subj", "/CN=wolfCLU-ML-DSA-csr",
+                        "-out", csr)
+        self.assertNotEqual(r.returncode, 0,
+                            "ml-dsa CSR (no -x509) should fail but returned 0")
+        self.assertIn("only supported with -x509", r.stdout + r.stderr,
+                      "expected the -x509-only guard message")
+        # The -x509 guard fires before keygen, so no key files should exist.
+        self.assertFalse(os.path.exists(priv + ".priv"),
+                         "-keyout .priv written before -x509 check fired")
+        self.assertFalse(os.path.exists(priv + ".pub"),
+                         "-keyout .pub written before -x509 check fired")
+
+    def test_newkey_keyout_roundtrip(self):
+        """A key kept via -keyout (standard SPKI .pub) is reusable with -key."""
+        key = _tmp("mldsa_rt_key")
+        cert1 = _tmp("mldsa_rt1.pem")
+        cert2 = _tmp("mldsa_rt2.pem")
+        self._clean(key + ".priv", key + ".pub", cert1, cert2)
+
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:2",
+                        "-keyout", key, "-subj", "/CN=rt1/O=wolfSSL",
+                        "-days", "1", "-out", cert1)
+        self.assertEqual(r.returncode, 0, "initial gen failed: " + r.stderr)
+
+        # reuse the retained .priv (+ companion .pub) to make another cert
+        r = run_wolfssl("req", "-x509", "-key", key + ".priv",
+                        "-subj", "/CN=rt2/O=wolfSSL", "-days", "1",
+                        "-out", cert2)
+        self.assertEqual(r.returncode, 0,
+                         "reuse of kept ml-dsa key failed: " + r.stderr)
+        r2 = run_wolfssl("verify", "-CAfile", cert2, cert2)
+        self.assertEqual(r2.returncode, 0,
+                         "verify of round-trip cert failed: " + r2.stderr)
+
+    def test_newkey_no_keyout_no_x509_cleans_temp(self):
+        """A rejected -newkey ml-dsa (no -x509, no -keyout) leaves no
+        throwaway key files — the -x509 check fires before keygen."""
+        csr = _tmp("mldsa_tmp_csr.pem")
+        tmp_priv = _tmp("wolfclu_tmp_mldsa.priv")
+        tmp_pub = _tmp("wolfclu_tmp_mldsa.pub")
+        self._clean(csr, tmp_priv, tmp_pub)
+
+        r = run_wolfssl("req",
+                        "-newkey", "ml-dsa:2",
+                        "-subj", "/CN=wolfCLU-ML-DSA-tmp-nox509",
+                        "-out", csr)
+        self.assertNotEqual(r.returncode, 0,
+                            "ml-dsa without -x509 should be rejected")
+        self.assertFalse(os.path.exists(tmp_priv),
+                         "throwaway private key should not exist (check fires before keygen)")
+        self.assertFalse(os.path.exists(tmp_pub),
+                         "throwaway public key should not exist (check fires before keygen)")
+
+    def test_missing_pub_sibling_fails(self):
+        """req -x509 -key <mldsa.priv> with no .pub sibling fails gracefully."""
+        priv = _tmp("mldsa_nopub_key")
+        cert = _tmp("mldsa_nopub_cert.pem")
+        self._clean(priv + ".priv", priv + ".pub", cert)
+
+        r = run_wolfssl("-genkey", "dilithium", "-level", "2",
+                        "-out", priv, "-outform", "pem")
+        if r.returncode != 0:
+            self.skipTest("key generation failed: " + r.stderr)
+        os.remove(priv + ".pub")
+
+        r = run_wolfssl("req", "-x509",
+                        "-key", priv + ".priv",
+                        "-subj", "/CN=nopub",
+                        "-days", "1",
+                        "-out", cert)
+        self.assertNotEqual(r.returncode, 0,
+                            "missing .pub sibling should fail but returned 0")
+        self.assertFalse(os.path.exists(cert) and os.path.getsize(cert) > 0,
+                         "no usable cert should be produced on failure")
+
+    def test_key_not_named_priv_fails(self):
+        """An ML-DSA private key not ending in .priv fails with a clear error."""
+        priv = _tmp("mldsa_named_key")
+        renamed = _tmp("mldsa_named_key.pem")
+        cert = _tmp("mldsa_named_cert.pem")
+        self._clean(priv + ".priv", priv + ".pub", renamed, cert)
+
+        r = run_wolfssl("-genkey", "dilithium", "-level", "2",
+                        "-out", priv, "-outform", "pem")
+        if r.returncode != 0:
+            self.skipTest("key generation failed: " + r.stderr)
+        # private-only key whose name does not end in .priv
+        shutil.copyfile(priv + ".priv", renamed)
+
+        r = run_wolfssl("req", "-x509",
+                        "-key", renamed,
+                        "-subj", "/CN=named",
+                        "-days", "1",
+                        "-out", cert)
+        self.assertNotEqual(r.returncode, 0,
+                            "non-.priv ml-dsa key should fail but returned 0")
+
+    def test_newkey_no_keyout_cleans_temp(self):
+        """-newkey ml-dsa without -keyout must not leave temp key files behind."""
+        cert = _tmp("mldsa_tmp_cert.pem")
+        tmp_priv = _tmp("wolfclu_tmp_mldsa.priv")
+        tmp_pub = _tmp("wolfclu_tmp_mldsa.pub")
+        # guard against leaving artifacts even if the assertion fails
+        self._clean(cert, tmp_priv, tmp_pub)
+
+        r = run_wolfssl("req", "-x509",
+                        "-newkey", "ml-dsa:2",
+                        "-subj", "/CN=wolfCLU-ML-DSA-tmp",
+                        "-days", "1",
+                        "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "req -x509 -newkey ml-dsa:2 (no -keyout) failed: "
+                         + r.stderr)
+        self.assertGreater(os.path.getsize(cert), 0, "cert file is empty")
+        self.assertFalse(os.path.exists(tmp_priv),
+                         "throwaway private key was not cleaned up")
+        self.assertFalse(os.path.exists(tmp_pub),
+                         "throwaway public key was not cleaned up")
+
+    def test_newkey_keyout_too_long_fails(self):
+        """An overlong -keyout name is rejected gracefully (path-truncation
+        guard), not silently truncated into the wrong file."""
+        cert = _tmp("mldsa_long_cert.pem")
+        self._clean(cert)
+        longname = "a" * 600
+
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:2",
+                        "-keyout", longname, "-subj", "/CN=long",
+                        "-days", "1", "-out", cert)
+        self.assertNotEqual(r.returncode, 0,
+                            "overlong -keyout should be rejected")
+        self.assertIn("too long", r.stdout + r.stderr)
+
+    def test_newkey_no_keyout_refuses_to_clobber(self):
+        """-newkey without -keyout must refuse (not overwrite/delete) when a
+        file named wolfclu_tmp_mldsa.priv already exists in the CWD."""
+        tmp_priv = _tmp("wolfclu_tmp_mldsa.priv")
+        tmp_pub = _tmp("wolfclu_tmp_mldsa.pub")
+        cert = _tmp("mldsa_clobber_cert.pem")
+        self._clean(tmp_priv, tmp_pub, cert)
+
+        sentinel = "DO NOT DELETE OR OVERWRITE ME"
+        with open(tmp_priv, "w", encoding="utf-8") as f:
+            f.write(sentinel)
+
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:2",
+                        "-subj", "/CN=clobber", "-days", "1", "-out", cert)
+        self.assertNotEqual(r.returncode, 0,
+                            "should refuse when temp key file already exists")
+        self.assertIn("Refusing to overwrite", r.stdout + r.stderr)
+        self.assertTrue(os.path.exists(tmp_priv),
+                        "pre-existing temp key file was deleted")
+        with open(tmp_priv, "r", encoding="utf-8") as f:
+            self.assertEqual(f.read(), sentinel,
+                             "pre-existing temp key file was overwritten")
+
+    def test_config_extensions_warns(self):
+        """ML-DSA -x509 with -config warns that extensions are not applied."""
+        conf = _tmp("mldsa_ext.conf")
+        cert = _tmp("mldsa_ext_cert.pem")
+        priv = _tmp("mldsa_ext_key")
+        self._clean(conf, cert, priv + ".priv", priv + ".pub")
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(TEST_CONF)
+
+        r = run_wolfssl("req", "-x509",
+                        "-newkey", "ml-dsa:2",
+                        "-keyout", priv,
+                        "-config", conf,
+                        "-days", "1",
+                        "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "ml-dsa -x509 with -config failed: " + r.stderr)
+        self.assertIn("ignores -config", r.stdout + r.stderr,
+                      "expected a warning that extensions are ignored")
+
+        # the produced cert is still a valid self-signed cert
+        r2 = run_wolfssl("verify", "-CAfile", cert, cert)
+        self.assertEqual(r2.returncode, 0,
+                         "verify failed for ml-dsa -config cert: " + r2.stderr)
+
+        # extensions really are dropped: the config's subjectAltName is absent
+        if HAS_OPENSSL:
+            import subprocess as _sp
+            r3 = _sp.run(["openssl", "x509", "-in", cert, "-text", "-noout"],
+                         capture_output=True, text=True, timeout=60)
+            if r3.returncode == 0:
+                self.assertNotIn("extraName", r3.stdout,
+                                 "subjectAltName from config should be dropped")
+
+    def test_keyout_unencrypted_warning(self):
+        """Keeping an ML-DSA key via -keyout warns it is written unencrypted."""
+        key = _tmp("mldsa_warn_key")
+        cert = _tmp("mldsa_warn_cert.pem")
+        self._clean(key + ".priv", key + ".pub", cert)
+
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:2",
+                        "-keyout", key, "-subj", "/CN=warn/O=wolfSSL",
+                        "-days", "1", "-out", cert)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("written unencrypted", r.stdout + r.stderr,
+                      "expected the unencrypted-key warning")
+
+    def test_keyout_nodes_no_warning(self):
+        """-nodes with -keyout must NOT emit the unencrypted-key warning."""
+        key = _tmp("mldsa_nodes_key")
+        cert = _tmp("mldsa_nodes_cert.pem")
+        self._clean(key + ".priv", key + ".pub", cert)
+
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:2",
+                        "-keyout", key, "-nodes", "-subj", "/CN=nodes/O=wolfSSL",
+                        "-days", "1", "-out", cert)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("written unencrypted", r.stdout + r.stderr,
+                         "-nodes should suppress the unencrypted-key warning")
+
+    def test_noout_suppresses_output(self):
+        """-noout must suppress certificate output on the ML-DSA path."""
+        key = _tmp("mldsa_noout_key")
+        cert = _tmp("mldsa_noout_cert.pem")
+        self._clean(key + ".priv", key + ".pub", cert)
+
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:2",
+                        "-keyout", key, "-noout", "-subj", "/CN=noout",
+                        "-days", "1", "-out", cert)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("BEGIN CERTIFICATE", r.stdout,
+                         "-noout should not print the certificate")
+        self.assertFalse(os.path.exists(cert) and os.path.getsize(cert) > 0,
+                         "-noout should not write certificate content")
+
+    def test_text_warns_unsupported(self):
+        """-text on the ML-DSA path warns that it is unsupported."""
+        key = _tmp("mldsa_text_key")
+        cert = _tmp("mldsa_text_cert.pem")
+        self._clean(key + ".priv", key + ".pub", cert)
+
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:2",
+                        "-keyout", key, "-text", "-subj", "/CN=text",
+                        "-days", "1", "-out", cert)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("not supported", r.stdout + r.stderr,
+                      "expected a warning that -text is unsupported")
+
+    def test_level5_full_subject_dn(self):
+        """ML-DSA-87 (largest sig+key) with a fully-populated subject DN must
+        still fit the cert buffer (self-signed duplicates the DN as issuer)."""
+        cert = _tmp("mldsa5_fulldn.pem")
+        key = _tmp("mldsa5_fulldn_key")
+        self._clean(cert, key + ".priv", key + ".pub")
+
+        big = "X" * 60  # near CTC_NAME_SIZE (64) for each component
+        subj = ("/C=US/ST={0}/L={0}/O={0}/OU={0}/CN={0}".format(big))
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:5",
+                        "-keyout", key, "-subj", subj, "-days", "1",
+                        "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "ml-dsa:5 with a full subject DN failed: " + r.stderr)
+        self.assertGreater(os.path.getsize(cert), 0, "cert file is empty")
+        r2 = run_wolfssl("verify", "-CAfile", cert, cert)
+        self.assertEqual(r2.returncode, 0,
+                         "verify failed for full-DN ml-dsa:5 cert: " + r2.stderr)
+
+    def test_newkey_dilithium_alias(self):
+        """The 'dilithium:N' spelling of -newkey works like 'ml-dsa:N'."""
+        cert = _tmp("dilithium_alias_cert.pem")
+        key = _tmp("dilithium_alias_key")
+        self._clean(cert, key + ".priv", key + ".pub")
+
+        r = run_wolfssl("req", "-x509", "-newkey", "dilithium:2",
+                        "-keyout", key, "-subj", "/CN=dilithium-alias/O=wolfSSL",
+                        "-days", "1", "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "req -x509 -newkey dilithium:2 failed: " + r.stderr)
+        self.assertGreater(os.path.getsize(cert), 0, "cert file is empty")
+        r2 = run_wolfssl("verify", "-CAfile", cert, cert)
+        self.assertEqual(r2.returncode, 0,
+                         "verify failed for dilithium-alias cert: " + r2.stderr)
+
+    def test_existing_key_without_x509_fails(self):
+        """An existing ML-DSA -key without -x509 (CSR) must be rejected."""
+        key = _tmp("mldsa_existing_csr_key")
+        csr = _tmp("mldsa_existing_csr.pem")
+        self._clean(key + ".priv", key + ".pub", csr)
+
+        r = run_wolfssl("-genkey", "dilithium", "-level", "2",
+                        "-out", key, "-outform", "pem")
+        if r.returncode != 0:
+            self.skipTest("key generation failed: " + r.stderr)
+
+        r = run_wolfssl("req", "-key", key + ".priv",
+                        "-subj", "/CN=mldsa-existing-csr", "-out", csr)
+        self.assertNotEqual(r.returncode, 0,
+                            "ml-dsa -key without -x509 should be rejected")
+        self.assertIn("only supported with -x509", r.stdout + r.stderr,
+                      "expected the -x509-only guard message")
+
+    def test_subject_field_truncation_warns(self):
+        """A DN component longer than CTC_NAME_SIZE-1 (63) is truncated and
+        emits a warning, but the cert is still produced and verifies."""
+        cert = _tmp("mldsa_trunc_cert.pem")
+        key = _tmp("mldsa_trunc_key")
+        self._clean(cert, key + ".priv", key + ".pub")
+
+        # CTC_NAME_SIZE is build-dependent (64 by default, 128 with
+        # --enable-all); 300 exceeds either so the truncation branch fires.
+        long_cn = "Z" * 300
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:2",
+                        "-keyout", key, "-subj", "/CN={}".format(long_cn),
+                        "-days", "1", "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "cert gen with an over-long CN failed: " + r.stderr)
+        self.assertIn("truncated", r.stdout + r.stderr,
+                      "expected a subject-field truncation warning")
+        self.assertGreater(os.path.getsize(cert), 0, "cert file is empty")
+        r2 = run_wolfssl("verify", "-CAfile", cert, cert)
+        self.assertEqual(r2.returncode, 0,
+                         "verify failed for truncated-DN cert: " + r2.stderr)
+
+    @unittest.skipUnless(HAS_OPENSSL, "openssl needed to make a PKCS#8 RSA key")
+    def test_pkcs8_rsa_key_not_misclassified(self):
+        """In a Dilithium build the -key ML-DSA probe must not misclassify a
+        conventional PKCS#8 RSA key; it must be handled by the normal path."""
+        import subprocess as _sp
+        key = _tmp("pkcs8_rsa.pem")
+        cert = _tmp("pkcs8_rsa_cert.pem")
+        self._clean(key, cert)
+
+        g = _sp.run(["openssl", "genpkey", "-algorithm", "RSA",
+                     "-pkeyopt", "rsa_keygen_bits:2048", "-out", key],
+                    capture_output=True, text=True, timeout=60)
+        if g.returncode != 0:
+            self.skipTest("openssl genpkey failed: " + g.stderr)
+
+        r = run_wolfssl("req", "-x509", "-key", key, "-subj", "/CN=pkcs8rsa",
+                        "-days", "1", "-out", cert)
+        self.assertEqual(r.returncode, 0,
+                         "PKCS#8 RSA key via -key failed (probe regression?): "
+                         + r.stderr)
+        self.assertGreater(os.path.getsize(cert), 0, "cert file is empty")
+
+
 if __name__ == "__main__":
     test_main()

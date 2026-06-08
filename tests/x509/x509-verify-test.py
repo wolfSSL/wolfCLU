@@ -3,10 +3,18 @@
 
 import os
 import sys
+import shutil
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
+
+
+def _has_dilithium():
+    """Return True if the current build supports Dilithium/ML-DSA."""
+    r = run_wolfssl("-genkey", "-h")
+    return "dilithium" in (r.stdout + r.stderr)
 
 
 def _has_crl():
@@ -171,6 +179,71 @@ class TestX509VerifyChain(unittest.TestCase):
                         os.path.join(CERTS_DIR, "ca-int-cert.pem"),
                         os.path.join(CERTS_DIR, "ca-int2-cert.pem"))
         self.assertEqual(r.returncode, 0, r.stderr)
+
+
+@unittest.skipUnless(_has_dilithium(), "ML-DSA (Dilithium) not available")
+class TestX509VerifyMLDSA(unittest.TestCase):
+    """Verification of pure ML-DSA self-signed certificates."""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
+
+    def _make_cert(self, level, cn):
+        key = os.path.join(self.dir, "k{}".format(level))
+        cert = os.path.join(self.dir, "c_{}.pem".format(cn))
+        r = run_wolfssl("req", "-x509", "-newkey", "ml-dsa:{}".format(level),
+                        "-keyout", key, "-subj", "/CN={}".format(cn),
+                        "-days", "1", "-out", cert)
+        self.assertEqual(r.returncode, 0, "ml-dsa cert gen failed: " + r.stderr)
+        return cert
+
+    def test_verify_self_signed_ok(self):
+        """A valid ML-DSA self-signed cert verifies against itself."""
+        cert = self._make_cert(2, "mldsa-ok")
+        r = run_wolfssl("verify", "-CAfile", cert, cert)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_verify_without_ca_fails(self):
+        """An ML-DSA cert without its CA fails (issuer cannot be found)."""
+        cert = self._make_cert(3, "mldsa-noca")
+        r = run_wolfssl("verify", cert)
+        self.assertNotEqual(r.returncode, 0,
+                            "verify should fail with no CA supplied")
+
+    def test_verify_wrong_ca_fails(self):
+        """An ML-DSA cert does not verify against an unrelated CA."""
+        cert = self._make_cert(2, "mldsa-wrongca")
+        r = run_wolfssl("verify", "-CAfile",
+                        os.path.join(CERTS_DIR, "ca-cert.pem"), cert)
+        self.assertNotEqual(r.returncode, 0,
+                            "verify should fail against an unrelated CA")
+
+    def test_verify_tampered_signature_fails(self):
+        """Flipping bytes INSIDE the ML-DSA signature (the trailing BIT STRING
+        content) must make verification fail. Mutating signature content does
+        not change any ASN.1 lengths, so the cert still parses and the failure
+        is unambiguously in signature verification, not DER decoding."""
+        import base64
+        cert = self._make_cert(2, "mldsa-tamper")
+        with open(cert, "r", encoding="utf-8") as f:
+            pem = f.read()
+        b64 = "".join(ln for ln in pem.splitlines() if "-----" not in ln)
+        der = bytearray(base64.b64decode(b64))
+        # The ML-DSA signature is the final element of the cert; the last bytes
+        # are signature content (thousands of bytes for ML-DSA). Flip several
+        # bytes near the very end, comfortably inside the signature.
+        for off in (-4, -12, -40):
+            der[off] ^= 0xFF
+        new_b64 = base64.encodebytes(bytes(der)).decode("ascii")
+        tampered = os.path.join(self.dir, "tampered.pem")
+        with open(tampered, "w", encoding="utf-8", newline="\n") as f:
+            f.write("-----BEGIN CERTIFICATE-----\n" + new_b64 +
+                    "-----END CERTIFICATE-----\n")
+
+        r = run_wolfssl("verify", "-CAfile", tampered, tampered)
+        self.assertNotEqual(r.returncode, 0,
+                            "verify should fail on a signature-tampered cert")
 
 
 if __name__ == "__main__":

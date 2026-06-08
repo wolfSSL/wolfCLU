@@ -69,9 +69,11 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-selfsign sign with key associated with cert");
 #if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend sign with alternate key");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-altkey file to read alternate private key from");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-altpub file to read alternate public key from");
+    WOLFCLU_LOG(WOLFCLU_L0, "  Chimera (dual-algorithm) options for adding a post-quantum");
+    WOLFCLU_LOG(WOLFCLU_L0, "  ML-DSA/dilithium alternate signature to a conventional cert:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend add an alternate (ML-DSA) signature to the cert");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altkey file to read the alternate (ML-DSA) private key from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altpub file to read the alternate (ML-DSA) public key from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-subjkey file to read subject key from");
 #endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
 }
