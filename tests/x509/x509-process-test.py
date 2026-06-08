@@ -504,6 +504,20 @@ class TestX509ProcessInvalidFiles(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
 
 
+class TestMalformedArguments(unittest.TestCase):
+    """ Regression: for malformed arguments """
+
+    def test_5a_malformed_subj_argument(self):
+        """ malformed string passed to -subj should result in error and
+        logging of issue """
+        r = run_wolfssl("req", "-new", "-days", "3650",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj",
+                        "/O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OUorg-unit")
+        self.assertNotEqual(r.returncode, 0, r.stderr)
+        self.assertGreater(len(r.stderr), 0)
+
+
 class TestX509ModulusNoout(unittest.TestCase):
     """Regression: x509 -modulus -noout must not crash."""
 

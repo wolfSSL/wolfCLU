@@ -865,9 +865,13 @@ int wolfCLU_requestSetup(int argc, char** argv)
         if (name != NULL) {
             wolfSSL_X509_REQ_set_subject_name(x509, name);
             wolfSSL_X509_NAME_free(name);
+            reSign = 1; /* re-sign after subject change */
         }
-
-        reSign = 1; /* re-sign after subject change */
+        else {
+            wolfCLU_LogError("Failed to parse -subj string");
+            wolfCLU_certgenHelp();
+            ret = USER_INPUT_ERROR;
+        }
     }
 
     /* if no configure is passed in then get input from command line */
