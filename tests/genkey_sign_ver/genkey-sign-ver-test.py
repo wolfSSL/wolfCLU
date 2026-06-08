@@ -212,6 +212,24 @@ class EccTest(_GenkeySignVerifyBase):
         self.assertNotEqual(r.returncode, 0,
                             "ECC signing with empty key should have failed")
 
+    def test_ecc_sign_empty_input_fails(self):
+        """Signing a 0-byte input file must fail gracefully (regression for
+        the XFSEEK/XFTELL size guards in wolfCLU_sign_data)."""
+        priv, _ = self._genkey("ecc", "ecc-empty-in", "der",
+                               use_output_flag=True)
+        empty_in = "empty-input.txt"
+        empty_sig = "empty-input.sig"
+        self._track(empty_in, empty_sig)
+        open(empty_in, "wb").close()
+
+        r = run_wolfssl("-ecc", "-sign", "-inkey", priv, "-inform", "der",
+                        "-in", empty_in, "-out", empty_sig)
+        self.assertNotEqual(r.returncode, 0,
+                            "ECC signing of empty input should have failed")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "ECC sign of empty input crashed with signal "
+                                "{}".format(r.returncode))
+
     def test_ecc_sign_missing_inkey_value(self):
         """-inkey with no value must fail gracefully (no segfault)."""
         r = run_wolfssl("-ecc", "-sign", "-inkey")
