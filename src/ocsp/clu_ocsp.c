@@ -28,6 +28,8 @@
 
 #include <wolfssl/ocsp.h>
 
+#include <limits.h> /* for INT_MAX */
+
 enum {
     WOLFCLU_OCSP_HELP = 2100,
     WOLFCLU_OCSP_IGNORE_ERR,
@@ -932,10 +934,23 @@ int wolfCLU_OcspSetup(int argc, char** argv)
                 clientConfig.noNonce = 1;
                 break;
 
-            case WOLFCLU_OCSP_PORT:
+            case WOLFCLU_OCSP_PORT: {
+                long pv;
+                if (optarg == NULL) {
+                    wolfCLU_LogError("Option -port requires an argument: "
+                                     "must be 1-65535");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+                if (wolfCLU_parseDecimalBounded(optarg, 1, 65535, &pv)
+                        != WOLFCLU_SUCCESS) {
+                    wolfCLU_LogError("Invalid port \"%s\": must be 1-65535",
+                                     optarg);
+                    return WOLFCLU_FATAL_ERROR;
+                }
                 isResponderMode = 1;
-                responderConfig.port = (word16)XATOI(optarg);
+                responderConfig.port = (word16)pv;
                 break;
+            }
 
             case WOLFCLU_OCSP_IGNORE_ERR:
                 wolfCLU_LogError("Option -ignore_err is not yet supported");
@@ -989,9 +1004,23 @@ int wolfCLU_OcspSetup(int argc, char** argv)
                 wolfCLU_LogError("Option -nmin is not yet supported");
                 return WOLFCLU_FATAL_ERROR;
 
-            case WOLFCLU_OCSP_NREQUEST:
-                responderConfig.nrequest = XATOI(optarg);
+            case WOLFCLU_OCSP_NREQUEST: {
+                long nr;
+                if (optarg == NULL) {
+                    wolfCLU_LogError("Option -nrequest requires an argument: "
+                                     "must be 0-%d", INT_MAX);
+                    return WOLFCLU_FATAL_ERROR;
+                }
+                /* 0 means unlimited; reject negative/non-numeric/overflow */
+                if (wolfCLU_parseDecimalBounded(optarg, 0, INT_MAX, &nr)
+                        != WOLFCLU_SUCCESS) {
+                    wolfCLU_LogError("Invalid -nrequest \"%s\": must be 0-%d",
+                                     optarg, INT_MAX);
+                    return WOLFCLU_FATAL_ERROR;
+                }
+                responderConfig.nrequest = (int)nr;
                 break;
+            }
 
             case WOLFCLU_OCSP_REQIN:
                 wolfCLU_LogError("Option -reqin is not yet supported");

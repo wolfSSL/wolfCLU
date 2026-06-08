@@ -340,6 +340,135 @@ class TestOpensslClientOpensslResponder(_OCSPInteropBase):
     RESPONDER_BIN = "openssl"
 
 
+class TestPortValidation(unittest.TestCase):
+    """Boundary tests for the -port range check in wolfCLU_OcspSetup.
+
+    Validation happens during argument parsing, so no live responder is
+    needed -- an out-of-range or non-numeric port is rejected immediately.
+    The exact upper boundary (65535) is asserted directly here; a valid port
+    with no -CA fails the required-option check after parsing, so the bind
+    loop is never reached.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        if not _ocsp_supported(WOLFSSL_BIN):
+            raise unittest.SkipTest(f"OCSP not supported by {WOLFSSL_BIN}")
+
+    def _run_port(self, port):
+        r = subprocess.run(
+            [WOLFSSL_BIN, "ocsp", "-port", str(port)],
+            capture_output=True, text=True,
+            stdin=subprocess.DEVNULL, timeout=10)
+        return r.returncode, r.stdout + r.stderr
+
+    def _assert_rejected(self, port):
+        rc, out = self._run_port(port)
+        self.assertNotEqual(rc, 0, f"port {port!r} should be rejected: {out}")
+        self.assertRegex(out, re.compile("invalid port|1-65535",
+                                         re.IGNORECASE),
+                         f"expected range diagnostic for {port!r}: {out}")
+
+    def test_port_zero_rejected(self):
+        self._assert_rejected(0)
+
+    def test_port_negative_rejected(self):
+        self._assert_rejected(-1)
+
+    def test_port_above_max_rejected(self):
+        self._assert_rejected(65536)
+
+    def test_port_truncation_value_rejected(self):
+        # 65537 would have truncated to 1 under the old word16 cast.
+        self._assert_rejected(65537)
+
+    def test_port_non_numeric_rejected(self):
+        self._assert_rejected("abc")
+
+    def test_port_empty_rejected(self):
+        self._assert_rejected("")
+
+    def test_port_trailing_text_rejected(self):
+        self._assert_rejected("80x")
+
+    def test_port_int_overflow_rejected(self):
+        # would wrap to a valid port under the old XATOI cast
+        self._assert_rejected(4294967297)  # 2**32 + 1
+
+    def test_port_huge_input_rejected(self):
+        # wider than any integer type; parser must not overflow while scanning
+        self._assert_rejected("9" * 40)
+
+    def test_port_max_accepted(self):
+        # exact upper boundary must pass the parser's overflow check; a regression
+        # rejecting 65535 (e.g. > vs >= slip in the bound math) is caught here.
+        # -CA is absent, so validation fails after parsing, never binding.
+        rc, out = self._run_port(65535)
+        self.assertNotRegex(out, re.compile("invalid port|1-65535",
+                                            re.IGNORECASE),
+                            f"port 65535 should be accepted by parser: {out}")
+
+    def test_port_missing_argument_rejected(self):
+        # trailing -port leaves optarg NULL; must emit a clean missing-argument
+        # diagnostic, not crash formatting NULL with %s.
+        r = subprocess.run(
+            [WOLFSSL_BIN, "ocsp", "-port"],
+            capture_output=True, text=True,
+            stdin=subprocess.DEVNULL, timeout=10)
+        self.assertNotEqual(r.returncode, 0,
+                            "trailing -port should be rejected")
+        self.assertRegex(r.stdout + r.stderr,
+                         re.compile("requires an argument|1-65535",
+                                    re.IGNORECASE),
+                         "expected missing-argument diagnostic for -port")
+
+
+class TestNrequestValidation(unittest.TestCase):
+    """Boundary tests for the -nrequest range check in wolfCLU_OcspSetup.
+
+    Validation happens during parsing. -nrequest alone never enters responder
+    mode (that needs -port), so a valid count exits without blocking, letting
+    us assert the accept path too.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        if not _ocsp_supported(WOLFSSL_BIN):
+            raise unittest.SkipTest(f"OCSP not supported by {WOLFSSL_BIN}")
+
+    def _run(self, nrequest):
+        r = subprocess.run(
+            [WOLFSSL_BIN, "ocsp", "-nrequest", str(nrequest)],
+            capture_output=True, text=True,
+            stdin=subprocess.DEVNULL, timeout=10)
+        return r.stdout + r.stderr
+
+    def _assert_rejected(self, nrequest):
+        out = self._run(nrequest)
+        self.assertRegex(out, re.compile("invalid -nrequest", re.IGNORECASE),
+                         f"expected diagnostic for {nrequest!r}: {out}")
+
+    def test_nrequest_negative_rejected(self):
+        # old XATOI accepted -1 as a degenerate count
+        self._assert_rejected(-1)
+
+    def test_nrequest_non_numeric_rejected(self):
+        # old XATOI returned 0, silently treated as unlimited
+        self._assert_rejected("abc")
+
+    def test_nrequest_overflow_rejected(self):
+        self._assert_rejected(4294967297)  # 2**32 + 1
+
+    def test_nrequest_valid_accepted(self):
+        # 0-means-unlimited boundary, a small count, and the exact upper bound
+        # (INT_MAX) must all pass parsing; INT_MAX locks in the overflow check.
+        for nrequest in (0, 5, 2147483647):
+            out = self._run(nrequest)
+            self.assertNotRegex(
+                out, re.compile("invalid -nrequest", re.IGNORECASE),
+                f"-nrequest {nrequest!r} should be accepted by parser: {out}")
+
+
 def load_tests(loader, tests, pattern):
     """Exclude the abstract _OCSPInteropBase from test discovery."""
     suite = unittest.TestSuite()
