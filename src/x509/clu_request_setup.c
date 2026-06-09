@@ -581,6 +581,21 @@ int wolfCLU_requestSetup(int argc, char** argv)
 #ifdef NO_WOLFSSL_REQ_PRINT
     byte isCSR     = 1;
 #endif
+    /* Multiple -addext is not yet supported. Detect it up front and fail
+     * instead of silently dropping the extension and exiting success. */
+    {
+        int i, addExtCount = 0;
+        for (i = 1; i < argc; i++) {
+            if (argv[i] != NULL && XSTRCMP(argv[i], "-addext") == 0) {
+                addExtCount++;
+            }
+        }
+        if (addExtCount > 1) {
+            wolfCLU_LogError("only one -addext arg is currently supported");
+            return USER_INPUT_ERROR;
+        }
+    }
+
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "", req_options,
