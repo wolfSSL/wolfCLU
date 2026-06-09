@@ -13,6 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+        # ASAN runs the full config sweep; the non-ASAN build only covers the
+        # default --enable-wolfclu config (added via include below).
         config:
           - '--enable-wolfclu'
           - '--enable-wolfclu --enable-crl --enable-dsa --enable-pkcs7'
@@ -20,7 +22,14 @@ jobs:
           - '--enable-wolfclu --enable-experimental --enable-dilithium'
           - '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium'
           - '--enable-all'
-        sanitize: ['', 'CC="cc -fsanitize=address"']
+        sanitize: ['CC="cc -fsanitize=address"']
+        include:
+          - os: ubuntu-latest
+            config: '--enable-wolfclu'
+            sanitize: ''
+          - os: macos-latest
+            config: '--enable-wolfclu'
+            sanitize: ''
 
     name: ${{ matrix.os }} ${{ matrix.sanitize && 'ASAN' || '' }} (${{ matrix.config }})
     runs-on: ${{ matrix.os }}
