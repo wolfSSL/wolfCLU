@@ -334,16 +334,11 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
 /* add a single alt name of type 'name' ("IP", "DNS", "URI", "RID" or "email")
  * with value 'value' to x509, shared by the config and -addext paths.
  * return WOLFCLU_SUCCESS on success */
+#ifdef WOLFSSL_ALT_NAMES
 static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
         const char* value)
 {
     int ret = WOLFCLU_SUCCESS;
-#ifndef WOLFSSL_ALT_NAMES
-    (void)x509;
-    (void)name;
-    (void)value;
-    WOLFCLU_LOG(WOLFCLU_L0, "Skipping alt names, recompile wolfSSL with WOLFSSL_ALT_NAMES...");
-#else
     WOLFSSL_ASN1_STRING *ipStr  = NULL;
     WOLFSSL_ASN1_OBJECT *ridObj = NULL;
     char  *token, *ptr, *s      = NULL;
@@ -497,10 +492,10 @@ static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
 
     if (ridObj != NULL)
         wolfSSL_ASN1_OBJECT_free(ridObj);
-#endif
 
     return ret;
 }
+#endif /* WOLFSSL_ALT_NAMES */
 
 
 /* return WOLFCLU_SUCCESS on success, searches for IP's and DNS's */
@@ -514,6 +509,12 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         return WOLFCLU_SUCCESS; /* none set */
     }
 
+#ifndef WOLFSSL_ALT_NAMES
+    (void)x509;
+    (void)altNames;
+    (void)i;
+    WOLFCLU_LOG(WOLFCLU_L0, "Skipping alt names, recompile wolfSSL with WOLFSSL_ALT_NAMES...");
+#else
     altNames = wolfSSL_NCONF_get_section(conf, sect);
     if (altNames != NULL) {
         int total;
@@ -536,6 +537,7 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             }
         }
     }
+#endif
 
     return ret;
 }
@@ -589,8 +591,6 @@ int wolfCLU_parseAddExt(WOLFSSL_X509* x509, char* addExt)
 {
     char* dup;
     char* val;
-    char* token;
-    char* ptr = NULL;
     int   len;
     int   ret = WOLFCLU_SUCCESS;
 
@@ -617,6 +617,13 @@ int wolfCLU_parseAddExt(WOLFSSL_X509* x509, char* addExt)
     val++;
 
     if (XSTRCMP(dup, "subjectAltName") == 0) {
+#ifndef WOLFSSL_ALT_NAMES
+        (void)val;
+        WOLFCLU_LOG(WOLFCLU_L0, "Skipping alt names, recompile wolfSSL with WOLFSSL_ALT_NAMES...");
+#else
+        char* token;
+        char* ptr = NULL;
+
         /* value is a comma separated list of TYPE:value pairs */
         token = XSTRTOK(val, ",", &ptr);
         while (token != NULL) {
@@ -634,6 +641,7 @@ int wolfCLU_parseAddExt(WOLFSSL_X509* x509, char* addExt)
             }
             token = XSTRTOK(NULL, ",", &ptr);
         }
+#endif
     }
     else {
         wolfCLU_LogError("unsupported -addext extension \"%s\"", dup);
