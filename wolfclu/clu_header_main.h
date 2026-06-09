@@ -282,19 +282,6 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size);
  */
 const WOLFSSL_EVP_CIPHER* wolfCLU_CipherTypeFromAlgo(int alg);
 
-/* adds characters to end of string
- *
- * @param s the char array we'll be appending to
- * @param c the char that will be appended to s
- */
-void wolfCLU_append(char* s, char c);
-
-/* interrupt function
- *
- * @param signo gets type cast to void, interrupts the loop.
- */
-void wolfCLU_stop(int signo);
-
 /* finds current time during runtime */
 double wolfCLU_getTime(void);
 
@@ -674,31 +661,6 @@ const char* wolfCLU_GetDefaultHttpResponse(void);
  * @return length of HTTP response
  */
 int wolfCLU_GetDefaultHttpResponseLength(void);
-
-/**
- * @brief Build a custom HTTP GET request
- * @param path the path to request (e.g., "/index.html")
- * @param host optional host header value (can be NULL)
- * @param buffer buffer to write the request to
- * @param bufferSz size of the buffer
- * @return number of bytes written to buffer, or negative on error
- */
-int wolfCLU_BuildHttpGet(const char* path, const char* host, char* buffer,
-                         int bufferSz);
-
-/**
- * @brief Build a simple HTTP response
- * @param statusCode HTTP status code (e.g., 200, 404)
- * @param statusText HTTP status text (e.g., "OK", "Not Found")
- * @param contentType MIME type (e.g., "text/html")
- * @param body response body content
- * @param buffer buffer to write the response to
- * @param bufferSz size of the buffer
- * @return number of bytes written to buffer, or negative on error
- */
-int wolfCLU_BuildHttpResponse(int statusCode, const char* statusText,
-                              const char* contentType, const char* body,
-                              char* buffer, int bufferSz);
 
 /* Platform-specific socket type */
 #ifdef _WIN32

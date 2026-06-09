@@ -27,12 +27,6 @@
     <ClCompile Include="src\benchmark\clu_bench_setup.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\certgen\clu_certgen_ed25519.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\certgen\clu_certgen_rsa.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\client\client.c">
       <Filter>Source Files</Filter>
     </ClCompile>
