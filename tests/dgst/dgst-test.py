@@ -9,7 +9,8 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, is_fips, run_wolfssl, test_main
+from wolfclu_test import (CERTS_DIR, is_fips, run_wolfssl, test_main,
+                          truncate_sparse)
 
 DGST_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -253,7 +254,7 @@ class LargeFileDgstTest(unittest.TestCase):
         try:
             for p in (cls.original, cls.tampered):
                 with open(p, "wb") as f:
-                    f.truncate(cls.LARGE_FILE_SIZE)
+                    truncate_sparse(f, cls.LARGE_FILE_SIZE)
             with open(cls.tampered, "r+b") as f:
                 f.seek(-1, os.SEEK_END)
                 f.write(b"X")
