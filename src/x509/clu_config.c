@@ -331,6 +331,173 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
 }
 
 
+/* add a single alt name of type 'name' ("IP", "DNS", "URI", "RID" or "email")
+ * with value 'value' to x509, shared by the config and -addext paths.
+ * return WOLFCLU_SUCCESS on success */
+#ifdef WOLFSSL_ALT_NAMES
+static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
+        const char* value)
+{
+    int ret = WOLFCLU_SUCCESS;
+    WOLFSSL_ASN1_STRING *ipStr  = NULL;
+    WOLFSSL_ASN1_OBJECT *ridObj = NULL;
+    char  *token, *ptr, *s      = NULL;
+    int   sSz  = 0;
+    int   type = 0;
+    byte oid[ASN1_OID_DOTTED_MAX_SZ];
+    word32 oidSz = ASN1_OID_DOTTED_MAX_SZ;
+    word32 decodedCount = 0;
+    word16 decoded[ASN1_OID_DOTTED_MAX_SZ];
+
+    if (XSTRNCMP(name, "IP", 2) == 0) {
+        ipStr = wolfSSL_a2i_IPADDRESS(value);
+
+        if (ipStr != NULL) {
+            s   = (char*)wolfSSL_ASN1_STRING_data(ipStr);
+            sSz = wolfSSL_ASN1_STRING_length(ipStr);
+            type = ASN_IP_TYPE;
+
+        }
+        else {
+            wolfCLU_LogError("bad IP found %s", value);
+            return WOLFCLU_FATAL_ERROR;
+        }
+
+    }
+
+    else if (XSTRNCMP(name, "DNS", 3) == 0) {
+        type = ASN_DNS_TYPE;
+        s = (char*)value;
+        sSz = (int)XSTRLEN(value);
+    }
+
+    else if (XSTRNCMP(name, "URI", 3) == 0) {
+        type = ASN_URI_TYPE;
+        s = (char*)value;
+        sSz = (int)XSTRLEN(value);
+    }
+
+    else if (XSTRNCMP(name, "RID", 3) == 0) {
+        if ((ridObj = wolfSSL_OBJ_txt2obj(value, 0)) == NULL) {
+    #if defined(HAVE_OID_ENCODING) && !defined(NO_WC_ENCODE_OBJECT_ID)
+            /* If RID value is not named OID, manually encode
+             * dotted OID into byte array. Tokenize a copy so the
+             * original value stays intact for error messages. */
+            int   ridLen = (int)XSTRLEN(value);
+            char* ridDup = (char*)XMALLOC(ridLen + 1, NULL,
+                    DYNAMIC_TYPE_TMP_BUFFER);
+            if (ridDup == NULL) {
+                wolfCLU_LogError("Failed to allocate memory for RID");
+                return MEMORY_E;
+            }
+            XMEMCPY(ridDup, value, ridLen + 1);
+
+            token = XSTRTOK(ridDup, ".", &ptr);
+
+            while (token != NULL) {
+                char* digit;
+                int n;
+
+                if (decodedCount >= ASN1_OID_DOTTED_MAX_SZ) {
+                    wolfCLU_LogError("RID has too many components "
+                            "(max %d): %s",
+                            ASN1_OID_DOTTED_MAX_SZ, value);
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+                }
+                /* require decimal-digits-only token so that things
+                 * like "1a" or "abc" are rejected instead of being
+                 * silently coerced by XATOI */
+                for (digit = token; *digit != '\0'; digit++) {
+                    if (*digit < '0' || *digit > '9') {
+                        wolfCLU_LogError("Non-numeric RID "
+                                "component '%s' in: %s", token,
+                                value);
+                        ret = WOLFCLU_FATAL_ERROR;
+                        break;
+                    }
+                }
+                if (ret != WOLFCLU_SUCCESS) {
+                    break;
+                }
+                n = XATOI(token);
+                if (n < 0 || n > 0xFFFF) {
+                    wolfCLU_LogError("RID component out of range "
+                            "[0, 65535]: %s", token);
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+                }
+                decoded[decodedCount] = (word16)n;
+                decodedCount++;
+                token = XSTRTOK(NULL, ".", &ptr);
+            }
+
+            XFREE(ridDup, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+
+            if (ret != WOLFCLU_SUCCESS) {
+                return ret;
+            }
+
+            if (wc_EncodeObjectId(decoded, decodedCount, oid, &oidSz)
+                    == 0) {
+                s   = (char*)oid;
+                sSz = (int)oidSz;
+            }
+            else {
+                wolfCLU_LogError("bad RID found %s", value);
+                return WOLFCLU_FATAL_ERROR;
+            }
+    #else
+            (void)token;
+            (void)ptr;
+            (void)decoded;
+            (void)decodedCount;
+            (void)oid;
+            (void)oidSz;
+
+            wolfCLU_LogError("Couldn't encode RID. OID encoding is not"
+                    " compiled in");
+            return WOLFCLU_FATAL_ERROR;
+
+    #endif
+        }
+        else {
+            s   = (char*)wolfSSL_OBJ_get0_data(ridObj);
+            sSz = (int)wolfSSL_OBJ_length(ridObj);
+        }
+
+
+        type = ASN_RID_TYPE;
+    }
+
+    else if (XSTRNCMP(name, "email", 5) == 0) {
+        type = ASN_RFC822_TYPE;
+        s = (char*)value;
+        sSz = (int)XSTRLEN(value);
+    }
+
+    else {
+        wolfCLU_LogError("unsupported alt name type %s", name);
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    if (wolfSSL_X509_add_altname_ex(x509, s, sSz, type)
+            != WOLFSSL_SUCCESS) {
+        wolfCLU_LogError("error adding alt name %s", value);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ipStr != NULL)
+        wolfSSL_ASN1_STRING_free(ipStr);
+
+    if (ridObj != NULL)
+        wolfSSL_ASN1_OBJECT_free(ridObj);
+
+    return ret;
+}
+#endif /* WOLFSSL_ALT_NAMES */
+
+
 /* return WOLFCLU_SUCCESS on success, searches for IP's and DNS's */
 static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
             char* sect)
@@ -343,9 +510,11 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
     }
 
 #ifndef WOLFSSL_ALT_NAMES
+    (void)x509;
+    (void)altNames;
+    (void)i;
     WOLFCLU_LOG(WOLFCLU_L0, "Skipping alt names, recompile wolfSSL with WOLFSSL_ALT_NAMES...");
 #else
-
     altNames = wolfSSL_NCONF_get_section(conf, sect);
     if (altNames != NULL) {
         int total;
@@ -353,15 +522,6 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
         total = wolfSSL_sk_CONF_VALUE_num(altNames);
         for (i = 0; i < total; i++) {
             WOLFSSL_CONF_VALUE *c;
-            WOLFSSL_ASN1_STRING *ipStr  = NULL;
-            WOLFSSL_ASN1_OBJECT *ridObj = NULL;
-            char  *token, *ptr, *s      = NULL;
-            int   sSz  = 0;
-            int   type = 0;
-            byte oid[ASN1_OID_DOTTED_MAX_SZ];
-            word32 oidSz = ASN1_OID_DOTTED_MAX_SZ;
-            word32 decodedCount = 0;
-            word16 decoded[ASN1_OID_DOTTED_MAX_SZ];
 
             c = wolfSSL_sk_CONF_VALUE_value(altNames, i);
             if (c == NULL) {
@@ -371,156 +531,10 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
                 break;
             }
 
-            if (XSTRNCMP(c->name, "IP", 2) == 0) {
-                ipStr = wolfSSL_a2i_IPADDRESS(c->value);
-
-                if (ipStr != NULL) {
-                    s   = (char*)wolfSSL_ASN1_STRING_data(ipStr);
-                    sSz = wolfSSL_ASN1_STRING_length(ipStr);
-                    type = ASN_IP_TYPE;
-
-                }
-                else {
-                    wolfCLU_LogError("bad IP found %s", c->value);
-                    ret = WOLFCLU_FATAL_ERROR;
-                    break;
-                }
-
-            }
-
-            else if (XSTRNCMP(c->name, "DNS", 3) == 0) {
-                type = ASN_DNS_TYPE;
-                s = c->value;
-                sSz = (int)XSTRLEN(c->value);
-            }
-
-            else if (XSTRNCMP(c->name, "URI", 3) == 0) {
-                type = ASN_URI_TYPE;
-                s = c->value;
-                sSz = (int)XSTRLEN(c->value);
-            }
-
-            else if (XSTRNCMP(c->name, "RID", 3) == 0) {
-                if ((ridObj = wolfSSL_OBJ_txt2obj(c->value, 0)) == NULL) {
-            #if defined(HAVE_OID_ENCODING) && !defined(NO_WC_ENCODE_OBJECT_ID)
-                    /* If RID value is not named OID, manually encode
-                     * dotted OID into byte array. Tokenize a copy so the
-                     * original c->value stays intact for error messages. */
-                    int   ridLen = (int)XSTRLEN(c->value);
-                    char* ridDup = (char*)XMALLOC(ridLen + 1, NULL,
-                            DYNAMIC_TYPE_TMP_BUFFER);
-                    if (ridDup == NULL) {
-                        wolfCLU_LogError("Failed to allocate memory for RID");
-                        ret = MEMORY_E;
-                        break;
-                    }
-                    XMEMCPY(ridDup, c->value, ridLen + 1);
-
-                    token = XSTRTOK(ridDup, ".", &ptr);
-
-                    while (token != NULL) {
-                        char* digit;
-                        int n;
-
-                        if (decodedCount >= ASN1_OID_DOTTED_MAX_SZ) {
-                            wolfCLU_LogError("RID has too many components "
-                                    "(max %d): %s",
-                                    ASN1_OID_DOTTED_MAX_SZ, c->value);
-                            ret = WOLFCLU_FATAL_ERROR;
-                            break;
-                        }
-                        /* require decimal-digits-only token so that things
-                         * like "1a" or "abc" are rejected instead of being
-                         * silently coerced by XATOI */
-                        for (digit = token; *digit != '\0'; digit++) {
-                            if (*digit < '0' || *digit > '9') {
-                                wolfCLU_LogError("Non-numeric RID "
-                                        "component '%s' in: %s", token,
-                                        c->value);
-                                ret = WOLFCLU_FATAL_ERROR;
-                                break;
-                            }
-                        }
-                        if (ret != WOLFCLU_SUCCESS) {
-                            break;
-                        }
-                        n = XATOI(token);
-                        if (n < 0 || n > 0xFFFF) {
-                            wolfCLU_LogError("RID component out of range "
-                                    "[0, 65535]: %s", token);
-                            ret = WOLFCLU_FATAL_ERROR;
-                            break;
-                        }
-                        decoded[decodedCount] = (word16)n;
-                        decodedCount++;
-                        token = XSTRTOK(NULL, ".", &ptr);
-                    }
-
-                    XFREE(ridDup, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-
-                    if (ret != WOLFCLU_SUCCESS) {
-                        break;
-                    }
-
-                    if (wc_EncodeObjectId(decoded, decodedCount, oid, &oidSz)
-                            == 0) {
-                        s   = (char*)oid;
-                        sSz = (int)oidSz;
-                    }
-                    else {
-                        wolfCLU_LogError("bad RID found %s", c->value);
-                        ret = WOLFCLU_FATAL_ERROR;
-                        break;
-                    }
-            #else
-                    (void)token;
-                    (void)ptr;
-                    (void)decoded;
-                    (void)decodedCount;
-                    (void)oid;
-                    (void)oidSz;
-
-                    wolfCLU_LogError("Couldn't encode RID. OID encoding is not"
-                            " compiled in");
-                    ret = WOLFCLU_FATAL_ERROR;
-                    break;
-
-            #endif
-                }
-                else {
-                    s   = (char*)wolfSSL_OBJ_get0_data(ridObj);
-                    sSz = (int)wolfSSL_OBJ_length(ridObj);
-                }
-
-
-                type = ASN_RID_TYPE;
-            }
-
-            else if (XSTRNCMP(c->name, "email", 5) == 0) {
-                type = ASN_RFC822_TYPE;
-                s = c->value;
-                sSz = (int)XSTRLEN(c->value);
-            }
-
-            else {
-                ret = WOLFCLU_FATAL_ERROR;
+            ret = wolfCLU_addAltName(x509, c->name, c->value);
+            if (ret != WOLFCLU_SUCCESS) {
                 break;
             }
-
-            if (wolfSSL_X509_add_altname_ex(x509, s, sSz, type)
-                    != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("error adding alt name %s", c->value);
-                if (ipStr != NULL)
-                    wolfSSL_ASN1_STRING_free(ipStr);
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-
-            if (ipStr != NULL)
-                wolfSSL_ASN1_STRING_free(ipStr);
-
-            if (ridObj != NULL)
-                wolfSSL_ASN1_OBJECT_free(ridObj);
         }
     }
 #endif
@@ -568,12 +582,90 @@ int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
     }
     return ret;
 }
+
+
+/* parse a command line "-addext name=value" and apply it to x509. Currently
+ * supports "subjectAltName=TYPE:val[,TYPE:val...]".
+ * return WOLFCLU_SUCCESS on success */
+int wolfCLU_parseAddExt(WOLFSSL_X509* x509, char* addExt)
+{
+    char* dup;
+    char* val;
+    int   len;
+    int   ret = WOLFCLU_SUCCESS;
+
+    if (x509 == NULL || addExt == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    /* work on a writable copy so the original argv string is untouched */
+    len = (int)XSTRLEN(addExt);
+    dup = (char*)XMALLOC(len + 1, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    if (dup == NULL) {
+        return MEMORY_E;
+    }
+    XMEMCPY(dup, addExt, len + 1);
+
+    /* split "name=value" on the first '=' */
+    val = XSTRSTR(dup, "=");
+    if (val == NULL) {
+        wolfCLU_LogError("-addext expects \"name=value\", got %s", addExt);
+        XFREE(dup, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    *val = '\0';
+    val++;
+
+    if (XSTRCMP(dup, "subjectAltName") == 0) {
+#ifndef WOLFSSL_ALT_NAMES
+        (void)val;
+        WOLFCLU_LOG(WOLFCLU_L0, "Skipping alt names, recompile wolfSSL with WOLFSSL_ALT_NAMES...");
+#else
+        char* token;
+        char* ptr = NULL;
+
+        /* value is a comma separated list of TYPE:value pairs */
+        token = XSTRTOK(val, ",", &ptr);
+        while (token != NULL) {
+            char* colon = XSTRSTR(token, ":");
+            if (colon == NULL) {
+                wolfCLU_LogError("bad subjectAltName entry \"%s\", expected "
+                        "TYPE:value", token);
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
+            *colon = '\0';
+            ret = wolfCLU_addAltName(x509, token, colon + 1);
+            if (ret != WOLFCLU_SUCCESS) {
+                break;
+            }
+            token = XSTRTOK(NULL, ",", &ptr);
+        }
+#endif
+    }
+    else {
+        wolfCLU_LogError("unsupported -addext extension \"%s\"", dup);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    XFREE(dup, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    return ret;
+}
 #else
 int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
 {
     (void)x509;
     (void)conf;
     (void)sect;
+
+    wolfCLU_LogError("wolfSSL not compiled with cert extensions");
+    return NOT_COMPILED_IN;
+}
+
+int wolfCLU_parseAddExt(WOLFSSL_X509* x509, char* addExt)
+{
+    (void)x509;
+    (void)addExt;
 
     wolfCLU_LogError("wolfSSL not compiled with cert extensions");
     return NOT_COMPILED_IN;

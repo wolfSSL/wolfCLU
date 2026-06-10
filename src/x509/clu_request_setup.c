@@ -56,6 +56,7 @@ static const struct option req_options[] = {
     {"-passout",   required_argument, 0, WOLFCLU_PASSWORD_OUT },
     {"-noout",     no_argument,       0, WOLFCLU_NOOUT },
     {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
+    {"-addext",    required_argument, 0, WOLFCLU_ADDEXT },
     {"-nodes",     no_argument,       0, WOLFCLU_NODES },
     {"-h",         no_argument,       0, WOLFCLU_HELP },
     {"-help",      no_argument,       0, WOLFCLU_HELP },
@@ -554,6 +555,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     char*   config = NULL;
     char*   subj = NULL;
     char*   ext = NULL;
+    char*   addExt = NULL;
     char*   keyType = NULL;
     char*   keyInfo = NULL;
     char*   keyOut  = NULL;
@@ -579,6 +581,21 @@ int wolfCLU_requestSetup(int argc, char** argv)
 #ifdef NO_WOLFSSL_REQ_PRINT
     byte isCSR     = 1;
 #endif
+    /* Multiple -addext is not yet supported. Detect it up front and fail
+     * instead of silently dropping the extension and exiting success. */
+    {
+        int i, addExtCount = 0;
+        for (i = 1; i < argc; i++) {
+            if (argv[i] != NULL && XSTRCMP(argv[i], "-addext") == 0) {
+                addExtCount++;
+            }
+        }
+        if (addExtCount > 1) {
+            wolfCLU_LogError("only one -addext arg is currently supported");
+            return USER_INPUT_ERROR;
+        }
+    }
+
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "", req_options,
@@ -587,6 +604,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
         switch (option) {
             case WOLFCLU_EXTENSIONS:
                 ext = optarg;
+                break;
+
+            case WOLFCLU_ADDEXT:
+                addExt = optarg;
                 break;
 
             case WOLFCLU_NODES:
@@ -872,6 +893,12 @@ int wolfCLU_requestSetup(int argc, char** argv)
             wolfCLU_certgenHelp();
             ret = USER_INPUT_ERROR;
         }
+    }
+
+    /* apply the -addext extension, if present */
+    if (ret == WOLFCLU_SUCCESS && addExt != NULL) {
+        ret = wolfCLU_parseAddExt(x509, addExt);
+        reSign = 1; /* re-sign after extension change */
     }
 
     /* if no configure is passed in then get input from command line */

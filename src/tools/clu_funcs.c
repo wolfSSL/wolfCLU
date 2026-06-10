@@ -665,6 +665,7 @@ void wolfCLU_certgenHelp(void) {
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-x509 generate self signed certificate");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-addext add an extension, ie \"subjectAltName=IP:192.168.1.2,DNS:example.com\"");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey generate the private key to use with req");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey private key to use with req");

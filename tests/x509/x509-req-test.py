@@ -211,6 +211,119 @@ class TestReqNew(unittest.TestCase):
         self.assertIn("CA:TRUE", r2.stdout)
 
 
+    def test_req_x509_addext_subject_alt_name(self):
+        """req -x509 -addext subjectAltName adds IP and DNS alt names."""
+        crt = _tmp("test_req_addext.crt")
+        self._clean(crt)
+        r = run_wolfssl("req", "-new", "-days", "3650",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", "CN=192.168.1.2",
+                        "-addext",
+                        "subjectAltName=IP:192.168.1.2,DNS:example.com",
+                        "-x509", "-out", crt)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r2 = run_wolfssl("x509", "-in", crt, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        found_san = False
+        lines = r2.stdout.splitlines()
+        for i, line in enumerate(lines):
+            if "X509v3 Subject Alternative Name" in line:
+                found_san = True
+                san_line = lines[i + 1]
+                self.assertIn("IP Address:192.168.1.2", san_line)
+                self.assertIn("DNS:example.com", san_line)
+                break
+        self.assertTrue(found_san, "SAN not found in cert output")
+
+
+    def _addext_san_line(self, addext, crt_name):
+        """Generate an -x509 cert with the given -addext and return the line
+        following the SAN header, or None if no SAN is present."""
+        crt = _tmp(crt_name)
+        self._clean(crt)
+        r = run_wolfssl("req", "-new", "-days", "3650",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", "CN=test",
+                        "-addext", addext,
+                        "-x509", "-out", crt)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r2 = run_wolfssl("x509", "-in", crt, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        lines = r2.stdout.splitlines()
+        for i, line in enumerate(lines):
+            if "X509v3 Subject Alternative Name" in line:
+                return lines[i + 1]
+        return None
+
+    def test_req_addext_san_uri(self):
+        """req -addext subjectAltName=URI:... adds a URI alt name."""
+        san = self._addext_san_line(
+            "subjectAltName=URI:https://www.wolfssl.com",
+            "test_req_addext_uri.crt")
+        self.assertIsNotNone(san, "SAN not found in cert output")
+        self.assertIn("URI:https://www.wolfssl.com", san)
+
+    def test_req_addext_san_email(self):
+        """req -addext subjectAltName=email:... adds an email alt name."""
+        san = self._addext_san_line(
+            "subjectAltName=email:facts@wolfssl.com",
+            "test_req_addext_email.crt")
+        self.assertIsNotNone(san, "SAN not found in cert output")
+        self.assertIn("email:facts@wolfssl.com", san)
+
+    def test_req_addext_san_rid(self):
+        """req -addext subjectAltName=RID:... adds a registered ID alt name."""
+        san = self._addext_san_line("subjectAltName=RID:1.2.3.4",
+                                    "test_req_addext_rid.crt")
+        self.assertIsNotNone(san, "SAN not found in cert output")
+        self.assertIn("Registered ID:1.2.3.4", san)
+
+    def test_req_addext_san_ipv6(self):
+        """req -addext subjectAltName=IP:<ipv6> keeps colons in the value.
+
+        The TYPE:value split consumes only the first ':' so the remaining
+        colons of an IPv6 literal stay part of the address."""
+        san = self._addext_san_line(
+            "subjectAltName=IP:2607:f8b0:400a:80b::2004",
+            "test_req_addext_ipv6.crt")
+        self.assertIsNotNone(san, "SAN not found in cert output")
+        self.assertIn(
+            "IP Address:2607:F8B0:400A:080B:0000:0000:0000:2004", san)
+
+    def _addext_fails(self, addext, crt_name):
+        """req -x509 with a malformed -addext must exit non-zero."""
+        crt = _tmp(crt_name)
+        self._clean(crt)
+        r = run_wolfssl("req", "-new", "-days", "3650",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", "CN=test",
+                        "-addext", addext,
+                        "-x509", "-out", crt)
+        self.assertNotEqual(r.returncode, 0,
+                            "expected failure for -addext {!r}".format(addext))
+
+    def test_req_addext_no_equals_fails(self):
+        """req -addext without '=' (name=value form) should fail."""
+        self._addext_fails("subjectAltName", "test_req_addext_noeq.crt")
+
+    def test_req_addext_san_entry_no_colon_fails(self):
+        """req -addext subjectAltName entry without TYPE:value should fail."""
+        self._addext_fails("subjectAltName=foo",
+                           "test_req_addext_nocolon.crt")
+
+    def test_req_addext_unsupported_extension_fails(self):
+        """req -addext with an unsupported extension name should fail."""
+        self._addext_fails("keyUsage=digitalSignature",
+                           "test_req_addext_unsupported_ext.crt")
+
+    def test_req_addext_unsupported_alt_type_fails(self):
+        """req -addext with an unsupported subjectAltName type should fail."""
+        self._addext_fails("subjectAltName=otherName:foo",
+                           "test_req_addext_badtype.crt")
+
+
 class TestReqPemDerRoundTrip(unittest.TestCase):
     """Test PEM <-> DER round-trip for CSR."""
 
