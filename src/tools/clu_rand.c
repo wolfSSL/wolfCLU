@@ -23,6 +23,12 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
+/* Fallback for RNG configs that leave RNG_MAX_BLOCK_LEN undefined. If a build's
+ * real per-call limit is smaller, wc_RNG_GenerateBlock fails cleanly. */
+#ifndef RNG_MAX_BLOCK_LEN
+    #define RNG_MAX_BLOCK_LEN (0x10000)
+#endif
+
 static const struct option rand_options[] = {
     {"-out",    required_argument, 0, WOLFCLU_OUTFILE},
     {"-base64", no_argument,       0, WOLFCLU_BASE64 },
@@ -39,6 +45,26 @@ static void wolfCLU_RandHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-hex output the results in hex encoding");
 }
 
+/* Look up token in rand_options[]. On a match, set *dupOpt if already in seen[],
+ * then mark it seen. Returns the table index, or -1 if not a known option.
+ * Shared by the skipNext and main scan paths so duplicate detection stays in
+ * sync. seen[] must have one slot per rand_options[] entry. */
+static int wolfCLU_RandMarkOption(const char* token, int* seen,
+        const char** dupOpt)
+{
+    int j;
+    for (j = 0; rand_options[j].name != NULL; j++) {
+        if (XSTRCMP(token, rand_options[j].name) == 0) {
+            if (seen[j]) {
+                *dupOpt = token;
+            }
+            seen[j] = 1;
+            return j;
+        }
+    }
+    return -1;
+}
+
 
 int wolfCLU_Rand(int argc, char** argv)
 {
@@ -51,23 +77,18 @@ int wolfCLU_Rand(int argc, char** argv)
     int option;
     int longIndex = 1;
     WOLFSSL_BIO *bioOut = NULL;
+#ifndef WOLFCLU_NO_FILESYSTEM
+    /* deferred: opened only after the count validates */
+    char *outFile = NULL;
+#endif
     byte *buf = NULL;
 
-    /* last parameter is the rand bytes output size. Match -h/-help exactly
-     * so other -h-prefixed flags (e.g. -hex) aren't swallowed as a help
-     * request. */
+    /* Match -h/-help exactly so -h-prefixed flags (e.g. -hex) aren't taken as
+     * help. */
     if (XSTRCMP("-h", argv[argc-1]) == 0 ||
             XSTRCMP("-help", argv[argc-1]) == 0) {
         wolfCLU_RandHelp();
         return WOLFCLU_SUCCESS;
-    }
-    else {
-        size = XATOI(argv[argc-1]);
-        if (size <= 0) {
-            wolfCLU_LogError("Unable to convert %s to a number",
-                    argv[argc-1]);
-            ret = WOLFCLU_FATAL_ERROR;
-        }
     }
 
     opterr = 0; /* do not display unrecognized options */
@@ -85,14 +106,18 @@ int wolfCLU_Rand(int argc, char** argv)
 
             case WOLFCLU_OUTFILE:
 #ifdef WOLFCLU_NO_FILESYSTEM
-                WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");
+                WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open output file");
                 ret = WOLFCLU_FATAL_ERROR;
 #else
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
+                /* optarg is NULL when -out is the final token with no filename.
+                 * Reject it: the deferred open would otherwise skip and dump
+                 * bytes to stdout instead of erroring. */
+                if (optarg == NULL) {
+                    wolfCLU_LogError("Missing filename argument for -out");
                     ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    outFile = optarg; /* defer open until the count validates */
                 }
 #endif
                 break;
@@ -112,19 +137,180 @@ int wolfCLU_Rand(int argc, char** argv)
     }
 
 
+    /* The byte count is the single positional that is neither an option flag
+     * nor the value consumed by -out. A manual rescan is needed because
+     * wolfCLU_GetOpt's optind indexes the option table, not argv, so it never
+     * surfaces leftover positionals. Resolving it here makes `rand -out 32`
+     * treat 32 as the path and `rand -hex 16 -out f` keep 16.
+     *
+     * The walk mirrors GetOpt's binding: for a required_argument option GetOpt
+     * sets optarg = argv[index+1], so this scan skips the next token
+     * (skipNext). Only the recovered byte count matters, so the one divergence
+     * (a value that is itself an option name is treated here only as the bound
+     * value) is benign. Any has_arg arity the scan doesn't model is rejected
+     * loudly below, turning a silent desync into a test-visible failure. */
+    if (ret == WOLFCLU_SUCCESS) {
+        int i;
+        int countIdx = -1;
+        int skipNext = 0;      /* next token is a value bound to the prior opt */
+        const char* extra = NULL;  /* second positional token, if any */
+        const char* badOpt = NULL; /* first unrecognized -flag, if any */
+        const char* dupOpt = NULL; /* first option repeated, if any */
+        /* one slot per rand_options[] entry; marks options already seen */
+        int seen[sizeof(rand_options) / sizeof(rand_options[0])];
+
+        XMEMSET(seen, 0, sizeof(seen));
+
+        for (i = 2; i < argc; i++) {  /* skip argv[0]=prog and argv[1]="rand" */
+            int j;
+            int matched = 0;
+
+            if (argv[i] == NULL) {
+                break;
+            }
+
+            if (skipNext) {
+                skipNext = 0;  /* this token was bound to the preceding option */
+                /* A token bound as a value may itself be an option name (e.g.
+                 * `rand -out -out 16`). The main scan never runs for a swallowed
+                 * token, so check and mark it seen here too. This keeps
+                 * duplicate detection symmetric whether or not a flag's first
+                 * appearance landed in a value slot. */
+                wolfCLU_RandMarkOption(argv[i], seen, &dupOpt);
+                if (dupOpt != NULL) {
+                    break;
+                }
+                continue;
+            }
+
+            /* -h/-help are handled globally, not listed in rand_options[] */
+            if (XSTRCMP(argv[i], "-h") == 0 || XSTRCMP(argv[i], "-help") == 0) {
+                continue;
+            }
+
+            /* Match against the option table. GetOpt rejects any option that
+             * appears more than once, so the value is never bound and, for -out,
+             * outFile stays NULL and output falls back to stdout. Catch the
+             * repeat here so a duplicate -out errors instead of leaking bytes. */
+            j = wolfCLU_RandMarkOption(argv[i], seen, &dupOpt);
+            if (j >= 0) {
+                matched = 1;
+                if (dupOpt != NULL) {
+                    break;
+                }
+                if (rand_options[j].has_arg == required_argument) {
+                    /* mirror GetOpt: optarg = argv[index+1] */
+                    skipNext = 1;
+                }
+                else if (rand_options[j].has_arg != no_argument) {
+                    /* Arity this scan doesn't model; fail loudly instead of
+                     * mis-reading the option's value as the count. */
+                    wolfCLU_LogError("internal error: option %s has an "
+                            "unsupported argument arity", argv[i]);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+            /* Redundant today: the j >= 0 block already breaks on a duplicate.
+             * Kept as a safety net so a future edit dropping that break can't
+             * let a duplicate fall through to positional handling. */
+            if (ret != WOLFCLU_SUCCESS || dupOpt != NULL) {
+                break;
+            }
+            if (matched) {
+                continue;
+            }
+
+            /* A leftover '-' token is an unknown flag, not a count. With
+             * opterr = 0 it would otherwise be miscounted as a positional. */
+            if (argv[i][0] == '-') {
+                badOpt = argv[i];
+                break;
+            }
+
+            if (countIdx == -1) {
+                countIdx = i;
+            }
+            else {
+                /* a second positional is already an error; stop scanning */
+                extra = argv[i];
+                break;
+            }
+        }
+
+        if (ret != WOLFCLU_SUCCESS) {
+            /* the arity guard above already logged and failed */
+        }
+        else if (dupOpt != NULL) {
+            /* Log locally rather than rely on GetOpt's own duplicate message,
+             * keeping this branch self-contained and consistent with its
+             * siblings. A duplicated message is acceptable; a silent non-zero
+             * exit is not. Note GetOpt's wolfCLU_checkForArg already printed
+             * its own "argument found twice" line during the option pass, so
+             * two differently-worded lines appear for one duplicate; that
+             * double output is expected, not a bug. */
+            wolfCLU_LogError("Option %s specified more than once", dupOpt);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (badOpt != NULL) {
+            wolfCLU_LogError("Unrecognized option %s", badOpt);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (countIdx == -1) {
+            wolfCLU_LogError("Missing <num bytes> argument");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (extra != NULL) {
+            wolfCLU_LogError(
+                    "Expected a single <num bytes> argument, got extra "
+                    "token %s", extra);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            size = XATOI(argv[countIdx]);
+            if (size <= 0) {
+                /* Reached for "0", a non-numeric token (XATOI yields 0), or an
+                 * all-digit token that overflows to a non-positive value. A
+                 * bare "-5" never lands here: the rescan rejects '-'-prefixed
+                 * tokens as unrecognized options first. */
+                wolfCLU_LogError(
+                        "Expected a positive <num bytes> count, got %s",
+                        argv[countIdx]);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+    }
+
     if (ret == WOLFCLU_SUCCESS && useBase64 && useHex) {
         wolfCLU_LogError("-base64 and -hex are mutually exclusive");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    /* Fail fast on a size that would overflow the hex buffer length
-     * (size * 2). Validate before the RNG allocation so an over-large
-     * request does not first burn an O(GB) malloc and the matching
-     * RNG fill. */
+    /* Reject sizes that overflow the hex length (size * 2) before the RNG
+     * allocation, so an over-large request doesn't first burn a huge malloc
+     * and RNG fill. Raw output is uncapped. */
     if (ret == WOLFCLU_SUCCESS && useHex && size > INT_MAX / 2) {
         wolfCLU_LogError("requested size too large for -hex output");
         ret = WOLFCLU_FATAL_ERROR;
     }
+
+    /* Same concern for base64: its ~4/3 expansion (<2x) is carried back into
+     * the signed int `size`, so INT_MAX/2 is a safe cap. */
+    if (ret == WOLFCLU_SUCCESS && useBase64 && size > INT_MAX / 2) {
+        wolfCLU_LogError("requested size too large for -base64 output");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+#ifndef WOLFCLU_NO_FILESYSTEM
+    /* Open output ("wb") only after the count validates, so a bad/missing
+     * count never truncates an existing file. */
+    if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
+        bioOut = wolfSSL_BIO_new_file(outFile, "wb");
+        if (bioOut == NULL) {
+            wolfCLU_LogError("Unable to open output file %s", outFile);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+#endif
 
     if (ret == WOLFCLU_SUCCESS) {
         buf = (byte*)XMALLOC(size, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -140,9 +326,21 @@ int wolfCLU_Rand(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            if (wc_RNG_GenerateBlock(&rng, buf, size) != 0) {
-                wolfCLU_LogError("Unable to generate RNG block");
-                ret = WOLFCLU_FATAL_ERROR;
+            /* wc_RNG_GenerateBlock rejects requests larger than the DRBG
+             * per-call max (RNG_MAX_BLOCK_LEN), so fill in chunks. */
+            int generated = 0;
+            while (ret == WOLFCLU_SUCCESS && generated < size) {
+                word32 chunk = (word32)(size - generated);
+                if (chunk > RNG_MAX_BLOCK_LEN) {
+                    chunk = RNG_MAX_BLOCK_LEN;
+                }
+                if (wc_RNG_GenerateBlock(&rng, buf + generated, chunk) != 0) {
+                    wolfCLU_LogError("Unable to generate RNG block");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    generated += (int)chunk;
+                }
             }
             wc_FreeRng(&rng);
         }
@@ -229,8 +427,8 @@ int wolfCLU_Rand(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
         else if (useHex && outIsStdout) {
-            /* Match `openssl rand -hex` and avoid the next shell prompt
-             * landing on the same line as the hex output. */
+            /* Trailing newline so the next shell prompt isn't on the same
+             * line as the output. */
             (void)wolfSSL_BIO_write(bioOut, "\n", 1);
         }
     }
@@ -247,4 +445,3 @@ int wolfCLU_Rand(int argc, char** argv)
     return WOLFCLU_FATAL_ERROR;
 #endif
 }
-
