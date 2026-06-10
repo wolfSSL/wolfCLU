@@ -6,7 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, run_wolfssl, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
 
 # Files that tests may create; cleaned up by tearDownClass
 _TEMP_FILES = []
@@ -403,12 +403,100 @@ class XmssTest(_GenkeySignVerifyBase):
         self._track("xmss-bad.priv", "xmss-bad.pub")
         r = run_wolfssl("-genkey", "xmss", "-out", "xmss-bad",
                         "-outform", "raw", "-output", "KEYPAIR", "-height")
-        self.assertNotEqual(r.returncode, 0,
-                            "expected failure for missing -height value")
-        self.assertGreaterEqual(r.returncode, 0,
-                                "-height without value crashed with signal "
-                                "{}".format(r.returncode))
+        self.assertEqual(r.returncode, 0,
+                            "expected default value of 20 set for -height (no "
+                            "crash)")
 
+    def test_xmss_missing_height_arg(self):
+        self._track("xmss-bad.priv", "xmss-bad.pub")
+        r = run_wolfssl("-genkey", "xmss", "-out", "xmss-bad",
+                        "-outform", "raw", "-output", "KEYPAIR")
+        self.assertEqual(r.returncode, 0,
+                            "expected default value for -height (no "
+                            "crash)")
+
+@unittest.skipUnless(_has_algorithm("xmss"), "xmss not available")
+class XmssmtTest(_GenkeySignVerifyBase):
+
+    def test_xmssmt_raw(self):
+        # The XMSS^MT signer derives the parameter set from the key file name,
+        # so the keybase must be a valid param string with '-' in place of '/'
+        # (e.g. "XMSSMT-SHA2_20/2_256" -> "XMSSMT-SHA2_20-2_256"). -height 20
+        # defaults to layer 2, matching this name.
+        keybase = "XMSSMT-SHA2_20-2_256"
+        self._track(keybase + ".priv", keybase + ".pub")
+        self._gen_sign_verify(
+            "xmssmt", keybase, "xmss-signed.sig", "raw",
+            extra_genkey_args=["-height", "20"],
+            skip_priv_verify=True, use_output_flag=True)
+
+    def test_xmssmt_missing_height_value(self):
+        """-height with no value must fail gracefully (no crash)."""
+        self._track("xmss-bad.priv", "xmss-bad.pub")
+        r = run_wolfssl("-genkey", "xmssmt", "-out", "xmss-bad",
+                        "-outform", "raw", "-output", "KEYPAIR", "-height")
+        self.assertEqual(r.returncode, 0,
+                            "expected default value of 20 set for -height (no "
+                            "crash)")
+
+    def test_xmssmt_missing_height_arg(self):
+        self._track("xmss-bad.priv", "xmss-bad.pub")
+        r = run_wolfssl("-genkey", "xmssmt", "-out", "xmss-bad",
+                        "-outform", "raw", "-output", "KEYPAIR")
+        self.assertEqual(r.returncode, 0,
+                            "expected default value for -height (no "
+                            "crash)")
+
+
+class SignVerifySetupArgsTest(unittest.TestCase):
+    """Argument-parsing branches in clu_sign_verify_setup.c.
+
+    These exercise the legacy `-rsa`/`-ecc`/... sign & verify entry point
+    (note the leading dash, which selects the legacy code path).
+    """
+
+    SIGN_FILE = "svsetup-sign-this.txt"
+    RSA_KEY = os.path.join(CERTS_DIR, "server-key.pem")
+    ECC_KEY = os.path.join(CERTS_DIR, "ecc-key.pem")
+    ECC_PUB = os.path.join(CERTS_DIR, "ecc-keyPub.pem")
+
+    @classmethod
+    def setUpClass(cls):
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+        with open(cls.SIGN_FILE, "w") as f:
+            f.write("Sign this test data\n")
+
+    @classmethod
+    def tearDownClass(cls):
+        _cleanup_files([cls.SIGN_FILE])
+
+    def test_sign_help(self):
+        r = run_wolfssl("-rsa", "-sign", "-help")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "sign help crashed with signal "
+                                "{}".format(r.returncode))
+        self.assertIn("RSA Sign", r.stdout + r.stderr)
+
+    def test_verify_help(self):
+        r = run_wolfssl("-rsa", "-verify", "-help")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "verify help crashed with signal "
+                                "{}".format(r.returncode))
+        self.assertIn("RSA Verify", r.stdout + r.stderr)
+
+    def test_generic_help(self):
+        """No -sign/-verify prints both the sign and verify help blocks."""
+        r = run_wolfssl("-ecc", "-help")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "generic help crashed with signal "
+                                "{}".format(r.returncode))
+        combined = r.stdout + r.stderr
+        self.assertIn("ECC Sign", combined)
+        self.assertIn("ECC Verify", combined)
 
 class GenkeyArgvTest(unittest.TestCase):
     """Argument-bounds checks for the genkey subcommand entry point."""

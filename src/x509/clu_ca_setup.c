@@ -26,6 +26,9 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_x509_sign.h>
 #include <wolfclu/certgen/clu_certgen.h>
+#include <wolfssl/openssl/evp.h>
+#include <wolfssl/ssl.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -169,7 +172,7 @@ int wolfCLU_CASetup(int argc, char** argv)
                     ca = wolfSSL_X509_load_certificate_file(optarg,
                         WOLFSSL_FILETYPE_ASN1);
                 }
-                
+
                 if (ca == NULL) {
                     wolfCLU_LogError("Unable to open CA file %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
@@ -246,7 +249,7 @@ int wolfCLU_CASetup(int argc, char** argv)
         wolfCLU_CertSignSetHash(signer, hashType);
     }
 
-    if (ret == WOLFCLU_SUCCESS && keyIn != NULL) {
+    if (ret == WOLFCLU_SUCCESS && keyIn != NULL && altSign == 0) {
         pkey = wolfSSL_PEM_read_bio_PrivateKey(keyIn, NULL, NULL, NULL);
         if (pkey == NULL) {
             wolfCLU_LogError("Error reading key from file");
@@ -285,9 +288,16 @@ int wolfCLU_CASetup(int argc, char** argv)
                     wolfCLU_GetTypeFromPKEY(pkey));
         }
         else if (altSign) {
-            ret = wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey, ca,
-                wolfSSL_X509_NAME_oneline(wolfSSL_X509_get_subject_name(x509), 0, 0),
-                out, outForm);
+            char* subjName = wolfSSL_X509_NAME_oneline(
+                wolfSSL_X509_get_subject_name(x509), 0, 0);
+            if (subjName != NULL) {
+                ret = wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey,
+                    ca, subjName, out, outForm);
+                XFREE(subjName, 0, DYNAMIC_TYPE_OPENSSL);
+            }
+            else {
+                ret = MEMORY_E;
+            }
         }
         else {
             wolfCLU_CertSignSetCA(signer, ca, pkey,
@@ -319,8 +329,14 @@ int wolfCLU_CASetup(int argc, char** argv)
     if (altKeyPub != NULL) {
         wolfSSL_BIO_free(altKeyPub);
     }
+    if (subjKey != NULL) {
+        wolfSSL_BIO_free(subjKey);
+    }
     if (!selfSigned) {
         wolfSSL_X509_free(x509);
+    }
+    if ((selfSigned || altSign) && ca != NULL) {
+        wolfSSL_X509_free(ca);
     }
 
     /* check for success on signer free since random data is output */

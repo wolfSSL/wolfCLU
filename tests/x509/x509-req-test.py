@@ -143,6 +143,44 @@ class TestReqNew(unittest.TestCase):
                          "Got: {!r}".format(subject_line))
 
 
+    def test_req_new_interactive_name(self):
+        """req -new with no -subj/-config reads the name fields from stdin.
+
+        Exercises wolfCLU_CreateX509Name(). The prompts consume one line each:
+        Country, State, Locality, Organization, Org-Unit, Common Name, Email.
+        """
+        tmp = _tmp("test_req_interactive.csr")
+        self._clean(tmp)
+        name_input = ("US\nMontana\nBozeman\nwolfSSL\n"
+                      "engineering\nexample.com\ntest@example.com\n")
+        r = subprocess.run(
+            [WOLFSSL_BIN, "req", "-new",
+             "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+             "-out", tmp],
+            input=name_input, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.isfile(tmp), "req did not create CSR")
+
+        r2 = subprocess.run(
+            [WOLFSSL_BIN, "req", "-in", tmp, "-text", "-verify"],
+            input=name_input, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        self.assertIn("example.com", r2.stdout)
+
+    def test_req_new_interactive_skip_fields(self):
+        """Empty lines skip the corresponding name fields (still succeeds)."""
+        tmp = _tmp("test_req_interactive_skip.csr")
+        self._clean(tmp)
+        # Only a common name; everything else left blank.
+        name_input = "\n\n\n\n\nexample.com\n\n"
+        r = subprocess.run(
+            [WOLFSSL_BIN, "req", "-new",
+             "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+             "-out", tmp],
+            input=name_input, capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.isfile(tmp), "req did not create CSR")
+
     def test_req_with_prompt_config(self):
         """req with prompt config file creates CSR with SAN."""
         tmp_csr = _tmp("test_req_prompt.csr")

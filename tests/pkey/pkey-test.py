@@ -84,5 +84,29 @@ class PkeyTest(unittest.TestCase):
         self.assertEqual(r.stdout.strip(), ECC_PUBKEY_PEM)
 
 
+    def test_help(self):
+        for flag in ("-help", "-h"):
+            r = run_wolfssl("pkey", flag)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("wolfssl pkey", r.stdout + r.stderr)
+
+    def test_pubout_from_private(self):
+        r = run_wolfssl("pkey", "-in",
+                        os.path.join(CERTS_DIR, "ecc-key.pem"), "-pubout")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), ECC_PUBKEY_PEM)
+
+    def test_out_to_file(self):
+        out = "pkey-out.pem"
+        self._cleanup(out)
+        r = run_wolfssl("pkey", "-in",
+                        os.path.join(CERTS_DIR, "ecc-key.pem"),
+                        "-pubout", "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.isfile(out), "pkey -out did not create file")
+        with open(out, "r") as f:
+            self.assertIn("BEGIN PUBLIC KEY", f.read())
+
+
 if __name__ == "__main__":
     test_main()

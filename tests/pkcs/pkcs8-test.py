@@ -72,6 +72,16 @@ class Pkcs8Test(unittest.TestCase):
                         pkcs1_pem, shallow=False),
             "server-key.pem -traditional check failed")
 
+    def test_help(self):
+        for flag in ("-help", "-h"):
+            r = run_wolfssl("pkcs8", flag)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("wolfssl pkcs8", r.stdout + r.stderr)
+
+    def test_bad_argument_fails(self):
+        r = run_wolfssl("pkcs8", "-not-a-real-option")
+        self.assertNotEqual(r.returncode, 0)
+
     @unittest.skipIf(is_fips(), "skipped in FIPS builds")
     def test_stdin_input(self):
         pem_path = os.path.join(CERTS_DIR, "server-keyEnc.pem")

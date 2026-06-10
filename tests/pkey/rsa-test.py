@@ -167,5 +167,18 @@ class RsaTest(unittest.TestCase):
                           combined[:200]))
 
 
+    def test_help(self):
+        for flag in ("-help", "-h"):
+            r = run_wolfssl("rsa", flag)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("wolfssl rsa", r.stdout + r.stderr)
+
+    def test_pubout_from_private(self):
+        r = run_wolfssl("rsa", "-in",
+                        os.path.join(CERTS_DIR, "server-key.pem"), "-pubout")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), RSA_PUBKEY_PEM)
+
+
 if __name__ == "__main__":
     test_main()

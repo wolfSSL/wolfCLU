@@ -321,11 +321,30 @@ class TestWolfsslClientWolfsslResponder(_OCSPInteropBase):
     CLIENT_BIN = WOLFSSL_BIN
     RESPONDER_BIN = WOLFSSL_BIN
 
+    def test_01_client_start_up(self):
+        """ successful round trip from client to server """
+        resp = self._start_responder(INDEX_VALID, nrequest=1)
+        rc, out = _run_client(self.CLIENT_BIN, self.PORT,
+                              ["-cert", os.path.join(CERTS_DIR, "server-cert.pem")])
+
+        resp.stop()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("good", out.lower(), out)
+
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
 class TestWolfsslClientOpensslResponder(_OCSPInteropBase):
     CLIENT_BIN = WOLFSSL_BIN
     RESPONDER_BIN = "openssl"
+
+    def test_01_client_start_up(self):
+        resp = self._start_responder(INDEX_VALID, nrequest=1)
+        rc, out = _run_client(self.CLIENT_BIN, self.PORT,
+                              ["-cert", os.path.join(CERTS_DIR, "server-cert.pem")])
+
+        resp.stop()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("good", out.lower(), out)
 
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
@@ -333,12 +352,28 @@ class TestOpensslClientWolfsslResponder(_OCSPInteropBase):
     CLIENT_BIN = "openssl"
     RESPONDER_BIN = WOLFSSL_BIN
 
+    def test_01_client_start_up(self):
+        resp = self._start_responder(INDEX_VALID, nrequest=1)
+        rc, out = _run_client(self.CLIENT_BIN, self.PORT,
+                              ["-cert", os.path.join(CERTS_DIR, "server-cert.pem")])
+
+        resp.stop()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("good", out.lower(), out)
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
 class TestOpensslClientOpensslResponder(_OCSPInteropBase):
     CLIENT_BIN = "openssl"
     RESPONDER_BIN = "openssl"
 
+    def test_01_client_start_up(self):
+        resp = self._start_responder(INDEX_VALID, nrequest=1)
+        rc, out = _run_client(self.CLIENT_BIN, self.PORT,
+                              ["-cert", os.path.join(CERTS_DIR, "server-cert.pem")])
+
+        resp.stop()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("good", out.lower(), out)
 
 class TestPortValidation(unittest.TestCase):
     """Boundary tests for the -port range check in wolfCLU_OcspSetup.
