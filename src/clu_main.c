@@ -61,6 +61,7 @@ static const struct option mode_options[] = {
     {"ecc",       no_argument,       0, WOLFCLU_ECC         },
     {"ed25519",   no_argument,       0, WOLFCLU_ED25519     },
     {"dilithium", no_argument,       0, WOLFCLU_DILITHIUM   },
+    {"ml-dsa",    no_argument,       0, WOLFCLU_DILITHIUM   },
     {"xmss",      no_argument,       0, WOLFCLU_XMSS        },
     {"xmssmt",    no_argument,       0, WOLFCLU_XMSSMT      },
     {"dgst",      no_argument,       0, WOLFCLU_DGST        },

@@ -386,6 +386,38 @@ class DilithiumTest(_GenkeySignVerifyBase):
                          "output file must not be created when signing with "
                          "corrupted key")
 
+    def test_ml_dsa_alias_der(self):
+        for level in [2, 3, 5]:
+            with self.subTest(level=level):
+                self._gen_sign_verify(
+                    "ml-dsa", "mldsakey_alias", "mldsa-alias.sig", "der",
+                    extra_genkey_args=["-level", str(level)],
+                    skip_priv_verify=True, use_output_flag=True)
+
+    def test_ml_dsa_alias_pem(self):
+        for level in [2, 3, 5]:
+            with self.subTest(level=level):
+                self._gen_sign_verify(
+                    "ml-dsa", "mldsakey_alias", "mldsa-alias.sig", "pem",
+                    extra_genkey_args=["-level", str(level)],
+                    skip_priv_verify=True, use_output_flag=True)
+
+    def test_ml_dsa_cross_alias(self):
+        """Keys generated with dilithium sign/verify with ml-dsa and vice-versa."""
+        for level in [2, 3, 5]:
+            with self.subTest(level=level):
+                priv, pub = self._genkey("dilithium", "mldsakey_cross",
+                                         "der", ["-level", str(level)],
+                                         use_output_flag=True)
+                self._sign("ml-dsa", priv, "der", "mldsa-cross.sig")
+                self._verify_pub("ml-dsa", pub, "der", "mldsa-cross.sig")
+
+                priv2, pub2 = self._genkey("ml-dsa", "mldsakey_cross2",
+                                            "der", ["-level", str(level)],
+                                            use_output_flag=True)
+                self._sign("dilithium", priv2, "der", "dil-cross.sig")
+                self._verify_pub("dilithium", pub2, "der", "dil-cross.sig")
+
 
 @unittest.skipUnless(_has_algorithm("xmss"), "xmss not available")
 class XmssTest(_GenkeySignVerifyBase):
