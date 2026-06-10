@@ -62,7 +62,6 @@
     #include <netinet/in.h>
     #include <arpa/inet.h>
     #include <unistd.h>
-    #include <errno.h>
 #endif
 
 /* Read exactly n bytes from socket, handling partial reads */
@@ -178,9 +177,14 @@ int wolfCLU_ScgiReadRequest(SOCKET_T sockfd, byte* buffer, int bufferSz,
     int headerLen;
     int pos = 0;
     byte comma;
-    
+
+    if (buffer == NULL || req == NULL || bufferSz <= 0) {
+        WOLFCLU_LOG(WOLFCLU_E0, "Invalid SCGI buffer or arguments");
+        return -1;
+    }
+
     XMEMSET(req, 0, sizeof(ScgiRequest));
-    
+
     if (parseNetstringLength(sockfd, &headerLen) != 0) {
         WOLFCLU_LOG(WOLFCLU_E0, "Failed to parse SCGI netstring length");
         return -1;
@@ -207,8 +211,8 @@ int wolfCLU_ScgiReadRequest(SOCKET_T sockfd, byte* buffer, int bufferSz,
         return -1;
     }
     
-    if (req->contentLength < 0 || pos + req->contentLength > bufferSz) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Invalid SCGI content length: %d", 
+    if (req->contentLength < 0 || req->contentLength > bufferSz - pos) {
+        WOLFCLU_LOG(WOLFCLU_E0, "Invalid SCGI content length: %d",
                     req->contentLength);
         return -1;
     }
