@@ -8,7 +8,7 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main, find_free_port
 
 
 class ServerClientTest(unittest.TestCase):
@@ -45,9 +45,11 @@ class ServerClientTest(unittest.TestCase):
         if os.path.exists(readyfile):
             os.remove(readyfile)
 
+        port = find_free_port()
+
         # Start server in background
         server = subprocess.Popen(
-            [WOLFSSL_BIN, "s_server", "-port", "11111",
+            [WOLFSSL_BIN, "s_server", "-port", str(port),
              "-key", os.path.join(CERTS_DIR, "server-key.pem"),
              "-cert", os.path.join(CERTS_DIR, "server-cert.pem"),
              "-CAfile", os.path.join(CERTS_DIR, "ca-cert.pem"),
@@ -71,7 +73,8 @@ class ServerClientTest(unittest.TestCase):
 
             # Connect with client
             client = subprocess.run(
-                [WOLFSSL_BIN, "s_client", "-connect", "127.0.0.1:11111",
+                [WOLFSSL_BIN, "s_client", "-connect",
+                 "127.0.0.1:{}".format(port),
                  "-CAfile", os.path.join(CERTS_DIR, "ca-cert.pem"),
                  "-verify_return_error", "-disable_stdin_check"],
                 capture_output=True, stdin=subprocess.DEVNULL, timeout=30,

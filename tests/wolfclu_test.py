@@ -5,10 +5,21 @@ import platform
 import subprocess
 import sys
 import unittest
+import socket
 
 _TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_TESTS_DIR)
 PROJECT_ROOT = _PROJECT_ROOT
+
+
+def find_free_port():
+     """Return an ephemeral TCP port number chosen by the OS.
+     This does *not* reserve the port after the socket is closed, so callers that
+     bind/listen should be prepared to retry if the port is claimed concurrently. """
+
+     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
 
 
 def _find_wolfssl_bin():
@@ -81,6 +92,76 @@ def is_fips():
     """True when linked against a FIPS wolfSSL build (per `wolfssl -v`)."""
     r = run_wolfssl("-v")
     return "FIPS" in (r.stdout + r.stderr)
+
+
+def make_sparse(fileobj):
+    """Mark an open file as sparse on Windows before it is extended.
+
+    NTFS does not treat a file as sparse unless the sparse flag is set
+    explicitly, so a subsequent truncate() physically allocates and
+    zero-fills every byte.  Setting FSCTL_SET_SPARSE first keeps the
+    extension sparse, matching the behaviour of ext4/APFS where truncate()
+    is already sparse.  This must be called before extending the file.
+
+    No-op on non-Windows platforms.
+    """
+    if sys.platform != "win32":
+        return
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    FSCTL_SET_SPARSE = 0x000900C4
+    handle = msvcrt.get_osfhandle(fileobj.fileno())
+    bytes_returned = wintypes.DWORD(0)
+    ok = ctypes.windll.kernel32.DeviceIoControl(
+        wintypes.HANDLE(handle),
+        FSCTL_SET_SPARSE,
+        None, 0,        # no input buffer => set the sparse flag (TRUE)
+        None, 0,        # no output buffer
+        ctypes.byref(bytes_returned),
+        None,
+    )
+    if not ok:
+        raise ctypes.WinError()
+
+
+def truncate_sparse(fileobj, size):
+    """Extend an open file to `size` bytes without physically allocating it.
+
+    On POSIX, truncate() already produces a sparse file. On Windows, Python's
+    truncate() routes through the CRT _chsize_s, which *writes zeros* over the
+    extended range and so allocates every cluster even when the sparse flag is
+    set. Instead we mark the file sparse and move the end-of-file pointer with
+    SetEndOfFile directly: no bytes are written, so the range stays sparse (and
+    it is instant rather than a multi-GB zero-fill).
+    """
+    if sys.platform != "win32":
+        fileobj.truncate(size)
+        return
+
+    import ctypes
+    import msvcrt
+    from ctypes import wintypes
+
+    make_sparse(fileobj)  # set FSCTL_SET_SPARSE first
+
+    k32 = ctypes.windll.kernel32
+    handle = wintypes.HANDLE(msvcrt.get_osfhandle(fileobj.fileno()))
+
+    set_ptr = k32.SetFilePointerEx
+    set_ptr.argtypes = [wintypes.HANDLE, ctypes.c_longlong,
+                        ctypes.POINTER(ctypes.c_longlong), wintypes.DWORD]
+    set_ptr.restype = wintypes.BOOL
+    FILE_BEGIN = 0
+    if not set_ptr(handle, ctypes.c_longlong(size), None, FILE_BEGIN):
+        raise ctypes.WinError()
+
+    set_eof = k32.SetEndOfFile
+    set_eof.argtypes = [wintypes.HANDLE]
+    set_eof.restype = wintypes.BOOL
+    if not set_eof(handle):
+        raise ctypes.WinError()
 
 
 def test_main():

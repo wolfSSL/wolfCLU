@@ -10,7 +10,7 @@ jobs:
   build:
     if: github.repository_owner == 'wolfssl'
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     env:
       BUILD_PLATFORM: x64
@@ -54,5 +54,5 @@ jobs:
 
       - name: Run tests
         working-directory: wolfclu
-        run: python tests/run_tests.py
+        run: python tests/run_tests_parallel.py
 

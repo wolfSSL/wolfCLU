@@ -8,7 +8,6 @@ test module. Tests all client/responder combinations (wolfssl, openssl).
 import os
 import re
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
@@ -16,16 +15,10 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main
+from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main, find_free_port
 
 HAS_OPENSSL = shutil.which("openssl") is not None
 
-
-def _find_free_port():
-    """Bind to port 0 to let the OS assign a free ephemeral port."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
 
 INDEX_VALID = (
     "V\t991231235959Z\t\t01\tunknown\t"
@@ -135,7 +128,7 @@ class _OCSPInteropBase(unittest.TestCase):
             raise unittest.SkipTest(
                 f"OCSP not supported by {cls.RESPONDER_BIN}")
 
-        cls.PORT = _find_free_port()
+        cls.PORT = find_free_port()
         cls._tmpdir = tempfile.mkdtemp()
         cls._responder = None
 
