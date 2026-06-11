@@ -1,0 +1,61 @@
+.\" Manpage for wolfssl rsa.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl rsa man page"
+.SH NAME
+wolfssl-rsa, rsa \- RSA key processing
+.SH SYNOPSIS
+wolfssl rsa [-in file] [-inform PEM|DER] [-out file] [-outform PEM|DER] [-passin source] [-pubin] [-pubout] [-RSAPublicKey_in] [-noout] [-modulus]
+.SH DESCRIPTION
+Reads an RSA key, converts it between PEM and DER, and prints selected
+key information. This is the RSA key-processing command; for legacy RSA
+signing and verification see the sign/verify documentation (wolfssl -rsa
+-sign / -verify).
+.SH OPTIONS
+-in file              input file for the key to read.
+.br
+.LP
+-inform PEM|DER       input format.
+.br
+.LP
+-out file             file to write the result to (default stdout).
+.br
+.LP
+-outform PEM|DER      output format.
+.br
+.LP
+-passin source        password source for PEM-encrypted input files, e.g.
+.br
+                      pass:<password> or stdin. Applies to PEM input only;
+.br
+                      DER private-key reads ignore -passin.
+.br
+.LP
+-pubin                expect a public key as input. Also forces public-key
+.br
+                      output (equivalent to setting -pubout).
+.br
+.LP
+-pubout               output a public key.
+.br
+.LP
+-RSAPublicKey_in      expect an RSAPublicKey-format public key as input.
+.br
+.LP
+-noout                suppress key re-encoding on output. Does not suppress
+.br
+                      -modulus output when both are given.
+.br
+.LP
+-modulus              print out the RSA modulus (n).
+.SH SEE ALSO
+.BR wolfssl-genkey(1) ", " wolfssl-pkey(1) ", " wolfssl-sign_verify(1) ", " wolfssl-dgst(1)
+.SH NOTES
+Available only when wolfSSL is built with filesystem support.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

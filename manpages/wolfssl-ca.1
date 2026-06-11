@@ -1,0 +1,97 @@
+.\" Manpage for wolfssl ca.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl ca man page"
+.SH NAME
+wolfssl-ca, ca \- sign certificates from a CSR or self-sign
+.SH SYNOPSIS
+wolfssl ca -in CSR [-config file] [-keyfile file] [-cert file] [-out file] [-inform PEM|DER] [-outform PEM|DER] [-md digest] [-days n] [-extensions section] [-selfsign] [-altkey file] [-altpub file] [-subjkey file] [-altextend]
+.SH DESCRIPTION
+Acts as a minimal certificate authority. Reads a certificate signing
+request (CSR) and issues a signed certificate using the CA certificate and
+private key, or self-signs using the supplied key. CA key and certificate
+may be supplied on the command line or via the [CA_default] section of
+the configuration file (see -config).
+.SH OPTIONS
+-in file              CSR file to read the request from (required for normal
+.br
+                      signing).
+.br
+.LP
+-out file             output file for the signed certificate.
+.br
+.LP
+-keyfile file         private key used to sign the certificate.
+.br
+.LP
+-cert file            CA certificate to issue from.
+.br
+.LP
+-config file          configuration file to read CA settings from.
+.br
+.LP
+-inform PEM|DER       input format of the CSR.
+.br
+.LP
+-outform PEM|DER      output format of the certificate. The normal signing
+.br
+                      path always writes PEM; -outform der is currently
+.br
+                      ignored.
+.br
+.LP
+-md digest            signing digest to use, e.g. sha256.
+.br
+.LP
+-days n               number of days the certificate is valid for.
+.br
+.LP
+-extensions section   section of the config file to read extensions from.
+.br
+.LP
+-selfsign             sign using the key associated with the certificate
+.br
+                      instead of a separate CA certificate.
+.br
+.LP
+-altkey file          alternate private key (dual-algorithm certificates;
+.br
+                      requires wolfSSL built with WOLFSSL_DUAL_ALG_CERTS and
+.br
+                      HAVE_DILITHIUM).
+.br
+.LP
+-altpub file          alternate public key (dual-algorithm certificates).
+.br
+.LP
+-subjkey file         subject key for dual-algorithm certificates.
+.br
+.LP
+-altextend            extend with an alternate key (dual-algorithm certificates).
+.SH EXAMPLES
+Self-sign a CSR with its own key:
+.RS
+wolfssl ca -selfsign -in mycsr.pem -keyfile mykey.pem -out mycert.pem -days 365 -md sha256
+.RE
+.LP
+Sign a CSR as a CA with your CA certificate and key:
+.RS
+wolfssl ca -in csr.pem -out cert.pem -keyfile ca-key.pem -cert ca-cert.pem -days 365 -md sha256
+.RE
+.LP
+View the certificate details after signing:
+.RS
+wolfssl x509 -in cert.pem -text -noout
+.RE
+.SH SEE ALSO
+.BR wolfssl-req(1) ", " wolfssl-x509(1) ", " wolfssl-verify(1)
+.SH NOTES
+This command is only available when wolfSSL is built with filesystem
+support (not WOLFCLU_NO_FILESYSTEM).
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

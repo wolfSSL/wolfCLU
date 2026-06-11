@@ -1,0 +1,84 @@
+.\" Manpage for wolfssl ocsp.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl ocsp man page"
+.SH NAME
+wolfssl-ocsp, ocsp \- OCSP client and responder utility
+.SH SYNOPSIS
+wolfssl ocsp [client options] [responder options]
+.SH DESCRIPTION
+Acts as an OCSP client to check certificate revocation status, or as an
+OCSP responder (when \-port is given) to serve status responses.
+.SH GENERAL OPTIONS
+-CAfile file          trusted certificates file.
+.br
+.LP
+-help                 print the ocsp help summary and exit.
+.SH CLIENT OPTIONS
+Client mode is entered by any of \-cert, \-url, or \-issuer, and requires
+both \-cert and \-issuer to complete a check.
+.LP
+-cert file            certificate to check (required for client mode).
+.br
+.LP
+-issuer file          issuer certificate (required for client mode).
+.br
+.LP
+-url URL              responder URL (overrides the AIA in the certificate).
+.br
+.LP
+-no_nonce             do not add an OCSP nonce to the request.
+.SH RESPONDER OPTIONS
+-port n               port to run the responder on.
+.br
+.LP
+-index file           certificate status index file.
+.br
+.LP
+-rsigner file         responder certificate used to sign responses.
+.br
+.LP
+-rkey file            responder key used to sign responses.
+.br
+.LP
+-CA file              CA certificate.
+.br
+.LP
+-scgi                 use the SCGI protocol (for a web server reverse proxy).
+.br
+.LP
+-nrequest n           stop the responder after processing n requests (0 =
+.br
+                      unlimited).
+.SH EXAMPLES
+Check a certificate's status against the responder named in its AIA:
+.RS
+wolfssl ocsp -cert server-cert.pem -issuer ca-cert.pem
+.RE
+.LP
+Check a certificate against an explicit responder URL:
+.RS
+wolfssl ocsp -cert server-cert.pem -issuer ca-cert.pem -url http://ocsp.example.com
+.RE
+.LP
+Run an OCSP responder on port 22221:
+.RS
+wolfssl ocsp -port 22221 -index index.txt -rsigner ocsp-cert.pem -rkey ocsp-key.pem -CA ca-cert.pem
+.RE
+.SH SEE ALSO
+.BR wolfssl-verify(1) ", " wolfssl-crl(1) ", " wolfssl-x509(1)
+.SH NOTES
+Available only when wolfSSL is built with OCSP support (HAVE_OCSP and
+HAVE_OCSP_RESPONDER). Exactly one mode must be selected: responder mode via
+\-port, or client mode via \-cert/\-url/\-issuer (see CLIENT OPTIONS).
+Selecting both, or neither, is an error. For OpenSSL compatibility the tool
+accepts many additional ocsp flags (e.g. \-CApath, \-ignore_err, \-host,
+\-path, \-serial, \-nonce, \-out, \-text), but these are not yet implemented
+and currently return an error.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

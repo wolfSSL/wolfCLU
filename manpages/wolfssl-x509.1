@@ -1,0 +1,130 @@
+.\" Manpage for wolfssl x509.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl x509 man page"
+.SH NAME
+wolfssl-x509, x509 \- X.509 certificate processing and conversion
+.SH SYNOPSIS
+wolfssl x509 [-inform PEM|DER] [-in file] [-outform PEM|DER] [-out file] [-req] [-signkey file] [-extfile file] [-extensions section] [-sha1|-sha224|-sha256|-sha384|-sha512] [-noout] [-text] [-subject] [-issuer] [-serial] [-dates] [-email] [-fingerprint] [-purpose] [-hash] [-modulus] [-pubkey]
+.SH DESCRIPTION
+Reads an X.509 certificate and converts it between PEM and DER formats
+and/or prints selected fields. By default the (re-encoded) certificate is
+written to the output.
+.SH OPTIONS
+-in file              the certificate file to read from (optional; reads
+.br
+                      stdin when omitted).
+.br
+.LP
+-out file             output file to write to.
+.br
+.LP
+-inform PEM|DER       input format of the certificate.
+.br
+.LP
+-outform PEM|DER      output format of the certificate.
+.br
+.LP
+-req                  treat the input file as a CSR and sign it into a
+.br
+                      certificate. Requires a matching -signkey; cannot be
+.br
+                      used alone to view or convert a CSR. PEM CSR input is
+.br
+                      supported; DER CSR input with -inform der is not
+.br
+                      (input is parsed as a certificate).
+.br
+.LP
+-signkey file         private key used when signing a CSR with -req.
+.br
+.LP
+-extfile file         configuration file for extensions. Only takes effect
+.br
+                      when both -req and -signkey are also given; otherwise
+.br
+                      silently ignored (see NOTES).
+.br
+.LP
+-extensions section   section of the config file to use. Only takes effect
+.br
+                      when both -req and -signkey are also given; otherwise
+.br
+                      silently ignored (see NOTES).
+.br
+.LP
+-sha1, -sha224, -sha256, -sha384, -sha512
+.br
+                      digest to use when signing a CSR with -req (default
+.br
+                      SHA-256 when omitted).
+.br
+.LP
+-noout                do not output the certificate.
+.br
+.LP
+-text                 print human readable text of the certificate.
+.br
+.LP
+-subject              print out the subject name.
+.br
+.LP
+-issuer               print out the issuer name.
+.br
+.LP
+-serial               print out the serial number in hex.
+.br
+.LP
+-dates                print out the validity dates of the certificate.
+.br
+.LP
+-email                print out the subject's email address.
+.br
+.LP
+-fingerprint          print the SHA-1 fingerprint of the certificate DER.
+.br
+.LP
+-purpose              print out the certificate's purpose.
+.br
+.LP
+-hash                 print out the hash of the certificate subject name.
+.br
+.LP
+-modulus              print out the RSA key modulus.
+.br
+.LP
+-pubkey               print out the public key.
+.SH NOTES
+Unless both -req and -signkey are used, -extfile and -extensions are
+silently ignored on output: the (re-encoded) certificate is written from
+the original input DER, not from any in-memory changes made while parsing
+extensions.
+.SH EXAMPLES
+View certificate details in human-readable format:
+.RS
+wolfssl x509 -in mycert.pem -text -noout
+.RE
+.LP
+Check when a certificate expires:
+.RS
+wolfssl x509 -in mycert.pem -dates -noout
+.RE
+.LP
+Extract the public key from a certificate:
+.RS
+wolfssl x509 -in mycert.pem -pubkey -noout > pubkey.pem
+.RE
+.LP
+Convert a PEM certificate to DER:
+.RS
+wolfssl x509 -inform pem -in certs/ca-cert.pem -outform der -out certs/ca-cert.der
+.RE
+.SH SEE ALSO
+.BR wolfssl-req(1) ", " wolfssl-ca(1) ", " wolfssl-verify(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

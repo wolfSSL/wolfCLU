@@ -1,0 +1,45 @@
+.\" Manpage for wolfssl pkey.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl pkey man page"
+.SH NAME
+wolfssl-pkey, pkey \- public and private key processing
+.SH SYNOPSIS
+wolfssl pkey [-in file] [-out file] [-inform PEM|DER] [-outform PEM|DER] [-pubin] [-pubout]
+.SH DESCRIPTION
+Reads a public or private key, converts it between PEM and DER, and
+optionally outputs only the public portion. RSA, ECC, and Ed25519 keys are
+supported; DSA keys are rejected.
+.SH OPTIONS
+-in file              input file for the key to read (optional; without -in
+.br
+                      the command exits successfully with no output).
+.br
+.LP
+-out file             file to output to (default stdout).
+.br
+.LP
+-inform PEM|DER       input format.
+.br
+.LP
+-outform PEM|DER      output format.
+.br
+.LP
+-pubin                expect a public key as input. Also forces public-key
+.br
+                      output (equivalent to setting -pubout).
+.br
+.LP
+-pubout               output the public key.
+.SH SEE ALSO
+.BR wolfssl-genkey(1) ", " wolfssl-rsa(1) ", " wolfssl-pkcs8(1) ", " wolfssl-x509(1)
+.SH NOTES
+Available only when wolfSSL is built with filesystem support. Encrypted PEM
+private keys are not supported (no -passin option).
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

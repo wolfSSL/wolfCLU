@@ -1,133 +1,27 @@
 Welcome to the wolfSSL Command Line Utility Manual!
 
-The first thing that will need to be done is a complete download and install of
-wolfSSL. An instructional video of this process can be found here:
+After installing wolfSSL and wolfCLU, man pages are installed automatically
+during "make install" (unless you used --disable-manpages). View them with:
 
-https://www.youtube.com/watch?v=zXRLwW0DIPA
+    man wolfssl
+    man wolfssl-encrypt
+    man wolfssl-genkey
 
-Next view the README.md file. Which says this:
+Each command has a wolfssl-<command> man page in the manpages/ directory.
+See README.md in the wolfCLU root for build options and local testing tips.
 
-To use this feature, please ./configure --enable-pwdbased --enable-opensslextra
-    other features that can be included are:
-        --enable-camellia
-        --enable-blake2
-        --enable-sha512
-        --enable-fortress
+Quick reference:
 
-then run configure, make, and make install from the command line utility root.
+    wolfssl encrypt / decrypt / enc   symmetric encryption
+    wolfssl hash / md5 / sha256       hashing
+    wolfssl bench                     benchmarking
+    wolfssl genkey / req / ca / x509  keys and certificates
+    wolfssl verify / crl / ocsp       chain and revocation checks
 
-The Utility has many tools. Encryption, Decryption, Hashing, Benchmarking, with
-more to come.
+For full option lists, use "wolfssl -h" or the individual man pages.
 
-The man pages provided with the utility also give a brief rundown of how to use
-each tool in the kit.
-
-Manpages are installed automatically during the make process
-
-You will now be able to run a man page by typing "man wolfsslBenchmark" etc.
-manpages are as follows:
-wolfCLU_benchmark
-wolfCLU_encrypt
-wolfCLU_decrypt
-wolfCLU_hash
-wolfCLU_main
-
-ENCRYPTION
-
-    SYNOPSIS
-        wolfssl -encrypt <-algorithm> <-in filename> [-out filename] [-pwd password] [-iv IV] [-key hex] [-inkey filename]
-    DESCRIPTION
-        This command allows data to be encrypted using ciphers and keys based on passwords if not explicitly provided
-    .ALGORITHMS
-        -aes-cbc-[128|192|256]
-            uses AES algorithm with designated key size.
-        -aes-ctr-[128|192|256]
-            uses AES Counter with designated key size. Only available if ./configure settings support
-        -3des-cbc-[056|112|168]
-            uses 3DES algorithm with designated key size.
-        -camellia-cbc-[128|192|256]
-            uses Camellia algorithm with designated key size. Only available if ./configure settings support
-    OPTIONS
-        -in filename/stdin     the input filename, standard input. If file does not exist, it will treat data as stdin
-        -out filename           the output filename, if filename does not exist, it will be created
-        -pwd password           password to derive the key from. prompts if password option is not provided. If used, iv isn't needed
-        -iv IV                  the actual iv to use. If not provided, one is randomly generated. Must be provided in hex
-        -key hex                the actual key to use, supplied as a hex string on the command line. Length must match the algorithm key size. Requires -iv: when an explicit key is supplied, no salt-based key/iv derivation runs and no Salted__ header is written.
-        -inkey filename         read the key from a file. The file may hold either a hex-encoded key (whitespace within the file is ignored) or a raw binary key whose byte length matches the algorithm key size. The argument must name a real file; use -key to pass a hex key on the command line.
-
-DECRYPTION
-
-    SYNOPSIS
-        wolfssl -decrypt <-algorithm> <-in filename> [-out filename] [-pwd password] [-iv IV] [-key hex] [-inkey filename]
-    DESCRIPTION
-        This command allows data to be decrypted using ciphers and keys based on passwords if not explicitly provided
-    ALGORITHMS
-        -aes-cbc-[128|192|256]
-            uses AES algorithm with designated key size.
-        -aes-ctr-[128|192|256]
-            uses AES Counter with designated key size. Only available if ./configure settings support
-        -3des-cbc-[056|112|168]
-            uses 3DES algorithm with designated key size.
-        -camellia-cbc-[128|192|256]
-            uses Camellia algorithm with designated key size. Only available if ./configure settings support
-    OPTIONS
-        -in filename/stdin     the input filename, standard input. If file does not exist, it will treat data as stdin
-        -out filename           the output filename, if filename does not exist, it will be created
-        -pwd password           password to derive the key from. prompts if password option is not provided. If used, iv isn't needed
-        -iv IV                  the actual iv to use. If not provided, one is randomly generated. Must be provided in hex
-        -key hex                the actual key to use, supplied as a hex string on the command line. Length must match the algorithm key size. Requires -iv: when an explicit key is supplied, no salt-based key/iv derivation runs, so the IV must be provided directly.
-        -inkey filename         read the key from a file. The file may hold either a hex-encoded key (whitespace within the file is ignored) or a raw binary key whose byte length matches the algorithm key size. The argument must name a real file; use -key to pass a hex key on the command line.
-
-HASH
-
-    SYNOPSIS
-        wolfssl -hash <-algorithm> <-i filename> [-o filename/stdin] [-s size] [-l length]
-    DESCRIPTION
-        This command hashes either stdin or a file based on the chosen algorithm
-    ALGORITHMS
-        -md5
-        -sha
-        -sha256
-        (NOTE: The following are only available if ./configure supports them)
-        -sha384
-        -sha512
-        -blake2b
-    OPTIONS
-        -in filename/stdin       the input filename, standard input. If file does not exist, it will treat data as stdin
-        -out filename           the output filename, if not provided will print stdout
-        -size size              block size of the function. Usuable only with Blake2b
-        -length length          length of message to hash
-
-BENCHMARK
-
-    SYNOPSIS
-        wolfssl benchmark TESTS [-time time] [-all] [-tests] 
-    DESCRIPTION
-        Tests algorithm functionality and speed
-    TESTS
-        -aes-cbc
-        -aes-ctr*
-        -3des
-        -camellia*
-        -md5
-        -sha
-        -sha256
-        -sha384*
-        -sha512*
-        -blake2b*
-        *(NOTE: Only available through ./configure options)
-    OPTIONS
-        -time <sec> time for each of the tests in seconds
-        -all        runs all available tests
-
-TESTING
-        
-    Various tests can also be performed on the toolkit via nistTest.sh and tests.sh
-    to perform these tests, simply change the 'PAT' variable in each one to lead
-    to where you extracted the Utility to.
 AUTHOR
-    wolfSSL, Inc. (info@wolfssl.com)
-    Copyright 2014 wolfSSL Inc.  All rights reserved.
+    wolfSSL, Inc. (facts@wolfssl.com)
+    Copyright 2026 wolfSSL Inc.  All rights reserved.
 
-Please report wolfssl any bugs to support@wolfssl.com
-
+Please report wolfssl bugs to support@wolfssl.com

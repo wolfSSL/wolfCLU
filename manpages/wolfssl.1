@@ -1,35 +1,147 @@
 .\" Manpage for wolfssl command line utility main options.
-.\" Contact support@wolfssl.com to correct errors or typos.
-.TH  wolfSSL SSL1 "10 Dec 2014" "0.3" "wolfssl man page"
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH  wolfSSL SSL1 "June 2026" "0.2.0" "wolfssl man page"
 .SH NAME
-wolfssl \- wolfSSL Command Line Utility. 
+wolfssl \- wolfSSL Command Line Utility.
 .SH SYNOPSIS
 wolfssl COMMAND [OPTIONS]... [ARGUMENTS]...
 .SH DESCRIPTION
 The wolfssl program is a command line tool for using various cryptographic functions of wolfSSL's wolfCrypt cryptography library.
-wolfSSL supports industry standards up to the current TLSv1.2 and DTLSv1.2 and offers a simple API for ease of use. Which can be utilized for:
-    \- Encryption and Decryption with Ciphers
+wolfSSL supports industry standards up to the current TLSv1.3 and DTLSv1.3 and offers a simple API for ease of use. It can be utilized for:
+    \- Encryption and decryption with ciphers
     \- Hashing functionality
     \- Benchmark utilities
-    \- x509 conversion from PEM to DER or DER to PEM
-    With more features to come.
+    \- X.509 certificate processing and conversion
+    \- Certificate requests and signing (CA)
+    \- Key generation and key format conversion
+    \- Signing and signature verification
+    \- TLS client/server testing
+.SH QUICK START
+Here are three common tasks to get started:
+.TP
+.B Encrypt a file with a password
+.RS
+wolfssl encrypt -aes-cbc-256 -in myfile.txt -out myfile.enc -pwd mypassword
+.RE
+.TP
+.B Generate a 2048-bit RSA key pair
+.RS
+wolfssl genkey rsa -size 2048 -out mykey -outform pem
+.br
+(writes PEM keys to mykey.priv and mykey.pub; default output format is DER)
+.RE
+.TP
+.B Create a certificate for testing
+.RS
+wolfssl req -new -x509 -newkey rsa:2048 -nodes -keyout mykey.pem -out cert.pem -days 365 -subj "/C=US/O=Test/CN=localhost"
+.RE
+.TP
+To explore more, see the COMMAND SUMMARY below, or run:
+.RS
+wolfssl -h
+.RE
 .SH COMMAND SUMMARY
-wolfSSL offers many different commands all of which have a vast variety of options and arguments. 
-This utility is to be used with wolfSSL installed and can use different function based on different ./configure options
+wolfSSL offers many different commands, all of which have a variety of options and arguments.
+This utility is to be used with wolfSSL installed and the available commands depend on the wolfSSL ./configure options.
+Most commands have their own man page (named wolfssl-<command>) with full details.
+Some are grouped: bench is documented in wolfssl-bench, the hashing shortcuts
+md5/sha256/sha384/sha512 alias wolfssl-hash, and the raw sign/verify key types
+alias wolfssl-sign_verify; help has no separate page, and version is documented
+in wolfssl-version(1).
 
-LIST
-        -encrypt \- encrypt a file or basic input using various algorithms and options
-        -decrypt \- decrypt a file or basic input using various algorithms and options
-        -hash \- hash a file or basic input using a variety of hashing algorithms
-        -bench \- tests the processing speed of the ciphersuites
-        -x509 \- converts an existing PEM formatted certificate to DER format or vise versa
+Certificates and CAs
+        ca             sign certificates from a CSR or self-sign
+        x509           X.509 certificate processing and conversion
+        req            generate certificate requests / self-signed certs
+        verify         verify an X.509 certificate chain
+        crl            parse and verify Certificate Revocation Lists
+
+Keys
+        genkey         generate cryptographic keys
+        pkey           public/private key processing
+        rsa            RSA key processing
+        ecparam        EC parameter and key generation
+        dsaparam       DSA parameter and key generation
+        dhparam        Diffie-Hellman parameter and key generation
+
+PKCS and signing
+        pkcs7          parse PKCS#7 files
+        pkcs8          PKCS#8 private key conversion
+        pkcs12         parse PKCS#12 bundles
+        dgst           create/verify message digest signatures
+        ecc/ed25519/dilithium/xmss/xmssmt   raw sign and verify (see sign/verify; -rsa also)
+
+Symmetric crypto and encoding
+        encrypt        encrypt a file or input
+        decrypt        decrypt a file or input
+        enc            generic encrypt/decrypt (OpenSSL-style)
+        base64         base64 encode/decode
+        rand           generate random data
+
+Hashing
+        hash           hash a file or input
+        md5            create an MD5 hash
+        sha256         create a SHA-256 hash
+        sha384         create a SHA-384 hash
+        sha512         create a SHA-512 hash
+
+Benchmark and TLS
+        bench          benchmark the algorithms
+        s_client       basic TLS client for testing
+        s_server       basic TLS server for testing
+        ocsp           OCSP client and responder (if supported)
+
+Misc
+        version        print wolfCLU/wolfSSL version
+        help           print the help menu
 .SH OPTIONS
-Acceptable options can be brought up using either "-help" or through the man pages of the commands
+Acceptable options can be brought up using either "-help" / "-h" or through the man pages of the individual commands.
+.SH GLOSSARY
+Common terms you'll see in wolfssl and cryptography:
+.TP
+.B PEM / DER
+File formats for keys and certificates. PEM is text-based (starts with "-----BEGIN..."), DER is binary. Defaults vary by command (for example genkey defaults to DER); use -inform and -outform when converting.
+.TP
+.B CSR
+Certificate Signing Request. A file you send to a Certificate Authority to request a signed certificate. Create one with
+.B wolfssl-req(1).
+.TP
+.B CA
+Certificate Authority. An entity that signs certificates, confirming they are valid. See
+.B wolfssl-ca(1)
+to sign requests yourself.
+.TP
+.B CRL / OCSP
+Certificate Revocation List / Online Certificate Status Protocol. Ways to check if a certificate has been cancelled. See
+.B wolfssl-crl(1)
+and
+.B wolfssl-ocsp(1).
+.TP
+.B PKCS#1, PKCS#8, PKCS#12
+Key/certificate container formats. PKCS#8 is commonly used for private keys; PKCS#12 bundles a key and certificate together. See
+.B wolfssl-pkcs8(1)
+and
+.B wolfssl-pkcs12(1).
+.TP
+.B Digest / Hash
+A fingerprint of data (e.g., MD5, SHA-256). Cannot be reversed to get the original data. Commonly used to verify file integrity or as part of signing. See
+.B wolfssl-hash(1)
+and
+.B wolfssl-dgst(1).
+.TP
+.B Salt
+Random data added to a password before hashing, making dictionary attacks harder. Used in encryption with passwords.
+.TP
+.B Key Derivation
+Converting a password into a cryptographic key suitable for encryption. See
+.B wolfssl-enc(1).
+.SH SEE ALSO
+.BR wolfssl-encrypt(1) ", " wolfssl-decrypt(1) ", " wolfssl-genkey(1) ", " wolfssl-req(1) ", " wolfssl-ca(1) ", " wolfssl-x509(1) ", " wolfssl-verify(1)
 .SH BUGS
 No known bugs at this time.
 .SH AUTHOR
-wolfSSL, Inc. (info@wolfssl.com)
+wolfSSL, Inc. (facts@wolfssl.com)
 .SH COPYRIGHT
-Copyright 2014 wolfSSL Inc.  All rights reserved.
+Copyright 2026 wolfSSL Inc.  All rights reserved.
 .SH REPORTING BUGS
 Report wolfssl bugs to support@wolfssl.com

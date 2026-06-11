@@ -54,3 +54,4 @@ CLAUDE.md
 /index.txt
 /serial-file-test
 /rand-file-test
+manpages/*.1.gz

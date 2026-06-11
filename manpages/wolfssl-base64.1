@@ -1,0 +1,31 @@
+.\" Manpage for wolfssl base64.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl base64 man page"
+.SH NAME
+wolfssl-base64, base64 \- base64 encode or decode data
+.SH SYNOPSIS
+wolfssl base64 [-in file] [-out file] [-d]
+.SH DESCRIPTION
+Base64-encodes or decodes data. Defaults to reading from standard input
+and writing to standard output when -in/-out are not given.
+.SH OPTIONS
+-in file              input file to encode/decode.
+.br
+.LP
+-out file             output file for the encoded/decoded data.
+.br
+.LP
+-d                    decode the input (default is to encode).
+.SH NOTES
+Available only when wolfSSL is built with filesystem support and encoding
+support (not NO_CODING).
+.SH SEE ALSO
+.BR wolfssl-enc(1) ", " wolfssl-hash(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com
