@@ -63,66 +63,40 @@ int wolfCLU_hexToBin(const char* h1, byte** b1, word32* b1Sz,
                     const char* h3, byte** b3, word32* b3Sz,
                     const char* h4, byte** b4, word32* b4Sz)
 {
-    int ret;
+    int ret = 0;
+    const char* hex[4] = {h1,h2,h3,h4};
+    byte** bs[4] = {b1,b2,b3,b4};
+    word32* bSz[4] = {b1Sz,b2Sz,b3Sz,b4Sz};
+    int i = 0;
 
-    /* b1 */
-    if (h1 && b1 && b1Sz) {
-        *b1Sz = (int)XSTRLEN(h1) / 2;
-        *b1   = XMALLOC(*b1Sz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-        if (*b1 == NULL)
-            return MEMORY_E;
-        ret = Base16_Decode((const byte*)h1, (int)XSTRLEN(h1), *b1, b1Sz);
-        if (ret != 0) {
-            wolfCLU_freeBins(*b1, NULL, NULL, NULL, NULL);
-            return ret;
+    for (; i < 4; i++) {
+        if (hex[i] && bs[i] && bSz[i]) {
+            *bSz[i] = (int)XSTRLEN(hex[i]) / 2;
+            *bs[i] = (byte*)XMALLOC(*bSz[i], NULL, DYNAMIC_TYPE_TMP_BUFFER);
+            if (*bs[i] == NULL) {
+                ret = MEMORY_E;
+                break;
+            }
+            ret = Base16_Decode((const byte*)hex[i], (int)XSTRLEN(hex[i]),
+                    *bs[i], bSz[i]);
+            if (ret != 0) {
+                break;
+            }
         }
     }
 
-    /* b2 */
-    if (h2 && b2 && b2Sz) {
-        *b2Sz = (int)XSTRLEN(h2) / 2;
-        *b2   = XMALLOC(*b2Sz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-        if (*b2 == NULL) {
-            wolfCLU_freeBins(b1 ? *b1 : NULL, NULL, NULL, NULL, NULL);
-            return MEMORY_E;
+    if (ret != 0) {
+        /* free all allocations made before error */
+        for (; i >= 0; i--) {
+            if (hex[i] && bs[i] && bSz[i]) {
+                if (*bs[i] != NULL) {
+                    XFREE(*bs[i], NULL, DYNAMIC_TYPE_TMP_BUFFER);
+                    *bs[i] = NULL;
+                }
+                *bSz[i] = 0;
+            }
         }
-        ret = Base16_Decode((const byte*)h2, (int)XSTRLEN(h2), *b2, b2Sz);
-        if (ret != 0) {
-            wolfCLU_freeBins(b1 ? *b1 : NULL, *b2, NULL, NULL, NULL);
-            return ret;
-        }
-    }
-
-    /* b3 */
-    if (h3 && b3 && b3Sz) {
-        *b3Sz = (int)XSTRLEN(h3) / 2;
-        *b3   = XMALLOC(*b3Sz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-        if (*b3 == NULL) {
-            wolfCLU_freeBins(b1 ? *b1 : NULL, b2 ? *b2 : NULL, NULL, NULL, NULL);
-            return MEMORY_E;
-        }
-        ret = Base16_Decode((const byte*)h3, (int)XSTRLEN(h3), *b3, b3Sz);
-        if (ret != 0) {
-            wolfCLU_freeBins(b1 ? *b1 : NULL, b2 ? *b2 : NULL, *b3, NULL, NULL);
-            return ret;
-        }
-    }
-
-    /* b4 */
-    if (h4 && b4 && b4Sz) {
-        *b4Sz = (int)XSTRLEN(h4) / 2;
-        *b4   = XMALLOC(*b4Sz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-        if (*b4 == NULL) {
-            wolfCLU_freeBins(b1 ? *b1 : NULL,b2 ? *b2 : NULL,b3 ? *b3 :
-                                                                NULL,NULL,NULL);
-            return MEMORY_E;
-        }
-        ret = Base16_Decode((const byte*)h4, (int)XSTRLEN(h4), *b4, b4Sz);
-        if (ret != 0) {
-            wolfCLU_freeBins(b1 ? *b1 : NULL, b2 ? *b2 : NULL, b3 ? *b3 : NULL,
-                *b4, NULL);
-            return ret;
-        }
+        return ret;
     }
 
     return WOLFCLU_SUCCESS;
