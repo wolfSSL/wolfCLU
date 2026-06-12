@@ -1,0 +1,47 @@
+.\" Manpage for wolfssl dhparam.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl dhparam man page"
+.SH NAME
+wolfssl-dhparam, dhparam \- Diffie-Hellman parameter and key generation
+.SH SYNOPSIS
+wolfssl dhparam [-in file] [-out file] [-genkey] [-check] [-noout] numbits
+.br
+wolfssl dhparam -in file [-out file] [-genkey] [-check] [-noout]
+.SH DESCRIPTION
+Generates Diffie-Hellman parameters and keys, or reads and displays
+existing DH parameters. Parameter generation requires a trailing numbits
+positional argument (for example 1024, 2048, or 4096). Omitting numbits
+when generating parameters fails.
+.SH OPTIONS
+-in file              input file for PEM DH parameters to read (PEM only;
+.br
+                      there is no -inform option).
+.br
+.LP
+-out file             file to output to (default stdout).
+.br
+.LP
+-genkey               generate a DH key from parameters supplied via -in or
+.br
+                      generated in the same command. Does not generate
+.br
+                      parameters by itself.
+.br
+.LP
+-check                check that the parameters are valid.
+.br
+.LP
+-noout                do not print out the parameters.
+.SH NOTES
+Available only when wolfSSL is built with DH support (not NO_DH).
+4096-bit parameters require wolfSSL built with HAVE_FFDHE_4096.
+.SH SEE ALSO
+.BR wolfssl-dsaparam(1) ", " wolfssl-ecparam(1) ", " wolfssl-genkey(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

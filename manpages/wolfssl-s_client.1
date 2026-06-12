@@ -1,0 +1,71 @@
+.\" Manpage for wolfssl s_client.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl s_client man page"
+.SH NAME
+wolfssl-s_client, s_client \- basic TLS client for testing connections
+.SH SYNOPSIS
+wolfssl s_client -connect <host>:<port> [-starttls proto] [-CAfile file] [-verify_return_error] [-disable_stdin_check] [-noservername] [-help]
+.SH DESCRIPTION
+Opens a TLS connection to a server for testing. Server Name Indication is
+sent by default. Certificate verification is disabled by default and can be
+enabled with -verify_return_error.
+.SH OPTIONS
+-connect host:port    address and port to connect to. IPv6 addresses use
+.br
+                      bracket notation, e.g. -connect '[::1]:11111'.
+.br
+.LP
+-starttls proto       use STARTTLS for the named protocol, e.g. smtp.
+.br
+.LP
+-CAfile file          CA certificate file. Has no effect on whether the
+.br
+                      connection succeeds or fails unless
+.br
+                      \-verify_return_error is also given (see NOTES).
+.br
+.LP
+-verify_return_error  close the connection on a verification error.
+.br
+.LP
+-disable_stdin_check  do not wait for or read input on stdin; useful when
+.br
+                      scripting the client.
+.br
+.LP
+-noservername         do not send Server Name Indication.
+.br
+.LP
+-help, -h             print the s_client help summary and exit.
+.SH EXAMPLES
+Connect to a server without certificate verification (testing only):
+.RS
+wolfssl s_client -connect example.com:443
+.RE
+.LP
+Connect and verify the server's certificate:
+.RS
+wolfssl s_client -connect example.com:443 -CAfile ca-cert.pem -verify_return_error
+.RE
+.LP
+Connect to an SMTP server using STARTTLS:
+.RS
+wolfssl s_client -connect mail.example.com:25 -starttls smtp
+.RE
+.SH SEE ALSO
+.BR wolfssl-s_server(1) ", " wolfssl-verify(1) ", " wolfssl-ocsp(1)
+.SH NOTES
+Available only when wolfSSL is built with filesystem support.
+.LP
+The client negotiates the highest TLS version both peers support. CRL
+checking is not performed. The server certificate is only verified when
+\-verify_return_error is given; without it the connection proceeds
+unverified (with a warning) even if \-CAfile is supplied.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

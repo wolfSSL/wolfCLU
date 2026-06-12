@@ -1,0 +1,72 @@
+.\" Manpage for wolfssl command line utility hash.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl hash man page"
+.SH NAME
+wolfssl-hash, hash \- hashing utility
+.SH SYNOPSIS
+wolfssl hash <algorithm> -in filename [-out filename] [-size size]
+.br
+wolfssl md5|sha256|sha384|sha512 filename
+.SH DESCRIPTION
+This command hashes the contents of an input file based on the chosen
+algorithm. For "wolfssl hash", an input file is required via -in. The
+shortcut commands (md5/sha256/sha384/sha512) take the filename as a
+positional argument (e.g. "wolfssl sha256 filename"). If no filename is
+given, input is read from standard input. The digest is written to standard
+output; shortcut commands do not accept -out or other options.
+.SH ALGORITHMS
+md5
+.br
+sha (SHA-1; only via "wolfssl hash sha -in file", no bare shortcut command)
+.br
+sha256
+.br
+(NOTE: The following are only available if ./configure supports them)
+.br
+sha384
+.br
+sha512
+.br
+blake2b
+.br
+base64enc / base64dec   (encode/decode, when coding support is enabled;
+.br
+                        base64enc additionally requires WOLFSSL_BASE64_ENCODE)
+.SH SHORTCUT COMMANDS
+The following may be used directly as the first argument to wolfssl as a
+convenience. These shortcut commands use a different syntax than the
+generic "wolfssl hash" command: they take the filename as a positional
+argument rather than with the -in flag, and do not support -out:
+.br
+md5 filename       \- create an MD5 hash
+.br
+sha256 filename    \- create a SHA-256 hash
+.br
+sha384 filename    \- create a SHA-384 hash
+.br
+sha512 filename    \- create a SHA-512 hash
+.SH OPTIONS
+-in filename          the input file to hash (required for "wolfssl hash").
+.br
+                      The file must exist; if it cannot be opened the
+.br
+                      command exits with an error.
+.br
+.LP
+-out filename         the output filename for "wolfssl hash" only. If the
+.br
+                      file does not exist, it will be created.
+.LP
+-size size            Usable only with Blake2b. Block size of the function.
+.br
+                      (only available for specific algorithms)
+.SH SEE ALSO
+.BR wolfssl-md5(1) ", " wolfssl-sha256(1) ", " wolfssl-sha384(1) ", " wolfssl-sha512(1) ", " wolfssl-dgst(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

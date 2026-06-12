@@ -1,0 +1,88 @@
+.\" Manpage for wolfssl sign/verify (rsa, ecc, ed25519, dilithium, xmss, xmssmt).
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl sign/verify man page"
+.SH NAME
+wolfssl-sign_verify, sign, verify \- raw public-key signing and signature verification
+.SH SYNOPSIS
+wolfssl -<keytype> -sign -inkey <priv_key> -in <filename> -out <filename> [-inform PEM|DER]
+.br
+wolfssl -<keytype> -verify -inkey <key> -sigfile <signature> -out <filename> [-in <original>] [-pubin] [-inform PEM|DER]
+.SH DESCRIPTION
+Creates or verifies a raw public-key signature. The keytype is one of the
+supported algorithms below. These are the per-algorithm sign/verify modes;
+for digest-based signing see dgst, and for RSA key conversion see the rsa
+command.
+.SH KEY TYPES
+-rsa       Legacy RSA signing and verification.
+.br
+-ecc       ECC signing and verification.
+.br
+-ed25519   Ed25519 signing and verification (requires HAVE_ED25519).
+.br
+-dilithium Dilithium (ML-DSA) signing and verification (requires HAVE_DILITHIUM).
+.br
+-xmss      XMSS signing and verification (requires WOLFSSL_HAVE_XMSS).
+.br
+-xmssmt    XMSS^MT signing and verification (requires WOLFSSL_HAVE_XMSS).
+.SH OPTIONS
+-sign                 create a signature.
+.br
+.LP
+-verify               verify a signature.
+.br
+.LP
+-inkey file           key to use. A private key for signing; for verify this
+.br
+                      may be a private or public key (use -pubin for a public
+.br
+                      key).
+.br
+.LP
+-in file              input file: the data to sign, or for verify the
+.br
+                      original data (required for most key types; ignored
+.br
+                      for RSA verify).
+.br
+.LP
+-inform PEM|DER       input format of the key file (default DER).
+.br
+.LP
+-out file             output file for the signature when signing (required
+.br
+                      for all key types). Also required for RSA verify;
+.br
+                      optional for other verify modes.
+.br
+.LP
+-sigfile file         signature file to check when verifying.
+.br
+.LP
+-pubin                treat the key supplied with -inkey as a public key.
+.SH EXAMPLES
+Sign a file with an RSA private key:
+.br
+wolfssl -rsa -sign -inkey priv.pem -inform pem -in message.txt -out message.sig
+.br
+.LP
+Verify with an RSA public key:
+.br
+wolfssl -rsa -verify -inkey pub.pem -inform pem -sigfile message.sig -out verify.out -pubin
+.br
+.LP
+Verify with an ECC public key:
+.br
+wolfssl -ecc -verify -inkey pub.pem -inform pem -sigfile message.sig -in message.txt -pubin
+.SH NOTES
+Available only when wolfSSL is built with filesystem support. The set of
+usable key types depends on the wolfSSL configure options.
+.SH SEE ALSO
+.BR wolfssl-dgst(1) ", " wolfssl-genkey(1) ", " wolfssl-req(1) ", " wolfssl-ca(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

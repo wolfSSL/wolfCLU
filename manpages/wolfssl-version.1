@@ -1,0 +1,27 @@
+.\" Manpage for wolfssl version.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl version man page"
+.SH NAME
+wolfssl-version, version \- display wolfCLU and wolfSSL version information
+.SH SYNOPSIS
+wolfssl version
+.br
+wolfssl -v
+.br
+wolfssl -version
+.SH DESCRIPTION
+Prints the version information for both the wolfCLU command-line utility and
+the underlying wolfSSL library it is linked against.
+.SH NOTES
+The version command takes no arguments. The same output is available via
+the top-level modes wolfssl -v and wolfssl -version. FIPS builds append
+" FIPS" to the library version string and may print additional notes about
+algorithm restrictions.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

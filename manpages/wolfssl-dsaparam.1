@@ -1,0 +1,39 @@
+.\" Manpage for wolfssl dsaparam.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl dsaparam man page"
+.SH NAME
+wolfssl-dsaparam, dsaparam \- DSA parameter and key generation
+.SH SYNOPSIS
+wolfssl dsaparam [-in file] [-out file] [-genkey] [-noout] [numbits]
+.SH DESCRIPTION
+Generates DSA parameters and keys, or reads and displays existing DSA
+parameters. Parameter generation requires a trailing numbits positional
+argument (for example 1024 or 2048). Omitting numbits when generating
+parameters fails.
+.SH OPTIONS
+-in file              input file for PEM DSA parameters to read (PEM only;
+.br
+                      there is no -inform option).
+.br
+.LP
+-out file             file to output to (default stdout).
+.br
+.LP
+-genkey               generate a DSA key from parameters supplied via -in or
+.br
+                      generated in the same command.
+.br
+.LP
+-noout                do not print out the parameters.
+.SH NOTES
+Available only when wolfSSL is built with DSA support (not NO_DSA).
+.SH SEE ALSO
+.BR wolfssl-dhparam(1) ", " wolfssl-ecparam(1) ", " wolfssl-genkey(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

@@ -1,0 +1,92 @@
+.\" Manpage for wolfssl enc.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl enc man page"
+.SH NAME
+wolfssl-enc, enc \- generic symmetric encryption and decryption
+.SH SYNOPSIS
+wolfssl enc <-algorithm> [-d] [-in file] [-out file] [-pwd password] [-pass source] [-k password] [-key hex] [-iv hex] [-inkey file] [-md digest] [-pbkdf2] [-base64] [-nosalt] [-p]
+.SH DESCRIPTION
+Encrypts or decrypts a file using a symmetric cipher. By default enc
+encrypts; the -d flag selects decryption. This is the OpenSSL-style generic
+cipher mode; the encrypt and decrypt commands are direction-fixed
+equivalents.
+.SH ALGORITHMS
+-aes-cbc-[128|192|256]
+.br
+        uses AES in CBC mode with the designated key size.
+.br
+-aes-ctr-[128|192|256]
+.br
+        uses AES in CTR mode (requires WOLFSSL_AES_COUNTER).
+.br
+-3des-cbc-[56|112|168]
+.br
+        uses 3DES (requires --enable-des3).
+.br
+-camellia-cbc-[128|192|256]
+.br
+        uses Camellia (requires --enable-camellia).
+.SH OPTIONS
+-d                    decrypt the input (default is to encrypt).
+.br
+.LP
+-in file              input file to read from.
+.br
+.LP
+-out file             file to write to (default stdout).
+.br
+.LP
+-pwd password         password to derive the key from.
+.br
+.LP
+-k password           alternate option for password input.
+.br
+.LP
+-pass source          password source, e.g. pass:<password>.
+.br
+.LP
+-key hex              explicit key as a hex string. Requires -iv; no
+.br
+                      salt-based derivation is performed.
+.br
+.LP
+-iv hex               initialization vector as a hex string.
+.br
+.LP
+-inkey file           read the key from a file.
+.br
+.LP
+-md digest            digest to use for key derivation, e.g. md5, sha256.
+.br
+.LP
+-pbkdf2               use PBKDF2 for key derivation.
+.br
+.LP
+-base64               base64-encode output (encrypt) or decode input (decrypt).
+.br
+.LP
+-nosalt               do not use a salt in key derivation.
+.br
+.LP
+-p                    print debug information (key, IV, salt).
+.SH EXAMPLES
+Encrypt a file:
+.br
+wolfssl enc -aes-cbc-128 -pwd Thi$i$myPa$$w0rd -in plain.txt -out cipher.txt
+.br
+.LP
+Decrypt it again:
+.br
+wolfssl enc -d -aes-cbc-128 -pwd Thi$i$myPa$$w0rd -in cipher.txt -out plain.txt
+.SH NOTES
+Available only when wolfSSL is built with filesystem support.
+.SH SEE ALSO
+.BR wolfssl-encrypt(1) ", " wolfssl-decrypt(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

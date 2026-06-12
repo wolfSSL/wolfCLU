@@ -1,0 +1,113 @@
+.\" Manpage for wolfssl req.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl req man page"
+.SH NAME
+wolfssl-req, req \- generate certificate requests and self-signed certificates
+.SH SYNOPSIS
+wolfssl req [-new] [-in file] [-out file] [-key file] [-newkey type:bits] [-keyout file] [-inform PEM|DER] [-outform PEM|DER] [-config file] [-days n] [-x509] [-subj name] [-extensions section] [-nodes] [-passout source] [-sha|-sha224|-sha256|-sha384|-sha512] [-verify] [-text] [-noout]
+.SH DESCRIPTION
+Creates a PKCS#10 certificate signing request (CSR), or with \-x509 a
+self-signed certificate. The signing key may be supplied with \-key or
+generated on the fly with \-newkey. Without -subj or -config, subject
+fields are collected interactively. Without -keyout, a generated private
+key is written to stdout.
+.SH OPTIONS
+-new                  OpenSSL compatibility flag (no-op).
+.br
+.LP
+-in file              input file to read from.
+.br
+.LP
+-out file             file to write to (default stdout).
+.br
+.LP
+-key file             private key used to sign the certificate request.
+.br
+.LP
+-newkey type:bits     generate the private key to use with the request.
+.br
+                      RSA: rsa:2048. Dilithium (with -x509 and certgen):
+.br
+                      dilithium:2, dilithium:3, dilithium:5, or ml-dsa:N.
+.br
+                      For ECC keys, generate with ecparam first.
+.br
+.LP
+-keyout file          file to output the generated key to.
+.br
+.LP
+-inform PEM|DER       format for -in.
+.br
+.LP
+-outform PEM|DER      format for -out.
+.br
+.LP
+-config file          file to parse for certificate configuration.
+.br
+.LP
+-days n               number of days the certificate should be valid for.
+.br
+.LP
+-x509                 generate a self-signed certificate instead of a CSR.
+.br
+.LP
+-subj name            subject name in /key=value/... format, e.g.
+.br
+                      /C=US/ST=WA/L=Seattle/O=wolfSSL/CN=wolfSSL.
+.br
+.LP
+-extensions section   section of the config file to read extensions from.
+.br
+.LP
+-nodes                do not encrypt the private key on output. Without
+.br
+                      -nodes, generated keys are encrypted and the user is
+.br
+                      prompted for an encryption password.
+.br
+.LP
+-passout source       password source for encrypting the output key, e.g.
+.br
+                      pass:<password> or stdin.
+.br
+.LP
+-sha, -sha224, -sha256, -sha384, -sha512
+.br
+                      signing digest (default SHA-256 when omitted).
+.br
+.LP
+-verify               check the signature on the request.
+.br
+.LP
+-text                 output human readable text of the request.
+.br
+.LP
+-noout                do not print the generated results.
+.SH EXAMPLES
+Create a certificate signing request (CSR) with a new key:
+.RS
+wolfssl req -new -newkey rsa:2048 -nodes -keyout mykey.pem -out mycsr.pem -subj "/C=US/ST=WA/L=Seattle/O=MyCompany/CN=example.com"
+.RE
+.LP
+Create a self-signed certificate valid for 365 days:
+.RS
+wolfssl req -new -x509 -newkey rsa:2048 -nodes -keyout mykey.pem -out mycert.pem -days 365 -subj "/C=US/O=Test/CN=localhost"
+.RE
+.LP
+View a CSR in human-readable format:
+.RS
+wolfssl req -in mycsr.pem -text -noout
+.RE
+.SH SEE ALSO
+.BR wolfssl-genkey(1) ", " wolfssl-ca(1) ", " wolfssl-x509(1)
+.SH NOTES
+Available only when wolfSSL is built with certificate request support
+(WOLFSSL_CERT_REQ) and filesystem support.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

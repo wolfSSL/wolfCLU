@@ -1,0 +1,62 @@
+.\" Manpage for wolfssl dgst.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl dgst man page"
+.SH NAME
+wolfssl-dgst, dgst \- create and verify message digest signatures
+.SH SYNOPSIS
+wolfssl dgst [-md5|-sha|-sha224|-sha256|-sha384|-sha512] [-sign key | -verify key] [-signature file] [-inform PEM|DER] [-out file] <file>
+.SH DESCRIPTION
+Signs a file or verifies a signature over a file using a chosen digest
+algorithm. A digest flag (e.g. -sha256) is required; there is no default.
+The data that was signed is given as the final argument. RSA and ECC keys
+are supported.
+.SH DIGEST ALGORITHMS
+-md5
+.br
+-sha
+.br
+-sha224
+.br
+-sha256
+.br
+-sha384
+.br
+-sha512
+.SH OPTIONS
+-sign key             private key used to create the signature.
+.br
+.LP
+-verify key           key used to verify the signature.
+.br
+.LP
+-signature file       file containing the signature to verify.
+.br
+.LP
+-inform PEM|DER       input format of the key (default PEM).
+.br
+.LP
+-out file             output file for the signature. Required when signing;
+.br
+                      optional when verifying.
+.SH EXAMPLES
+Sign a file:
+.br
+wolfssl dgst -sha256 -sign key.pem -out test.sig test
+.br
+.LP
+Verify a signature over the file "test":
+.br
+wolfssl dgst -sha256 -signature test.sig -verify key.pem test
+.SH NOTES
+Available only when wolfSSL is built with filesystem support. On wolfSSL
+later than 5.9.1, MD5 is below the default minimum signature hash.
+.SH SEE ALSO
+.BR wolfssl-hash(1) ", " wolfssl-sign_verify(1) ", " wolfssl-genkey(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

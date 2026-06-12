@@ -80,6 +80,16 @@ then
     AM_CFLAGS="$AM_CFLAGS -DWOLFCLU_NO_FILESYSTEM"
 fi
 
+# Manpages Build
+ENABLED_MANPAGES_DEFAULT=yes
+AC_ARG_ENABLE([manpages],
+    [AS_HELP_STRING([--disable-manpages],[Disable manpage installation (default: enabled)])],
+    [ ENABLED_MANPAGES=$enableval ],
+    [ ENABLED_MANPAGES=$ENABLED_MANPAGES_DEFAULT ]
+    )
+
+AM_CONDITIONAL([ENABLE_MANPAGES], [test "x$ENABLED_MANPAGES" != "xno"])
+
 
 #wolfssl
 AC_MSG_CHECKING([for wolfSSL])

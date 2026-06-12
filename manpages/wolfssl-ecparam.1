@@ -1,0 +1,50 @@
+.\" Manpage for wolfssl ecparam.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl ecparam man page"
+.SH NAME
+wolfssl-ecparam, ecparam \- EC parameter and key generation
+.SH SYNOPSIS
+wolfssl ecparam [-in file] [-out file] [-inform PEM|DER] [-outform PEM|DER] [-genkey] [-name curve] [-text]
+.SH DESCRIPTION
+Generates elliptic curve keys and parameters, or reads an EC private key
+and writes its curve parameters. With -in alone the output is an EC
+PARAMETERS OID block (and optional -text curve name), not the private key.
+Private key output requires -genkey.
+.SH OPTIONS
+-in file              input file to read an EC private key from (optional).
+.br
+                      Does not read standalone EC PARAMETERS files. When
+.br
+                      combined with -genkey, -in is read but then replaced
+.br
+                      by a newly generated key.
+.br
+.LP
+-out file             output file.
+.br
+.LP
+-inform PEM|DER       input format.
+.br
+.LP
+-outform PEM|DER      output format.
+.br
+.LP
+-genkey               generate a new EC private key and write it to -out.
+.br
+.LP
+-name curve           curve name, e.g. secp256r1 or secp384r1. The list of
+.br
+                      supported curve names is shown by "wolfssl ecparam -help".
+.br
+.LP
+-text                 output a text representation of the curve name.
+.SH SEE ALSO
+.BR wolfssl-dhparam(1) ", " wolfssl-dsaparam(1) ", " wolfssl-genkey(1) ", " wolfssl-req(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

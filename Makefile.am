@@ -44,11 +44,48 @@ EXTRA_DIST+= wolfclu.sln
 EXTRA_DIST+= wolfCLU.vcxproj
 EXTRA_DIST+= wolfCLU.vcxproj.filters
 
-man_MANS+= manpages/wolfCLU_benchmark.1
-man_MANS+= manpages/wolfCLU_decrypt.1
-man_MANS+= manpages/wolfCLU_encrypt.1
-man_MANS+= manpages/wolfCLU_hash.1
+if ENABLE_MANPAGES
 man_MANS+= manpages/wolfssl.1
+man_MANS+= manpages/wolfssl-bench.1
+man_MANS+= manpages/wolfssl-decrypt.1
+man_MANS+= manpages/wolfssl-encrypt.1
+man_MANS+= manpages/wolfssl-hash.1
+man_MANS+= manpages/wolfssl-enc.1
+man_MANS+= manpages/wolfssl-ca.1
+man_MANS+= manpages/wolfssl-x509.1
+man_MANS+= manpages/wolfssl-req.1
+man_MANS+= manpages/wolfssl-verify.1
+man_MANS+= manpages/wolfssl-crl.1
+man_MANS+= manpages/wolfssl-genkey.1
+man_MANS+= manpages/wolfssl-pkey.1
+man_MANS+= manpages/wolfssl-rsa.1
+man_MANS+= manpages/wolfssl-ecparam.1
+man_MANS+= manpages/wolfssl-dsaparam.1
+man_MANS+= manpages/wolfssl-dhparam.1
+man_MANS+= manpages/wolfssl-pkcs7.1
+man_MANS+= manpages/wolfssl-pkcs8.1
+man_MANS+= manpages/wolfssl-pkcs12.1
+man_MANS+= manpages/wolfssl-dgst.1
+man_MANS+= manpages/wolfssl-sign_verify.1
+# The keytype and hash-shortcut pages below are .so aliases for
+# wolfssl-sign_verify.1 and wolfssl-hash.1 respectively. .so pages only
+# render once installed under man1/.
+man_MANS+= manpages/wolfssl-ecc.1
+man_MANS+= manpages/wolfssl-ed25519.1
+man_MANS+= manpages/wolfssl-dilithium.1
+man_MANS+= manpages/wolfssl-xmss.1
+man_MANS+= manpages/wolfssl-xmssmt.1
+man_MANS+= manpages/wolfssl-rand.1
+man_MANS+= manpages/wolfssl-base64.1
+man_MANS+= manpages/wolfssl-s_client.1
+man_MANS+= manpages/wolfssl-s_server.1
+man_MANS+= manpages/wolfssl-ocsp.1
+man_MANS+= manpages/wolfssl-md5.1
+man_MANS+= manpages/wolfssl-sha256.1
+man_MANS+= manpages/wolfssl-sha384.1
+man_MANS+= manpages/wolfssl-sha512.1
+man_MANS+= manpages/wolfssl-version.1
+endif
 
 include src/include.am
 include wolfclu/include.am
@@ -84,9 +121,44 @@ TESTS += $(check_SCRIPTS)
 # When tests live in the source tree (no VPATH), those files land in tests/,
 # where EXTRA_DIST+=tests would otherwise sweep them into the tarball and
 # break `make distcheck` via stale VPATH lookups.
+# Generate the compressed manpages into the tarball from their .1 sources,
+# so the .gz copies are never hand-maintained in git. These ship in the release
+# tarball for downstream packaging; they are intentionally not installed
+# (man_MANS installs the .1 files, and distros compress man pages themselves).
+# -n keeps the output byte-reproducible across dist runs (no embedded
+# filename/mtime). Only done if manpages are enabled.
 dist-hook:
 	find $(distdir)/tests -name '*.log' -delete
 	find $(distdir)/tests -name '*.trs' -delete
+# Always strip stale .1.gz from the tarball (local manpages-gz output or a
+# prior dist may have left them in manpages/). Regenerate only when enabled.
+	chmod u+w $(distdir)/manpages 2>/dev/null || true
+	rm -f $(distdir)/manpages/*.1.gz
+if ENABLE_MANPAGES
+	for f in $(distdir)/manpages/*.1; do gzip -nc "$$f" > "$$f.gz"; done
+endif
+
+if ENABLE_MANPAGES
+# On-demand regeneration of the compressed manpages from their .1 sources.
+# Run `make manpages-gz` after editing any .1; thanks to the prerequisite
+# only the pages whose source actually changed are rebuilt. These .gz are
+# gitignored and NOT installed (man_MANS installs the .1 files) -- the
+# release tarball gets its own fresh copies via the dist-hook above, so this
+# target is purely a local convenience (preview/packaging). It is not wired
+# into `all` on purpose: writing into the source tree during a normal build
+# would break `make distcheck`, which builds against a read-only srcdir.
+# -n keeps the output byte-reproducible (no embedded filename/mtime).
+MAN_GZ = $(man_MANS:.1=.1.gz)
+
+.PHONY: manpages-gz
+manpages-gz: $(MAN_GZ)
+
+manpages/%.1.gz: $(srcdir)/manpages/%.1
+	@$(MKDIR_P) manpages
+	gzip -nc "$<" > "$@"
+
+CLEANFILES += $(MAN_GZ)
+endif
 
 test: check
 #DISTCLEANFILES+= wolfssl-config

@@ -32,15 +32,53 @@ sudo make install
 
 If wolfSSL was recently installed run `sudo ldconfig` to update the linker cache.
 
+#### Build Options
+
+You can customize the build with configure flags:
+
+```
+./configure --disable-manpages    # Skip manpage installation (useful for embedded builds)
+./configure --with-wolfssl=PATH   # Specify wolfSSL installation path
+```
+
 Now, you should be able to use wolfCLU:
 
 ```
 wolfssl -h
 ```
 
-If everything worked, you should see the wolfCLU help message.
+If everything worked, you should see the wolfCLU help message. The manpages are also automatically installed during `make install`, so you can view them immediately:
+
+```
+man wolfssl
+man wolfssl-genkey
+man wolfssl-encrypt
+```
 
 For instuctions on how to build windows, see [here](ide/winvs/README.md).
+
+## Contributing to Documentation
+
+### Manpage Building
+
+Manpages are automatically generated and installed as part of the normal build process (unless disabled with `--disable-manpages`). When you run `make install`, the `.1` source files in the `manpages/` directory are installed to your configured man1 directory (commonly `/usr/local/share/man/man1` or `/usr/share/man/man1`), making them accessible via the `man` command.
+
+For developers actively editing manpage files (`.1` files in the `manpages/` directory), you can test changes locally without running the full build:
+
+```bash
+mkdir -p ~/.local/share/man/man1
+cp manpages/*.1 ~/.local/share/man/man1/
+man wolfssl-base64
+```
+
+Alternatively, generate compressed versions and view them directly (only available if manpages are enabled):
+
+```bash
+make manpages-gz
+man -l manpages/wolfssl-base64.1.gz   # GNU man; on macOS/BSD use man manpages/wolfssl-base64.1
+```
+
+**Important:** Only commit the `.1` source files to the repository. The `.1.gz` compressed versions are generated on-demand during build and distribution—they are gitignored and should never be tracked in git.
 
 ## Examples
 

@@ -1,0 +1,49 @@
+.\" Manpage for wolfssl pkcs12.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl pkcs12 man page"
+.SH NAME
+wolfssl-pkcs12, pkcs12 \- parse PKCS#12 bundles
+.SH SYNOPSIS
+wolfssl pkcs12 -in file [-out file] [-passin source] [-nodes] [-nocerts] [-nokeys]
+.SH DESCRIPTION
+Parses a PKCS#12 bundle and extracts the certificates and private key it
+contains.
+.SH OPTIONS
+-in file              file input for the PKCS#12 bundle (required).
+.br
+.LP
+-out file             file to write results to (default stdout).
+.br
+.LP
+-passin source        password source for encrypted input bundles, e.g.
+.br
+                      pass:<password> or stdin. Required when the bundle is
+.br
+                      encrypted.
+.br
+.LP
+-nodes                do not encrypt the private key on output. Without
+.br
+                      -nodes, the user is prompted on stdin for an output
+.br
+                      encryption password.
+.br
+.LP
+-nocerts              do not output certificates.
+.br
+.LP
+-nokeys               do not output keys.
+.SH NOTES
+Available only when wolfSSL is built with PKCS#12 support (HAVE_PKCS12) and
+filesystem support. -passout is accepted for OpenSSL compatibility but is
+currently a no-op.
+.SH SEE ALSO
+.BR wolfssl-pkcs8(1) ", " wolfssl-pkcs7(1) ", " wolfssl-pkey(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

@@ -1,0 +1,67 @@
+.\" Manpage for wolfssl verify.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl verify man page"
+.SH NAME
+wolfssl-verify, verify \- verify an X.509 certificate chain
+.SH SYNOPSIS
+wolfssl verify -CAfile <ca file> [-untrusted <intermediate file>] [-crl_check] [-partial_chain] <cert to verify>
+.SH DESCRIPTION
+Verifies an X.509 certificate against a trusted CA certificate, optionally
+building the chain with an intermediate certificate and checking
+revocation.
+.SH OPTIONS
+-CAfile file          trusted CA certificate to verify against (PEM only).
+.br
+                      Must be a self-signed root CA unless \-partial_chain
+.br
+                      is given; an intermediate CA causes "CA file is not
+.br
+                      root CA".
+.br
+.LP
+-untrusted file       intermediate certificate file. Only one intermediate
+.br
+                      certificate may be loaded.
+.br
+.LP
+-crl_check            enable CRL checking. Requires wolfSSL built with CRL
+.br
+                      support (HAVE_CRL).
+.br
+.LP
+-partial_chain        allow verification to succeed with a partial chain.
+.br
+                      Also permits using a non-root CA in -CAfile.
+.SH EXAMPLES
+Verify a certificate against a trusted root CA:
+.RS
+wolfssl verify -CAfile ca-cert.pem server-cert.pem
+.RE
+.LP
+Verify a certificate with an intermediate CA:
+.RS
+wolfssl verify -CAfile ca-cert.pem -untrusted intermediate-cert.pem server-cert.pem
+.RE
+.LP
+Verify a certificate with CRL checking (concatenate the CRL PEM into the
+CA file; there is no separate CRL-loading option):
+.RS
+wolfssl verify -CAfile ca-and-crl.pem -crl_check server-cert.pem
+.RE
+.SH SEE ALSO
+.BR wolfssl-x509(1) ", " wolfssl-crl(1)
+.SH NOTES
+The certificate to verify is given as the final argument. -CAfile must be
+a PEM file. Unless -partial_chain is given, -CAfile must be a self-signed
+root CA; supplying an intermediate CA without -partial_chain fails with
+"CA file is not root CA". With -crl_check, revocation data must already be
+present in -CAfile (for example by concatenating the CRL PEM after the CA
+certificate). Available only when wolfSSL is built with filesystem support.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

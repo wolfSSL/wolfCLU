@@ -1,0 +1,40 @@
+.\" Manpage for wolfssl pkcs7.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl pkcs7 man page"
+.SH NAME
+wolfssl-pkcs7, pkcs7 \- parse PKCS#7 files
+.SH SYNOPSIS
+wolfssl pkcs7 [-in file] [-out file] [-inform PEM|DER] [-outform PEM|DER] [-print_certs]
+.SH DESCRIPTION
+Parses a PKCS#7 structure. Without -print_certs, the default output is
+the parsed PKCS#7 blob re-encoded in the chosen output format. With
+-print_certs, the contained certificates are extracted and written out.
+.SH OPTIONS
+-in file              file input for the PKCS#7 structure (optional; reads
+.br
+                      stdin when omitted).
+.br
+.LP
+-out file             file to write results to (default stdout).
+.br
+.LP
+-inform PEM|DER       input format.
+.br
+.LP
+-outform PEM|DER      output format.
+.br
+.LP
+-print_certs          output the certificates contained in the structure.
+.SH SEE ALSO
+.BR wolfssl-pkcs12(1) ", " wolfssl-pkcs8(1) ", " wolfssl-x509(1)
+.SH NOTES
+Available only when wolfSSL is built with PKCS#7 support (HAVE_PKCS7) and
+filesystem support.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

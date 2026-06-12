@@ -1,0 +1,71 @@
+.\" Manpage for wolfssl s_server.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl s_server man page"
+.SH NAME
+wolfssl-s_server, s_server \- basic TLS server for testing connections
+.SH SYNOPSIS
+wolfssl s_server -port <port> -cert <file> -key <file> [-CAfile file] [-noVerify] [-version n] [-naccept n] [-www] [-readyFile file] [-help]
+.SH DESCRIPTION
+Runs a simple TLS server for testing connections. Supply a certificate and
+key (\-cert and \-key, PEM only). By default the server accepts one
+connection and then exits; use \-naccept to change this.
+.SH OPTIONS
+-port n               port to listen on.
+.br
+.LP
+-cert file            server certificate (PEM only).
+.br
+.LP
+-key file             server private key (PEM only).
+.br
+.LP
+-CAfile file          CA certificate for verifying client certificates
+.br
+                      (PEM only; forwarded as the server -A argument).
+.br
+.LP
+-noVerify             disable the client certificate check.
+.br
+.LP
+-version n            SSL/TLS version [0-4], SSLv3(0) through TLS1.3(4).
+.br
+.LP
+-naccept n            number of connections to accept (default 1).
+.br
+.LP
+-www                  respond in HTML format.
+.br
+.LP
+-readyFile file       write a file once the server is listening, so a script
+.br
+                      can wait for it before connecting.
+.br
+.LP
+-help, -h             print the s_server help summary and exit.
+.SH EXAMPLES
+Start a basic TLS server on port 443:
+.RS
+wolfssl s_server -port 443 -cert server-cert.pem -key server-key.pem
+.RE
+.LP
+Start a TLS server that accepts multiple connections:
+.RS
+wolfssl s_server -port 8443 -cert server-cert.pem -key server-key.pem -naccept 10
+.RE
+.LP
+Test with s_client in another terminal:
+.RS
+wolfssl s_client -connect localhost:8443
+.RE
+.SH SEE ALSO
+.BR wolfssl-s_client(1) ", " wolfssl-req(1) ", " wolfssl-ca(1)
+.SH NOTES
+Available only when wolfSSL is built with filesystem support.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

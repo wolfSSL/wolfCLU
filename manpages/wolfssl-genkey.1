@@ -1,0 +1,103 @@
+.\" Manpage for wolfssl genkey.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl genkey man page"
+.SH NAME
+wolfssl-genkey, genkey \- generate cryptographic keys
+.SH SYNOPSIS
+wolfssl genkey <keytype> -out filename [-size bits] [-outform PEM|DER|RAW] [-output PUB|PRIV|KEYPAIR] [-exponent n] [-name curve] [-level N] [-height N] [-layer N]
+.SH DESCRIPTION
+Generates a key of the requested type and writes the public key, private
+key, or both. The set of available key types depends on the wolfSSL
+configure options.
+.SH KEY TYPES
+rsa
+.br
+ecc
+.br
+ed25519
+.br
+dilithium \- only if wolfSSL was built with Dilithium support
+.br
+ml-dsa    \- only if wolfSSL was built with Dilithium support (produces
+.br
+            keys with ML-DSA OIDs, not interchangeable with dilithium keys)
+.br
+xmss / xmssmt \- only if wolfSSL was built with XMSS support
+.SH OPTIONS
+-out filename         base output filename (required). The suffixes .priv
+.br
+                      and .pub are added for the private and public key
+.br
+                      files.
+.br
+.LP
+-size bits            key size in bits (for key types that take a size,
+.br
+                      e.g. rsa).
+.br
+.LP
+-outform PEM|DER|RAW  output format (default DER). xmss and xmssmt only
+.br
+                      meaningfully support raw; PEM/DER log a warning.
+.br
+.LP
+-exponent n           RSA public exponent (default 65537).
+.br
+.LP
+-name curve           ECC curve name, e.g. secp256r1 (default curve used
+.br
+                      when omitted).
+.br
+.LP
+-output PUB|PRIV|KEYPAIR
+.br
+                      which keys to output. KEYPAIR writes both, PUB writes
+.br
+                      only the public key, PRIV only the private key.
+.br
+.LP
+-level [2|3|5]        security level for dilithium / ml-dsa keys.
+.br
+.LP
+-height N            tree height. For xmss: 10 or 16. For xmssmt: 20, 40,
+.br
+                      or 60 (invalid values fall back to 20).
+.br
+.LP
+-layer [2|3|4|6|8|12] number of layers for xmssmt keys.
+.SH EXAMPLES
+Generate a 2048-bit RSA key pair in DER format (default):
+.br
+wolfssl genkey rsa -size 2048 -out mykey
+.br
+.LP
+Generate a 2048-bit RSA key pair in PEM format:
+.br
+wolfssl genkey rsa -size 2048 -out mykey -outform pem -output KEYPAIR
+.br
+.LP
+The command above outputs the files mykey.priv and mykey.pub.
+.br
+.LP
+Generate a Dilithium key pair:
+.br
+wolfssl genkey dilithium -level 3 -out mykey -outform der -output KEYPAIR
+.br
+.LP
+Generate an XMSS key pair:
+.br
+wolfssl genkey xmss -height 10 -out mykey -outform raw -output KEYPAIR
+.SH NOTES
+For XMSS/XMSS^MT the key file name encodes the parameters (for example
+"XMSS-SHA2_10_256"); these parameters are determined from the file name
+when signing.
+.SH SEE ALSO
+.BR wolfssl-req(1) ", " wolfssl-ca(1) ", " wolfssl-sign_verify(1) ", " wolfssl-encrypt(1)
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com

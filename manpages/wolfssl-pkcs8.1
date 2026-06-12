@@ -1,0 +1,51 @@
+.\" Manpage for wolfssl pkcs8.
+.\" Contact facts@wolfssl.com to correct errors or typos.
+.TH wolfSSL SSL1  "June 2026" "0.2.0" "wolfssl pkcs8 man page"
+.SH NAME
+wolfssl-pkcs8, pkcs8 \- convert between PKCS#8 and traditional private key formats
+.SH SYNOPSIS
+wolfssl pkcs8 [-in file] [-out file] [-inform PEM|DER] [-outform PEM|DER] [-passin source] [-traditional] [-topk8] [-nocrypt]
+.SH DESCRIPTION
+Converts private keys between PKCS#8 and traditional (PKCS#1) formats.
+If neither -traditional nor -topk8 is given, output defaults to PKCS#8 PEM.
+.SH OPTIONS
+-in file              file input for the key (optional; reads stdin when
+.br
+                      omitted).
+.br
+.LP
+-out file             file to write results to (default stdout).
+.br
+.LP
+-inform PEM|DER       input format.
+.br
+.LP
+-outform PEM|DER      output format.
+.br
+.LP
+-passin source        password source for encrypted input keys, e.g.
+.br
+                      pass:<password> or stdin.
+.br
+.LP
+-traditional          output the key in traditional (PKCS#1) format.
+.br
+.LP
+-topk8                output the key in PKCS#8 format.
+.br
+.LP
+-nocrypt              output an unencrypted private key.
+.SH SEE ALSO
+.BR wolfssl-pkcs7(1) ", " wolfssl-pkcs12(1) ", " wolfssl-pkey(1) ", " wolfssl-genkey(1)
+.SH NOTES
+Available only when wolfSSL is built with PKCS#8 support (not NO_PKCS8) and
+filesystem support. Encrypting PKCS#8 keys on output is not yet supported;
+use -nocrypt when writing PKCS#8.
+.SH BUGS
+No known bugs at this time.
+.SH AUTHOR
+wolfSSL, Inc. (facts@wolfssl.com)
+.SH COPYRIGHT
+Copyright 2026 wolfSSL Inc.  All rights reserved.
+.SH REPORTING BUGS
+Report wolfssl bugs to support@wolfssl.com
