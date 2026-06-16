@@ -43,10 +43,16 @@ INDEX_REVOKED = (
 )
 
 
-def _scgi_request(host, port, body, path="/ocsp"):
-    """Send an SCGI request and return the raw response body."""
+def _scgi_request(host, port, body, path="/ocsp", content_length=None):
+    """Send an SCGI request and return the raw response body.
+
+    content_length overrides the declared CONTENT_LENGTH header without
+    changing the bytes actually sent, allowing the bounds check in
+    wolfCLU_ScgiReadRequest() to be exercised with hostile values.
+    """
+    declared = len(body) if content_length is None else content_length
     headers = (
-        "CONTENT_LENGTH\x00" + str(len(body)) + "\x00"
+        "CONTENT_LENGTH\x00" + str(declared) + "\x00"
         "SCGI\x001\x00"
         "REQUEST_METHOD\x00POST\x00"
         "REQUEST_URI\x00" + path + "\x00"
@@ -64,7 +70,10 @@ def _scgi_request(host, port, body, path="/ocsp"):
         # Read full response
         chunks = []
         while True:
-            data = sock.recv(4096)
+            try:
+                data = sock.recv(4096)
+            except ConnectionResetError:
+                break
             if not data:
                 break
             chunks.append(data)
@@ -290,6 +299,29 @@ class TestOCSPScgi(unittest.TestCase):
         with open(self._log_path) as f:
             log = f.read()
         self.assertIn("wolfssl exiting gracefully", log)
+
+    def test_09_oversized_content_length(self):
+        """ Regression: Hostile CONTENT_LENGTH values must be rejected,
+            not crash.
+        """
+        self._start_responder(INDEX_VALID)
+
+        # bufferSz is 16384; each value exceeds bufferSz - pos and so must
+        # be rejected. 2147483647 (INT_MAX) exercises the overflow path.
+        for declared in (16384, 16385, 65535, 2147483647):
+            with self.subTest(content_length=declared):
+                raw = _scgi_request("127.0.0.1", self._scgi_port, b"",
+                                    content_length=declared)
+                # Rejected: connection closed with no CGI Status header.
+                self.assertNotIn(b"Status:", raw,
+                                 f"content_length {declared} not rejected")
+
+        # The responder must still be alive and serving valid requests.
+        self.assertIsNone(self._wolfclu_proc.poll(),
+                          "responder crashed on hostile CONTENT_LENGTH")
+        rc, out = self._ocsp_query()
+        self.assertEqual(rc, 0, out)
+        self.assertIn("good", out.lower())
 
 
 if __name__ == "__main__":
