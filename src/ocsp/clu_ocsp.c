@@ -23,6 +23,7 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/clu_error_codes.h>
+#include <wolfssl/wolfcrypt/asn.h>
 
 #if defined(HAVE_OCSP) && defined(HAVE_OCSP_RESPONDER)
 
@@ -804,6 +805,7 @@ static int ocspResponder(OcspResponderConfig* config)
         const byte* ocspReq;
         int ocspReqSz;
         word32 respSz;
+        enum Ocsp_Response_Status ocspStatus = OCSP_SUCCESSFUL;
 
         /* Accept connection */
         clientfd = wolfCLU_ServerAccept(sockfd);
@@ -821,30 +823,29 @@ static int ocspResponder(OcspResponderConfig* config)
                 respBuffer, &respSz);
 
         if (ret != 0) {
-            enum Ocsp_Response_Status errStatus;
 
             /* Map error to OCSP response status */
             switch (ret) {
                 case ASN_PARSE_E:
-                    errStatus = OCSP_MALFORMED_REQUEST;
+                    ocspStatus = OCSP_MALFORMED_REQUEST;
                     break;
                 case ASN_SIG_HASH_E:
-                    errStatus = OCSP_INTERNAL_ERROR;
+                    ocspStatus = OCSP_INTERNAL_ERROR;
                     break;
                 case ASN_NO_SIGNER_E:
-                    errStatus = OCSP_UNAUTHORIZED;
+                    ocspStatus = OCSP_UNAUTHORIZED;
                     break;
                 case OCSP_CERT_UNKNOWN:
-                    errStatus = OCSP_UNAUTHORIZED;
+                    ocspStatus = OCSP_UNAUTHORIZED;
                     break;
                 default:
-                    errStatus = OCSP_INTERNAL_ERROR;
+                    ocspStatus = OCSP_INTERNAL_ERROR;
                     break;
             }
 
             /* Generate OCSP error response */
             respSz = sizeof(respBuffer);
-            ret = wc_OcspResponder_WriteErrorResponse(errStatus, respBuffer, &respSz);
+            ret = wc_OcspResponder_WriteErrorResponse(ocspStatus, respBuffer, &respSz);
 
             if (ret != 0) {
                 /* If we can't encode an error response, send HTTP/SCGI error */
@@ -857,10 +858,12 @@ static int ocspResponder(OcspResponderConfig* config)
         if (transportSendResponse(clientfd, transportType, respBuffer, (int)respSz) != 0)
             goto continue_loop;
 
-        /* Only count successfully processed requests toward the -nrequest
-         * limit. Failed reads/sends jump to continue_loop above, so a
-         * misbehaving client cannot exhaust the budget. */
-        requestsProcessed++;
+        if (ocspStatus == OCSP_SUCCESSFUL) {
+            /* Only count successfully processed requests toward the -nrequest
+             * limit. Failed reads/sends jump to continue_loop above, so a
+             * misbehaving client cannot exhaust the budget. */
+            requestsProcessed++;
+        }
 
         /* Check if we've hit the request limit */
         if (config->nrequest > 0 && requestsProcessed >= config->nrequest) {
