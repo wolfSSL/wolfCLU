@@ -24,6 +24,7 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/x509/clu_cert.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -155,10 +156,29 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    cert = load_cert_from_file(verifyCert);
-    if (!cert) {
-        wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
+
+    /* Detect malformed arguments: the trailing positional argument (verifyCert
+     * == argv[argc-1]) is the certificate to verify and must be a distinct
+     * token from every option value. If it string-matches an option's argument,
+     * the last option consumed the token that was meant to be the cert to
+     * verify, so the command line is malformed. With -partial_chain the CA file
+     * may legitimately equal the verify cert (verifying a cert as its own
+     * partial-chain anchor), so that one pairing is allowed. The NULL guards
+     * keep the comparison safe when an option was not supplied. */
+    if ((caCert != NULL && !partialChain &&
+                caCert == verifyCert) ||
+            (intermCert != NULL && intermCert == verifyCert)) {
+        wolfCLU_LogError("Malformed argument: last argument \"%s\" must not be "
+                "a flag arg", verifyCert);
         ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        cert = load_cert_from_file(verifyCert);
+        if (!cert) {
+            wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS && intermCert) {

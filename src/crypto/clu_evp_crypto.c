@@ -88,31 +88,36 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         in = wolfSSL_BIO_new_file(fileIn, "rb");
         if (in != NULL && !enc && isBase64) {
             word32 decodeSz;
+            int bioSz;
 
-            decodeSz = wolfSSL_BIO_get_len(in);
-            decodedBase64 = (byte*)XMALLOC(decodeSz, HEAP_HINT,
-                    DYNAMIC_TYPE_TMP_BUFFER);
-            if (decodedBase64 == NULL) {
+            if ((bioSz = wolfSSL_BIO_get_len(in)) <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                if (wolfSSL_BIO_read(in, decodedBase64, decodeSz) !=
-                        (int)decodeSz) {
+                decodeSz = (word32)bioSz;
+                decodedBase64 = (byte*)XMALLOC(bioSz, HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (decodedBase64 == NULL) {
                     ret = WOLFCLU_FATAL_ERROR;
                 }
+                else {
+                    if (wolfSSL_BIO_read(in, decodedBase64, bioSz) !=
+                            bioSz) {
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
 
-                if (ret == WOLFCLU_SUCCESS &&
-                        Base64_Decode(decodedBase64, decodeSz,
-                            decodedBase64, &decodeSz) != 0) {
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                    if (ret == WOLFCLU_SUCCESS &&
+                            Base64_Decode(decodedBase64, bioSz,
+                                decodedBase64, &decodeSz) != 0) {
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
 
-                if (ret == WOLFCLU_SUCCESS) {
-                    wolfSSL_BIO_free(in);
-                    in = wolfSSL_BIO_new_mem_buf(decodedBase64, decodeSz);
+                    if (ret == WOLFCLU_SUCCESS) {
+                        wolfSSL_BIO_free(in);
+                        in = wolfSSL_BIO_new_mem_buf(decodedBase64, decodeSz);
+                    }
                 }
             }
-
         }
     }
     else {
