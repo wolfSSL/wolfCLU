@@ -516,6 +516,7 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         }
         else {
             wolfCLU_LogError("Invalid Signature.");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -651,6 +652,7 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
         }
         else {
             wolfCLU_LogError("Invalid Signature.");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -795,6 +797,7 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     }
     else {
         wolfCLU_LogError("Invalid Signature.");
+        ret = WOLFCLU_FATAL_ERROR;
     }
     wc_dilithium_free(key);
 
@@ -802,7 +805,7 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 #endif
 
-    return WOLFCLU_SUCCESS;
+    return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 #else
     (void)sig;
     (void)sigSz;
