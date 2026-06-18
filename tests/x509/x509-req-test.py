@@ -99,6 +99,20 @@ def _cleanup(*files):
             os.remove(f)
 
 
+def _flip_last_der_byte(src, dst):
+    """Copy a DER file to dst with its final byte flipped.
+
+    A CSR's DER encoding ends with the signature BIT STRING, so flipping
+    the last byte corrupts the signature value while leaving every ASN.1
+    length intact: the request still parses, but the signature no longer
+    verifies."""
+    data = bytearray(open(src, "rb").read())
+    assert len(data) > 0, "empty DER file"
+    data[-1] ^= 0xFF
+    with open(dst, "wb") as f:
+        f.write(data)
+
+
 class TestReqNew(unittest.TestCase):
     """Test req -new with various options."""
 
@@ -403,6 +417,65 @@ class TestReqPemDerRoundTrip(unittest.TestCase):
         with open(pem_file) as f1, open(self.csr) as f2:
             self.assertEqual(f1.read(), f2.read(),
                              "PEM -> DER -> PEM round-trip mismatch")
+
+
+class TestReqVerify(unittest.TestCase):
+    """Test req -verify, including that a tampered CSR fails (F-5363)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.key = os.path.join(CERTS_DIR, "server-key.pem")
+        cls.csr_pem = _tmp("test_req_verify.csr")
+        cls.csr_der = _tmp("test_req_verify.csr.der")
+        r = run_wolfssl("req", "-new", "-key", cls.key,
+                        "-subj", "/O=wolfSSL/C=US/CN=verify-test",
+                        "-out", cls.csr_pem)
+        assert r.returncode == 0, "setup CSR creation failed: " + r.stderr
+        r = run_wolfssl("req", "-inform", "pem", "-outform", "der",
+                        "-in", cls.csr_pem, "-out", cls.csr_der)
+        assert r.returncode == 0, "setup CSR DER convert failed: " + r.stderr
+
+    @classmethod
+    def tearDownClass(cls):
+        _cleanup(cls.csr_pem, cls.csr_der)
+
+    def _clean(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: _cleanup(p))
+
+    def test_verify_good_csr(self):
+        """A valid CSR verifies OK and exits 0."""
+        r = run_wolfssl("req", "-in", self.csr_pem, "-verify", "-noout")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("verify OK", r.stdout + r.stderr)
+
+    def test_verify_tampered_csr_der_fails(self):
+        """A CSR with a corrupted signature must fail verification (F-5363)."""
+        bad = _tmp("test_req_verify_bad.der")
+        self._clean(bad)
+        _flip_last_der_byte(self.csr_der, bad)
+
+        r = run_wolfssl("req", "-inform", "der", "-in", bad,
+                        "-verify", "-noout")
+        self.assertNotEqual(r.returncode, 0,
+                            "tampered CSR verify should fail")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "tampered CSR verify crashed with signal "
+                                "{}".format(r.returncode))
+
+    def test_verify_tampered_csr_no_output(self):
+        """A failed verify must not emit the CSR even without -noout (F-5363).
+
+        Output handling is gated on the verify result, so a tampered CSR
+        produces no PEM body on stdout."""
+        bad = _tmp("test_req_verify_bad2.der")
+        self._clean(bad)
+        _flip_last_der_byte(self.csr_der, bad)
+
+        r = run_wolfssl("req", "-inform", "der", "-in", bad, "-verify")
+        self.assertNotEqual(r.returncode, 0,
+                            "tampered CSR verify should fail")
+        self.assertNotIn("BEGIN CERTIFICATE REQUEST", r.stdout)
 
 
 class TestX509ReqSign(unittest.TestCase):
