@@ -3,13 +3,24 @@
 
 import filecmp
 import os
+import re
 import shutil
 import subprocess
 import sys
+import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import CERTS_DIR, WOLFSSL_BIN, run_wolfssl, test_main
+
+# The interactive password prompt only reads from stdin when stdin is a real
+# terminal (wolfCLU_GetStdinPassword -> tcgetattr fails on a pipe), so driving
+# it requires a pseudo-terminal. The pty module is POSIX-only.
+try:
+    import pty as _pty
+    HAVE_PTY = True
+except ImportError:
+    HAVE_PTY = False
 
 
 def run_enc(*args, password=""):
@@ -816,6 +827,187 @@ class EncKeyInputTest(unittest.TestCase):
                          + r.stderr)
         self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
                         "rand-hex -> -inkey workflow did not round-trip")
+
+
+@unittest.skipUnless(HAVE_PTY, "pty not available (non-POSIX)")
+class EncStdinPasswordTest(unittest.TestCase):
+    """Interactive stdin-password path of `encrypt` (F-5970).
+
+    Running `encrypt` without -pwd/-pass/-key prompts for a password on the
+    terminal via wolfCLU_GetStdinPassword, which writes the typed length back
+    through its size pointer. The caller passed &keySize (the algorithm key
+    size in bits), so keySize was overwritten by the password length. With
+    -pbkdf2 the EVP derivation length is (keySize+7)/8, collapsing the derived
+    key to a couple of bytes. These tests drive the prompt over a pty.
+    """
+
+    # Any human-length password truncates the bit-size keySize well below a
+    # real cipher key, so the derived key collapses to 1-2 bytes when buggy.
+    PASSWORD = "correcthorse"
+    PLAINTEXT = b"F-5970 interactive password regression payload\n"
+    # AES-256 key length in bytes.
+    FULL_KEY_BYTES = 32
+
+    @classmethod
+    def setUpClass(cls):
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log) as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+
+    def _cleanup(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: os.remove(p)
+                            if os.path.exists(p) else None)
+
+    def _write_plaintext(self, path):
+        with open(path, "wb") as f:
+            f.write(self.PLAINTEXT)
+
+    def _encrypt_with_pty_password(self, password, *args, timeout=30):
+        """Run `wolfssl encrypt <args>` and type `password` at the prompt over
+        a pseudo-terminal. Returns (exit_code, combined_output)."""
+        import select
+        import signal
+
+        # fgets() reads a line, so the password must be newline-terminated or
+        # the child blocks forever waiting for end-of-line.
+        line = (password + "\n").encode()
+        argv = [WOLFSSL_BIN, "encrypt"] + list(args)
+        pid, fd = _pty.fork()
+        if pid == 0:
+            # Child: become the encrypt process with the pty as its stdin.
+            try:
+                os.execvpe(argv[0], argv, os.environ)
+            except Exception:
+                pass
+            os._exit(127)
+
+        output = b""
+        wrote = False
+        deadline = time.time() + timeout
+        try:
+            while time.time() < deadline:
+                r, _, _ = select.select([fd], [], [], 0.5)
+                if fd in r:
+                    try:
+                        data = os.read(fd, 1024)
+                    except OSError:
+                        break  # slave closed (child exited)
+                    if not data:
+                        break
+                    output += data
+                    if not wrote and b"Input Password" in output:
+                        os.write(fd, line)
+                        wrote = True
+                elif not wrote:
+                    # Prompt may not have matched yet; send it anyway.
+                    os.write(fd, line)
+                    wrote = True
+        finally:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+        # Reap with a bounded wait so a stuck child cannot hang the suite.
+        end = time.time() + 5
+        status = None
+        while time.time() < end:
+            wpid, st = os.waitpid(pid, os.WNOHANG)
+            if wpid == pid:
+                status = st
+                break
+            time.sleep(0.05)
+        if status is None:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+            _, status = os.waitpid(pid, 0)
+
+        if os.WIFEXITED(status):
+            code = os.WEXITSTATUS(status)
+        elif os.WIFSIGNALED(status):
+            code = -os.WTERMSIG(status)
+        else:
+            code = -1
+        return code, output.decode(errors="replace")
+
+    def test_pbkdf2_full_key_derivation(self):
+        """A typed password with -pbkdf2 must derive the full cipher key.
+
+        Before the fix keySize was overwritten by the password length, so the
+        `-p` debug print reported a 1-2 byte key instead of 32."""
+        plain = "f5970_keylen_in.txt"
+        cipher = "f5970_keylen.bin"
+        self._cleanup(plain, cipher)
+        self._write_plaintext(plain)
+
+        code, out = self._encrypt_with_pty_password(
+            self.PASSWORD, "aes-cbc-256", "-pbkdf2", "-p",
+            "-in", plain, "-out", cipher)
+        self.assertEqual(code, 0, "encrypt failed: " + out)
+
+        m = re.search(r"key\s*\[(\d+)\]", out)
+        self.assertIsNotNone(m, "no key length in debug output: " + out)
+        self.assertEqual(int(m.group(1)), self.FULL_KEY_BYTES,
+                         "AES-256 key derived as {} bytes, expected {} "
+                         "(keySize was clobbered)".format(
+                             m.group(1), self.FULL_KEY_BYTES))
+
+    def test_pbkdf2_stdin_decrypts_with_pass(self):
+        """A file encrypted with a typed password + -pbkdf2 must decrypt with
+        the same password supplied via -pass (interoperability, F-5970)."""
+        plain = "f5970_interop_in.txt"
+        cipher = "f5970_interop.bin"
+        dec = "f5970_interop_out.txt"
+        self._cleanup(plain, cipher, dec)
+        self._write_plaintext(plain)
+
+        code, out = self._encrypt_with_pty_password(
+            self.PASSWORD, "aes-cbc-256", "-pbkdf2",
+            "-in", plain, "-out", cipher)
+        self.assertEqual(code, 0, "encrypt failed: " + out)
+
+        r = subprocess.run(
+            [WOLFSSL_BIN, "decrypt", "aes-cbc-256", "-pbkdf2",
+             "-pass", "pass:" + self.PASSWORD, "-in", cipher, "-out", dec],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+            timeout=60)
+        self.assertEqual(r.returncode, 0,
+                         "decrypt of pbkdf2 stdin-password file failed: "
+                         + r.stderr)
+        with open(dec, "rb") as f:
+            self.assertEqual(f.read(), self.PLAINTEXT,
+                             "decrypted plaintext mismatch")
+
+    def test_default_kdf_stdin_decrypts_with_pass(self):
+        """Regression guard: the default (BytesToKey) path already interops
+        because the key length comes from the cipher; the fix must keep it
+        working."""
+        plain = "f5970_def_in.txt"
+        cipher = "f5970_def.bin"
+        dec = "f5970_def_out.txt"
+        self._cleanup(plain, cipher, dec)
+        self._write_plaintext(plain)
+
+        code, out = self._encrypt_with_pty_password(
+            self.PASSWORD, "aes-cbc-256", "-in", plain, "-out", cipher)
+        self.assertEqual(code, 0, "encrypt failed: " + out)
+
+        r = subprocess.run(
+            [WOLFSSL_BIN, "decrypt", "aes-cbc-256",
+             "-pass", "pass:" + self.PASSWORD, "-in", cipher, "-out", dec],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+            timeout=60)
+        self.assertEqual(r.returncode, 0,
+                         "decrypt of default stdin-password file failed: "
+                         + r.stderr)
+        with open(dec, "rb") as f:
+            self.assertEqual(f.read(), self.PLAINTEXT,
+                             "decrypted plaintext mismatch")
 
 
 if __name__ == "__main__":

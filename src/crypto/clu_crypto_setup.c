@@ -533,10 +533,15 @@ int wolfCLU_setup(int argc, char** argv, char action)
         }
         /* if no pwdKey is provided */
         else {
+            /* Pass the pwdKey buffer capacity, NOT &keySize:
+             * wolfCLU_GetStdinPassword writes the entered length back through
+             * this pointer, and keySize (the algorithm key size in bits) is
+             * still needed for key derivation and cleanup below. */
+            int pwdBufSz = keySize + block;
             WOLFCLU_LOG(WOLFCLU_L0,
                     "No -pwd flag set, please enter a password to use for"
                     " encrypting.");
-            ret = wolfCLU_GetStdinPassword(pwdKey, (word32*)&keySize);
+            ret = wolfCLU_GetStdinPassword(pwdKey, (word32*)&pwdBufSz);
             pwdKeyChk = 1;
         }
     }
@@ -649,10 +654,12 @@ int wolfCLU_setup(int argc, char** argv, char action)
     }
     /* clear and free data — zero the full allocation, not just the
      * keyBytes actually used, so any future code path that writes past
-     * the cipher key length doesn't leak material across XFREE. */
-    XMEMSET(key, 0, keySize);
-    XMEMSET(pwdKey, 0, keySize + block);
-    XMEMSET(iv, 0, block);
+     * the cipher key length doesn't leak material across XFREE.
+     * ForceZero (not XMEMSET) so the compiler can't drop the wipe of these
+     * soon-to-be-freed key buffers. */
+    wolfCLU_ForceZero(key, keySize);
+    wolfCLU_ForceZero(pwdKey, keySize + block);
+    wolfCLU_ForceZero(iv, block);
     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
 
     if (mode != NULL)
