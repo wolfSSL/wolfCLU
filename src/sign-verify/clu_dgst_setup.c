@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include "wolfclu/clu_error_codes.h"
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
@@ -202,7 +203,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = wolfCLU_GetOpt(argc, argv, "",
+    while (ret == WOLFCLU_SUCCESS && (option = wolfCLU_GetOpt(argc-1, argv, "",
                    dgst_options, &longIndex )) != -1) {
 
         switch (option) {
@@ -271,6 +272,16 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                 /* do nothing. */
                 (void)ret;
         }
+    }
+
+    /* Detect malformed arguments: if the trailing positional data file was
+     * instead consumed as the value of a required-argument option, optarg will
+     * string-match argv[argc-1]. The argc >= 2 guard keeps the argv[argc-2]
+     * access in bounds. */
+    if (argc >= 2 && optarg != NULL && XSTRCMP(optarg, argv[argc-1]) == 0) {
+        wolfCLU_LogError("Malformed arguments last argument read as value for "
+                "%s", argv[argc-2]);
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret == WOLFCLU_SUCCESS) {
