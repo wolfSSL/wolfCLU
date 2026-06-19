@@ -537,11 +537,11 @@ int wolfCLU_setup(int argc, char** argv, char action)
              * wolfCLU_GetStdinPassword writes the entered length back through
              * this pointer, and keySize (the algorithm key size in bits) is
              * still needed for key derivation and cleanup below. */
-            int pwdBufSz = keySize + block;
+            word32 pwdBufSz = (word32)(keySize + block);
             WOLFCLU_LOG(WOLFCLU_L0,
                     "No -pwd flag set, please enter a password to use for"
                     " encrypting.");
-            ret = wolfCLU_GetStdinPassword(pwdKey, (word32*)&pwdBufSz);
+            ret = wolfCLU_GetStdinPassword(pwdKey, &pwdBufSz);
             pwdKeyChk = 1;
         }
     }
