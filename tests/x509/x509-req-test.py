@@ -106,7 +106,8 @@ def _flip_last_der_byte(src, dst):
     the last byte corrupts the signature value while leaving every ASN.1
     length intact: the request still parses, but the signature no longer
     verifies."""
-    data = bytearray(open(src, "rb").read())
+    with open(src, "rb") as f:
+        data = bytearray(f.read())
     assert len(data) > 0, "empty DER file"
     data[-1] ^= 0xFF
     with open(dst, "wb") as f:
