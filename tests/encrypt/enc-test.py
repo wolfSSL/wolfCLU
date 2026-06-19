@@ -841,9 +841,10 @@ class EncStdinPasswordTest(unittest.TestCase):
     key to a couple of bytes. These tests drive the prompt over a pty.
     """
 
-    # Any human-length password truncates the bit-size keySize well below a
-    # real cipher key, so the derived key collapses to 1-2 bytes when buggy.
-    PASSWORD = "correcthorse"
+    # >= 14 chars to satisfy the FIPS HMAC minimum (HMAC_FIPS_MIN_KEY) for the
+    # PBKDF2 path, while still truncating the bit-size keySize far below a real
+    # cipher key, so the buggy derivation collapses to a few key bytes.
+    PASSWORD = "correcthorsebatterystaple"
     PLAINTEXT = b"F-5970 interactive password regression payload\n"
     # AES-256 key length in bytes.
     FULL_KEY_BYTES = 32
@@ -939,7 +940,7 @@ class EncStdinPasswordTest(unittest.TestCase):
         """A typed password with -pbkdf2 must derive the full cipher key.
 
         Before the fix keySize was overwritten by the password length, so the
-        `-p` debug print reported a 1-2 byte key instead of 32."""
+        `-p` debug print reported a few key bytes instead of 32."""
         plain = "f5970_keylen_in.txt"
         cipher = "f5970_keylen.bin"
         self._cleanup(plain, cipher)
