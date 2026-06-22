@@ -51,6 +51,36 @@ class _GenkeySignVerifyBase(unittest.TestCase):
         for f in files:
             _TEMP_FILES.append(f)
 
+    def _gen_sign_badverify(self, algo, keybase, sig_file, fmt,
+                            extra_genkey_args=None, use_output_flag=False):
+        """Generate a key, sign SIGN_FILE, then verify the (valid) signature
+        against a *different* message and assert the command fails with a
+        non-zero (non-crash) exit.
+
+        Verifying a genuine signature against tampered input produces a
+        well-formed signature that simply does not match: the verify API
+        returns successfully with stat/res != 1.  The buggy code logged
+        "Invalid Signature." but still exited 0; the fix must turn that into
+        a failure exit (F-5362)."""
+        priv, pub = self._genkey(algo, keybase, fmt, extra_genkey_args,
+                                 use_output_flag=use_output_flag)
+        self._sign(algo, priv, fmt, sig_file)
+
+        wrong_msg = keybase + "-wrong-msg.txt"
+        self._track(wrong_msg)
+        with open(wrong_msg, "w") as f:
+            f.write("Totally different data that was never signed\n")
+
+        r = run_wolfssl(f"-{algo}", "-verify", "-inkey", pub,
+                        "-inform", fmt, "-sigfile", sig_file,
+                        "-in", wrong_msg, "-pubin")
+        self.assertNotEqual(r.returncode, 0,
+                            "{} verify of a signature over different data "
+                            "should fail".format(algo))
+        self.assertGreaterEqual(r.returncode, 0,
+                                "{} bad verify crashed with signal "
+                                "{}".format(algo, r.returncode))
+
     def _genkey(self, algo, keybase, fmt, extra_args=None,
                 use_output_flag=False):
         args = ["-genkey", algo]
@@ -135,6 +165,10 @@ class Ed25519Test(_GenkeySignVerifyBase):
     def test_ed25519_raw(self):
         self._gen_sign_verify("ed25519", "edkey", "ed-signed.sig", "raw")
 
+    def test_ed25519_bad_verify(self):
+        """An Ed25519 signature that does not match must fail (F-5362)."""
+        self._gen_sign_badverify("ed25519", "edkey-bad", "ed-bad.sig", "der")
+
     def test_ed25519_signature_size(self):
         """ED25519 signatures must be exactly 64 bytes."""
         priv, pub = self._genkey("ed25519", "edkey-sztest", "der",
@@ -171,6 +205,10 @@ class EccTest(_GenkeySignVerifyBase):
 
     def test_ecc_pem(self):
         self._gen_sign_verify("ecc", "ecckey", "ecc-signed.sig", "pem")
+
+    def test_ecc_bad_verify(self):
+        """An ECC signature that does not match must fail (F-5362)."""
+        self._gen_sign_badverify("ecc", "ecckey-bad", "ecc-bad.sig", "der")
 
     def test_ecc_der_key_size_and_roundtrip(self):
         """Regression: ECC DER private key must be reasonably sized, and the
@@ -308,6 +346,15 @@ class DilithiumTest(_GenkeySignVerifyBase):
                     "dilithium", "mldsakey", "mldsa-signed.sig", "pem",
                     extra_genkey_args=["-level", str(level)],
                     skip_priv_verify=True, use_output_flag=True)
+
+    def test_dilithium_bad_verify(self):
+        """A Dilithium signature that does not match must fail (F-5362)."""
+        for level in [2, 3, 5]:
+            with self.subTest(level=level):
+                self._gen_sign_badverify(
+                    "dilithium", "mldsakey-bad", "mldsa-bad.sig", "der",
+                    extra_genkey_args=["-level", str(level)],
+                    use_output_flag=True)
 
     def test_output_pub_only(self):
         pub = "mldsakey_pub.pub"
