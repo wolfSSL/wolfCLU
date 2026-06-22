@@ -382,7 +382,7 @@ int clu_entry(const void* argument)
 {
 
     HAL_StatusTypeDef halRet;
-    byte buffer[50];
+    byte buffer[51] = {0};
 
     char* command;
     char* token;
@@ -397,7 +397,7 @@ int clu_entry(const void* argument)
 
     /* Recieve the command from the UART console */
     do {
-        halRet = HAL_UART_Receive(&HAL_CONSOLE_UART, buffer, sizeof(buffer), 100);
+        halRet = HAL_UART_Receive(&HAL_CONSOLE_UART, buffer, (sizeof(buffer)-1), 100);
     } while (halRet != HAL_OK || buffer[0] == '\n' || buffer[0] == '\r');
 
     WOLFCLU_LOG(WOLFCLU_L0, "Command received.");

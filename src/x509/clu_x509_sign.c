@@ -1376,7 +1376,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
     /* set extensions */
     if (ret == WOLFCLU_SUCCESS && csign->ext != NULL) {
-        wolfCLU_setExtensions(x509, csign->config, csign->ext);
+        ret = wolfCLU_setExtensions(x509, csign->config, csign->ext);
     }
 
     /* sign the certificate */

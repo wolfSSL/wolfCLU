@@ -59,7 +59,7 @@ static void wolfCLU_pKeyHelp(void)
 int wolfCLU_PKCS12(int argc, char** argv)
 {
 #if defined(HAVE_PKCS12) && !defined(WOLFCLU_NO_FILESYSTEM)
-    char password[MAX_PASSWORD_SIZE];
+    char password[MAX_PASSWORD_SIZE] = "";
     int passwordSz = MAX_PASSWORD_SIZE;
     int ret    = WOLFCLU_SUCCESS;
     int useDES = 1;     /* default to yes */
