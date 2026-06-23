@@ -242,8 +242,6 @@ int wolfCLU_setup(int argc, char** argv, char action)
              * and fails. Bail out so we do not encrypt under an empty key. */
             if (ret != WOLFCLU_SUCCESS) {
                 wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
-                if (mode != NULL)
-                    XFREE(mode, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 return ret;
             }
             pwdKeyChk = 1;
