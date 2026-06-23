@@ -368,5 +368,157 @@ class DgstSignVerifyRoundtripTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+class DgstHmacTest(unittest.TestCase):
+    """HMAC test vectors for `dgst -mac HMAC`.
+
+    Mirrors the wolfCrypt hmac_*_test functions in
+    wolfssl/wolfcrypt/test/test.c. The hex-key vectors come from RFC 4231
+    Test Case 1 (a 20-byte 0x0b key over "Hi There"). The plaintext-key
+    vectors use a 16-byte key over 50 bytes of 0xdd, generated with OpenSSL
+    and confirmed with wolfSSL. Both keys are at or above the FIPS minimum
+    HMAC key length (112 bits), so these run under FIPS too.
+    """
+
+    HEXKEY = "hexkey:0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
+    HEXKEY_DATA = "Hi There"
+
+    # alg -> expected lowercase-hex HMAC of DATA under HEXKEY
+    VECTORS_FOR_HEX_KEY_DATA = {
+        "sha224": "896fb1128abbdf196832107cd49df33f47b4b1169912ba4f53684b22",
+        "sha256": ("b0344c61d8db38535ca8afceaf0bf12b"
+                  "881dc200c9833da726e9376c2e32cff7"),
+        "sha384": ("afd03944d84895626b0825f4ab46907f"
+                  "15f9dadbe4101ec682aa034c7cebc59c"
+                  "faea9ea9076ede7f4af152e8b2fa9cb6"),
+        "sha512": ("87aa7cdea5ef619d4ff0b4241a1d6cb0"
+                  "2379f4e2ce4ec2787ad0b30545e17cde"
+                  "daa833b7d6b8a702038b274eaea3f4e4"
+                  "be9d914eeb61f1702e696c203a126854")
+        }
+
+    # Plaintext 16-byte key (>= FIPS minimum) over 50 bytes of 0xdd. The
+    # expected values were generated with OpenSSL and confirmed with wolfSSL.
+    KEY = "key:thisisthelongkey"
+    DATA = b"\xdd" * 50
+
+    # alg -> expected lowercase-hex HMAC of DATA under KEY
+    VECTORS = {
+        "md5":    "b4dcc86b987a882a22c04126bf38754b",
+        "sha":    "0c2735ff7b6c0e598a2385648d89d207a9fb74f2",
+        "sha224": "7d4b1d628eff8fa743dc598a8c2868b54aed43db69325dcc8f90008f",
+        "sha256": "71c7b62392c086d96222f765ec415a48f5008d24e7eae079b319c5e1ad5a288b",
+        "sha384": ("b7630df0ff9a2c2468292d74a378252817df6ebb893e943d7761c16c747"
+                   "166fad502ec2760c40a451ea282dedf78edbf"),
+        "sha512": ("f78a1c7382fab1ee2a5dd617a26715a9898cd0a64dbad7d35dba15392781"
+                   "edfc9d37274dd68472ead7e6d04cf8202db34003dfc3a11dae9864bbbbe4"
+                   "3b46bfed"),
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+
+        cls._tmpdir = tempfile.mkdtemp(prefix="wolfclu-hmac-")
+        cls.data_file = os.path.join(cls._tmpdir, "data.bin")
+        with open(cls.data_file, "wb") as f:
+            f.write(cls.DATA)
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(getattr(cls, "_tmpdir", ""), ignore_errors=True)
+
+    def test_hmac_HEX_vectors(self):
+        """HMAC of using hex key "Hi There" matches RFC vectors."""
+        for alg, expected in self.VECTORS_FOR_HEX_KEY_DATA.items():
+            with self.subTest(alg=alg):
+                r = run_wolfssl("dgst", "-" + alg, "-hmac",
+                                "-mackey", self.HEXKEY,
+                                stdin_data=self.HEXKEY_DATA)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(expected, r.stdout,
+                              "HMAC-{} mismatch".format(alg))
+
+    def test_hmac_vectors(self):
+        """HMAC of 50 bytes of 0xdd under the plaintext key matches vectors."""
+        for alg, expected in self.VECTORS.items():
+            if alg == "md5" and is_fips():
+                continue
+            with self.subTest(alg=alg):
+                r = run_wolfssl("dgst", "-" + alg, "-hmac",
+                                "-mackey", self.KEY, self.data_file)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertIn(expected, r.stdout,
+                              "HMAC-{} mismatch".format(alg))
+
+    def test_hmac_wrong_key(self):
+        """A different key must not produce the reference HMAC."""
+         # Use a different 20-byte key (FIPS-valid length) than the reference
+         # plaintext key used to generate VECTORS.
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", "hexkey:" + "bb" * 20, self.data_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn(self.VECTORS["sha256"], r.stdout)
+
+    def test_hmac_out_file(self):
+        """-out writes the raw MAC bytes; hex-encoding them matches."""
+        out_file = os.path.join(self._tmpdir, "mac.bin")
+        self.addCleanup(lambda: os.remove(out_file)
+                        if os.path.exists(out_file) else None)
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", self.KEY, "-out", out_file,
+                        self.data_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(out_file, "rb") as f:
+            mac = f.read()
+        self.assertEqual(mac.hex(), self.VECTORS["sha256"])
+
+    def test_hmac_plaintext_key_with_colon(self):
+        """A plaintext key containing ':' is used verbatim, not truncated."""
+        # Both keys are >= the FIPS minimum length so this runs under FIPS.
+        # "key:aaaaaaaaaaaaaa:bb" -> the HMAC key is "aaaaaaaaaaaaaa:bb",
+        # not just "aaaaaaaaaaaaaa".
+        r_full = run_wolfssl("dgst", "-sha256", "-hmac",
+                             "-mackey", "key:aaaaaaaaaaaaaa:bb", self.data_file)
+        self.assertEqual(r_full.returncode, 0, r_full.stderr)
+        # Keying with just the part before ':' (old truncated behaviour) differs.
+        r_trunc = run_wolfssl("dgst", "-sha256", "-hmac",
+                              "-mackey", "key:aaaaaaaaaaaaaa", self.data_file)
+        self.assertEqual(r_trunc.returncode, 0, r_trunc.stderr)
+        self.assertNotEqual(r_full.stdout, r_trunc.stdout)
+
+    def test_hmac_missing_key(self):
+        """-mac HMAC without -mackey must fail."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac", self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_malformed_key_no_colon(self):
+        """A -mackey value with no ':' separator must fail."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", "Jefe", self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_invalid_key_type(self):
+        """A -mackey type other than key/hexkey must fail."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", "bogus:Jefe", self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_invalid_hex_key(self):
+        """A non-hex value passed to hexkey: must fail."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", "hexkey:nothexZZ", self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_no_hash_algorithm(self):
+        """-mac HMAC with no hash flag must fail (no default hash)."""
+        r = run_wolfssl("dgst", "-hmac",
+                        "-mackey", self.KEY, self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+
 if __name__ == "__main__":
     test_main()
