@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
@@ -27,6 +28,11 @@
 #include <wolfclu/sign-verify/clu_sign.h> /* for RSA_SIG_VER, ECC_SIG_VER,
                                              ED25519_SIG_VER */
 #include <wolfclu/x509/clu_parse.h>
+#include <wolfssl/openssl/compat_types.h>
+#include <wolfssl/openssl/hmac.h>
+#include <wolfssl/ssl.h>
+#include <wolfssl/wolfcrypt/hash.h>
+#include <wolfssl/wolfcrypt/memory.h>
 
 #define SALT_SIZE       8
 #define DES3_BLOCK_SIZE 24
@@ -1823,5 +1829,94 @@ int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
         wc_HashFree(&hashAlg, hashType);
     }
 
+    return ret;
+}
+
+int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
+        enum wc_HashType alg, WOLFSSL_BIO* in, byte* out, word32* outSz)
+{
+    int ret = WOLFCLU_SUCCESS;
+    byte chunk[MAX_IO_CHUNK_SZ];
+    word32 hmacLen = 0;
+    const WOLFSSL_EVP_MD* md = NULL;
+
+     if (ctx == NULL || key == NULL || in == NULL ||
+             out == NULL || outSz == NULL) {
+         return BAD_FUNC_ARG;
+     }
+
+    /* wc_HashType values are not contiguous, so map each one explicitly.
+     * Cast to int so unrelated hash types don't trip -Wswitch-enum. */
+    switch ((int)alg) {
+        case WC_HASH_TYPE_MD5:
+            md = wolfSSL_EVP_md5();
+            break;
+        case WC_HASH_TYPE_SHA:
+            md = wolfSSL_EVP_sha1();
+            break;
+        case WC_HASH_TYPE_SHA224:
+            md = wolfSSL_EVP_sha224();
+            break;
+        case WC_HASH_TYPE_SHA256:
+            md = wolfSSL_EVP_sha256();
+            break;
+        case WC_HASH_TYPE_SHA384:
+            md = wolfSSL_EVP_sha384();
+            break;
+        case WC_HASH_TYPE_SHA512:
+            md = wolfSSL_EVP_sha512();
+            break;
+        default:
+            wolfCLU_LogError("Invalid hash type");
+            ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfSSL_HMAC_Init(ctx, key, len, md)
+                != WOLFSSL_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        int bytesRead = 0;
+        while (ret == WOLFCLU_SUCCESS) {
+            bytesRead = wolfSSL_BIO_read(in, chunk, sizeof(chunk));
+            if (bytesRead < 0) {
+                wolfCLU_LogError("Error reading data");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
+            else if (bytesRead == 0) {
+                break;
+            }
+            if (wolfSSL_HMAC_Update(ctx, chunk, (word32)bytesRead)
+                    != WOLFSSL_SUCCESS) {
+                wolfCLU_LogError("Hash update failed");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        wc_ForceZero(chunk, sizeof(chunk));
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (wolfSSL_HMAC_Final(ctx, chunk, &hmacLen) != WOLFSSL_SUCCESS) {
+            wolfCLU_LogError("Unable to get hmac hash of data.");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (hmacLen <= *outSz) {
+            XMEMCPY(out, chunk, hmacLen);
+            *outSz = hmacLen;
+        }
+        else {
+            wolfCLU_LogError("Out buffer too small to hold HMAC dgst");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    wc_ForceZero(chunk, sizeof(chunk));
     return ret;
 }

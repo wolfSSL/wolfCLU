@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
@@ -27,6 +28,10 @@
 #include <wolfclu/sign-verify/clu_sign_verify_setup.h>
 #include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
+#include <wolfssl/openssl/bio.h>
+#include <wolfssl/openssl/compat_types.h>
+#include <wolfssl/openssl/hmac.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -38,6 +43,9 @@ static const struct option dgst_options[] = {
     {"-sha256",    no_argument,       0, WOLFCLU_CERT_SHA256},
     {"-sha384",    no_argument,       0, WOLFCLU_CERT_SHA384},
     {"-sha512",    no_argument,       0, WOLFCLU_CERT_SHA512},
+
+    {"-hmac",     no_argument      , 0, WOLFCLU_HMAC       },
+    {"-mackey",   required_argument, 0, WOLFCLU_HMAC_KEY   },
 
     {"-inform",    required_argument, 0, WOLFCLU_INFORM    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
@@ -53,7 +61,8 @@ static const struct option dgst_options[] = {
 
 static void wolfCLU_dgstHelp(void)
 {
-    WOLFCLU_LOG(WOLFCLU_L0, "dgst: (the last argument is the data that was signed)");
+    WOLFCLU_LOG(WOLFCLU_L0, "dgst: (Data can be passed in via stdin or via "
+        "a file as the last argument)");
     WOLFCLU_LOG(WOLFCLU_L0, "Hash algos supported:");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-md5");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sha");
@@ -61,14 +70,27 @@ static void wolfCLU_dgstHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sha256");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sha384");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-sha512");
-    WOLFCLU_LOG(WOLFCLU_L0, "Parameters:");
+    WOLFCLU_LOG(WOLFCLU_L0, "General Parameters:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out    output file for signature\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "Parameters sign/verify:");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-signature file containing the signature");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inform pem or der in format");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-verify key used to verify the signature");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-sign   private key used to create the signature");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-out    output file for signature");
-    WOLFCLU_LOG(WOLFCLU_L0, "Example:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-sign   private key used to create the "
+                                        "signature\n");
+
+    WOLFCLU_LOG(WOLFCLU_L0, "Parameters hmac:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-hmac       Must be passed to enable hmac "
+                                            "functionality");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-mackey     key:value for plain text "
+                                        "hexkey:value to have value encoded\n");
+
+
+    WOLFCLU_LOG(WOLFCLU_L0, "Example sign/verify:");
     WOLFCLU_LOG(WOLFCLU_L0, "\twolfssl dgst -signature test.sig -verify key.pem test");
+    WOLFCLU_LOG(WOLFCLU_L0, "Example hmac:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\twolfssl dgst -sha256 -hmac -mackey "
+            "hexkey:0b0b0b0b0b0b0b inputfile.txt");
 }
 
 
@@ -155,130 +177,166 @@ static int ExtractKey(void* key, WOLFSSL_EVP_PKEY* pkey, int* keySz,
 
     return ret;
 }
-#endif /* !WOLFCLU_NO_FILESYSTEM */
 
-/* return WOLFCLU_SUCCESS on success */
-int wolfCLU_dgst_setup(int argc, char** argv)
+
+/* compute an HMAC over the data in dataBio and output the resulting MAC. When
+ * outFile is set the raw MAC bytes are written there, otherwise the MAC is
+ * printed to stdout as hex.
+ * return WOLFCLU_SUCCESS on success */
+static int wolfCLU_dgstHmac(WOLFSSL_BIO* dataBio, char* hmacKey,
+        enum wc_HashType hashType, char* outFile)
 {
-#ifndef WOLFCLU_NO_FILESYSTEM
-    ecc_key ecc;
-    RsaKey  rsa;
-    WOLFSSL_BIO *sigBio = NULL;
-    WOLFSSL_BIO *pubKeyBio = NULL;
-    WOLFSSL_BIO *dataBio = NULL;
-    WOLFSSL_EVP_PKEY *pkey = NULL;
-    int     ret = WOLFCLU_SUCCESS;
-    byte* sig  = NULL;
-    char* sigFile = NULL;
-    void* key  = NULL;
-    byte digest[MAX_DER_DIGEST_SZ];
-    word32 digestSz = 0;
-    word32 sigSz  = 0;
-    int keySz  = 0;
-    int option;
-    int longIndex = 2;
-    byte signing = 0;
-    int inForm = PEM_FORM;
+    WOLFSSL_HMAC_CTX* hmacCtx = NULL;
+    byte digest[WC_MAX_DIGEST_SIZE];
+    word32 digestSz = sizeof(digest);
+    byte*  keyBin = NULL;
+    word32 keyBinSz = 0;
+    int ret = WOLFCLU_SUCCESS;
+    char* macKeyVal= NULL;
+    char* sep;
+    byte hex = 0;
 
-    enum wc_HashType      hashType = WC_HASH_TYPE_NONE;
-    enum wc_SignatureType sigType  = WC_SIGNATURE_TYPE_NONE;
+    if (hmacKey == NULL) {
+        wolfCLU_LogError("No HMAC key provided");
+        return WOLFCLU_FATAL_ERROR;
+    }
 
-    XMEMSET(&ecc, 0, sizeof(ecc));
-    XMEMSET(&rsa, 0, sizeof(rsa));
-
-    /* signed file should be the last arg */
-    if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
-        wolfCLU_dgstHelp();
-        return WOLFCLU_SUCCESS;
+    /* Split the key on the FIRST ':' only, so a plaintext value may itself
+     * contain ':' (matching OpenSSL's key:/hexkey: forms). Everything before
+     * the colon is the type, everything after is the verbatim value. */
+    sep = XSTRSTR(hmacKey, ":");
+    if (sep == NULL) {
+        wolfCLU_LogError("Malformed Hmac key %s", hmacKey);
+        ret = WOLFCLU_FATAL_ERROR;
     }
     else {
-        dataBio = wolfSSL_BIO_new_file(argv[argc-1], "rb");
-        if (dataBio == NULL) {
-            wolfCLU_LogError("Unable to open data file %s",
-                    argv[argc-1]);
+        macKeyVal = sep + 1; /* value is the remainder, ':' included */
+
+        if (XSTRNCMP(hmacKey, "hexkey:", 7) == 0) {
+            hex = 1;
+        }
+        else if (XSTRNCMP(hmacKey, "key:", 4) != 0) {
+            wolfCLU_LogError("Invalid key type must be 'hexkey' or "
+                    "'key' %s", hmacKey);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    opterr = 0; /* do not display unrecognized options */
-    optind = 0; /* start at indent 0 */
-    while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   dgst_options, &longIndex )) != -1) {
+    /* an empty value (e.g. "key:") is not a usable key */
+    if (ret == WOLFCLU_SUCCESS && *macKeyVal == '\0') {
+        wolfCLU_LogError("No HMAC key value provided after '%s:'", hmacKey);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
 
-        switch (option) {
-
-            case WOLFCLU_MD5:
-                hashType = WC_HASH_TYPE_MD5;
-                break;
-
-            case WOLFCLU_CERT_SHA:
-                hashType = WC_HASH_TYPE_SHA;
-                break;
-
-            case WOLFCLU_CERT_SHA224:
-                hashType = WC_HASH_TYPE_SHA224;
-                break;
-
-            case WOLFCLU_CERT_SHA256:
-                hashType = WC_HASH_TYPE_SHA256;
-                break;
-
-            case WOLFCLU_CERT_SHA384:
-                hashType = WC_HASH_TYPE_SHA384;
-                break;
-
-            case WOLFCLU_CERT_SHA512:
-                hashType = WC_HASH_TYPE_SHA512;
-                break;
-
-            case WOLFCLU_SIGN:
-                signing = 1;
-                FALL_THROUGH;
-            case WOLFCLU_VERIFY:
-                pubKeyBio = wolfSSL_BIO_new_file(optarg, "rb");
-                if (pubKeyBio == NULL) {
-                    wolfCLU_LogError("Unable to open key file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
-                break;
-
-            case WOLFCLU_OUTFILE:
-                sigFile = optarg;
-                break;
-
-            case WOLFCLU_INFILE:
-                sigFile = optarg;
-                break;
-
-            case WOLFCLU_INFORM:
-                inForm = wolfCLU_checkInform(optarg);
-                if (inForm < 0) {
-                    wolfCLU_LogError("bad inform");
-                    ret = USER_INPUT_ERROR;
-                }
-                break;
-
-            case WOLFCLU_HELP:
-                wolfCLU_dgstHelp();
-                return WOLFCLU_SUCCESS;
-
-            case ':':
-            case '?':
-                break;
-
-            default:
-                /* do nothing. */
-                (void)ret;
+    /* The key is supplied as a hex string (matching OpenSSL's "hexkey:"
+     * form), so decode it to raw bytes before keying the HMAC. Using the
+     * ASCII text directly would key with the wrong bytes and length. */
+    if (ret == WOLFCLU_SUCCESS) {
+        if (hex) {
+            ret = wolfCLU_hexToBin(macKeyVal, &keyBin, &keyBinSz,
+                    NULL, NULL, NULL,
+                    NULL, NULL, NULL,
+                    NULL, NULL, NULL);
+            if (ret != WOLFCLU_SUCCESS) {
+                wolfCLU_LogError("Invalid hex key value passed to -mackey %s",
+                        macKeyVal);
+            }
         }
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (dataBio == NULL || sigFile == NULL) {
-            wolfCLU_LogError("error with reading signature or data");
+        hmacCtx = wolfSSL_HMAC_CTX_new();
+        if (hmacCtx == NULL) {
+            wolfCLU_LogError("Unable to create HMAC context");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (keyBin != NULL) {
+            ret = wolfCLU_hmacHash(hmacCtx, keyBin, keyBinSz, hashType, dataBio,
+                    digest, &digestSz);
+        }
+        else {
+            ret = wolfCLU_hmacHash(hmacCtx, macKeyVal,
+                    (word32)XSTRLEN(macKeyVal),
+                    hashType, dataBio, digest, &digestSz);
+        }
+    }
+
+    /* output the resulting MAC */
+    if (ret == WOLFCLU_SUCCESS) {
+        WOLFSSL_BIO* outBio = NULL;
+
+        if (outFile != NULL) {
+            outBio = wolfSSL_BIO_new_file(outFile, "wb");
+        }
+        else {
+            outBio = wolfSSL_BIO_new_fp(stdout, WOLFSSL_BIO_NOCLOSE);
+        }
+
+        if (outBio == NULL) {
+            wolfCLU_LogError("Unable to open output for HMAC");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            if (outFile != NULL) {
+                if (wolfSSL_BIO_write(outBio, digest, digestSz) <= 0) {
+                    wolfCLU_LogError("Error writing out HMAC");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+            else {
+                word32 i;
+                for (i = 0; i < digestSz; i++)
+                    wolfSSL_BIO_printf(outBio, "%02x", digest[i]);
+                wolfSSL_BIO_printf(outBio, "\n");
+            }
+        }
+        if (outBio != NULL) {
+            wolfSSL_BIO_free(outBio);
+        }
+    }
+
+    /* clean up */
+    if (hmacCtx != NULL) {
+        wolfSSL_HMAC_CTX_cleanup(hmacCtx);
+        wolfSSL_HMAC_CTX_free(hmacCtx);
+    }
+    /* wolfCLU_hexToBin allocates keyBin with a NULL heap hint; zero the
+     * key material and free it with the matching hint. */
+    if (keyBin != NULL) {
+        wolfCLU_ForceZero(keyBin, keyBinSz);
+        XFREE(keyBin, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    return ret;
+}
+
+
+/* create or verify a signature over the data in dataBio using the key in
+ * pubKeyBio. When signing the signature is written to outFile, otherwise the
+ * signature is read from sigFile and verified.
+ * return WOLFCLU_SUCCESS on success */
+static int wolfCLU_dgstSignVerify(WOLFSSL_BIO* dataBio, WOLFSSL_BIO* pubKeyBio,
+        char* sigFile, char* outFile, enum wc_HashType hashType, int inForm,
+        byte signing)
+{
+    ecc_key ecc;
+    RsaKey  rsa;
+    WOLFSSL_BIO* sigBio = NULL;
+    WOLFSSL_EVP_PKEY* pkey = NULL;
+    void* key  = NULL;
+    byte* sig  = NULL;
+    byte digest[MAX_DER_DIGEST_SZ];
+    word32 digestSz = 0;
+    word32 sigSz  = 0;
+    int keySz  = 0;
+    int ret = WOLFCLU_SUCCESS;
+    enum wc_SignatureType sigType = WC_SIGNATURE_TYPE_NONE;
+
+    XMEMSET(&ecc, 0, sizeof(ecc));
+    XMEMSET(&rsa, 0, sizeof(rsa));
 
     /* Stream the data file through a hash to produce a digest, then pass
      * the digest to wc_Signature{Generate,Verify}Hash below. */
@@ -289,6 +347,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS && signing == 0) {
         sigBio = wolfSSL_BIO_new_file(sigFile, "rb");
+
         if (sigBio == NULL) {
             wolfCLU_LogError("Unable to read signature file %s", sigFile);
             ret = WOLFCLU_FATAL_ERROR;
@@ -453,10 +512,10 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
         /* write out the signature */
         if (ret == WOLFCLU_SUCCESS) {
-            sigBio = wolfSSL_BIO_new_file(sigFile, "wb");
+            sigBio = wolfSSL_BIO_new_file(outFile, "wb");
             if (sigBio == NULL) {
                 wolfCLU_LogError("Unable to create signature file %s",
-                        sigFile);
+                        outFile);
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -495,6 +554,182 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     wolfSSL_EVP_PKEY_free(pkey);
     wolfSSL_BIO_free(sigBio);
+    return ret;
+}
+#endif /* !WOLFCLU_NO_FILESYSTEM */
+
+/* return WOLFCLU_SUCCESS on success */
+int wolfCLU_dgst_setup(int argc, char** argv)
+{
+#ifndef WOLFCLU_NO_FILESYSTEM
+    WOLFSSL_BIO *pubKeyBio = NULL;
+    WOLFSSL_BIO *dataBio = NULL;
+    int     ret = WOLFCLU_SUCCESS;
+    char* sigFile = NULL;
+    char* outFile = NULL;
+    int option;
+    int longIndex = 2;
+    byte signing = 0;
+    byte hmac    = 0;
+    char* hmacKey = NULL;
+    int inForm = PEM_FORM;
+
+    enum wc_HashType hashType = WC_HASH_TYPE_NONE;
+
+    /* Last arg is input data if there otherwise we look at stdin */
+    if ((XSTRNCMP("-h", argv[argc-1], 2) == 0 && argv[argc-1][2] == '\0') ||
+            (XSTRNCMP("-help", argv[argc-1], 5) == 0
+             && argv[argc-1][5] == '\0')) {
+        wolfCLU_dgstHelp();
+        return WOLFCLU_SUCCESS;
+    }
+    else {
+        /* check that last arg file is unique and not a flag or flag arg */
+        char* lastArg = argv[argc-1];
+        int isPositional = 1;
+        int j;
+
+        for (j = 0; dgst_options[j].name != NULL; j++) {
+            if (XSTRCMP(lastArg, dgst_options[j].name) == 0) {
+                isPositional = 0; /* last token is itself an option */
+                break;
+            }
+            if (argc >= 2 && dgst_options[j].has_arg == required_argument &&
+                    XSTRCMP(argv[argc-2], dgst_options[j].name) == 0) {
+                isPositional = 0; /* last token is that option's value */
+                break;
+            }
+        }
+
+        if (isPositional) {
+            dataBio = wolfSSL_BIO_new_file(lastArg, "rb");
+            if (dataBio == NULL) {
+                wolfCLU_LogError("Unable to open data file %s", lastArg);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else {
+            dataBio = wolfSSL_BIO_new_fp(stdin, WOLFSSL_BIO_NOCLOSE);
+        }
+    }
+
+    opterr = 0; /* do not display unrecognized options */
+    optind = 0; /* start at indent 0 */
+    while ((option = wolfCLU_GetOpt(argc, argv, "",
+                   dgst_options, &longIndex )) != -1) {
+
+        switch (option) {
+
+            case WOLFCLU_MD5:
+                hashType = WC_HASH_TYPE_MD5;
+                break;
+
+            case WOLFCLU_CERT_SHA:
+                hashType = WC_HASH_TYPE_SHA;
+                break;
+
+            case WOLFCLU_CERT_SHA224:
+                hashType = WC_HASH_TYPE_SHA224;
+                break;
+
+            case WOLFCLU_CERT_SHA256:
+                hashType = WC_HASH_TYPE_SHA256;
+                break;
+
+            case WOLFCLU_CERT_SHA384:
+                hashType = WC_HASH_TYPE_SHA384;
+                break;
+
+            case WOLFCLU_CERT_SHA512:
+                hashType = WC_HASH_TYPE_SHA512;
+                break;
+
+            case WOLFCLU_HMAC:
+                hmac = 1;
+                break;
+
+            case WOLFCLU_HMAC_KEY:
+                if (optarg != NULL) {
+                    hmacKey = optarg;
+                }
+                else {
+                    wolfCLU_LogError("No Key passed to -mackey");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
+
+            case WOLFCLU_SIGN:
+                signing = 1;
+                FALL_THROUGH;
+            case WOLFCLU_VERIFY:
+                pubKeyBio = wolfSSL_BIO_new_file(optarg, "rb");
+                if (pubKeyBio == NULL) {
+                    wolfCLU_LogError("Unable to open key file %s",
+                            optarg);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
+
+            case WOLFCLU_INFILE:
+                sigFile = optarg;
+                break;
+
+            case WOLFCLU_OUTFILE:
+                outFile = optarg;
+                break;
+
+            case WOLFCLU_INFORM:
+                inForm = wolfCLU_checkInform(optarg);
+                if (inForm < 0) {
+                    wolfCLU_LogError("bad inform");
+                    ret = USER_INPUT_ERROR;
+                }
+                break;
+
+            case ':':
+            case '?':
+                break;
+
+            default:
+                /* do nothing. */
+                (void)ret;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && dataBio == NULL) {
+        wolfCLU_LogError("error with reading signature or data");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    /* the sign/verify paths need a file to read/write; validate before
+     * dispatch so a NULL is never handed to wolfSSL_BIO_new_file/LogError.
+     * Also check that we have a pubkey*/
+    if (ret == WOLFCLU_SUCCESS && hmac == 0) {
+        if (pubKeyBio == NULL) {
+            wolfCLU_LogError("No key provided, use -sign <key> or -verify <key>");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (signing == 0 && sigFile == NULL) {
+            wolfCLU_LogError("No signature file provided, use -signature");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (signing == 1 && outFile == NULL) {
+            wolfCLU_LogError("No output file provided, use -out");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    /* dispatch to the HMAC or sign/verify handler */
+    if (ret == WOLFCLU_SUCCESS) {
+        if (hmac == 1) {
+            ret = wolfCLU_dgstHmac(dataBio, hmacKey, hashType, outFile);
+        }
+        else {
+            ret = wolfCLU_dgstSignVerify(dataBio, pubKeyBio, sigFile, outFile,
+                    hashType, inForm, signing);
+        }
+    }
+
     wolfSSL_BIO_free(pubKeyBio);
     wolfSSL_BIO_free(dataBio);
 
