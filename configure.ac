@@ -59,6 +59,10 @@ AM_PATH_PYTHON([3.6],, [:])
 AC_SUBST([PYTHON])
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != ":"])
 
+# SBOM generation prerequisites
+AC_CHECK_PROG([PYTHON3], [python3], [python3])
+AC_CHECK_PROG([PYSPDXTOOLS], [pyspdxtools], [pyspdxtools])
+
 # Checks for headers/libraries
 AC_CHECK_HEADERS([sys/time.h string.h termios.h unistd.h])
 AC_CHECK_SIZEOF(long long, 8)

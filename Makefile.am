@@ -163,6 +163,48 @@ endif
 test: check
 #DISTCLEANFILES+= wolfssl-config
 
+# SBOM generation. Requires WOLFSSL_DIR pointing to a wolfssl source tree
+# containing scripts/gen-sbom (feat/sbom-embedded branch, or master once
+# wolfSSL/wolfssl#10343 merges). wolfCLU ships a binary, not a .so, so the
+# artifact hash is computed from the compiled sources via --srcs.
+WOLFSSL_DIR ?=
+PRODUCT   = wolfclu
+VERSION   = $(shell grep CLUWOLFSSL_VERSION_STRING $(srcdir)/wolfclu/version.h 2>/dev/null | sed 's/.*"\(.*\)".*/\1/')
+GEN_SBOM  = $(WOLFSSL_DIR)/scripts/gen-sbom
+WOLFSSL_INCLUDEDIR ?= $(WOLFSSL_DIR)/include
+SBOM_OPTS = --name $(PRODUCT) \
+            --version $(VERSION) \
+            --supplier "wolfSSL Inc." \
+            --options-h $(WOLFSSL_INCLUDEDIR)/wolfssl/options.h \
+            --srcs $(addprefix $(srcdir)/,$(wolfssl_SOURCES))
+
+SBOM_OUT_DIR = $(builddir)
+SBOM_CDX     = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).cdx.json
+SBOM_SPDX_J  = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).spdx.json
+SBOM_SPDX_TV = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).spdx
+
+.PHONY: sbom install-sbom uninstall-sbom
+
+sbom: all
+	@if test -z "$(WOLFSSL_DIR)"; then \
+	    echo "ERROR: WOLFSSL_DIR not set. Usage: make sbom WOLFSSL_DIR=/path/to/wolfssl"; \
+	    exit 1; \
+	fi
+	@if test -z "$(PYTHON3)"; then echo "ERROR: python3 not found in PATH."; exit 1; fi
+	$(PYTHON3) $(GEN_SBOM) $(SBOM_OPTS)
+
+install-sbom: sbom
+	$(MKDIR_P) $(DESTDIR)$(datadir)/doc/$(PRODUCT)
+	$(INSTALL_DATA) $(SBOM_CDX) $(SBOM_SPDX_J) $(SBOM_SPDX_TV) \
+	    $(DESTDIR)$(datadir)/doc/$(PRODUCT)/
+
+uninstall-sbom:
+	-rm -f $(DESTDIR)$(datadir)/doc/$(PRODUCT)/$(PRODUCT)-*.cdx.json
+	-rm -f $(DESTDIR)$(datadir)/doc/$(PRODUCT)/$(PRODUCT)-*.spdx.json
+	-rm -f $(DESTDIR)$(datadir)/doc/$(PRODUCT)/$(PRODUCT)-*.spdx
+
+uninstall-hook: uninstall-sbom
+
 
 maintainer-clean-local:
 	-rm Makefile.in
