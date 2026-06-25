@@ -102,6 +102,25 @@ class TestX509Verify(unittest.TestCase):
                         os.path.join(CERTS_DIR, "server-cert.pem"))
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_last_arg_not_misread(self):
+        r = run_wolfssl("verify", "-partial_chain", "-CAfile",
+                        os.path.join(CERTS_DIR, "server-cert.pem"),
+                        "-untrusted", os.path.join(CERTS_DIR, "random.pem")
+                        )
+        self.assertNotEqual(r.returncode, 0, r.stderr)
+
+    def test_partial_chain_no_cafile_no_crash(self):
+        """-partial_chain with -untrusted but no -CAfile must not crash.
+
+        caCert is NULL in this path; the malformed-argument check must
+        tolerate that rather than dereferencing it.
+        """
+        r = run_wolfssl("verify", "-partial_chain",
+                        "-untrusted", os.path.join(CERTS_DIR, "server-cert.pem"),
+                        os.path.join(CERTS_DIR, "server-cert.pem"))
+        # A NULL-deref would crash (negative returncode from a signal);
+        # require a normal exit code regardless of verify success/failure.
+        self.assertGreaterEqual(r.returncode, 0, r.stderr)
 
 class TestX509VerifyCRL(unittest.TestCase):
     """CRL-related verification tests."""

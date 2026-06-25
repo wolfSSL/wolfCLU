@@ -24,6 +24,7 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/x509/clu_cert.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -155,10 +156,28 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    cert = load_cert_from_file(verifyCert);
-    if (!cert) {
-        wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
+
+    /* Detect malformed arguments: if the trailing positional argument (the
+     * cert to verify) was instead consumed as the value of a required-argument
+     * option, optarg will string-match argv[argc-1]. The argc >= 2 guard keeps
+     * the argv[argc-2] access in bounds. With -partial_chain the CA file may
+     * legitimately equal the verify cert, so that case is not treated as an
+     * error. */
+    if (argc >= 2 && optarg != NULL && XSTRCMP(optarg, argv[argc-1]) == 0 &&
+            (partialChain == 0 || caCert == NULL ||
+             XSTRCMP(caCert, argv[argc-1]) != 0) &&
+             (intermCert == NULL || XSTRCMP(intermCert, argv[argc-1]) != 0)) {
+        wolfCLU_LogError("Malformed arguments last argument read as value for "
+                "%s", argv[argc-2]);
         ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        cert = load_cert_from_file(verifyCert);
+        if (!cert) {
+            wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS && intermCert) {

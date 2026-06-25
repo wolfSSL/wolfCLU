@@ -395,7 +395,7 @@ static int ocspClient(OcspClientConfig* config)
 typedef struct IndexEntry {
     char status;
     time_t revocationTime;
-    char serial[64];
+    char serial[65];
     struct IndexEntry* next;
 } IndexEntry;
 
@@ -466,7 +466,14 @@ static IndexEntry* parseIndexFile(const char* filename)
                     }
                     break;
                 case 3: /* Serial (hex) */
+                    if (XSTRLEN(field) > sizeof(entry->serial)-1) {
+                        wolfCLU_LogError("Field %s too long to fit in entry "
+                                "with max size %lu", field,
+                                (unsigned long)(sizeof(entry->serial)-1));
+                        break;
+                    }
                     XSTRNCPY(entry->serial, field, sizeof(entry->serial) - 1);
+                    entry->serial[sizeof(entry->serial) - 1] = '\0';
                     break;
             }
             fieldNum++;
@@ -478,7 +485,7 @@ static IndexEntry* parseIndexFile(const char* filename)
             entry = NULL;
             continue;
         }
-        
+
         /* For revoked certificates, revocationTime must be valid */
         if (entry->status == 'R' && entry->revocationTime == (time_t)-1) {
             wolfCLU_LogError("Invalid revocation time for serial %s", entry->serial);
