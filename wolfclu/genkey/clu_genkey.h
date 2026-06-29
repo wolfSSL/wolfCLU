@@ -135,8 +135,8 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
  *
  * return WOLFCLU_SUCCESS on success
 */
-int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
-                            int keySz, int level, int withAlg);
+int wolfCLU_genKey_ML_DSA(WC_RNG* rng, const char* fName, int directive,
+                            int fmt, int keySz, int level, int withAlg);
 
 /**
  * call back function of read/write a XMSS private key

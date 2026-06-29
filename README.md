@@ -154,6 +154,12 @@ uqGDApXWYuBdjheL4Ysoq6YXtt6dnm8DkBVrnt+gAMCBFbBNPXxy2MODBDqya907
 iky6IRTUzkBy1fssv3Gr/jOsyN8J565NST3RpQ==
 -----END CERTIFICATE-----
 ```
+A self-signed certificate can also be generated with post-quantum ML-DSA (FIPS 204) key. `ml-dsa` and `dilithium` are interchangeable command aliases, and the level (`2`/`3`/`5`) selects ML-DSA-44/65/87. This needs wolfSSL built with `--enable-dilithium --enable-experimental`.
+```
+wolfssl req -x509 -newkey ml-dsa:2 -keyout ml-dsa-key -days 3650 \
+    -subj /CN=wolfSSL -out ml-dsa.cert
+```
+
 ### DGST Sign and Verify
 
 The commands below sign this README then verify it with the resulting signature.
@@ -166,7 +172,7 @@ wolfssl dgst -sha256 -verify mykey.pub -signature readme.sig ./README.md
 
 The following demonstrates how to create a root CA and use it to sign other certificates. This example uses ECC, but steps are similar for RSA.
 
-In this scenario there are three entities A, B, and C, where A is meant to function as a root CA. 
+In this scenario there are three entities A, B, and C, where A is meant to function as a root CA.
 
 The following steps demonstrate how to generate keys and certificates for A, B, and C, where A is self-signed and B and C are signed by A
 

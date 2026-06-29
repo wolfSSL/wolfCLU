@@ -135,6 +135,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "For x509:         wolfssl -x509 -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For key creation: wolfssl -genkey -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For certificate creation: wolfssl -req -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For ca signing:           wolfssl ca -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For RSA sign/ver: wolfssl -rsa -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For ECC sign/ver: wolfssl -ecc -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For ED25519 sign/ver: wolfssl -ed25519 -help");
@@ -715,7 +716,16 @@ void wolfCLU_certgenHelp(void) {
     WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-addext add an extension, ie \"subjectAltName=IP:192.168.1.2,DNS:example.com\"");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey generate the private key to use with req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey <alg>:<param> generate a new private key to use with req,");
+#if defined(HAVE_DILITHIUM) && defined(WOLFSSL_CERT_GEN) && \
+    defined(WOLFSSL_CERT_REQ) && !defined(WOLFCLU_NO_FILESYSTEM)
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        e.g. rsa:2048, ml-dsa:[2|3|5], dilithium:[2|3|5]");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        Note: ML-DSA/dilithium keys are supported only for");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        self-signed certificates (-x509) and are written");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        unencrypted to <keyout>.priv and <keyout>.pub");
+#else
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        e.g. rsa:2048");
+#endif
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey private key to use with req");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-keyout file to output key to");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-subj use a specified subject name, ie O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit");

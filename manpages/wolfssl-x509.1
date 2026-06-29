@@ -98,6 +98,10 @@ Unless both -req and -signkey are used, -extfile and -extensions are
 silently ignored on output: the (re-encoded) certificate is written from
 the original input DER, not from any in-memory changes made while parsing
 extensions.
+.LP
+When -text is used on a certificate containing an ML-DSA SubjectPublicKey,
+the output shows the algorithm OID but does not decode key bytes due to
+library limitations.
 .SH EXAMPLES
 View certificate details in human-readable format:
 .RS

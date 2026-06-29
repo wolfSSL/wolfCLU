@@ -113,6 +113,20 @@ extern "C" {
 
 #include <wolfssl/wolfcrypt/coding.h>
 
+#ifdef HAVE_DILITHIUM
+    #include <wolfssl/wolfcrypt/dilithium.h>
+    /* Detect ML-DSA API on platforms without configure (e.g. Windows). */
+    #if !defined(WOLFCLU_HAVE_MLDSA) && !defined(WOLFCLU_MLDSA_CHECKED) && \
+            (defined(DILITHIUM_MAX_BOTH_KEY_PEM_SIZE) || \
+             defined(WOLFSSL_HAVE_MLDSA))
+        #define WOLFCLU_HAVE_MLDSA
+    #endif
+    #if defined(HAVE_DILITHIUM) && !defined(DILITHIUM_MAX_BOTH_KEY_PEM_SIZE)
+        /* Older wolfSSL Dilithium builds may predate this constant. */
+        #define DILITHIUM_MAX_BOTH_KEY_PEM_SIZE 10267
+    #endif
+#endif
+
 #define BLOCK_SIZE 16384
 #define MEGABYTE (1024*1024)
 #define KILOBYTE 1024

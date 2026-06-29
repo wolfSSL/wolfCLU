@@ -283,7 +283,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     /* Stream the data file through a hash to produce a digest, then pass
      * the digest to wc_Signature{Generate,Verify}Hash below. */
     if (ret == WOLFCLU_SUCCESS) {
-        digestSz = WC_MAX_DIGEST_SIZE;
+        digestSz = MAX_DER_DIGEST_SZ;
         ret = wolfCLU_streamHashBio(dataBio, hashType, digest, &digestSz);
     }
 
@@ -378,14 +378,18 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            enc = wc_EncodeSignature(digest, digest, digestSz, oid);
-            if (enc == 0) {
+            byte encodedDigest[MAX_DER_DIGEST_SZ + 256];
+            enc = wc_EncodeSignature(encodedDigest, digest, digestSz, oid);
+            if (enc == 0 || enc > (word32)MAX_DER_DIGEST_SZ) {
                 wolfCLU_LogError("Unable to DER-encode digest");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
+                XMEMCPY(digest, encodedDigest, enc); /* copy before zero */
                 digestSz = enc;
+                wolfCLU_ForceZero(digest + enc, (word32)MAX_DER_DIGEST_SZ - enc);
             }
+            wolfCLU_ForceZero(encodedDigest, sizeof(encodedDigest));
         }
     }
 #endif

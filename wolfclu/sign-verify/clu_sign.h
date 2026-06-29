@@ -34,6 +34,20 @@
 #endif
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
+    /* Detect ML-DSA API on platforms without configure. */
+    #if !defined(WOLFCLU_HAVE_MLDSA) && !defined(WOLFCLU_MLDSA_CHECKED) && \
+            (defined(DILITHIUM_MAX_BOTH_KEY_PEM_SIZE) || \
+             defined(WOLFSSL_HAVE_MLDSA))
+        #define WOLFCLU_HAVE_MLDSA
+    #endif
+    #ifdef WOLFCLU_HAVE_MLDSA
+        /* Accesses pubKeySet directly. Fails if wolfSSL renames it. */
+        #define WOLFCLU_MLDSA_PUB_KEY_IS_SET(k) ((k)->pubKeySet)
+    #endif
+    #if defined(HAVE_DILITHIUM) && !defined(DILITHIUM_MAX_BOTH_KEY_PEM_SIZE)
+        /* Older wolfSSL Dilithium builds may predate this constant. */
+        #define DILITHIUM_MAX_BOTH_KEY_PEM_SIZE 10267
+    #endif
 #endif
 #ifdef WOLFSSL_HAVE_XMSS
     #include <wolfssl/wolfcrypt/wc_xmss.h>
