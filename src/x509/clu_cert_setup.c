@@ -26,6 +26,7 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
+#include <wolfclu/x509/clu_mldsa.h>
 
 #define PEM_BEGIN_CERT "-----BEGIN CERTIFICATE-----"
 #define BEGIN_CERT_REQ "-----BEGIN CERTIFICATE REQUEST-----"
@@ -735,8 +736,30 @@ int wolfCLU_certSetup(int argc, char** argv)
     /* write out human readable text if set to */
     if (ret == WOLFCLU_SUCCESS && textFlag) {
         if (wolfSSL_X509_print(out, x509) != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("unable to print certificate out");
-            ret = WOLFCLU_FATAL_ERROR;
+#if defined(WOLFCLU_HAVE_MLDSA)
+            /* wolfSSL_X509_print cannot render ML-DSA public key bytes. */
+            if (wolfCLU_IsMLDSAKeyType(wolfSSL_X509_get_pubkey_type(x509))) {
+                static const char msg[] =
+                    "        ML-DSA public key (full print not yet "
+                    "supported)\n";
+                if (wolfSSL_BIO_write(out, msg, (int)XSTRLEN(msg)) <= 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                if (ret == WOLFCLU_SUCCESS && wolfSSL_X509_get_isCA(x509)) {
+                    static const char bc[] =
+                        "        X509v3 extensions:\n"
+                        "            X509v3 Basic Constraints:\n"
+                        "                CA:TRUE\n";
+                    if (wolfSSL_BIO_write(out, bc, (int)XSTRLEN(bc)) <= 0)
+                        ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+            else
+#endif /* WOLFCLU_HAVE_MLDSA */
+            {
+                wolfCLU_LogError("unable to print certificate out");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 

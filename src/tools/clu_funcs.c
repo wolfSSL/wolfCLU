@@ -135,6 +135,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "For x509:         wolfssl -x509 -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For key creation: wolfssl -genkey -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For certificate creation: wolfssl -req -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For ca signing:           wolfssl ca -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For RSA sign/ver: wolfssl -rsa -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For ECC sign/ver: wolfssl -ecc -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For ED25519 sign/ver: wolfssl -ed25519 -help");

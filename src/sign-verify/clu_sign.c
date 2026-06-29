@@ -25,42 +25,58 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/genkey/clu_genkey.h>  /* for xmss callback functions */
 
-/* Fallback for older wolfSSL builds that have HAVE_DILITHIUM but predate the
- * PEM size constants. DILITHIUM_LEVEL5_BOTH_KEY_PEM_SIZE (10267) is the
- * largest possible key PEM size and is used as a safe upper bound. */
-#ifdef HAVE_DILITHIUM
-#ifndef DILITHIUM_MAX_BOTH_KEY_PEM_SIZE
-#define DILITHIUM_MAX_BOTH_KEY_PEM_SIZE 10267
-#endif
-#endif
+#include <limits.h>
+
+/* Upper bound on DER size from PEM key conversion before heap allocation.
+ * 65536 is a conservative ceiling that covers all supported key types going
+ * through wolfCLU_KeyPemToDer (e.g. DILITHIUM_MAX_BOTH_KEY_PEM_SIZE is 10267
+ * for Dilithium keys).  Tighten with a per-algorithm cap if needed. */
+#ifndef WOLFCLU_MAX_KEY_PEM_DER_SZ
+#define WOLFCLU_MAX_KEY_PEM_DER_SZ 65536
+#endif /* WOLFCLU_MAX_KEY_PEM_DER_SZ */
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
 int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
     int ret = 0;
     byte* der = NULL;
-    const unsigned char* keyBuf = *pkeyBuf;
+    const unsigned char* keyBuf;
+
+    if (pkeyBuf == NULL || *pkeyBuf == NULL || pkeySz <= 0) {
+        return BAD_FUNC_ARG;
+    }
+    keyBuf = *pkeyBuf;
 
     if (pubIn == 0) {
         ret = wc_KeyPemToDer(keyBuf, pkeySz, NULL, 0, NULL);
         if (ret > 0) {
             int derSz = ret;
-            der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (der == NULL) {
-                wolfCLU_Log(WOLFCLU_L0, "Failed to allocate memory for DER");
-                ret = MEMORY_E;
+            if (derSz > WOLFCLU_MAX_KEY_PEM_DER_SZ) {
+                /* Leave *pkeyBuf intact for the caller to free, matching the
+                 * other error paths' ownership contract (see header). */
+                wolfCLU_LogError("PEM private key DER size exceeds limit");
+                ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                ret = wc_KeyPemToDer(keyBuf, pkeySz, der, derSz, NULL);
-                if (ret > 0) {
-                    /* replace incoming pkeyBuf with new der buf */
-                    XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                    *pkeyBuf = der;
+                der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                if (der == NULL) {
+                    wolfCLU_LogError("Failed to allocate memory for DER");
+                    ret = MEMORY_E;
                 }
                 else {
-                    wolfCLU_Log(WOLFCLU_L0, "Failed to convert PEM to DER");
-                    /* failure, so cleanup */
-                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    ret = wc_KeyPemToDer(keyBuf, pkeySz, der, derSz, NULL);
+                    if (ret > 0) {
+                        /* *pkeyBuf still points to the original PEM alloc here
+                         * (pkeySz is its size); 'der' is the new DER alloc. */
+                        wolfCLU_ForceZero(*pkeyBuf, (unsigned int)pkeySz);
+                        XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        *pkeyBuf = der;
+                    }
+                    else {
+                        wolfCLU_LogError("Failed to convert PEM to DER");
+                        /* failure, so cleanup */
+                        XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    }
                 }
             }
         }
@@ -69,20 +85,28 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
         ret = wc_PubKeyPemToDer(keyBuf, pkeySz, NULL, 0);
         if (ret > 0) {
             int derSz = ret;
-            der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (der == NULL) {
-                ret = MEMORY_E;
+            if (derSz > WOLFCLU_MAX_KEY_PEM_DER_SZ) {
+                wolfCLU_LogError("PEM public key DER size exceeds limit");
+                ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                ret = wc_PubKeyPemToDer(keyBuf, pkeySz, der, derSz);
-                if (ret > 0) {
-                    /* replace incoming pkeyBuf with new der buf */
-                    XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                    *pkeyBuf = der;
+                der = (byte*)XMALLOC(derSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                if (der == NULL) {
+                    ret = MEMORY_E;
                 }
                 else {
-                    /* failure, so cleanup */
-                    XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    ret = wc_PubKeyPemToDer(keyBuf, pkeySz, der, derSz);
+                    if (ret > 0) {
+                        /* replace incoming pkeyBuf with new der buf */
+                        wolfCLU_ForceZero(*pkeyBuf, (unsigned int)pkeySz);
+                        XFREE(*pkeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        *pkeyBuf = der;
+                    }
+                    else {
+                        wolfCLU_LogError(
+                                "Failed to convert public key PEM to DER");
+                        XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                    }
                 }
             }
         }
@@ -317,7 +341,7 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     }
 
     if (keyBuf!= NULL) {
-        wolfCLU_ForceZero(keyBuf, privFileSz);
+        wolfCLU_ForceZero(keyBuf, (unsigned int)privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (outBuf!= NULL) {
@@ -494,7 +518,7 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     }
 
     if (keyBuf!= NULL) {
-        wolfCLU_ForceZero(keyBuf, privFileSz);
+        wolfCLU_ForceZero(keyBuf, (unsigned int)privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (outBuf!= NULL) {
@@ -659,7 +683,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     }
 
     if (keyBuf!= NULL) {
-        wolfCLU_ForceZero(keyBuf, privFileSz);
+        wolfCLU_ForceZero(keyBuf, (unsigned int)privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (outBuf!= NULL) {
@@ -679,7 +703,7 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
 int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* privKey,
                                 int inForm)
 {
-#ifdef HAVE_DILITHIUM
+#if defined(HAVE_DILITHIUM)
     int ret = 0;
     int privFileSz = 0;
     word32 index = 0;
@@ -705,7 +729,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     dilithium_key key[1];
 #endif
 
-    /* zero before init for defensive security */
     XMEMSET(&rng, 0, sizeof(rng));
     XMEMSET(key, 0, sizeof(dilithium_key));
 
@@ -770,7 +793,14 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&privBuf, privFileSz, 0);
         if (ret < 0) {
-            wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
+                WOLFCLU_LOG(WOLFCLU_L0,
+                    "No PEM header found, treating as DER.");
+                ret = 0;
+            }
+            else {
+                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            }
         }
         else {
             /* update privBuf and privFileSz with the converted DER data */
@@ -827,7 +857,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
         XFCLOSE(privKeyFile);
 
     if (privBuf != NULL) {
-        wolfCLU_ForceZero(privBuf, privBufSz);
+        wolfCLU_ForceZero(privBuf, (unsigned int)privBufSz);
         XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
@@ -836,9 +866,8 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     }
 
     wc_dilithium_free(key);
-    /* rng was zeroed via XMEMSET before wc_InitRng, so wc_FreeRng is safe
-     * even if wc_InitRng failed: wolfSSL checks rng->drbg != NULL internally
-     * before freeing any resources. */
+    /* rng zeroed via XMEMSET before wc_InitRng, so even if wc_InitRng
+     * failed: wolfSSL checks rng->drbg internally before freeing. */
     wc_FreeRng(&rng);
 #ifdef WOLFSSL_SMALL_STACK
     XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
