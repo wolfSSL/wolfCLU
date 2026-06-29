@@ -19,9 +19,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#ifndef WOLFCLU_SIGN_H
+#define WOLFCLU_SIGN_H
+
 #ifndef WOLFSSL_USER_SETTINGS
 #include <wolfssl/options.h>
 #endif
+/* Pulls in the WOLFCLU_HAVE_MLDSA detection block and the
+ * DILITHIUM_MAX_BOTH_KEY_PEM_SIZE fallback; kept in one place there to
+ * avoid a second copy going stale here. */
+#include <wolfclu/clu_header_main.h>
 #ifdef HAVE_ED25519
     #include <wolfssl/wolfcrypt/ed25519.h>
 #endif
@@ -34,6 +41,10 @@
 #endif
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
+    #ifdef WOLFCLU_HAVE_MLDSA
+        /* Accesses pubKeySet directly. Fails if wolfSSL renames it. */
+        #define WOLFCLU_MLDSA_PUB_KEY_IS_SET(k) ((k)->pubKeySet)
+    #endif
 #endif
 #ifdef WOLFSSL_HAVE_XMSS
     #include <wolfssl/wolfcrypt/wc_xmss.h>
@@ -58,4 +69,20 @@ int wolfCLU_sign_data_dilithium (byte*, char*, word32, char*, int);
 int wolfCLU_sign_data_xmss(byte*, char*, int, char*);
 int wolfCLU_sign_data_xmssmt(byte*, char*, int, char*);
 
+/**
+ * convert a PEM key buffer to DER in place.
+ *
+ * Ownership contract: on success, *pkeyBuf is freed and repointed to the
+ * newly allocated DER buffer. On any error path, *pkeyBuf is left untouched
+ * for the caller to free.
+ *
+ * @param pkeyBuf   in/out pointer to the key buffer
+ * @param pkeySz    size of the input PEM buffer
+ * @param pubIn     1 if pkeyBuf holds a public key, 0 for private
+ *
+ * return the DER length (a positive int) on success, negative error code
+ * on failure
+ */
 int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn);
+
+#endif /* WOLFCLU_SIGN_H */

@@ -114,6 +114,20 @@ extern "C" {
 
 #include <wolfssl/wolfcrypt/coding.h>
 
+#ifdef HAVE_DILITHIUM
+    #include <wolfssl/wolfcrypt/dilithium.h>
+    /* Detect ML-DSA API on platforms without configure (e.g. Windows). */
+    #if !defined(WOLFCLU_HAVE_MLDSA) && !defined(WOLFCLU_MLDSA_CHECKED) && \
+            (defined(DILITHIUM_MAX_BOTH_KEY_PEM_SIZE) || \
+             defined(WOLFSSL_HAVE_MLDSA))
+        #define WOLFCLU_HAVE_MLDSA
+    #endif
+    #if defined(HAVE_DILITHIUM) && !defined(DILITHIUM_MAX_BOTH_KEY_PEM_SIZE)
+        /* Older wolfSSL Dilithium builds may predate this constant. */
+        #define DILITHIUM_MAX_BOTH_KEY_PEM_SIZE 10267
+    #endif
+#endif
+
 #define BLOCK_SIZE 16384
 #define MEGABYTE (1024*1024)
 #define KILOBYTE 1024
@@ -608,10 +622,14 @@ int wolfCLU_PKCS8(int argc, char** argv);
  */
 int wolfCLU_PKCS12(int argc, char** argv);
 
+
 /**
- * @brief function to write 0 at each index of 'mem' passed in
+ * @brief read an entire file into a newly XMALLOC'd buffer, capped at maxSz.
+ * On success *outBuf and *outSz are set; caller frees *outBuf with XFREE
+ * (DYNAMIC_TYPE_TMP_BUFFER). Returns WOLFCLU_SUCCESS or an error code.
  */
-void wolfCLU_ForceZero(void* mem, unsigned int len);
+int wolfCLU_ReadFileToBuffer(const char* path, long maxSz, byte** outBuf,
+        int* outSz);
 
 /**
  * @brief example client

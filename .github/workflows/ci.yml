@@ -21,6 +21,8 @@ jobs:
           - '--enable-wolfclu --enable-smallstack'
           - '--enable-wolfclu --enable-experimental --enable-dilithium'
           - '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium'
+          - '--enable-wolfclu --enable-experimental --enable-mldsa'
+          - '--enable-wolfclu --enable-smallstack --enable-experimental --enable-mldsa'
           - '--enable-all'
         sanitize: ['CC="cc -fsanitize=address"']
         include:

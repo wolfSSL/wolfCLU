@@ -234,7 +234,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
         }
     }
 
-    wolfCLU_ForceZero(password, MAX_PASSWORD_SIZE);
+    wc_ForceZero(password, MAX_PASSWORD_SIZE);
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_EVP_PKEY_free(pkey);

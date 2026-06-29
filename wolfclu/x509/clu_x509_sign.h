@@ -23,18 +23,32 @@
 #ifndef WOLFCLU_X509_SIGN_H
 #define WOLFCLU_X509_SIGN_H
 
-typedef struct WOLFCLU_CERT_SIGN WOLFCLU_CERT_SIGN; 
+#ifndef WOLFCLU_NO_FILESYSTEM
+#include <wolfclu/x509/clu_mldsa.h>
+#endif /* WOLFCLU_NO_FILESYSTEM */
+
+#include <wolfssl/wolfcrypt/asn_public.h>
+
+typedef struct WOLFCLU_CERT_SIGN WOLFCLU_CERT_SIGN;
+
+/* Copy val (valLen bytes, need not be NUL-terminated) into the CertName field
+ * matching nid (C/ST/L/O/OU/CN/emailAddress). Unrecognized nids are ignored.
+ * Returns WOLFCLU_FATAL_ERROR if val is too large. */
+int wolfCLU_SetCertNameFieldByNid(CertName* dst, int nid, const char* val,
+        int valLen);
 
 WOLFCLU_CERT_SIGN* wolfCLU_CertSignNew(void);
 int wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign);
 void wolfCLU_CertSignSetSerial(WOLFCLU_CERT_SIGN* csign, WOLFSSL_BIO* s);
-void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
+int wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
         void* key, int keyType);
+int wolfCLU_CertSignHasKey(WOLFCLU_CERT_SIGN* csign);
 int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         WOLFSSL_BIO *bioAltSubjPubKey, WOLFSSL_BIO *bioSubjKey, WOLFSSL_X509 *caCert,
         const char *subject, const char *outFileName, int outForm);
 void wolfCLU_CertSignSetHash(WOLFCLU_CERT_SIGN* csign,
         enum wc_HashType hashType);
+int wolfCLU_CertSignSetOutForm(WOLFCLU_CERT_SIGN* csign, int outForm);
 void wolfCLU_CertSignSetDate(WOLFCLU_CERT_SIGN* csign, int d);
 int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509);
 WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect);
@@ -44,7 +58,6 @@ void wolfCLU_CertSignSetExt(WOLFCLU_CERT_SIGN* csign, char* ext);
 #ifdef HAVE_CRL
 void wolfCLU_CertSignSetCrl(WOLFCLU_CERT_SIGN* csign, char* crl, char* crlDir,
         int crlNumber);
-#endif
+#endif /* HAVE_CRL */
 
 #endif /* WOLFCLU_X509_SIGN_H */
-

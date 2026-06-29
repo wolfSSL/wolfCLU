@@ -95,7 +95,7 @@ static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
         }
 
         if (der != NULL) {
-            wolfCLU_ForceZero(der, derSz);
+            wc_ForceZero(der, derSz);
             XFREE(der, NULL, DYNAMIC_TYPE_OPENSSL);
         }
     }
@@ -337,7 +337,7 @@ static int wolfCLU_pKeyToKeyECC(WOLFSSL_EVP_PKEY* pkey, unsigned char** out,
     }
 
     if (ret < 0 && der != NULL) {
-        wolfCLU_ForceZero(der, derSz);
+        wc_ForceZero(der, derSz);
         XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         *out = NULL;
     }

@@ -306,7 +306,7 @@ static int wolfCLU_dgstHmac(WOLFSSL_BIO* dataBio, char* hmacKey,
     /* wolfCLU_hexToBin allocates keyBin with a NULL heap hint; zero the
      * key material and free it with the matching hint. */
     if (keyBin != NULL) {
-        wolfCLU_ForceZero(keyBin, keyBinSz);
+        wc_ForceZero(keyBin, keyBinSz);
         XFREE(keyBin, NULL, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
@@ -437,17 +437,18 @@ static int wolfCLU_dgstSignVerify(WOLFSSL_BIO* dataBio, WOLFSSL_BIO* pubKeyBio,
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            byte encodedDigest[MAX_DER_DIGEST_SZ];
+            byte encodedDigest[MAX_DER_DIGEST_SZ + 256];
             enc = wc_EncodeSignature(encodedDigest, digest, digestSz, oid);
-            if (enc == 0) {
+            if (enc == 0 || enc > (word32)MAX_DER_DIGEST_SZ) {
                 wolfCLU_LogError("Unable to DER-encode digest");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
                 XMEMCPY(digest, encodedDigest, enc); /* copy before zero */
                 digestSz = enc;
+                wc_ForceZero(digest + enc, (word32)MAX_DER_DIGEST_SZ - enc);
             }
-            wolfCLU_ForceZero(encodedDigest, sizeof(encodedDigest));
+            wc_ForceZero(encodedDigest, sizeof(encodedDigest));
         }
     }
 #endif

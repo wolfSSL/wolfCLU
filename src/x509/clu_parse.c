@@ -79,7 +79,7 @@ int wolfCLU_printDer(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
     }
 
     if (pem != NULL) {
-        wolfCLU_ForceZero(pem, pemSz);
+        wc_ForceZero(pem, pemSz);
         XFREE(pem, NULL, heapType);
     }
 

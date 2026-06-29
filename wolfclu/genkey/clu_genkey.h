@@ -37,6 +37,10 @@
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
 #endif
+/* MlDsaKey is forward-declared here (opaque struct pointer) regardless of
+ * HAVE_DILITHIUM so wolfCLU_genKey_ML_DSA's prototype below is always
+ * declarable; its gate for actual availability is WOLFCLU_HAVE_MLDSA. */
+#include <wolfssl/wolfcrypt/asn_public.h>
 #ifdef WOLFSSL_HAVE_XMSS
     #include <wolfssl/wolfcrypt/wc_xmss.h>
 #endif
@@ -125,18 +129,20 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
 /**
  * generate a ML-DSA key
- * 
+ *
  * @param rng       the random number generator
- * @param fName     name of the file to write to
+ * @param fName     name of the file to write to, may be NULL if outKey set
  * @param directive which key to output, public or private, maybe both
  * @param fmt       output format (PEM/DER)
  * @param level     the ML-DSA level 2, 3 or 5
  * @param withAlg   Whether to use SubjectPublicKeyInfo format
+ * @param outKey    if non-NULL, returns the generated key; caller frees it
  *
  * return WOLFCLU_SUCCESS on success
 */
 int wolfCLU_genKey_ML_DSA(WC_RNG* rng, const char* fName, int directive,
-                            int fmt, int keySz, int level, int withAlg);
+                            int fmt, int keySz, int level, int withAlg,
+                            MlDsaKey** outKey);
 
 /**
  * call back function of read/write a XMSS private key
