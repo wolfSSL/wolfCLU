@@ -109,7 +109,7 @@ int wolfCLU_CASetup(int argc, char** argv)
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "", ca_options,
-                    &longIndex )) != WOLFCLU_FATAL_ERROR) {
+                    &longIndex )) != END_OF_ARGS) {
 
         switch (option) {
             case WOLFCLU_INFILE:
@@ -217,8 +217,9 @@ int wolfCLU_CASetup(int argc, char** argv)
                 return WOLFCLU_SUCCESS;
 
             case ARG_FOUND_TWICE:
-                wolfCLU_LogError("Arg Found Twice");
-                return WOLFCLU_FATAL_ERROR;
+                wolfCLU_LogError("Found duplicate argument");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
 
             case ':':
             case '?':

@@ -158,7 +158,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
                 break;
 
             case ARG_FOUND_TWICE:
-                wolfCLU_LogError("Arg %s found twice.", argv[optind]);
+                wolfCLU_LogError("Found duplicate argument");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
 

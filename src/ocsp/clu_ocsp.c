@@ -913,8 +913,12 @@ int wolfCLU_OcspSetup(int argc, char** argv)
     opterr = 0;
     optind = 0;
 
-    while ((option = wolfCLU_GetOpt(argc, argv, "", ocsp_options, &longIndex)) != -1) {
+    while ((option = wolfCLU_GetOpt(argc, argv, "", ocsp_options, &longIndex)) != END_OF_ARGS) {
         switch (option) {
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                return WOLFCLU_FATAL_ERROR;
+
             case WOLFCLU_OCSP_HELP:
                 wolfCLU_OcspHelp();
                 return WOLFCLU_SUCCESS;

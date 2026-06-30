@@ -138,6 +138,9 @@ enum {
     WOLFCLU_BASE64ENC,
     WOLFCLU_BASE64DEC,
     WOLFCLU_BLAKE    ,
+    WOLFCLU_LEVEL,
+    WOLFCLU_HEIGHT,
+    WOLFCLU_LAYER,
 };
 
 /* algos */

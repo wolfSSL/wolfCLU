@@ -232,9 +232,13 @@ int wolfCLU_setup(int argc, char** argv, char action)
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   crypt_options, &longIndex )) != -1) {
+                   crypt_options, &longIndex )) != END_OF_ARGS) {
 
         switch (option) {
+        case ARG_FOUND_TWICE:
+            wolfCLU_LogError("Found duplicate argument");
+            return WOLFCLU_FATAL_ERROR;
+
         case WOLFCLU_PASSWORD_SOURCE:
             passwordSz = keySize;
             ret = wolfCLU_GetPassword((char*)pwdKey, &passwordSz, optarg);

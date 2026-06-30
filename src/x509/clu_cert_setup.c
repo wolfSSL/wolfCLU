@@ -249,7 +249,7 @@ int wolfCLU_certSetup(int argc, char** argv)
                 break;
 
             case ARG_FOUND_TWICE:
-                wolfCLU_LogError("Arg %s found twice.", argv[optind]);
+                wolfCLU_LogError("Found duplicate argument");
                 return WOLFCLU_FATAL_ERROR;
 
             case ':':

@@ -76,8 +76,12 @@ int wolfCLU_PKCS7(int argc, char** argv)
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   pkcs7_options, &longIndex )) != -1) {
+                   pkcs7_options, &longIndex )) != END_OF_ARGS) {
         switch (option) {
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                return WOLFCLU_FATAL_ERROR;
+
             case WOLFCLU_CERTFILE:
                 printCerts = 1;
                 break;

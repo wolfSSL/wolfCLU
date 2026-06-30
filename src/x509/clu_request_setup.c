@@ -66,7 +66,7 @@ static const struct option req_options[] = {
     {"-nodes",     no_argument,       0, WOLFCLU_NODES },
     {"-h",         no_argument,       0, WOLFCLU_HELP },
     {"-help",      no_argument,       0, WOLFCLU_HELP },
-&
+
     {0, 0, 0, 0} /* terminal element */
 };
 
@@ -606,7 +606,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "", req_options,
-                    &longIndex )) != -1) {
+                    &longIndex )) != END_OF_ARGS) {
 
         switch (option) {
             case WOLFCLU_EXTENSIONS:
@@ -776,7 +776,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 break;
 
             case ARG_FOUND_TWICE:
-                wolfCLU_LogError("Arg %s found twice", argv[optind]);
+                wolfCLU_LogError("Found duplicate argument");
                 return WOLFCLU_FATAL_ERROR;
 
             case ':':

@@ -43,6 +43,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
     int     ret = WOLFCLU_SUCCESS;
     int     outSz;
     int     handled = 0;
+    int     isCoding = 0;       /* base64 enc/dec output is raw, not hex */
     enum wc_HashType hashType = WC_HASH_TYPE_NONE;
     WOLFSSL_BIO* tmp;
 
@@ -204,6 +205,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 handled = 1;
+                isCoding = 1;
             }
         }
 #endif /* WOLFSSL_BASE64_ENCODE */
@@ -227,6 +229,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 handled = 1;
+                isCoding = 1;
             }
         }
     }
@@ -251,10 +254,19 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
             }
             else {
                 wolfSSL_BIO_set_fp(tmp, stdout, BIO_NOCLOSE);
-                for (i = 0; i < outSz; i++) {
-                    wolfSSL_BIO_printf(tmp, "%02x", output[i]);
+                if (isCoding) {
+                    /* base64 enc/dec output is text/raw bytes, not a digest */
+                    if (wolfSSL_BIO_write(tmp, output, outSz) != outSz) {
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                 }
-                wolfSSL_BIO_printf(tmp, "\n");
+                else {
+                    /* write hash digest as hex */
+                    for (i = 0; i < outSz; i++) {
+                        wolfSSL_BIO_printf(tmp, "%02x", output[i]);
+                    }
+                    wolfSSL_BIO_printf(tmp, "\n");
+                }
                 wolfSSL_BIO_free(tmp);
             }
         }

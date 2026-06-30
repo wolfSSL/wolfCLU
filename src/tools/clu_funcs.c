@@ -1036,8 +1036,12 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
         optind = 0;
         opterr = 0; /* do not print out unknown options */
         while ((option = wolfCLU_GetOpt(argc, argv, "",
-                       crypt_algo_options, &longIndex )) != -1) {
+                       crypt_algo_options, &longIndex )) != END_OF_ARGS) {
             switch (option) {
+                case ARG_FOUND_TWICE:
+                    wolfCLU_LogError("Found duplicate argument");
+                    return WOLFCLU_FATAL_ERROR;
+
                 /* AES */
                 case WOLFCLU_AES128CTR:
                     XSTRNCPY(name, WOLFCLU_AES128CTR_NAME,
@@ -1753,7 +1757,12 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
                      * hand; any change here to how/when optarg is bound (e.g.
                      * adding --opt=value handling, optional_argument support, or
                      * argv permutation) must be reflected there too. */
-                    optarg=argv[index+1];
+                    if (index + 1 < argc) {
+                        optarg = argv[index+1];
+                    }
+                    else {
+                        optarg = NULL;
+                    }
                 }
                 return long_options[i].val;
             }

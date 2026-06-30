@@ -116,7 +116,7 @@ int wolfCLU_Server(int argc, char** argv)
     optind = 0;
 
     while ((option = wolfCLU_GetOpt(argc, argv, "", server_options, &longIndex))
-                    != -1) {
+                    != END_OF_ARGS) {
         switch (option) {
             case WOLFCLU_PORT:
                 if (ret == WOLFCLU_SUCCESS) {
@@ -189,7 +189,7 @@ int wolfCLU_Server(int argc, char** argv)
                 goto exit;
 
             case ARG_FOUND_TWICE:
-                wolfCLU_LogError("Arg %s found twice", argv[optind]);
+                wolfCLU_LogError("Found duplicate argument");
                 return WOLFCLU_FATAL_ERROR;
         }
     }

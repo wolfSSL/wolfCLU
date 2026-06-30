@@ -34,26 +34,37 @@ class HashCommandTest(unittest.TestCase):
                 if "disable-filesystem" in f.read():
                     raise unittest.SkipTest("filesystem support disabled")
 
-    def test_sha_base64enc(self):
-        r = run_wolfssl("-hash", "sha", "-in", CERT_FILE, "-base64enc")
+    def test_sha_(self):
+        r = run_wolfssl("-hash", "-sha", "-in", CERT_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), _read_expected("sha-expect.hex"))
 
     def test_sha256(self):
-        r = run_wolfssl("-hash", "sha256", "-in", CERT_FILE)
+        r = run_wolfssl("-hash", "-sha256", "-in", CERT_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), _read_expected("sha256-expect.hex"))
 
     def test_sha384(self):
-        r = run_wolfssl("-hash", "sha384", "-in", CERT_FILE)
+        r = run_wolfssl("-hash", "-sha384", "-in", CERT_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), _read_expected("sha384-expect.hex"))
 
     def test_sha512(self):
-        r = run_wolfssl("-hash", "sha512", "-in", CERT_FILE)
+        r = run_wolfssl("-hash", "-sha512", "-in", CERT_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), _read_expected("sha512-expect.hex"))
 
+    def test_base64enc(self):
+        r = run_wolfssl("-hash", "-base64enc", "-in", CERT_FILE)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), _read_expected("base64enc-expect.b64"))
+
+    def test_base64dec(self):
+        r = run_wolfssl("-hash", "-base64dec", "-in", os.path.join(HASH_DIR,
+                                                        "base64enc-expect.b64"))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(CERT_FILE) as f:
+            self.assertEqual(r.stdout.strip(), f.read().strip())
 
 class HashShortcutTest(unittest.TestCase):
     """Tests using the shortcut subcommands (md5, sha256, etc.)."""
