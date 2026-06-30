@@ -1258,7 +1258,6 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
     while (1) {
         /* set end to 1 if last option is reached */
         if (long_options[i].name == 0 ) {
-            wolfCLU_LogError("%d\n", i);
             return END_OF_ARGS;
         }
         else {

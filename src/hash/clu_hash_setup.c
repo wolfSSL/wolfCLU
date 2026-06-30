@@ -68,7 +68,7 @@ static void wolfCLU_hashHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
     WOLFCLU_LOG(WOLFCLU_L0, "\nUSAGE: wolfssl -hash <-algorithm> -in <file to hash>");
     WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -hash sha -in <some file>\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -hash -sha -in <some file>\n");
 }
 
 static const struct option hash_options[] = {
@@ -227,7 +227,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 if (optarg != NULL)
                     size = XATOI(optarg);
                 else
-                    size = BLAKE2B_BLOCKBYTES;
+                    size = BLAKE2B_OUTBYTES;
                 if (size < 1 || size > 64) {
                     wolfCLU_LogError("black2b size must be between 1-64");
                     ret = WOLFCLU_FATAL_ERROR;

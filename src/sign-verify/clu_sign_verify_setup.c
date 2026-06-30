@@ -297,7 +297,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
 
             case WOLFCLU_INKEY:
                 priv = optarg;
-                if (access(priv, F_OK) == -1) {
+                if (priv == NULL || access(priv, F_OK) == -1) {
                     wolfCLU_LogError("Inkey file %s did not exist. Please "
                             "check your options.", priv);
                     ret = INPUT_FILE_ERROR;
@@ -306,7 +306,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
 
             case WOLFCLU_INFILE:
                 in = optarg;
-                if (access(in, F_OK) == -1) {
+                if (in == NULL || access(in, F_OK) == -1) {
                     wolfCLU_LogError("In file did not exist. Please check "
                             "your options.");
                     ret = INPUT_FILE_ERROR;
@@ -322,7 +322,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
 
             case WOLFCLU_SIGFILE:
                 sig = optarg;
-                if (access(sig, F_OK) == -1) {
+                if (sig == NULL || access(sig, F_OK) == -1) {
                     wolfCLU_LogError("Signature file did not exist. Please "
                             "check your options.");
                     ret = INPUT_FILE_ERROR;
