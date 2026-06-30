@@ -26,6 +26,69 @@
 #include <wolfclu/x509/clu_cert.h>  /* argument checking */
 
 #ifndef WOLFCLU_NO_FILESYSTEM
+
+static void wolfCLU_genKeyHelp(void)
+{
+    int i;
+
+    const char* keysother[] = { /* list of acceptable key types */
+        "KEYS: "
+    #ifndef NO_RSA
+        ,"rsa"
+    #endif
+    #ifdef HAVE_ED25519
+        ,"ed25519"
+    #endif
+    #ifdef HAVE_ECC
+        ,"ecc"
+    #endif
+    #ifdef HAVE_DILITHIUM
+        ,"ml-dsa"
+        ,"dilithium"
+    #endif
+    #ifdef WOLFSSL_HAVE_XMSS
+        ,"xmss"
+        ,"xmssmt"
+    #endif
+        };
+
+        WOLFCLU_LOG(WOLFCLU_L0, "Available keys with current configure settings:");
+        for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
+            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
+        }
+    WOLFCLU_LOG(WOLFCLU_L0, "\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\ngenkey USAGE:\nwolfssl -genkey <keytype> -size(optional) <bits> "
+           "-out <filename> -outform <PEM or DER> -output <PUB/PRIV/KEYPAIR> \n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -genkey rsa -size 2048 -out mykey -outform der "
+           " -output KEYPAIR");
+#ifdef HAVE_DILITHIUM
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
+           "[2|3|5] -out mykey -outform der -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
+           "[2|3|5] -out mykey -outform pem -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
+           "[2|3|5] -out mykey -outform der -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
+           "[2|3|5] -out mykey -outform pem -output KEYPAIR");
+#endif
+#ifdef WOLFSSL_HAVE_XMSS
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmss -height [10|16|20] -out mykey -outform raw"
+                " -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmssmt -height [20|40|60] -layer [2|4|8|3|6|12]"
+                "  -out mykey -outform raw -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "XMSS key file name must be something like \"XMSS-SHA2_10_256\""
+                "\nXMSS/XMSS^MT parametaers are determined by file name when signing");
+#endif
+    WOLFCLU_LOG(WOLFCLU_L0,
+           "\n\nThe above command would output the files: mykey.priv "
+           " and mykey.pub\nChanging the -output option to just PRIV would only"
+           "\noutput the mykey.priv and using just PUB would only output"
+           "\nmykey.pub\n");
+}
+
+
 static const struct option genkey_options[] = {
     {"-out",      required_argument, 0, WOLFCLU_OUTFILE   },
     {"-outform",  required_argument, 0, WOLFCLU_OUTFORM   },

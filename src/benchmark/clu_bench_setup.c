@@ -62,6 +62,63 @@ enum {
     WOLFCLU_BENCH_COUNT /* number of available tests, also terminal index */
 };
 
+/*
+ * Benchmark Usage
+ */
+static void wolfCLU_benchHelp(void)
+{
+    int i;
+
+    /* benchmark options */
+    const char* algsother[] = {      /* list of acceptable algorithms */
+        "ALGS: "
+#ifndef NO_AES
+        , "aes-cbc"
+#endif
+#ifdef WOLFSSL_AES_COUNTER
+        , "aes-ctr"
+#endif
+#ifndef NO_DES3
+        , "3des"
+#endif
+#ifdef HAVE_CAMELLIA
+        , "camellia"
+#endif
+#ifndef NO_MD5
+        , "md5"
+#endif
+#ifndef NO_SHA
+        , "sha"
+#endif
+#ifndef NO_SHA256
+        , "sha256"
+#endif
+#ifdef WOLFSSL_SHA384
+        , "sha384"
+#endif
+#ifdef WOLFSSL_SHA512
+        , "sha512"
+#endif
+#ifdef HAVE_BLAKE2B
+        , "blake2b"
+#endif
+    };
+
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable tests: (-a to test all)");
+    WOLFCLU_LOG(WOLFCLU_L0, "Available tests with current configure settings:");
+    for(i = 0; i < (int) sizeof(algsother)/(int) sizeof(algsother[0]); i++) {
+        WOLFCLU_LOG(WOLFCLU_L0, "%s", algsother[i]);
+    }
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
+            /* encryption/decryption help lists options */
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "USAGE: wolfssl -bench [alg] -time [time in seconds [1-10]]"
+           "       or\n       wolfssl -bench -time 10 -all (to test all)");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -bench aes-cbc -time 10"
+           " -in encryptedfile.txt -out decryptedfile.txt\n");
+}
+
 static const struct option bench_options[] = {
     {"-time", required_argument, 0, WOLFCLU_TIME},
     {"-all",  no_argument,       0, WOLFCLU_ALL },

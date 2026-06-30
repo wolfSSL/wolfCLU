@@ -27,6 +27,50 @@
 #include <wolfssl/wolfcrypt/sha512.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
+static void wolfCLU_hashHelp(void)
+{
+    int i;
+
+    /* hash options */
+    const char* algsenc[] = {        /* list of acceptable algorithms */
+    "Algorithms: "
+#ifndef NO_MD5
+        ,"md5"
+#endif
+#ifndef NO_SHA
+        ,"sha"
+#endif
+#ifndef NO_SHA256
+        ,"sha256"
+#endif
+#ifdef WOLFSSL_SHA384
+        ,"sha384"
+#endif
+#ifdef WOLFSSL_SHA512
+        ,"sha512"
+#endif
+#ifdef HAVE_BLAKE2B
+        ,"blake2b"
+#endif
+#ifndef NO_CODING
+    #ifdef WOLFSSL_BASE64_ENCODE
+        ,"base64enc"
+    #endif
+        ,"base64dec"
+#endif
+        };
+
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable algorithms with current configure settings:");
+    for (i = 0; i < (int) sizeof(algsenc)/(int) sizeof(algsenc[0]); i++) {
+        WOLFCLU_LOG(WOLFCLU_L0, "%s", algsenc[i]);
+    }
+            /* encryption/decryption help lists options */
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nUSAGE: wolfssl -hash <-algorithm> -in <file to hash>");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -hash sha -in <some file>\n");
+}
+
 static const struct option hash_options[] = {
     {"-in",   required_argument, 0, WOLFCLU_INFILE  },
     {"-out",  required_argument, 0, WOLFCLU_OUTFILE },

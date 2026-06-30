@@ -33,6 +33,28 @@
 #include <wolfssl/wolfcrypt/types.h>
 
 #if defined(WOLFSSL_CERT_REQ) && !defined(WOLFCLU_NO_FILESYSTEM)
+static void wolfCLU_certgenHelp(void) {
+    WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-key public key to put into certificate request");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inform der or pem format for '-in'");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-outform der or pem format for '-out'");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to parse for certificate configuration");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-x509 generate self signed certificate");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-addext add an extension, ie \"subjectAltName=IP:192.168.1.2,DNS:example.com\"");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey generate the private key to use with req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey private key to use with req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-keyout file to output key to");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-subj use a specified subject name, ie O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-verify check the signature on the req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-text output human readable text of req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-noout do not print out the generated results");
+}
+
 static const struct option req_options[] = {
 
     {"-sha",       no_argument,       0, WOLFCLU_CERT_SHA   },

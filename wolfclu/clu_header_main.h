@@ -225,47 +225,6 @@ void wolfCLU_help(void);
  */
 void wolfCLU_verboseHelp(void);
 
-/*
- * encrypt help function
- */
-void wolfCLU_encryptHelp(void);
-
-/*
- * decrypt help function
- */
-void wolfCLU_decryptHelp(void);
-
-/*
- * hash help function
- */
-void wolfCLU_hashHelp(void);
-
-/*
- * benchmark help function
- */
-void wolfCLU_benchHelp(void);
-
-/*
- * genkey help function
- */
-void wolfCLU_genKeyHelp(void);
-
-/*
- * sign help function
- */
-void wolfCLU_signHelp(int);
-
-/*
- * verify help function
- */
-void wolfCLU_verifyHelp(int);
-
-/*
- * certgen help function
- */
-void wolfCLU_certgenHelp(void);
-
-
 /* find algorithm for encryption/decryption
  *
  * @param name the whole line sent from user. Example: "aes-cbc-128"

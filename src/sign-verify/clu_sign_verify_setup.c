@@ -29,6 +29,185 @@
 #include <wolfclu/x509/clu_cert.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
+static void wolfCLU_verifyHelp(int keyType) {
+    int i;
+    const char* keysother[] = { /* list of acceptable key types */
+        "KEYS: "
+        #ifndef NO_RSA
+        ,"rsa"
+        #endif
+        #ifdef HAVE_ED25519
+        ,"ed25519"
+        #endif
+        #ifdef HAVE_ECC
+        ,"ecc"
+        #endif
+        #ifdef HAVE_DILITHIUM
+        ,"ml-dsa"
+        ,"dilithium"
+        #endif
+        #ifdef WOLFSSL_HAVE_XMSS
+        ,"xmss"
+        ,"xmssmt"
+        #endif
+        };
+
+        WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable keys with current configure settings:");
+        for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
+            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
+        }
+
+        WOLFCLU_LOG(WOLFCLU_L0, "\n***************************************************************");
+        switch(keyType) {
+            #ifndef NO_RSA
+            case RSA_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "RSA Verify with Private Key:"
+                        "wolfssl -rsa -verify -inkey <priv_key>"
+                        " -sigfile <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                WOLFCLU_LOG(WOLFCLU_L0, "RSA Verify with Public Key"
+                       "wolfssl -rsa -verify -inkey <pub_key>"
+                       " -sigfile <filename> -out <filename> -pubin\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            #ifdef HAVE_DILITHIUM
+            case DILITHIUM_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "ML-DSA (Dilithium) Verify Usage:\n"
+                       "wolfssl -ml-dsa -verify -inkey <pub_key> -inform <pem|der>\n"
+                       "                -in <original_file> -sigfile <signature_file>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "  Verifies with the public key (.pub).\n"
+                       "  PEM keys require '-inform pem' (default is der).\n"
+                       "  'dilithium' is accepted as an alias for 'ml-dsa'.\n"
+                       "  (-pubin is not applicable; verification always uses the public key)\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "EXAMPLE:\n"
+                       "wolfssl -ml-dsa -verify -inkey ml-dsa-key-A.pub -inform pem\n"
+                       "                -in input.txt -sigfile input.sign\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            #ifdef HAVE_ED25519
+            case ED25519_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verifiy with Private Key"
+                       "wolfssl -ed25519 -verify -inkey "
+                       "<priv_key> -sigfile <filename> -in <original>"
+                       "\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verifiy with Public Key"
+                       "wolfssl -ed25519 -verify -inkey "
+                       "<pub_key> -sigfile <filename> -in <original> -pubin"
+                       "\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            #ifdef HAVE_ECC
+            case ECC_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "ECC Verify with Public Key"
+                       "wolfssl -ecc -verify -inkey <pub_key>"
+                       " -sigfile <signature> -in <original> -pubin\n");
+                break;
+            #endif
+            #ifdef WOLFSSL_HAVE_XMSS
+            case XMSS_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "XMSS Verify with Public Key"
+                       "wolfssl -xmss -verify -inkey <pub_key>"
+                       " -sigfile <signature> -in <original>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            case XMSSMT_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT Verify with Public Key"
+                       "wolfssl -xmssmt -verify -inkey <pub_key>"
+                       " -sigfile <signature> -in <original>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            default:
+                WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
+        }
+}
+
+static void wolfCLU_signHelp(int keyType)
+{
+    int i;
+    const char* keysother[] = { /* list of acceptable key types */
+        "KEYS: "
+        #ifndef NO_RSA
+        ,"rsa"
+        #endif
+        #ifdef HAVE_ED25519
+        ,"ed25519"
+        #endif
+        #ifdef HAVE_ECC
+        ,"ecc"
+        #endif
+        #ifdef HAVE_DILITHIUM
+        ,"ml-dsa"
+        ,"dilithium"
+        #endif
+        #ifdef WOLFSSL_HAVE_XMSS
+        ,"xmss"
+        ,"xmssmt"
+        #endif
+        };
+
+        WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable keys with current configure settings:");
+        for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
+            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
+        }
+
+        WOLFCLU_LOG(WOLFCLU_L0, "\n***************************************************************");
+        switch(keyType) {
+            #ifndef NO_RSA
+            case RSA_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "RSA Sign Usage: \nwolfssl -rsa -sign -inkey <priv_key>"
+                       " -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            #ifdef HAVE_DILITHIUM
+            case DILITHIUM_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "ML-DSA (Dilithium) Sign Usage:\n"
+                       "wolfssl -ml-dsa -sign -inkey <priv_key> -inform <pem|der>\n"
+                       "                -in <file_to_sign> -out <signature_file>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "  -level [2|3|5] is set at key generation, not here.\n"
+                       "  PEM keys require '-inform pem' (default is der).\n"
+                       "  'dilithium' is accepted as an alias for 'ml-dsa'.\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "EXAMPLE:\n"
+                       "wolfssl -ml-dsa -sign -inkey ml-dsa-key-A.priv -inform pem\n"
+                       "                -in input.txt -out input.sign\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            #ifdef HAVE_ED25519
+            case ED25519_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Sign Usage: \nwolfssl -ed25519 -sign -inkey "
+                       "<priv_key> -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            #ifdef HAVE_ECC
+            case ECC_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "ECC Sign Usage: \nwolfssl -ecc -sign -inkey <priv_key>"
+                       " -in <filename> -out <filename>\n");
+                break;
+            #endif
+            #ifdef WOLFSSL_HAVE_XMSS
+            case XMSS_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "XMSS Sign Usage: \nwolfssl -xmss -sign -inkey <priv_key>"
+                       " -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            case XMSSMT_SIG_VER:
+                WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT Sign Usage: \nwolfssl -xmssmt -sign -inkey <priv_key>"
+                       " -in <filename> -out <filename>\n");
+                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+                break;
+            #endif
+            default:
+                WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
+        }
+}
+
 static const struct option sign_verify_options[] = {
     {"-sign",    no_argument,       0, WOLFCLU_SIGN    },
     {"-verify",  no_argument,       0, WOLFCLU_VERIFY  },

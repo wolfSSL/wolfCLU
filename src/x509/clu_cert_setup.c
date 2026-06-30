@@ -31,6 +31,39 @@
 #define PEM_BEGIN_CERT "-----BEGIN CERTIFICATE-----"
 #define BEGIN_CERT_REQ "-----BEGIN CERTIFICATE REQUEST-----"
 
+void wolfCLU_certHelp(void)
+{
+    WOLFCLU_LOG(WOLFCLU_L0, "\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "-inform pem or der in format");
+    WOLFCLU_LOG(WOLFCLU_L0, "-in the file to read from");
+    WOLFCLU_LOG(WOLFCLU_L0, "-outform pem or der out format");
+    WOLFCLU_LOG(WOLFCLU_L0, "-out output file to write to");
+    WOLFCLU_LOG(WOLFCLU_L0, "-req input file is a CSR file");
+    WOLFCLU_LOG(WOLFCLU_L0, "-singkey a key for signing");
+    WOLFCLU_LOG(WOLFCLU_L0, "-* supported digests for signing");
+    WOLFCLU_LOG(WOLFCLU_L0, "-extfile config file");
+    WOLFCLU_LOG(WOLFCLU_L0, "-extensions section of the config file to use");
+    WOLFCLU_LOG(WOLFCLU_L0, "-noout no output");
+    WOLFCLU_LOG(WOLFCLU_L0, "-subject print out the subject name");
+    WOLFCLU_LOG(WOLFCLU_L0, "-issuer  print out the issuer name");
+    WOLFCLU_LOG(WOLFCLU_L0, "-serial  print out the serial number in hex");
+    WOLFCLU_LOG(WOLFCLU_L0, "-dates   print out the valid dates of cert");
+    WOLFCLU_LOG(WOLFCLU_L0, "-email   print out the subject names email address");
+    WOLFCLU_LOG(WOLFCLU_L0, "-fingerprint print out the hash of the certificate in DER form");
+    WOLFCLU_LOG(WOLFCLU_L0, "-purpose print out the certificates purpose");
+    WOLFCLU_LOG(WOLFCLU_L0, "-hash print out the hash of the certificate subject name");
+    WOLFCLU_LOG(WOLFCLU_L0, "-text print human readable text of X509");
+    WOLFCLU_LOG(WOLFCLU_L0, "-modulus print out the RSA key modulus");
+    WOLFCLU_LOG(WOLFCLU_L0, "-pubkey print out the Public Key");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nX509 USAGE: wolfssl x509 -inform <PEM or DER> -in <filename> "
+           "-outform <PEM or DER> -out <output file name> \n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl x509 -inform pem -in certs/"
+           "ca-cert.pem -outform der -out certs/ca-cert-converted.der"
+           "\n");
+}
+
 #ifndef WOLFCLU_NO_FILESYSTEM
 static const struct option cert_options[] = {
     {"-sha1",       no_argument,       0, WOLFCLU_CERT_SHA      },
