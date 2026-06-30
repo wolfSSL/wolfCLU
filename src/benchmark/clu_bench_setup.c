@@ -56,7 +56,7 @@ enum {
 #ifdef WOLFSSL_SHA512
     WOLFCLU_BENCH_SHA512,
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     WOLFCLU_BENCH_BLAKE2B,
 #endif
     WOLFCLU_BENCH_COUNT /* number of available tests, also terminal index */
@@ -96,7 +96,7 @@ static const struct option bench_options[] = {
 #ifdef WOLFSSL_SHA512
     {"sha512",   no_argument, 0, WOLFCLU_BENCH_SHA512   },
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     {"blake2b",  no_argument, 0, WOLFCLU_BENCH_BLAKE2B  },
 #endif
 

@@ -190,7 +190,7 @@ int wolfCLU_Server(int argc, char** argv)
 
             case ARG_FOUND_TWICE:
                 wolfCLU_LogError("Found duplicate argument");
-                return WOLFCLU_FATAL_ERROR;
+                goto exit;
         }
     }
 

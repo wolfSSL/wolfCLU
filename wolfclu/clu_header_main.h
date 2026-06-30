@@ -103,7 +103,7 @@ extern "C" {
     #include <wolfssl/wolfcrypt/sha512.h>
 #endif
 
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     #include <wolfssl/wolfcrypt/blake2.h>
 #endif
 

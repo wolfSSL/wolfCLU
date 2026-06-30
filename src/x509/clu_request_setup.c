@@ -55,7 +55,6 @@ static const struct option req_options[] = {
     {"-config",    required_argument, 0, WOLFCLU_CONFIG },
     {"-days",      required_argument, 0, WOLFCLU_DAYS },
     {"-x509",      no_argument,       0, WOLFCLU_X509 },
-    {"-set_serial",no_argument,       0, WOLFCLU_SETSERIAL},
     {"-subj",      required_argument, 0, WOLFCLU_SUBJECT },
     {"-verify",    no_argument,       0, WOLFCLU_VERIFY },
     {"-text",      no_argument,       0, WOLFCLU_TEXT_OUT },
@@ -575,7 +574,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
     int     days = 0;
     int     genX509 = 0;
     int     passout = 0;
-    WOLFSSL_ASN1_INTEGER* x509Serial = NULL;
 
     char password[MAX_PASSWORD_SIZE];
     int passwordSz = MAX_PASSWORD_SIZE;
@@ -741,20 +739,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 genX509 = 1;
                 break;
 
-            case WOLFCLU_SETSERIAL:
-                {
-                    /*TODO : replace with StrToWord32*/
-                    int number = XATOI(optarg);
-                    x509Serial = wolfSSL_ASN1_INTEGER_new();
-                    if (x509Serial == NULL) {
-                        wolfCLU_LogError("Unable to create ASN1 Integer");
-                        ret = MEMORY_E;
-                    }
-                    ret = wolfSSL_ASN1_INTEGER_set(x509Serial, number);
-                    break;
-                }
-
-
             case WOLFCLU_VERIFY:
                 doVerify = 1;
                 break;
@@ -819,10 +803,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
-    }
-
-    if (ret == WOLFCLU_SUCCESS && x509Serial != NULL && x509 != NULL) {
-        wolfSSL_X509_set_serialNumber(x509, x509Serial);
     }
 
     if (ret == WOLFCLU_SUCCESS && days > 0) {

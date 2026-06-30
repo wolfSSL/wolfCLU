@@ -18,7 +18,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
-
 #include "wolfclu/clu_error_codes.h"
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
@@ -171,7 +170,7 @@ void wolfCLU_verboseHelp(void)
 #ifdef WOLFSSL_SHA512
         ,"sha512"
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
         ,"blake2b"
 #endif
 #ifndef NO_CODING
@@ -212,7 +211,7 @@ void wolfCLU_verboseHelp(void)
 #ifdef WOLFSSL_SHA512
         , "sha512"
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
         , "blake2b"
 #endif
     };
@@ -351,7 +350,7 @@ void wolfCLU_hashHelp(void)
 #ifdef WOLFSSL_SHA512
         ,"sha512"
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
         ,"blake2b"
 #endif
 #ifndef NO_CODING
@@ -410,7 +409,7 @@ void wolfCLU_benchHelp(void)
 #ifdef WOLFSSL_SHA512
         , "sha512"
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
         , "blake2b"
 #endif
     };
@@ -1733,9 +1732,9 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
     int index = 0;      /* index at which option was found */
 
     while (1) {
-
         /* set end to 1 if last option is reached */
         if (long_options[i].name == 0 ) {
+            wolfCLU_LogError("%d\n", i);
             return END_OF_ARGS;
         }
         else {

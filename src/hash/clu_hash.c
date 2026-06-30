@@ -34,7 +34,7 @@
 int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
         int size)
 {
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     Blake2b hash;               /* blake2b declaration */
     byte    chunk[MAX_IO_CHUNK_SZ];
 #endif
@@ -102,7 +102,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
         handled = 1;
     }
 
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     if (!handled && ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "blake2b") == 0) {
         int bytesRead;
         if (wc_InitBlake2b(&hash, outSz) != 0) {

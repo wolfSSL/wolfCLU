@@ -24,9 +24,9 @@
 
 #define DES3_BLOCK_SIZE 24
 
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
 
-#endif /* HAVE_BLAKE2 */
+#endif /* HAVE_BLAKE2B */
 
 /*
  * benchmarking funciton
@@ -475,7 +475,7 @@ int wolfCLU_benchmark(int timer, int* option)
     }
     i++;
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     /* blake2b test */
     if (option[i] == 1) {
         Blake2b  b2b;
