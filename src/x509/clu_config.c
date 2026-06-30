@@ -543,6 +543,76 @@ static int wolfCLU_setAltNames(WOLFSSL_X509* x509, WOLFSSL_CONF* conf,
 }
 
 
+#ifdef WOLFSSL_ALT_NAMES
+/* Apply an inline subjectAltName list to x509, e.g.
+ * "DNS:example.com,IP:10.0.0.1". Leading whitespace per entry is skipped.
+ * Buffer is tokenized in place, so callers pass a writable string. Returns
+ * WOLFCLU_SUCCESS, or WOLFCLU_FATAL_ERROR on a malformed entry so a bad SAN is
+ * never silently ignored. */
+static int wolfCLU_setInlineAltNames(WOLFSSL_X509* x509, char* val)
+{
+    int ret = WOLFCLU_SUCCESS;
+    char* token;
+    char* ptr = NULL;
+
+    if (x509 == NULL || val == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    token = XSTRTOK(val, ",", &ptr);
+    while (token != NULL) {
+        char* colon;
+        char* value;
+        size_t len;
+
+        /* trim whitespace around entries and trailing whitespace */
+        while (*token == ' ' || *token == '\t' || *token == '\r' || *token == '\n') {
+            token++;
+        }
+        len = XSTRLEN(token);
+        while (len > 0 && (token[len - 1] == ' ' || token[len - 1] == '\t' ||
+                           token[len - 1] == '\r' || token[len - 1] == '\n')) {
+            token[--len] = '\0';
+        }
+        colon = XSTRSTR(token, ":");
+        if (colon == NULL) {
+            wolfCLU_LogError("bad subjectAltName entry \"%s\", expected "
+                    "TYPE:value", token);
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+        *colon = '\0';
+        /* The trailing-whitespace trim above already NUL-terminated the token
+         * at the correct boundary, so value needs no second trailing trim. */
+        /* drop whitespace between the colon and the value */
+        value = colon + 1;
+        while (*value == ' ' || *value == '\t' || *value == '\r' || *value == '\n') {
+            value++;
+        }
+
+        /* Check for empty type or value after trimming */
+        if (XSTRLEN(token) == 0) {
+            wolfCLU_LogError("bad subjectAltName entry: empty type prefix");
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+        if (XSTRLEN(value) == 0) {
+            wolfCLU_LogError("bad subjectAltName entry: empty value for type \"%s\"", token);
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+
+        ret = wolfCLU_addAltName(x509, token, value);
+        if (ret != WOLFCLU_SUCCESS) {
+            break;
+        }
+        token = XSTRTOK(NULL, ",", &ptr);
+    }
+    return ret;
+}
+#endif /* WOLFSSL_ALT_NAMES */
+
+
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
 {
@@ -576,9 +646,40 @@ int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
     }
 
     current = wolfSSL_NCONF_get_string(conf, sect, "subjectAltName");
-    if (current != NULL && current[0] == '@') {
-        current = current+1;
-        ret = wolfCLU_setAltNames(x509, conf, current);
+    if (current != NULL) {
+        if (current[0] == '@') {
+            ret = wolfCLU_setAltNames(x509, conf, current + 1);
+        }
+        else {
+            /* Accept inline form for config compatibility. */
+#ifndef WOLFSSL_ALT_NAMES
+            /* Intentional: mirror the pre-existing silent-skip behaviour of
+             * the @section form (wolfCLU_setAltNames is also a no-op when
+             * WOLFSSL_ALT_NAMES is not defined).  We log the skip but do NOT
+             * promote ret to WOLFCLU_FATAL_ERROR so that a config containing
+             * a subjectAltName line is still usable in builds where alt-name
+             * support was compiled out. */
+            WOLFCLU_LOG(WOLFCLU_L0, "Skipping alt names, recompile wolfSSL "
+                    "with WOLFSSL_ALT_NAMES...");
+#else
+            {
+                int   len = (int)XSTRLEN(current);
+                char* dup = (char*)XMALLOC(len + 1, NULL,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+
+                if (dup == NULL) {
+                    wolfCLU_LogError("out of memory duplicating "
+                            "subjectAltName value");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    XMEMCPY(dup, current, len + 1);
+                    ret = wolfCLU_setInlineAltNames(x509, dup);
+                    XFREE(dup, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+                }
+            }
+#endif
+        }
     }
     return ret;
 }
@@ -621,26 +722,8 @@ int wolfCLU_parseAddExt(WOLFSSL_X509* x509, char* addExt)
         (void)val;
         WOLFCLU_LOG(WOLFCLU_L0, "Skipping alt names, recompile wolfSSL with WOLFSSL_ALT_NAMES...");
 #else
-        char* token;
-        char* ptr = NULL;
-
         /* value is a comma separated list of TYPE:value pairs */
-        token = XSTRTOK(val, ",", &ptr);
-        while (token != NULL) {
-            char* colon = XSTRSTR(token, ":");
-            if (colon == NULL) {
-                wolfCLU_LogError("bad subjectAltName entry \"%s\", expected "
-                        "TYPE:value", token);
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-            *colon = '\0';
-            ret = wolfCLU_addAltName(x509, token, colon + 1);
-            if (ret != WOLFCLU_SUCCESS) {
-                break;
-            }
-            token = XSTRTOK(NULL, ",", &ptr);
-        }
+        ret = wolfCLU_setInlineAltNames(x509, val);
 #endif
     }
     else {
@@ -656,9 +739,18 @@ int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
 {
     (void)x509;
     (void)conf;
-    (void)sect;
 
-    wolfCLU_LogError("wolfSSL not compiled with cert extensions");
+    /* No extension section requested, so not having WOLFSSL_CERT_EXT
+     * can be ignored. (Coupled with `ret = ` in wolfCLU_readConfig) */
+    if (sect == NULL) {
+        return WOLFCLU_SUCCESS;
+    }
+
+    /* If not compiled with WOLFSSL_CERT_EXT, fail so certs can be built as
+     * intended by user. */
+    wolfCLU_LogError("wolfSSL not compiled with cert extensions "
+            "(WOLFSSL_CERT_EXT); cannot apply requested x509_extensions "
+            "section \"%s\"", sect);
     return NOT_COMPILED_IN;
 }
 
@@ -918,7 +1010,11 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext)
     wolfCLU_setAttributes(x509, conf,
             wolfSSL_NCONF_get_string(conf, sect, "attributes"));
     if (ext == NULL) {
-        (void)wolfCLU_setExtensions(x509, conf,
+        /* Note: we capture this return code because the !WOLFSSL_CERT_EXT stub
+         * of wolfCLU_setExtensions gracefully returns SUCCESS when the string
+         * is NULL, but fails loudly if an extension section IS requested and
+         * WOLFSSL_CERT_EXT is disabled. These two behaviors are coupled. */
+        ret = wolfCLU_setExtensions(x509, conf,
             wolfSSL_NCONF_get_string(conf, sect, "x509_extensions"));
     }
     else {
