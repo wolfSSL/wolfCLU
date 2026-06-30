@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include "wolfclu/clu_error_codes.h"
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
@@ -234,6 +235,11 @@ int wolfCLU_Client(int argc, char** argv)
             case WOLFCLU_NOSERVERNAME:
                 noservername = 1;
                 break;
+
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Arg %s found twice", argv[optind]);
+                return WOLFCLU_FATAL_ERROR;
+
             case WOLFCLU_HELP:
                 wolfCLU_ClientHelp();
                 return WOLFCLU_SUCCESS;

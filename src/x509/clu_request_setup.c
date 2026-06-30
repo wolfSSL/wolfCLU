@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include "wolfclu/clu_error_codes.h"
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
@@ -26,6 +27,10 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/certgen/clu_certgen.h>
+#include <wolfssl/openssl/ssl.h>
+#include <wolfssl/ssl.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #if defined(WOLFSSL_CERT_REQ) && !defined(WOLFCLU_NO_FILESYSTEM)
 static const struct option req_options[] = {
@@ -50,6 +55,7 @@ static const struct option req_options[] = {
     {"-config",    required_argument, 0, WOLFCLU_CONFIG },
     {"-days",      required_argument, 0, WOLFCLU_DAYS },
     {"-x509",      no_argument,       0, WOLFCLU_X509 },
+    {"-set_serial",no_argument,       0, WOLFCLU_SETSERIAL},
     {"-subj",      required_argument, 0, WOLFCLU_SUBJECT },
     {"-verify",    no_argument,       0, WOLFCLU_VERIFY },
     {"-text",      no_argument,       0, WOLFCLU_TEXT_OUT },
@@ -60,7 +66,7 @@ static const struct option req_options[] = {
     {"-nodes",     no_argument,       0, WOLFCLU_NODES },
     {"-h",         no_argument,       0, WOLFCLU_HELP },
     {"-help",      no_argument,       0, WOLFCLU_HELP },
-
+&
     {0, 0, 0, 0} /* terminal element */
 };
 
@@ -569,6 +575,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     int     days = 0;
     int     genX509 = 0;
     int     passout = 0;
+    WOLFSSL_ASN1_INTEGER* x509Serial = NULL;
 
     char password[MAX_PASSWORD_SIZE];
     int passwordSz = MAX_PASSWORD_SIZE;
@@ -633,7 +640,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
                 if (ret == WOLFCLU_SUCCESS) {
                     int idx;
-
                     idx     = (int)strcspn(optarg, ":");
                     keyType = (char*)XMALLOC(idx + 1, HEAP_HINT,
                             DYNAMIC_TYPE_TMP_BUFFER);
@@ -735,6 +741,20 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 genX509 = 1;
                 break;
 
+            case WOLFCLU_SETSERIAL:
+                {
+                    /*TODO : replace with StrToWord32*/
+                    int number = XATOI(optarg);
+                    x509Serial = wolfSSL_ASN1_INTEGER_new();
+                    if (x509Serial == NULL) {
+                        wolfCLU_LogError("Unable to create ASN1 Integer");
+                        ret = MEMORY_E;
+                    }
+                    ret = wolfSSL_ASN1_INTEGER_set(x509Serial, number);
+                    break;
+                }
+
+
             case WOLFCLU_VERIFY:
                 doVerify = 1;
                 break;
@@ -754,6 +774,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_NEW:
                 break;
+
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Arg %s found twice", argv[optind]);
+                return WOLFCLU_FATAL_ERROR;
 
             case ':':
             case '?':
@@ -795,6 +819,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && x509Serial != NULL && x509 != NULL) {
+        wolfSSL_X509_set_serialNumber(x509, x509Serial);
     }
 
     if (ret == WOLFCLU_SUCCESS && days > 0) {

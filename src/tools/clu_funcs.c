@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include "wolfclu/clu_error_codes.h"
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
@@ -1731,13 +1732,17 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
 
         /* set end to 1 if last option is reached */
         if (long_options[i].name == 0 ) {
-            return WOLFCLU_FATAL_ERROR;
+            return END_OF_ARGS;
         }
         else {
 
             /* check if option is present in argv */
             index = wolfCLU_checkForArg(long_options[i].name, (int)XSTRLEN(long_options[i].name), argc, argv);
             optind++;
+
+            if (index == USER_INPUT_ERROR) {
+                return ARG_FOUND_TWICE;
+            }
 
             /* if index matches *opt_index at first position or if index is found */
             if (index == *opt_index+1 || (*opt_index !=0 && index > 0)) {

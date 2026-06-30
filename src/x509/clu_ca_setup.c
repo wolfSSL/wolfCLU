@@ -19,6 +19,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include "wolfclu/clu_error_codes.h"
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
@@ -108,7 +109,7 @@ int wolfCLU_CASetup(int argc, char** argv)
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "", ca_options,
-                    &longIndex )) != -1) {
+                    &longIndex )) != WOLFCLU_FATAL_ERROR) {
 
         switch (option) {
             case WOLFCLU_INFILE:
@@ -214,6 +215,10 @@ int wolfCLU_CASetup(int argc, char** argv)
             case WOLFCLU_HELP:
                 wolfCLU_CAHelp();
                 return WOLFCLU_SUCCESS;
+
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Arg Found Twice");
+                return WOLFCLU_FATAL_ERROR;
 
             case ':':
             case '?':

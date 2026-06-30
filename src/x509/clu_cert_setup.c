@@ -24,17 +24,56 @@
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_error_codes.h>
+#include <wolfclu/clu_optargs.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
 
 #define PEM_BEGIN_CERT "-----BEGIN CERTIFICATE-----"
 #define BEGIN_CERT_REQ "-----BEGIN CERTIFICATE REQUEST-----"
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+static const struct option cert_options[] = {
+    {"-sha1",       no_argument,       0, WOLFCLU_CERT_SHA      },
+    {"-sha224",     no_argument,       0, WOLFCLU_CERT_SHA224   },
+    {"-sha256",     no_argument,       0, WOLFCLU_CERT_SHA256   },
+    {"-sha384",     no_argument,       0, WOLFCLU_CERT_SHA384   },
+    {"-sha512",     no_argument,       0, WOLFCLU_CERT_SHA512   },
+
+    {"-in",         required_argument, 0, WOLFCLU_INFILE        },
+    {"-out",        required_argument, 0, WOLFCLU_OUTFILE       },
+    {"-inform",     required_argument, 0, WOLFCLU_INFORM        },
+    {"-outform",    required_argument, 0, WOLFCLU_OUTFORM       },
+    {"-signkey",    required_argument, 0, WOLFCLU_SIGNKEY       },
+    {"-extfile",    required_argument, 0, WOLFCLU_EXTFILE       },
+    {"-extensions", required_argument, 0, WOLFCLU_EXTENSIONS    },
+
+    {"-req",        no_argument,       0, WOLFCLU_REQ           },
+    {"-noout",      no_argument,       0, WOLFCLU_NOOUT         },
+    {"-text",       no_argument,       0, WOLFCLU_TEXT_OUT      },
+    {"-pubkey",     no_argument,       0, WOLFCLU_PUBKEY        },
+    {"-modulus",    no_argument,       0, WOLFCLU_MODULUS       },
+    {"-silent",     no_argument,       0, WOLFCLU_SILENT        },
+    {"-subject",    no_argument,       0, WOLFCLU_PRINT_SUBJECT },
+    {"-issuer",     no_argument,       0, WOLFCLU_PRINT_ISSUER  },
+    {"-serial",     no_argument,       0, WOLFCLU_PRINT_SERIAL  },
+    {"-dates",      no_argument,       0, WOLFCLU_PRINT_DATES   },
+    {"-email",      no_argument,       0, WOLFCLU_PRINT_EMAIL   },
+    {"-fingerprint",no_argument,       0, WOLFCLU_FINGERPRINT   },
+    {"-purpose",    no_argument,       0, WOLFCLU_PURPOSE       },
+    {"-hash",       no_argument,       0, WOLFCLU_SUBJ_HASH     },
+    {"-h",          no_argument,       0, WOLFCLU_HELP          },
+    {"-help",       no_argument,       0, WOLFCLU_HELP          },
+
+    {0, 0, 0, 0} /* terminal element */
+};
+#endif
+
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_certSetup(int argc, char** argv)
 {
 #ifndef WOLFCLU_NO_FILESYSTEM
-    int idx;
+    int option;
+    int longIndex = 1;
     int ret = WOLFCLU_SUCCESS;
     int textFlag    = 0;   /* does user desire human readable cert info */
     int textPubkey  = 0;   /* does user desire human readable pubkey info */
@@ -78,143 +117,157 @@ int wolfCLU_certSetup(int argc, char** argv)
     const byte* derBufPtr = NULL;
     DerBuffer* derObj = NULL;
 
-/*---------------------------------------------------------------------------*/
-/* help */
-/*---------------------------------------------------------------------------*/
-    if (wolfCLU_checkForArg("-h", 2, argc, argv) > 0) {
-        wolfCLU_certHelp();
-        return WOLFCLU_SUCCESS;
-    }
+    opterr = 0; /* do not display unrecognized options */
+    optind = 0; /* start at index 0 */
+    while ((option = wolfCLU_GetOpt(argc, argv, "", cert_options,
+                    &longIndex)) != END_OF_ARGS) {
+        switch (option) {
+            case WOLFCLU_HELP:
+                wolfCLU_certHelp();
+                return WOLFCLU_SUCCESS;
 
-/*---------------------------------------------------------------------------*/
-/* text */
-/*---------------------------------------------------------------------------*/
-    if (wolfCLU_checkForArg("-text", 5, argc, argv) > 0) {
-        /* set flag for converting to human readable.
-         */
-        textFlag = 1;
-    } /* Optional flag do not return error */
-/*---------------------------------------------------------------------------*/
-/* pubkey */
-/*--------------------------------------------------------------------------*/
-    if (wolfCLU_checkForArg("-pubkey", 7, argc, argv) > 0) {
-        /* set flag for converting to human readable.
-         */
-        textPubkey = 1;
-    } /* Optional flag do not return error */
-/*---------------------------------------------------------------------------*/
-/* signkey */
-/*--------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-signkey", 8, argc, argv);
-        if (idx > 0) {
-            /* If no error, then write keyFile */
-            keyIn = wolfSSL_BIO_new_file(argv[idx+1], "rb");
-            if (keyIn == NULL) {
+            case WOLFCLU_TEXT_OUT:
+                textFlag = 1;
+                break;
+
+            case WOLFCLU_PUBKEY:
+                textPubkey = 1;
+                break;
+
+            case WOLFCLU_SIGNKEY:
+                keyIn = wolfSSL_BIO_new_file(optarg, "rb");
+                if (keyIn == NULL) {
                     wolfCLU_LogError("Unable to open private key file %s",
-                            argv[idx+1]);
+                            optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
-        }
-        if (idx < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-/*---------------------------------------------------------------------------*/
-/* extFile */
-/*--------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-extfile", 8, argc, argv);
-        if (idx > 0) {
-            /* If no error, then write extFile */
-            extFile = argv[idx+1];
-        }
-        if (idx < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-/*---------------------------------------------------------------------------*/
-/* extensions */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-extensions", 11, argc, argv);
-        if (idx > 0) {
-            /*If no error, then write extFile extension's section */
-            ext = argv[idx+1];
-        }
-        if (idx < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-/*---------------------------------------------------------------------------*/
-/* inForm pem/der/??OTHER?? */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-inform", 7, argc, argv);
-        if (idx > 0) {
-            inForm = wolfCLU_checkInform(argv[idx+1]);
-            if (inForm == USER_INPUT_ERROR) {
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-        if (idx < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
+                break;
 
-/*---------------------------------------------------------------------------*/
-/* outForm pem/der/??OTHER?? */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-outform", 8, argc, argv);
-        if (idx > 0) {
-            outForm = wolfCLU_checkOutform(argv[idx+1]);
-            if (outForm == USER_INPUT_ERROR) {
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-        if (idx < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
+            case WOLFCLU_EXTFILE:
+                extFile = optarg;
+                break;
 
+            case WOLFCLU_EXTENSIONS:
+                ext = optarg;
+                break;
 
+            case WOLFCLU_INFORM:
+                inForm = wolfCLU_checkInform(optarg);
+                if (inForm == USER_INPUT_ERROR) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
 
-/*---------------------------------------------------------------------------*/
-/* in file */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-in", 3, argc, argv);
-        if (idx > 0) {
-            if (idx == USER_INPUT_ERROR) {
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                /* set flag for in file and flag for input file OK if exists
-                 * check for error case below. If no error then read in file */
-                inFile = argv[idx+1];
+            case WOLFCLU_OUTFORM:
+                outForm = wolfCLU_checkOutform(optarg);
+                if (outForm == USER_INPUT_ERROR) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
+
+            case WOLFCLU_INFILE:
+                inFile = optarg;
                 in = wolfSSL_BIO_new_file(inFile, "rb");
-                if (in == NULL) {
+                if (in == NULL || access(inFile, F_OK) != 0) {
                     wolfCLU_LogError("ERROR: in file \"%s\" does not"
                                      " exist", inFile);
                     ret = INPUT_FILE_ERROR;
                 }
-                if (ret == WOLFCLU_SUCCESS) {
-                    if (access(inFile, F_OK) != 0) {
-                        wolfCLU_LogError("ERROR: input file \"%s\" does"
-                                         " not exist", inFile);
-                        ret = INPUT_FILE_ERROR;
-                    }
-                }
-            }
+                break;
+
+            case WOLFCLU_OUTFILE:
+                outFile = optarg;
+                break;
+
+            case WOLFCLU_CERT_SHA:
+                md = wolfSSL_EVP_sha1();
+                break;
+
+            case WOLFCLU_CERT_SHA224:
+                md = wolfSSL_EVP_sha224();
+                break;
+
+            case WOLFCLU_CERT_SHA256:
+                md = wolfSSL_EVP_sha256();
+                break;
+
+            case WOLFCLU_CERT_SHA384:
+                md = wolfSSL_EVP_sha384();
+                break;
+
+            case WOLFCLU_CERT_SHA512:
+                md = wolfSSL_EVP_sha512();
+                break;
+
+            case WOLFCLU_NOOUT:
+                nooutFlag = 1;
+                break;
+
+            case WOLFCLU_REQ:
+                reqFlag = 1;
+                break;
+
+            case WOLFCLU_SILENT:
+                silentFlag = 1;
+                (void)silentFlag;
+                break;
+
+            case WOLFCLU_MODULUS:
+                modulus = 1;
+                break;
+
+            case WOLFCLU_PRINT_SUBJECT:
+                printSubject = 1;
+                break;
+
+            case WOLFCLU_PRINT_ISSUER:
+                printIssuer = 1;
+                break;
+
+            case WOLFCLU_PRINT_SERIAL:
+                printSerial = 1;
+                break;
+
+            case WOLFCLU_PRINT_DATES:
+                printDates = 1;
+                break;
+
+            case WOLFCLU_PRINT_EMAIL:
+                printEmail = 1;
+                break;
+
+            case WOLFCLU_FINGERPRINT:
+                printFinger = 1;
+                break;
+
+            case WOLFCLU_PURPOSE:
+                printPurpose = 1;
+                break;
+
+            case WOLFCLU_SUBJ_HASH:
+                printSubjHash = 1;
+                break;
+
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Arg %s found twice.", argv[optind]);
+                return WOLFCLU_FATAL_ERROR;
+
+            case ':':
+            case '?':
+                break;
+
+            default:
+                wolfCLU_LogError("Unsupported argument");
+                ret = WOLFCLU_FATAL_ERROR;
         }
-        if (idx < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
+
+        if (ret != WOLFCLU_SUCCESS) {
+            break;
         }
     }
 
     /* -in not used, look for stdin for input */
-    if (ret == WOLFCLU_SUCCESS && idx <= 0) {
+    if (ret == WOLFCLU_SUCCESS && in == NULL) {
         in = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (in == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
@@ -226,90 +279,6 @@ int wolfCLU_certSetup(int argc, char** argv)
             }
         }
     }
-
-/*---------------------------------------------------------------------------*/
-/* out file */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS) {
-        idx = wolfCLU_checkForArg("-out", 4, argc, argv);
-        if (idx > 0) {
-            /* set flag for out file, check for error case below. If no error
-             * then write outFile */
-            outFile = argv[idx+1];
-        }
-
-        if (idx < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-/*---------------------------------------------------------------------------*/
-/* digest */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS) {
-        int tmp = 0;
-        idx = wolfCLU_checkForArg("-sha1", 5, argc, argv);
-        if (idx > 0) {
-            md = wolfSSL_EVP_sha1();
-            tmp = idx;
-        }
-        idx = wolfCLU_checkForArg("-sha224", 7, argc, argv);
-        if (idx > 0 && idx > tmp) {
-            md = wolfSSL_EVP_sha224();
-            tmp = idx;
-        }
-        idx = wolfCLU_checkForArg("-sha256", 7, argc, argv);
-        if (idx > 0 && idx > tmp) {
-            md = wolfSSL_EVP_sha256();
-            tmp = idx;
-        }
-        idx = wolfCLU_checkForArg("-sha384", 7, argc, argv);
-        if (idx > 0 && idx > tmp) {
-            md = wolfSSL_EVP_sha384();
-            tmp = idx;
-        }
-        idx = wolfCLU_checkForArg("-sha512", 7, argc, argv);
-        if (idx > 0 && idx > tmp) {
-            md = wolfSSL_EVP_sha512();
-        }
-    }
-/*---------------------------------------------------------------------------*/
-/* noout */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS &&
-            wolfCLU_checkForArg("-noout", 6, argc, argv) > 0) {
-        /* set flag for no output file */
-        nooutFlag = 1;
-    } /* Optional flag do not return error */
-/*---------------------------------------------------------------------------*/
-/* Request */
-/*---------------------------------------------------------------------------*/
- if (ret == WOLFCLU_SUCCESS &&
-         wolfCLU_checkForArg("-req", 4, argc, argv) > 0) {
-        /* set flag for csr file */
-        reqFlag = 1;
-    }/* Optional flag do not return error */
-/*---------------------------------------------------------------------------*/
-/* silent */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS &&
-            wolfCLU_checkForArg("-silent", 7, argc, argv) > 0) {
-        /* set flag for converting to human readable.
-         * return NOT_YET_IMPLEMENTED error
-         */
-        silentFlag = 1;
-	(void)silentFlag;
-    } /* Optional flag do not return error */
-/*---------------------------------------------------------------------------*/
-/* modulus */
-/*---------------------------------------------------------------------------*/
-    if (ret == WOLFCLU_SUCCESS &&
-            wolfCLU_checkForArg("-modulus", 8, argc, argv) > 0) {
-        /* set flag for viewing modulus */
-        modulus = 1;
-    } /* Optional flag do not return error */
-/*---------------------------------------------------------------------------*/
-/* END ARG PROCESSING */
-/*---------------------------------------------------------------------------*/
 
     if (ret == WOLFCLU_SUCCESS) {
         char read;
@@ -479,13 +448,6 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
     }
 
-    /* Print out specific parts as requested */
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-subject", 8, argc, argv) != 0) {
-            printSubject = 1;
-        }
-    }
-
     if (ret == WOLFCLU_SUCCESS && printSubject) {
         char* subject;
 
@@ -498,12 +460,6 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-issuer", 7, argc, argv) != 0) {
-            printIssuer = 1;
-        }
-    }
-
     if (ret == WOLFCLU_SUCCESS && printIssuer) {
         char* issuer;
 
@@ -513,12 +469,6 @@ int wolfCLU_certSetup(int argc, char** argv)
             wolfSSL_BIO_write(out, issuer, (int)XSTRLEN(issuer));
             wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n"));
             XFREE(issuer, 0, DYNAMIC_TYPE_OPENSSL);
-        }
-    }
-
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-serial", 7, argc, argv) != 0) {
-            printSerial = 1;
         }
     }
 
@@ -551,12 +501,6 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-dates", 6, argc, argv) != 0) {
-            printDates = 1;
-        }
-    }
-
     if (ret == WOLFCLU_SUCCESS && printDates) {
         char notBefore[] = "notBefore=";
         char notAfter[] = "notAfter=";
@@ -585,12 +529,6 @@ int wolfCLU_certSetup(int argc, char** argv)
         if (ret == WOLFCLU_SUCCESS &&
                 wolfSSL_BIO_write(out, "\n", (int)XSTRLEN("\n")) < 0) {
             ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-email", 6, argc, argv) != 0) {
-            printEmail = 1;
         }
     }
 
@@ -636,12 +574,6 @@ int wolfCLU_certSetup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-fingerprint", 12, argc, argv) != 0) {
-            printFinger = 1;
-        }
-    }
-
     if (ret == WOLFCLU_SUCCESS && printFinger) {
         int derSz;
         const unsigned char* der;
@@ -677,12 +609,6 @@ int wolfCLU_certSetup(int argc, char** argv)
 
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-purpose", 8, argc, argv) != 0) {
-            printPurpose = 1;
-        }
-    }
-
     if (ret == WOLFCLU_SUCCESS && printPurpose) {
     #if LIBWOLFSSL_VERSION_HEX > 0x05001000
         unsigned int keyUsage;
@@ -698,12 +624,6 @@ int wolfCLU_certSetup(int argc, char** argv)
                          " version of wolfSSL");
         ret = WOLFCLU_FATAL_ERROR;
     #endif
-    }
-
-    if (ret == WOLFCLU_SUCCESS) {
-        if (wolfCLU_checkForArg("-hash", 5, argc, argv) != 0) {
-            printSubjHash = 1;
-        }
     }
 
     if (ret == WOLFCLU_SUCCESS && printSubjHash) {
