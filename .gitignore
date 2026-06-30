@@ -34,6 +34,10 @@ src/config.h
 src/config.h.in
 src/config.h.in~
 src/stamp-h1
+wolfclu/config.h
+wolfclu/config.h.in
+wolfclu/config.h.in~
+wolfclu/stamp-h1
 *.gcno
 *.gcda
 .cproject
@@ -43,8 +47,11 @@ AGENTS.md
 Win32/
 x64/
 .vs/
+.idea/
 __pycache__/
 CLAUDE.md
+compile_commands.json
+compile_commands.json.bak
 
 # x509 test runtime artifacts (generated in cwd by tests/x509/*.py)
 /ca_*.conf

@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/sign-verify/clu_verify.h>
@@ -113,9 +114,14 @@ int wolfCLU_x509Verify(int argc, char** argv)
 
         opterr = 0; /* do not display unrecognized options */
         optind = 0; /* start at indent 0 */
-        while ((option = wolfCLU_GetOpt(argc - 1, argv, "",
-                       verify_options, &longIndex )) != -1) {
+        while ((option = wolfCLU_GetOpt(argc - 1, argv,
+                        "", verify_options, &longIndex )) != END_OF_ARGS) {
             switch (option) {
+                case ARG_FOUND_TWICE:
+                    wolfCLU_LogError("Found duplicate argument");
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+
                 case WOLFCLU_CHECK_CRL:
                 #ifndef HAVE_CRL
                     wolfCLU_LogError("recompile wolfSSL with CRL");

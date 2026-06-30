@@ -21,8 +21,112 @@
 
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
+#include <wolfclu/clu_optargs.h>
 #include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/x509/clu_cert.h>  /* argument checking */
+
+#ifndef WOLFCLU_NO_FILESYSTEM
+
+static void wolfCLU_genKeyHelp(void)
+{
+    int i;
+
+    const char* keysother[] = { /* list of acceptable key types */
+        "KEYS: "
+    #ifndef NO_RSA
+        ,"rsa"
+    #endif
+    #ifdef HAVE_ED25519
+        ,"ed25519"
+    #endif
+    #ifdef HAVE_ECC
+        ,"ecc"
+    #endif
+    #ifdef HAVE_DILITHIUM
+        ,"ml-dsa"
+        ,"dilithium"
+    #endif
+    #ifdef WOLFSSL_HAVE_XMSS
+        ,"xmss"
+        ,"xmssmt"
+    #endif
+        };
+
+        WOLFCLU_LOG(WOLFCLU_L0, "Available keys with current configure settings:");
+        for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
+            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
+        }
+    WOLFCLU_LOG(WOLFCLU_L0, "\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\ngenkey USAGE:\nwolfssl -genkey <keytype> -size(optional) <bits> "
+           "-out <filename> -outform <PEM or DER> -output <PUB/PRIV/KEYPAIR> \n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -genkey rsa -size 2048 -out mykey -outform der "
+           " -output KEYPAIR");
+#ifdef HAVE_DILITHIUM
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
+           "[2|3|5] -out mykey -outform der -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
+           "[2|3|5] -out mykey -outform pem -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
+           "[2|3|5] -out mykey -outform der -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
+           "[2|3|5] -out mykey -outform pem -output KEYPAIR");
+#endif
+#ifdef WOLFSSL_HAVE_XMSS
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmss -height [10|16|20] -out mykey -outform raw"
+                " -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmssmt -height [20|40|60] -layer [2|4|8|3|6|12]"
+                "  -out mykey -outform raw -output KEYPAIR");
+    WOLFCLU_LOG(WOLFCLU_L0, "XMSS key file name must be something like \"XMSS-SHA2_10_256\""
+                "\nXMSS/XMSS^MT parametaers are determined by file name when signing");
+#endif
+    WOLFCLU_LOG(WOLFCLU_L0,
+           "\n\nThe above command would output the files: mykey.priv "
+           " and mykey.pub\nChanging the -output option to just PRIV would only"
+           "\noutput the mykey.priv and using just PUB would only output"
+           "\nmykey.pub\n");
+}
+
+
+static const struct option genkey_options[] = {
+    {"-out",      required_argument, 0, WOLFCLU_OUTFILE   },
+    {"-outform",  required_argument, 0, WOLFCLU_OUTFORM   },
+    {"-output",   required_argument, 0, WOLFCLU_OUTPUT    },
+    {"-name",     required_argument, 0, WOLFCLU_CURVE_NAME},
+    {"-size",     required_argument, 0, WOLFCLU_SIZE      },
+    {"-exponent", required_argument, 0, WOLFCLU_EXPONENT  },
+    {"-level",    required_argument, 0, WOLFCLU_LEVEL     },
+    {"-height",   required_argument, 0, WOLFCLU_HEIGHT    },
+    {"-layer",    required_argument, 0, WOLFCLU_LAYER     },
+    {"-h",        no_argument,       0, WOLFCLU_HELP      },
+    {"-help",     no_argument,       0, WOLFCLU_HELP      },
+
+    {0, 0, 0, 0} /* terminal element */
+};
+
+/* Map a -output value (pub/priv/keypair) to a directive. Returns the directive,
+ * defaulting to PRIV_AND_PUB_FILES when output is NULL or unrecognized. */
+static int wolfCLU_genKeyDirective(const char* output)
+{
+    int directiveArg = PRIV_AND_PUB_FILES;
+
+    if (output != NULL) {
+        if (XSTRNCASECMP(output, "pub", 3) == 0)
+            directiveArg = PUB_ONLY_FILE;
+        else if (XSTRNCASECMP(output, "priv", 4) == 0)
+            directiveArg = PRIV_ONLY_FILE;
+        else if (XSTRNCASECMP(output, "keypair", 7) == 0)
+            directiveArg = PRIV_AND_PUB_FILES;
+    }
+    else {
+        WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
+        WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
+    }
+
+    return directiveArg;
+}
+#endif
 
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKeySetup(int argc, char** argv)
@@ -32,21 +136,85 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     char     defaultFormat[4] = "der";
     WC_RNG   rng;
 
-    char*    keyType = NULL;       /* keyType */
-    char*    format  = defaultFormat;
-    char*    name    = NULL;
+    char*    keyType  = NULL;       /* keyType */
+    char*    outFile  = NULL;       /* -out file name */
+    char*    output   = NULL;       /* -output directive (pub/priv/keypair) */
+    char*    name     = NULL;       /* -name curve name */
+    char*    sizeStr  = NULL;       /* -size argument */
+    char*    expStr   = NULL;       /* -exponent argument */
+    char*    levelStr = NULL;       /* -level argument */
+    char*    heightStr= NULL;       /* -height argument */
+    char*    layerStr = NULL;       /* -layer argument */
+    char*    format   = defaultFormat;
 
     int      formatArg;
+    int      option;
+    int      longIndex = 1;
     int      ret;
-
-    ret = wolfCLU_checkForArg("-h", 2, argc, argv);
-    if (ret > 0) {
-        wolfCLU_genKeyHelp();
-        return WOLFCLU_SUCCESS;
-    }
 
     XMEMSET(keyOutFName, 0, MAX_FILENAME_SZ);
 
+    opterr = 0; /* do not display unrecognized options */
+    optind = 0; /* start at index 0 */
+    while ((option = wolfCLU_GetOpt(argc, argv, "", genkey_options,
+                    &longIndex)) != END_OF_ARGS) {
+        switch (option) {
+            case WOLFCLU_HELP:
+                wolfCLU_genKeyHelp();
+                return WOLFCLU_SUCCESS;
+
+            case WOLFCLU_OUTFILE:
+                outFile = optarg;
+                break;
+
+            case WOLFCLU_OUTFORM:
+                if (optarg != NULL)
+                    format = optarg;
+                break;
+
+            case WOLFCLU_OUTPUT:
+                output = optarg;
+                break;
+
+            case WOLFCLU_CURVE_NAME:
+                name = optarg;
+                break;
+
+            case WOLFCLU_SIZE:
+                sizeStr = optarg;
+                break;
+
+            case WOLFCLU_EXPONENT:
+                expStr = optarg;
+                break;
+
+            case WOLFCLU_LEVEL:
+                levelStr = optarg;
+                break;
+
+            case WOLFCLU_HEIGHT:
+                heightStr = optarg;
+                break;
+
+            case WOLFCLU_LAYER:
+                layerStr = optarg;
+                break;
+
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                return WOLFCLU_FATAL_ERROR;
+
+            case ':':
+            case '?':
+                break;
+
+            default:
+                /* do nothing. */
+                break;
+        }
+    }
+
+    /* key type is the positional argument following the "genkey" command */
     if (argc < 3) {
         wolfCLU_LogError("ERROR: missing key type argument");
         wolfCLU_genKeyHelp();
@@ -54,53 +222,42 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     }
     keyType = argv[2];
 
-    ret = wc_InitRng(&rng);
-    if (ret != 0) {
-        wolfCLU_LogError("rng init failed");
-        return ret;
-    }
+    /* These options are consumed only by feature-gated key types; cast to
+     * void so a build with those types disabled does not warn. */
+    (void)output; (void)name; (void)sizeStr; (void)expStr;
+    (void)levelStr; (void)heightStr; (void)layerStr;
 
-    ret = wolfCLU_checkForArg("-out", 4, argc, argv);
-    if (ret > 0) {
-        if (argv[ret+1] != NULL) {
-            if (XSTRLEN(argv[ret+1]) >= sizeof(keyOutFName)) {
-                wolfCLU_LogError("ERROR: -out filename too long (max %d)",
-                                 (int)sizeof(keyOutFName) - 1);
-                wc_FreeRng(&rng);
-                return USER_INPUT_ERROR;
-            }
-            XSTRLCPY(keyOutFName, argv[ret+1], sizeof(keyOutFName));
-        }
-        else {
-            wolfCLU_LogError("ERROR: No output file name specified");
-            wolfCLU_genKeyHelp();
-            wc_FreeRng(&rng);
-            return USER_INPUT_ERROR;
-        }
-    }
-    else {
+    /* an output file name is required */
+    if (outFile == NULL) {
         wolfCLU_LogError("ERROR: Please specify an output file name");
         wolfCLU_genKeyHelp();
-        wc_FreeRng(&rng);
         return USER_INPUT_ERROR;
     }
-
-    ret = wolfCLU_checkForArg("-outform", 8, argc, argv);
-    if (ret > 0 && ret + 1 < argc) {
-        format = argv[ret+1];
+    if (XSTRLEN(outFile) >= sizeof(keyOutFName)) {
+        wolfCLU_LogError("ERROR: -out filename too long (max %d)",
+                         (int)sizeof(keyOutFName) - 1);
+        return USER_INPUT_ERROR;
     }
-    ret = wolfCLU_checkOutform(format);
-    if (ret == PEM_FORM || ret == DER_FORM || ret == RAW_FORM) {
-        const char* formatStr = (ret == PEM_FORM) ? "PEM" :
-                                (ret == DER_FORM) ? "DER" :
+    XSTRLCPY(keyOutFName, outFile, sizeof(keyOutFName));
+
+    /* validate the output format */
+    formatArg = wolfCLU_checkOutform(format);
+    if (formatArg == PEM_FORM || formatArg == DER_FORM ||
+            formatArg == RAW_FORM) {
+        const char* formatStr = (formatArg == PEM_FORM) ? "PEM" :
+                                (formatArg == DER_FORM) ? "DER" :
                                 "RAW";
 
         WOLFCLU_LOG(WOLFCLU_L0, "OUTPUT A %s FILE", formatStr);
-        formatArg = ret;
     }
     else {
         wolfCLU_LogError("ERROR: \"%s\" is not a valid file format", format);
-        wc_FreeRng(&rng);
+        return formatArg;
+    }
+
+    ret = wc_InitRng(&rng);
+    if (ret != 0) {
+        wolfCLU_LogError("rng init failed");
         return ret;
     }
 
@@ -109,29 +266,10 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         /* force fail w/ check on condition "false" */
     }
     else if (XSTRNCMP(keyType, "ed25519", 7) == 0) {
-
     #ifdef HAVE_ED25519
+        int directiveArg = wolfCLU_genKeyDirective(output);
 
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
-                    ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PUB_ONLY_FILE,
-                                                                     formatArg);
-                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
-                    ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_ONLY_FILE,
-                                                                     formatArg);
-                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
-                    ret = wolfCLU_genKey_ED25519(&rng, keyOutFName,
-                                                       PRIV_AND_PUB_FILES, formatArg);
-            }
-        }
-        else {
-            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
-            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
-            ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, PRIV_AND_PUB_FILES,
-                                                                     formatArg);
-        }
+        ret = wolfCLU_genKey_ED25519(&rng, keyOutFName, directiveArg, formatArg);
     #else
         wolfCLU_LogError("Invalid option, ED25519 not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with --enable-ed25519 and "
@@ -139,48 +277,23 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
     #endif /* HAVE_ED25519 */
-
     }
     else if (XSTRNCMP(keyType, "ecc", 3) == 0) {
     #if defined(HAVE_ECC) && defined(WOLFSSL_KEY_GEN)
         /* ECC flags */
-        int directiveArg = PRIV_AND_PUB_FILES;
+        int directiveArg = wolfCLU_genKeyDirective(output);
 
         WOLFCLU_LOG(WOLFCLU_L0, "generate ECC key");
 
-        /* get the directive argument */
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
-                    directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
-                    directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
-                    directiveArg = PRIV_AND_PUB_FILES;
-            }
+        /* get the curve name */
+        if (name != NULL) {
+            int i;
+
+            /* convert name to upper case */
+            for (i = 0; i < (int)XSTRLEN(name); i++)
+                name[i] = (char)toupper((unsigned char)name[i]);
         }
         else {
-            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
-            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
-            directiveArg = PRIV_AND_PUB_FILES;
-        }
-
-        /* get the curve name */
-        ret = wolfCLU_checkForArg("-name", 5, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                int i;
-
-                name = argv[ret+1];
-
-                /* convert name to upper case */
-                for (i = 0; i < (int)XSTRLEN(name); i++)
-                    name[i] = (char)toupper((unsigned char)name[i]);
-            }
-        }
-
-        if (name == NULL) {
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: ECC key curve name used");
         }
 
@@ -197,50 +310,29 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     else if (XSTRNCMP(keyType, "rsa", 3) == 0) {
     #if !defined(NO_RSA) && defined(WOLFSSL_KEY_GEN)
         /* RSA flags */
-        int directiveArg = PRIV_AND_PUB_FILES;
+        int directiveArg = wolfCLU_genKeyDirective(output);
         int sizeArg = 0;
         int expArg  = 0;
 
         WOLFCLU_LOG(WOLFCLU_L0, "generate RSA key");
 
-        /* get the directive argument */
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
-                    directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
-                    directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
-                    directiveArg = PRIV_AND_PUB_FILES;
-            }
-        }
-        else {
-            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
-            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
-            directiveArg = PRIV_AND_PUB_FILES;
-        }
-
         /* get the size argument */
-        ret = wolfCLU_checkForArg("-size", 5, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                char* cur;
-                /* make sure it's an integer */
-                if (*argv[ret+1] == '\0') {
-                    WOLFCLU_LOG(WOLFCLU_L0, "Empty -size argument, using 2048");
-                    sizeArg = 2048;
+        if (sizeStr != NULL) {
+            char* cur;
+            /* make sure it's an integer */
+            if (*sizeStr == '\0') {
+                WOLFCLU_LOG(WOLFCLU_L0, "Empty -size argument, using 2048");
+                sizeArg = 2048;
+            }
+            else {
+                for (cur = sizeStr; *cur && isdigit(*cur); ++cur);
+                if (*cur == '\0') {
+                    sizeArg = XATOI(sizeStr);
                 }
                 else {
-                    for (cur = argv[ret+1]; *cur && isdigit(*cur); ++cur);
-                    if (*cur == '\0') {
-                        sizeArg = XATOI(argv[ret+1]);
-                    }
-                    else {
-                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -size (%s), using 2048",
-                               argv[ret+1]);
-                        sizeArg = 2048;
-                    }
+                    WOLFCLU_LOG(WOLFCLU_L0, "Invalid -size (%s), using 2048",
+                           sizeStr);
+                    sizeArg = 2048;
                 }
             }
         }
@@ -251,25 +343,22 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         /* get the exponent argument */
-        ret = wolfCLU_checkForArg("-exponent", 9, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                char* cur;
-                /* make sure it's an integer */
-                if (*argv[ret+1] == '\0') {
-                    WOLFCLU_LOG(WOLFCLU_L0, "Empty -exponent argument, using 65537");
-                    expArg = 65537;
+        if (expStr != NULL) {
+            char* cur;
+            /* make sure it's an integer */
+            if (*expStr == '\0') {
+                WOLFCLU_LOG(WOLFCLU_L0, "Empty -exponent argument, using 65537");
+                expArg = 65537;
+            }
+            else {
+                for (cur = expStr; *cur && isdigit(*cur); ++cur);
+                if (*cur == '\0') {
+                    expArg = XATOI(expStr);
                 }
                 else {
-                    for (cur = argv[ret+1]; *cur && isdigit(*cur); ++cur);
-                    if (*cur == '\0') {
-                        expArg = XATOI(argv[ret+1]);
-                    }
-                    else {
-                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -exponent (%s), using 65537",
-                               argv[ret+1]);
-                        expArg = 65537;
-                    }
+                    WOLFCLU_LOG(WOLFCLU_L0, "Invalid -exponent (%s), using 65537",
+                           expStr);
+                    expArg = 65537;
                 }
             }
         }
@@ -291,7 +380,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     }
     else if (XSTRNCMP(keyType, "dilithium", 9) == 0) {
     #if defined(HAVE_DILITHIUM) && defined(WOLFSSL_KEY_GEN)
-        int directiveArg = PRIV_AND_PUB_FILES;
+        int directiveArg = wolfCLU_genKeyDirective(output);
         int keySz = DILITHIUM_LEVEL2_PRV_KEY_SIZE;
         int level = 2;
         int withAlg = DILITHIUM_LEVEL2k;
@@ -299,9 +388,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_L0, "Generate Dilithium Key");
 
         /* get the level argument */
-        ret = wolfCLU_checkForArg("-level", 6, argc, argv);
-        if (ret > 0 && ret + 1 < argc) {
-            level = XATOI(argv[ret+1]);
+        if (levelStr != NULL) {
+            level = XATOI(levelStr);
             switch (level) {
                 case 2:
                     keySz = DILITHIUM_LEVEL2_PRV_KEY_SIZE;
@@ -317,7 +405,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                     break;
                 default:
                     WOLFCLU_LOG(WOLFCLU_L0, "Invalid -level (%s), using level%d",
-                                argv[ret+1], level);
+                                levelStr, level);
                     break;
             }
         }
@@ -325,23 +413,6 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             /* no option -level */
             WOLFCLU_LOG(WOLFCLU_L0, "No -level [ 2 | 3 | 5 ]");
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use Level %d", level);
-        }
-
-        /* get the directive argument */
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
-                    directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
-                    directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
-                    directiveArg = PRIV_AND_PUB_FILES;
-            }
-        }
-        else {
-            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
-            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
         }
 
         WOLFCLU_LOG(WOLFCLU_L0, "using Dilithium%d", level);
@@ -357,7 +428,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     }
     else if (XSTRNCMP(keyType, "ml-dsa", 6) == 0) {
     #if defined(HAVE_DILITHIUM) && defined(WOLFSSL_KEY_GEN)
-        int directiveArg = PRIV_AND_PUB_FILES;
+        int directiveArg = wolfCLU_genKeyDirective(output);
         int keySz = ML_DSA_LEVEL2_BOTH_KEY_DER_SIZE;
         int level = WC_ML_DSA_44;
         int withAlg = DILITHIUM_LEVEL2k;
@@ -365,9 +436,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_L0, "Generate ML-DSA Key");
 
         /* get the level argument */
-        ret = wolfCLU_checkForArg("-level", 6, argc, argv);
-        if (ret > 0 && ret + 1 < argc) {
-            level = XATOI(argv[ret+1]);
+        if (levelStr != NULL) {
+            level = XATOI(levelStr);
             switch (level) {
                 case WC_ML_DSA_44:
                     keySz    = ML_DSA_LEVEL2_BOTH_KEY_DER_SIZE;
@@ -383,7 +453,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
                     break;
                 default:
                     WOLFCLU_LOG(WOLFCLU_L0, "Invalid -level (%s), using level%d",
-                                argv[ret+1], level);
+                                levelStr, level);
                     break;
             }
         }
@@ -391,23 +461,6 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             /* no option -level */
             WOLFCLU_LOG(WOLFCLU_L0, "No -level [ 2 | 3 | 5 ]");
             WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: use Level %d", level);
-        }
-
-        /* get the directive argument */
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
-                    directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
-                    directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
-                    directiveArg = PRIV_AND_PUB_FILES;
-            }
-        }
-        else {
-            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
-            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
         }
 
         ret = wolfCLU_genKey_ML_DSA(&rng, keyOutFName, directiveArg,
@@ -422,7 +475,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     }
     else if (XSTRNCMP(keyType, "xmssmt", 6) == 0) {
     #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN)
-        int directiveArg = PRIV_AND_PUB_FILES;
+        int directiveArg = wolfCLU_genKeyDirective(output);
         char xmssmtParam[XMSSMT_NAME_MAX_LEN + 1];   /* XMSS^MT parameter */
         char xmssmtParamHead[] = "XMSSMT-SHA2_\0";
         const int xmssmtHeadLen = (int)XSTRLEN(xmssmtParamHead);
@@ -437,23 +490,6 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_L0, "XMSS/XMSS^MT only supports RAW format");
         }
 
-        /* get the directive argument */
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
-                    directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
-                    directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
-                    directiveArg = PRIV_AND_PUB_FILES;
-            }
-        }
-        else {
-            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
-            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
-        }
-
         /* set XMSS Param head */
         XMEMSET(xmssmtParam, 0, sizeof(xmssmtParam));
         WOLFCLU_LOG(WOLFCLU_L0, "XMSS Param Head: %s\nLength: %d",
@@ -461,17 +497,16 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         XMEMCPY(xmssmtParam, xmssmtParamHead, xmssmtHeadLen);
 
         /* get the height argument */
-        ret = wolfCLU_checkForArg("-height", 7, argc, argv);
-        if (ret > 0 && ret + 1 < argc) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", argv[ret+1]);
+        if (heightStr != NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", heightStr);
 
-            if (XSTRNCMP(argv[ret+1], "20", 2) == 0
-                || XSTRNCMP(argv[ret+1], "40", 2) == 0
-                || XSTRNCMP(argv[ret+1], "60", 2) == 0) {
-                height = XATOI(argv[ret+1]);
+            if (XSTRNCMP(heightStr, "20", 2) == 0
+                || XSTRNCMP(heightStr, "40", 2) == 0
+                || XSTRNCMP(heightStr, "60", 2) == 0) {
+                height = XATOI(heightStr);
             }
             else {
-                WOLFCLU_LOG(WOLFCLU_L0, "Invalid -height (%s), using 20", argv[ret+1]);
+                WOLFCLU_LOG(WOLFCLU_L0, "Invalid -height (%s), using 20", heightStr);
                 height = XMSSMT_MIN_HEIGHT;
             }
         }
@@ -483,55 +518,54 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         /* get the layer argument */
-        ret = wolfCLU_checkForArg("-layer", 6, argc, argv);
-        if (ret > 0 && ret + 1 < argc) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Layer: %s", argv[ret+1]);
+        if (layerStr != NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Layer: %s", layerStr);
 
             switch (height) {
                 case 20:
-                    if (XSTRNCMP(argv[ret+1], "2", 1) == 0) {
+                    if (XSTRNCMP(layerStr, "2", 1) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/2_256\0", hdLen);
                     }
-                    else if (XSTRNCMP(argv[ret+1], "4", 1) == 0) {
+                    else if (XSTRNCMP(layerStr, "4", 1) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/4_256\0", hdLen);
                     }
                     else {
-                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", argv[ret+1]);
+                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", layerStr);
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/2_256\0", hdLen);
                     }
                     break;
                 case 40:
-                    if (XSTRNCMP(argv[ret+1], "2", 1) == 0) {
+                    if (XSTRNCMP(layerStr, "2", 1) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_256\0", hdLen);
                     }
-                    else if (XSTRNCMP(argv[ret+1], "4", 1) == 0) {
+                    else if (XSTRNCMP(layerStr, "4", 1) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/4_256\0", hdLen);
                     }
-                    else if (XSTRNCMP(argv[ret+1], "8", 1) == 0) {
+                    else if (XSTRNCMP(layerStr, "8", 1) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/8_256\0", hdLen);
                     }
                     else {
-                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", argv[ret+1]);
+                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", layerStr);
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "40/2_256\0", hdLen);
                     }
                     break;
                 case 60:
-                    if (XSTRNCMP(argv[ret+1], "3", 1) == 0) {
+                    if (XSTRNCMP(layerStr, "3", 1) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/3_256\0", hdLen);
                     }
-                    else if (XSTRNCMP(argv[ret+1], "6", 1) == 0) {
+                    else if (XSTRNCMP(layerStr, "6", 1) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/6_256\0", hdLen);
                     }
-                    else if (XSTRNCMP(argv[ret+1], "12", 2) == 0) {
+                    else if (XSTRNCMP(layerStr, "12", 2) == 0) {
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/12_256\0", hdLen+1);
                     }
                     else {
-                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 3", argv[ret+1]);
+                        WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 3", layerStr);
                         XMEMCPY(xmssmtParam + xmssmtHeadLen, "60/3_256\0", hdLen);
                     }
                     break;
                 default:
-                    WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", argv[ret+1]);
+                    WOLFCLU_LOG(WOLFCLU_L0, "Invalid -layer (%s), using 2", layerStr);
                     XMEMCPY(xmssmtParam + xmssmtHeadLen, "20/2_256\0", hdLen);
                     break;
             }
@@ -584,7 +618,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     }
     else if (XSTRNCMP(keyType, "xmss", 4) == 0) {
     #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN)
-        int directiveArg = PRIV_AND_PUB_FILES;
+        int directiveArg = wolfCLU_genKeyDirective(output);
         char xmssParam[XMSS_NAME_LEN + 1];   /* XMSS parameter */
         char xmssParamHead[] = "XMSS-SHA2_";
         int xmssHeadLen = (int)XSTRLEN(xmssParamHead);
@@ -597,45 +631,27 @@ int wolfCLU_genKeySetup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_L0, "XMSS/XMSS^MT only supports RAW format");
         }
 
-        /* get the directive argument */
-        ret = wolfCLU_checkForArg("-output", 7, argc, argv);
-        if (ret > 0) {
-            if (argv[ret+1] != NULL) {
-                if (XSTRNCASECMP(argv[ret+1], "pub", 3) == 0)
-                    directiveArg = PUB_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "priv", 4) == 0)
-                    directiveArg = PRIV_ONLY_FILE;
-                else if (XSTRNCASECMP(argv[ret+1], "keypair", 7) == 0)
-                    directiveArg = PRIV_AND_PUB_FILES;
-            }
-        }
-        else {
-            WOLFCLU_LOG(WOLFCLU_L0, "No -output <PUB/PRIV/KEYPAIR>");
-            WOLFCLU_LOG(WOLFCLU_L0, "DEFAULT: output public and private key pair");
-        }
-
         /* set XMSS Param head */
         XMEMSET(xmssParam, 0, sizeof(xmssParam));
         WOLFCLU_LOG(WOLFCLU_L0, "XMSS Param Head: %s", xmssParamHead);
         XMEMCPY(xmssParam, xmssParamHead, xmssHeadLen);
 
         /* get the height argument */
-        ret = wolfCLU_checkForArg("-height", 7, argc, argv);
-        if (ret > 0 && ret + 1 < argc) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", argv[ret+1]);
+        if (heightStr != NULL) {
+            WOLFCLU_LOG(WOLFCLU_L0, "Height: %s", heightStr);
 
-            if (XSTRNCMP(argv[ret+1], "10", 2) == 0) {
+            if (XSTRNCMP(heightStr, "10", 2) == 0) {
                 XMEMCPY(xmssParam + xmssHeadLen, "10_256", hLen);
             }
-            else if (XSTRNCMP(argv[ret+1], "16", 2) == 0) {
+            else if (XSTRNCMP(heightStr, "16", 2) == 0) {
                 XMEMCPY(xmssParam + xmssHeadLen, "16_256", hLen);
             }
-            else if (XSTRNCMP(argv[ret+1], "20", 2) == 0) {
+            else if (XSTRNCMP(heightStr, "20", 2) == 0) {
                 XMEMCPY(xmssParam + xmssHeadLen, "20_256", hLen);
             }
             else {
                 WOLFCLU_LOG(WOLFCLU_L0, "Invalid -height (%s)"
-                            "\nDefault: use height 10", argv[ret+1]);
+                            "\nDefault: use height 10", heightStr);
                 XMEMCPY(xmssParam + xmssHeadLen, "10_256", hLen);
             }
         }

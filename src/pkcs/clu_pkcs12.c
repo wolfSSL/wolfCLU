@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/pkey/clu_pkey.h>
@@ -77,8 +78,13 @@ int wolfCLU_PKCS12(int argc, char** argv)
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   pkcs12_options, &longIndex )) != -1) {
+                   pkcs12_options, &longIndex )) != END_OF_ARGS) {
         switch (option) {
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+
             case WOLFCLU_NODES:
                 useDES = 0;
                 break;

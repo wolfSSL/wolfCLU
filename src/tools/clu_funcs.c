@@ -19,8 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/version.h>
@@ -176,7 +176,7 @@ void wolfCLU_verboseHelp(void)
 #ifdef WOLFSSL_SHA512
         ,"sha512"
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
         ,"blake2b"
 #endif
 #ifndef NO_CODING
@@ -217,7 +217,7 @@ void wolfCLU_verboseHelp(void)
 #ifdef WOLFSSL_SHA512
         , "sha512"
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
         , "blake2b"
 #endif
     };
@@ -254,482 +254,6 @@ void wolfCLU_verboseHelp(void)
         WOLFCLU_LOG(WOLFCLU_L0, "%s", algsother[i]);
     }
 }
-
-/*
- * Encrypt Usage
- */
-void wolfCLU_encryptHelp(void)
-{
-    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable En/De crypt Algorithms with current configure "
-            "settings.\n");
-#ifndef NO_AES
-    WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
-#endif
-#if defined(WOLFSSL_AES_COUNTER) && \
-    LIBWOLFSSL_VERSION_HEX >= 0x05009000
-    WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
-#endif
-#ifndef NO_DES3
-    WOLFCLU_LOG(WOLFCLU_L0, "3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168");
-#endif
-#ifdef HAVE_CAMELLIA
-    WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
-            "camellia-cbc-256\n");
-#endif
-
-    WOLFCLU_LOG(WOLFCLU_L0, " ");
-    WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-pwd password input");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-k another option for password input");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-pass option for password source i.e pass:<password>");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-key hex key input");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-iv  hex iv input");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey input file for key");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-pbkdf2 use kdf version 2");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-md specify hash algo to use i.e md5, sha256");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-d decrypt the input file");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-p display debug information (key / iv ...)");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-base64 handle decoding a base64 input");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-nosalt do not use a salt input to kdf");
-    WOLFCLU_LOG(WOLFCLU_L0, " ");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nENCRYPT USAGE: wolfssl -encrypt <-algorithm> -in <filename> "
-           "-pwd <password> -out <output file name>\n");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -encrypt aes-cbc-128 -pwd Thi$i$myPa$$w0rd"
-           " -in somefile.txt -out encryptedfile.txt\n");
-}
-
-/*
- * Decrypt Usage
- */
-void wolfCLU_decryptHelp(void)
-{
-    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable En/De crypt Algorithms with current configure "
-            "settings.\n");
-#ifndef NO_AES
-    WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
-#endif
-#if defined(WOLFSSL_AES_COUNTER) && \
-    LIBWOLFSSL_VERSION_HEX >= 0x05009000
-    WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
-#endif
-#ifndef NO_DES3
-    WOLFCLU_LOG(WOLFCLU_L0, "3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168");
-#endif
-#ifdef HAVE_CAMELLIA
-    WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
-            "camellia-cbc-256\n");
-#endif
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nDECRYPT USAGE: wolfssl -decrypt <algorithm> -in <encrypted file> "
-           "-pwd <password> -out <output file name>\n");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -decrypt aes-cbc-128 -pwd Thi$i$myPa$$w0rd"
-           " -in encryptedfile.txt -out decryptedfile.txt\n");
-}
-
-/*
- * Hash Usage
- */
-void wolfCLU_hashHelp(void)
-{
-    int i;
-
-    /* hash options */
-    const char* algsenc[] = {        /* list of acceptable algorithms */
-    "Algorithms: "
-#ifndef NO_MD5
-        ,"md5"
-#endif
-#ifndef NO_SHA
-        ,"sha"
-#endif
-#ifndef NO_SHA256
-        ,"sha256"
-#endif
-#ifdef WOLFSSL_SHA384
-        ,"sha384"
-#endif
-#ifdef WOLFSSL_SHA512
-        ,"sha512"
-#endif
-#ifdef HAVE_BLAKE2
-        ,"blake2b"
-#endif
-#ifndef NO_CODING
-    #ifdef WOLFSSL_BASE64_ENCODE
-        ,"base64enc"
-    #endif
-        ,"base64dec"
-#endif
-        };
-
-    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable algorithms with current configure settings:");
-    for (i = 0; i < (int) sizeof(algsenc)/(int) sizeof(algsenc[0]); i++) {
-        WOLFCLU_LOG(WOLFCLU_L0, "%s", algsenc[i]);
-    }
-            /* encryption/decryption help lists options */
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nUSAGE: wolfssl -hash <-algorithm> -in <file to hash>");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -hash sha -in <some file>\n");
-}
-
-/*
- * Benchmark Usage
- */
-void wolfCLU_benchHelp(void)
-{
-    int i;
-
-    /* benchmark options */
-    const char* algsother[] = {      /* list of acceptable algorithms */
-        "ALGS: "
-#ifndef NO_AES
-        , "aes-cbc"
-#endif
-#ifdef WOLFSSL_AES_COUNTER
-        , "aes-ctr"
-#endif
-#ifndef NO_DES3
-        , "3des"
-#endif
-#ifdef HAVE_CAMELLIA
-        , "camellia"
-#endif
-#ifndef NO_MD5
-        , "md5"
-#endif
-#ifndef NO_SHA
-        , "sha"
-#endif
-#ifndef NO_SHA256
-        , "sha256"
-#endif
-#ifdef WOLFSSL_SHA384
-        , "sha384"
-#endif
-#ifdef WOLFSSL_SHA512
-        , "sha512"
-#endif
-#ifdef HAVE_BLAKE2
-        , "blake2b"
-#endif
-    };
-
-    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable tests: (-a to test all)");
-    WOLFCLU_LOG(WOLFCLU_L0, "Available tests with current configure settings:");
-    for(i = 0; i < (int) sizeof(algsother)/(int) sizeof(algsother[0]); i++) {
-        WOLFCLU_LOG(WOLFCLU_L0, "%s", algsother[i]);
-    }
-    WOLFCLU_LOG(WOLFCLU_L0, " ");
-            /* encryption/decryption help lists options */
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "USAGE: wolfssl -bench [alg] -time [time in seconds [1-10]]"
-           "       or\n       wolfssl -bench -time 10 -all (to test all)");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -bench aes-cbc -time 10"
-           " -in encryptedfile.txt -out decryptedfile.txt\n");
-}
-
-void wolfCLU_certHelp(void)
-{
-    WOLFCLU_LOG(WOLFCLU_L0, "\n");
-    WOLFCLU_LOG(WOLFCLU_L0, "-inform pem or der in format");
-    WOLFCLU_LOG(WOLFCLU_L0, "-in the file to read from");
-    WOLFCLU_LOG(WOLFCLU_L0, "-outform pem or der out format");
-    WOLFCLU_LOG(WOLFCLU_L0, "-out output file to write to");
-    WOLFCLU_LOG(WOLFCLU_L0, "-req input file is a CSR file");
-    WOLFCLU_LOG(WOLFCLU_L0, "-signkey a key for signing");
-    WOLFCLU_LOG(WOLFCLU_L0, "-* supported digests for signing");
-    WOLFCLU_LOG(WOLFCLU_L0, "-extfile config file");
-    WOLFCLU_LOG(WOLFCLU_L0, "-extensions section of the config file to use");
-    WOLFCLU_LOG(WOLFCLU_L0, "-noout no output");
-    WOLFCLU_LOG(WOLFCLU_L0, "-subject print out the subject name");
-    WOLFCLU_LOG(WOLFCLU_L0, "-issuer  print out the issuer name");
-    WOLFCLU_LOG(WOLFCLU_L0, "-serial  print out the serial number in hex");
-    WOLFCLU_LOG(WOLFCLU_L0, "-dates   print out the valid dates of cert");
-    WOLFCLU_LOG(WOLFCLU_L0, "-email   print out the subject names email address");
-    WOLFCLU_LOG(WOLFCLU_L0, "-fingerprint print out the hash of the certificate in DER form");
-    WOLFCLU_LOG(WOLFCLU_L0, "-purpose print out the certificates purpose");
-    WOLFCLU_LOG(WOLFCLU_L0, "-hash print out the hash of the certificate subject name");
-    WOLFCLU_LOG(WOLFCLU_L0, "-text print human readable text of X509");
-    WOLFCLU_LOG(WOLFCLU_L0, "-modulus print out the RSA key modulus");
-    WOLFCLU_LOG(WOLFCLU_L0, "-pubkey print out the Public Key");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nX509 USAGE: wolfssl x509 -inform <PEM or DER> -in <filename> "
-           "-outform <PEM or DER> -out <output file name> \n");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl x509 -inform pem -in certs/"
-           "ca-cert.pem -outform der -out certs/ca-cert-converted.der"
-           "\n");
-}
-
-void wolfCLU_genKeyHelp(void)
-{
-    int i;
-
-    const char* keysother[] = { /* list of acceptable key types */
-        "KEYS: "
-    #ifndef NO_RSA
-        ,"rsa"
-    #endif
-    #ifdef HAVE_ED25519
-        ,"ed25519"
-    #endif
-    #ifdef HAVE_ECC
-        ,"ecc"
-    #endif
-    #ifdef HAVE_DILITHIUM
-        ,"ml-dsa"
-        ,"dilithium"
-    #endif
-    #ifdef WOLFSSL_HAVE_XMSS
-        ,"xmss"
-        ,"xmssmt"
-    #endif
-        };
-
-        WOLFCLU_LOG(WOLFCLU_L0, "Available keys with current configure settings:");
-        for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
-            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
-        }
-    WOLFCLU_LOG(WOLFCLU_L0, "\n");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\ngenkey USAGE:\nwolfssl -genkey <keytype> -size(optional) <bits> "
-           "-out <filename> -outform <PEM or DER> -output <PUB/PRIV/KEYPAIR> \n");
-    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -genkey rsa -size 2048 -out mykey -outform der "
-           " -output KEYPAIR");
-#ifdef HAVE_DILITHIUM
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
-           "[2|3|5] -out mykey -outform der -output KEYPAIR");
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey dilithium -level "
-           "[2|3|5] -out mykey -outform pem -output KEYPAIR");
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
-           "[2|3|5] -out mykey -outform der -output KEYPAIR");
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
-           "[2|3|5] -out mykey -outform pem -output KEYPAIR");
-#endif
-#ifdef WOLFSSL_HAVE_XMSS
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmss -height [10|16|20] -out mykey -outform raw"
-                " -output KEYPAIR");
-    WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmssmt -height [20|40|60] -layer [2|4|8|3|6|12]"
-                "  -out mykey -outform raw -output KEYPAIR");
-    WOLFCLU_LOG(WOLFCLU_L0, "XMSS key file name must be something like \"XMSS-SHA2_10_256\""
-                "\nXMSS/XMSS^MT parametaers are determined by file name when signing");
-#endif
-    WOLFCLU_LOG(WOLFCLU_L0,
-           "\n\nThe above command would output the files: mykey.priv "
-           " and mykey.pub\nChanging the -output option to just PRIV would only"
-           "\noutput the mykey.priv and using just PUB would only output"
-           "\nmykey.pub\n");
-}
-
-void wolfCLU_signHelp(int keyType)
-{
-    int i;
-    const char* keysother[] = { /* list of acceptable key types */
-        "KEYS: "
-        #ifndef NO_RSA
-        ,"rsa"
-        #endif
-        #ifdef HAVE_ED25519
-        ,"ed25519"
-        #endif
-        #ifdef HAVE_ECC
-        ,"ecc"
-        #endif
-        #ifdef HAVE_DILITHIUM
-        ,"ml-dsa"
-        ,"dilithium"
-        #endif
-        #ifdef WOLFSSL_HAVE_XMSS
-        ,"xmss"
-        ,"xmssmt"
-        #endif
-        };
-
-        WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable keys with current configure settings:");
-        for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
-            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
-        }
-
-        WOLFCLU_LOG(WOLFCLU_L0, "\n***************************************************************");
-        switch(keyType) {
-            #ifndef NO_RSA
-            case RSA_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "RSA Sign Usage: \nwolfssl -rsa -sign -inkey <priv_key>"
-                       " -in <filename> -out <filename>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            #endif
-            #ifdef HAVE_DILITHIUM
-            case DILITHIUM_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "ML-DSA (Dilithium) Sign Usage:\n"
-                       "wolfssl -ml-dsa -sign -inkey <priv_key> -inform <pem|der>\n"
-                       "                -in <file_to_sign> -out <signature_file>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "  -level [2|3|5] is set at key generation, not here.\n"
-                       "  PEM keys require '-inform pem' (default is der).\n"
-                       "  'dilithium' is accepted as an alias for 'ml-dsa'.\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "EXAMPLE:\n"
-                       "wolfssl -ml-dsa -sign -inkey ml-dsa-key-A.priv -inform pem\n"
-                       "                -in input.txt -out input.sign\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            #endif
-            #ifdef HAVE_ED25519
-            case ED25519_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Sign Usage: \nwolfssl -ed25519 -sign -inkey "
-                       "<priv_key> -in <filename> -out <filename>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            #endif
-            #ifdef HAVE_ECC
-            case ECC_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "ECC Sign Usage: \nwolfssl -ecc -sign -inkey <priv_key>"
-                       " -in <filename> -out <filename>\n");
-                break;
-            #endif
-            #ifdef WOLFSSL_HAVE_XMSS
-            case XMSS_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "XMSS Sign Usage: \nwolfssl -xmss -sign -inkey <priv_key>"
-                       " -in <filename> -out <filename>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            case XMSSMT_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT Sign Usage: \nwolfssl -xmssmt -sign -inkey <priv_key>"
-                       " -in <filename> -out <filename>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            #endif
-            default:
-                WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
-        }
-}
-
-void wolfCLU_verifyHelp(int keyType) {
-    int i;
-    const char* keysother[] = { /* list of acceptable key types */
-        "KEYS: "
-        #ifndef NO_RSA
-        ,"rsa"
-        #endif
-        #ifdef HAVE_ED25519
-        ,"ed25519"
-        #endif
-        #ifdef HAVE_ECC
-        ,"ecc"
-        #endif
-        #ifdef HAVE_DILITHIUM
-        ,"ml-dsa"
-        ,"dilithium"
-        #endif
-        #ifdef WOLFSSL_HAVE_XMSS
-        ,"xmss"
-        ,"xmssmt"
-        #endif
-        };
-
-        WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable keys with current configure settings:");
-        for(i = 0; i < (int) sizeof(keysother)/(int) sizeof(keysother[0]); i++) {
-            WOLFCLU_LOG(WOLFCLU_L0, "%s", keysother[i]);
-        }
-
-        WOLFCLU_LOG(WOLFCLU_L0, "\n***************************************************************");
-        switch(keyType) {
-            #ifndef NO_RSA
-            case RSA_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "RSA Verify with Private Key:"
-                        "wolfssl -rsa -verify -inkey <priv_key>"
-                        " -sigfile <filename> -out <filename>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                WOLFCLU_LOG(WOLFCLU_L0, "RSA Verify with Public Key"
-                       "wolfssl -rsa -verify -inkey <pub_key>"
-                       " -sigfile <filename> -out <filename> -pubin\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            #endif
-            #ifdef HAVE_DILITHIUM
-            case DILITHIUM_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "ML-DSA (Dilithium) Verify Usage:\n"
-                       "wolfssl -ml-dsa -verify -inkey <pub_key> -inform <pem|der>\n"
-                       "                -in <original_file> -sigfile <signature_file>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "  Verifies with the public key (.pub).\n"
-                       "  PEM keys require '-inform pem' (default is der).\n"
-                       "  'dilithium' is accepted as an alias for 'ml-dsa'.\n"
-                       "  (-pubin is not applicable; verification always uses the public key)\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "EXAMPLE:\n"
-                       "wolfssl -ml-dsa -verify -inkey ml-dsa-key-A.pub -inform pem\n"
-                       "                -in input.txt -sigfile input.sign\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            #endif
-            #ifdef HAVE_ED25519
-            case ED25519_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verify with Private Key"
-                       "wolfssl -ed25519 -verify -inkey "
-                       "<priv_key> -sigfile <filename> -in <original>"
-                       "\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verify with Public Key"
-                       "wolfssl -ed25519 -verify -inkey "
-                       "<pub_key> -sigfile <filename> -in <original> -pubin"
-                       "\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            #endif
-            #ifdef HAVE_ECC
-            case ECC_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "ECC Verify with Public Key"
-                       "wolfssl -ecc -verify -inkey <pub_key>"
-                       " -sigfile <signature> -in <original> -pubin\n");
-                break;
-            #endif
-            #ifdef WOLFSSL_HAVE_XMSS
-            case XMSS_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "XMSS Verify with Public Key"
-                       "wolfssl -xmss -verify -inkey <pub_key>"
-                       " -sigfile <signature> -in <original>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            case XMSSMT_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "XMSS^MT Verify with Public Key"
-                       "wolfssl -xmssmt -verify -inkey <pub_key>"
-                       " -sigfile <signature> -in <original>\n");
-                WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                break;
-            #endif
-            default:
-                WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
-        }
-}
-
-void wolfCLU_certgenHelp(void) {
-    WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-key public key to put into certificate request");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-inform der or pem format for '-in'");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-outform der or pem format for '-out'");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to parse for certificate configuration");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-x509 generate self signed certificate");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-addext add an extension, ie \"subjectAltName=IP:192.168.1.2,DNS:example.com\"");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey generate the private key to use with req");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey private key to use with req");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-keyout file to output key to");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-subj use a specified subject name, ie O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-verify check the signature on the req");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-text output human readable text of req");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-noout do not print out the generated results");
-}
-
 
 /* return block size on success
  * alg and mode are null terminated strings that need free'd by the caller
@@ -1041,8 +565,12 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
         optind = 0;
         opterr = 0; /* do not print out unknown options */
         while ((option = wolfCLU_GetOpt(argc, argv, "",
-                       crypt_algo_options, &longIndex )) != -1) {
+                       crypt_algo_options, &longIndex )) != END_OF_ARGS) {
             switch (option) {
+                case ARG_FOUND_TWICE:
+                    wolfCLU_LogError("Found duplicate argument");
+                    return WOLFCLU_FATAL_ERROR;
+
                 /* AES */
                 case WOLFCLU_AES128CTR:
                     XSTRNCPY(name, WOLFCLU_AES128CTR_NAME,
@@ -1732,18 +1260,23 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
 {
     int i     = optind; /* variable to keep track of starting option position */
     int index = 0;      /* index at which option was found */
+    optarg = NULL;      /* Clear out the last argument */
 
     while (1) {
-
         /* set end to 1 if last option is reached */
         if (long_options[i].name == 0 ) {
-            return WOLFCLU_FATAL_ERROR;
+            return END_OF_ARGS;
         }
         else {
 
             /* check if option is present in argv */
-            index = wolfCLU_checkForArg(long_options[i].name, (int)XSTRLEN(long_options[i].name), argc, argv);
+            index = wolfCLU_checkForArg(long_options[i].name,
+                    (int)XSTRLEN(long_options[i].name), argc, argv);
             optind++;
+
+            if (index == USER_INPUT_ERROR) {
+                return ARG_FOUND_TWICE;
+            }
 
             /* if index matches *opt_index at first position or if index is found */
             if (index == *opt_index+1 || (*opt_index !=0 && index > 0)) {
@@ -1754,7 +1287,12 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
                      * hand; any change here to how/when optarg is bound (e.g.
                      * adding --opt=value handling, optional_argument support, or
                      * argv permutation) must be reflected there too. */
-                    optarg=argv[index+1];
+                    if (index + 1 < argc) {
+                        optarg = argv[index+1];
+                    }
+                    else {
+                        optarg = NULL;
+                    }
                 }
                 return long_options[i].val;
             }

@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/pkey/clu_pkey.h>
@@ -427,9 +428,14 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     WOLFSSL_BIO *bioOut = NULL;
 
     optind = 0; /* start at indent 0 */
-    while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   pkey_options, &longIndex )) != -1) {
+    while ((option = wolfCLU_GetOpt(argc, argv, "", pkey_options,
+                    &longIndex )) != END_OF_ARGS) {
         switch (option) {
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+
             case WOLFCLU_PUBOUT:
                 pubOut = 1;
                 break;

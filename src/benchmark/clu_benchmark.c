@@ -20,13 +20,14 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_log.h>
 
 
 #define DES3_BLOCK_SIZE 24
 
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
 
-#endif /* HAVE_BLAKE2 */
+#endif /* HAVE_BLAKE2B */
 
 /*
  * benchmarking function
@@ -475,7 +476,7 @@ int wolfCLU_benchmark(int timer, int* option)
     }
     i++;
 #endif
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     /* blake2b test */
     if (option[i] == 1) {
         Blake2b  b2b;
@@ -509,8 +510,19 @@ int wolfCLU_benchmark(int timer, int* option)
         XMEMSET(digest, 0, BLAKE2B_OUTBYTES);
         wolfCLU_freeBins(digest, plain, NULL, NULL, NULL);
     }
+    i++;
 #endif
     wc_FreeRng(&rng);
+
+    /* The number of ifdef-guarded test blocks walked above MUST match the
+     * WOLFCLU_BENCH_* enumeration used to index option[] (clu_header_main.h).
+     * If they desync, benchmark selection silently mis-maps, so fail loudly. */
+    if (i != WOLFCLU_BENCH_COUNT) {
+        wolfCLU_LogError("Benchmark index desync: walked %d tests, expected %d",
+                i, WOLFCLU_BENCH_COUNT);
+        return WOLFCLU_FATAL_ERROR;
+    }
+
     (void)blocks;
     (void)loop;
     return WOLFCLU_SUCCESS;

@@ -104,7 +104,7 @@ extern "C" {
     #include <wolfssl/wolfcrypt/sha512.h>
 #endif
 
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     #include <wolfssl/wolfcrypt/blake2.h>
 #endif
 
@@ -225,47 +225,6 @@ void wolfCLU_help(void);
  * verbose help function
  */
 void wolfCLU_verboseHelp(void);
-
-/*
- * encrypt help function
- */
-void wolfCLU_encryptHelp(void);
-
-/*
- * decrypt help function
- */
-void wolfCLU_decryptHelp(void);
-
-/*
- * hash help function
- */
-void wolfCLU_hashHelp(void);
-
-/*
- * benchmark help function
- */
-void wolfCLU_benchHelp(void);
-
-/*
- * genkey help function
- */
-void wolfCLU_genKeyHelp(void);
-
-/*
- * sign help function
- */
-void wolfCLU_signHelp(int);
-
-/*
- * verify help function
- */
-void wolfCLU_verifyHelp(int);
-
-/*
- * certgen help function
- */
-void wolfCLU_certgenHelp(void);
-
 
 /* find algorithm for encryption/decryption
  *
@@ -403,6 +362,47 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         byte* iv, int hexOut, int enc, int pbkVersion,
         const WOLFSSL_EVP_MD* hashType, int printOut, int isBase64,
         int noSalt, int keyType);
+
+/* Index into the option array passed to wolfCLU_benchmark(). These values are
+ * also used as the GetOpt val for each algorithm in clu_bench_setup.c, so this
+ * enumeration MUST stay in sync with the ifdef-guarded test ordering in the
+ * body of wolfCLU_benchmark() (src/benchmark/clu_benchmark.c). A runtime check
+ * at the end of that function asserts the final index equals
+ * WOLFCLU_BENCH_COUNT so an add/remove desync is caught rather than silently
+ * mis-selecting a benchmark. */
+enum {
+#ifndef NO_AES
+    WOLFCLU_BENCH_AESCBC,
+#endif
+#ifdef WOLFSSL_AES_COUNTER
+    WOLFCLU_BENCH_AESCTR,
+#endif
+#ifndef NO_DES3
+    WOLFCLU_BENCH_3DES,
+#endif
+#ifdef HAVE_CAMELLIA
+    WOLFCLU_BENCH_CAMELLIA,
+#endif
+#ifndef NO_MD5
+    WOLFCLU_BENCH_MD5,
+#endif
+#ifndef NO_SHA
+    WOLFCLU_BENCH_SHA,
+#endif
+#ifndef NO_SHA256
+    WOLFCLU_BENCH_SHA256,
+#endif
+#ifdef WOLFSSL_SHA384
+    WOLFCLU_BENCH_SHA384,
+#endif
+#ifdef WOLFSSL_SHA512
+    WOLFCLU_BENCH_SHA512,
+#endif
+#ifdef HAVE_BLAKE2B
+    WOLFCLU_BENCH_BLAKE2B,
+#endif
+    WOLFCLU_BENCH_COUNT /* number of available tests, also terminal index */
+};
 
 /* benchmarking function
  *

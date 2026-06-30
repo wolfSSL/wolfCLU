@@ -34,7 +34,7 @@
 int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
         int size)
 {
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     Blake2b hash;               /* blake2b declaration */
     byte    chunk[MAX_IO_CHUNK_SZ];
 #endif
@@ -43,6 +43,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
     int     ret = WOLFCLU_SUCCESS;
     int     outSz;
     int     handled = 0;
+    int     isCoding = 0;       /* base64 enc/dec output is raw, not hex */
     enum wc_HashType hashType = WC_HASH_TYPE_NONE;
     WOLFSSL_BIO* tmp;
 
@@ -101,7 +102,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
         handled = 1;
     }
 
-#ifdef HAVE_BLAKE2
+#ifdef HAVE_BLAKE2B
     if (!handled && ret == WOLFCLU_SUCCESS && XSTRCMP(alg, "blake2b") == 0) {
         int bytesRead;
         if (wc_InitBlake2b(&hash, outSz) != 0) {
@@ -204,6 +205,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 handled = 1;
+                isCoding = 1;
             }
         }
 #endif /* WOLFSSL_BASE64_ENCODE */
@@ -227,6 +229,7 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 handled = 1;
+                isCoding = 1;
             }
         }
     }
@@ -251,10 +254,19 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
             }
             else {
                 wolfSSL_BIO_set_fp(tmp, stdout, BIO_NOCLOSE);
-                for (i = 0; i < outSz; i++) {
-                    wolfSSL_BIO_printf(tmp, "%02x", output[i]);
+                if (isCoding) {
+                    /* base64 enc/dec output is text/raw bytes, not a digest */
+                    if (wolfSSL_BIO_write(tmp, output, outSz) != outSz) {
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                 }
-                wolfSSL_BIO_printf(tmp, "\n");
+                else {
+                    /* write hash digest as hex */
+                    for (i = 0; i < outSz; i++) {
+                        wolfSSL_BIO_printf(tmp, "%02x", output[i]);
+                    }
+                    wolfSSL_BIO_printf(tmp, "\n");
+                }
                 wolfSSL_BIO_free(tmp);
             }
         }
