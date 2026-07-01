@@ -587,6 +587,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
             hashType = wolfSSL_EVP_get_digestbyname(optarg);
             if (hashType == NULL) {
                 wolfCLU_LogError("Invalid digest name");
+                wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
                 return WOLFCLU_FATAL_ERROR;
             }
             break;
