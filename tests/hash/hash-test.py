@@ -34,7 +34,7 @@ class HashCommandTest(unittest.TestCase):
                 if "disable-filesystem" in f.read():
                     raise unittest.SkipTest("filesystem support disabled")
 
-    def test_sha_(self):
+    def test_sha(self):
         r = run_wolfssl("-hash", "-sha", "-in", CERT_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), _read_expected("sha-expect.hex"))

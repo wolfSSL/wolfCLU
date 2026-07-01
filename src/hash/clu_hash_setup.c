@@ -19,8 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-#include "wolfclu/clu_error_codes.h"
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfssl/wolfcrypt/blake2-int.h>
@@ -50,7 +50,7 @@ static void wolfCLU_hashHelp(void)
         ,"sha512"
 #endif
 #ifdef HAVE_BLAKE2B
-        ,"blake2b"
+        ,"blake2b <size arg>"
 #endif
 #ifndef NO_CODING
     #ifdef WOLFSSL_BASE64_ENCODE
@@ -76,6 +76,7 @@ static const struct option hash_options[] = {
     {"-out",  required_argument, 0, WOLFCLU_OUTFILE },
     {"-h",    no_argument,       0, WOLFCLU_HELP    },
     {"-help", no_argument,       0, WOLFCLU_HELP    },
+    {"-size", required_argument, 0, WOLFCLU_SIZE    },
 
     /* Algorithms */
     {"-md5",        no_argument,       0, WOLFCLU_MD5      },
@@ -85,7 +86,7 @@ static const struct option hash_options[] = {
     {"-sha512",     no_argument,       0, WOLFCLU_SHA512   },
     {"-base64enc",  no_argument,       0, WOLFCLU_BASE64ENC},
     {"-base64dec",  no_argument,       0, WOLFCLU_BASE64DEC},
-    {"-blake2b",    required_argument, 0, WOLFCLU_BLAKE    },
+    {"-blake2b",    no_argument,       0, WOLFCLU_BLAKE    },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -130,7 +131,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_MD5:
-            #ifndef WC_MD5
+            #ifdef NO_MD5
                 wolfCLU_LogError("MD5 not avalable in your current wolfSSL "
                         "build");
                 return WOLFCLU_FATAL_ERROR;
@@ -146,7 +147,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_SHA:
-            #ifndef WC_SHA
+            #ifdef NO_SHA
                 wolfCLU_LogError("SHA not avalible in your current wolfSSL "
                         "build");
                 return WOLFCLU_FATAL_ERROR;
@@ -162,7 +163,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_SHA256:
-            #ifndef WC_SHA256
+            #ifdef NO_SHA256
                 wolfCLU_LogError("SHA-256 not avalible in your current wolfSSL "
                         "build");
                 return WOLFCLU_FATAL_ERROR;
@@ -178,7 +179,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_SHA384:
-            #ifndef WC_SHA384
+            #ifndef WOLFSSL_SHA384
                 wolfCLU_LogError("SHA-384 not avalible in your current wolfSSL "
                         "build");
                 return WOLFCLU_FATAL_ERROR;
@@ -195,7 +196,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_SHA512:
-            #ifndef WC_SHA512
+            #ifndef WOLFSSL_SHA512
                 wolfCLU_LogError("SHA-512 not avalible in your current wolfSSL "
                         "build");
                 return WOLFCLU_FATAL_ERROR;
@@ -212,7 +213,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_BLAKE:
-            #ifndef HAVE_BLAKE2B
+            #ifdef HAVE_BLAKE2B
                 wolfCLU_LogError("BLAKE2 not avalible in your current wolfSSL "
                         "build");
                 return WOLFCLU_FATAL_ERROR;
@@ -224,12 +225,12 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
                 alg = "blake2b";
                 algCheck = 1;
-                if (optarg != NULL)
+                if (optarg == NULL) {
                     size = XATOI(optarg);
-                else
-                    size = BLAKE2B_OUTBYTES;
+                }
                 if (size < 1 || size > 64) {
-                    wolfCLU_LogError("black2b size must be between 1-64");
+                    wolfCLU_LogError("-blake2b requires a size argument "
+                            "between [1, 64]");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
             #endif

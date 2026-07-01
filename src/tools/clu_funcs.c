@@ -18,8 +18,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
-#include "wolfclu/clu_error_codes.h"
+
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/version.h>
@@ -1254,6 +1255,7 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
 {
     int i     = optind; /* variable to keep track of starting option position */
     int index = 0;      /* index at which option was found */
+    optarg = NULL;      /* Clear out the last argument */
 
     while (1) {
         /* set end to 1 if last option is reached */
@@ -1263,7 +1265,8 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
         else {
 
             /* check if option is present in argv */
-            index = wolfCLU_checkForArg(long_options[i].name, (int)XSTRLEN(long_options[i].name), argc, argv);
+            index = wolfCLU_checkForArg(long_options[i].name,
+                    (int)XSTRLEN(long_options[i].name), argc, argv);
             optind++;
 
             if (index == USER_INPUT_ERROR) {

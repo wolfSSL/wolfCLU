@@ -208,7 +208,8 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         switch (option) {
             case ARG_FOUND_TWICE:
                 wolfCLU_LogError("Found duplicate argument");
-                return WOLFCLU_FATAL_ERROR;
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
 
             case WOLFCLU_MD5:
                 hashType = WC_HASH_TYPE_MD5;

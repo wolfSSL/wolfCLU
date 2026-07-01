@@ -279,13 +279,15 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
     /* initialize memory buffers */
     pwdKey = (byte*)XMALLOC(keySize + block, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (pwdKey == NULL)
+    if (pwdKey == NULL) {
+        wolfCLU_freeBins((byte*)mode, NULL, NULL, NULL, NULL);
         return MEMORY_E;
+    }
     XMEMSET(pwdKey, 0, keySize + block);
 
     iv = (byte*)XMALLOC(block, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (iv == NULL) {
-        wolfCLU_freeBins(pwdKey, NULL, NULL, NULL, NULL);
+        wolfCLU_freeBins(pwdKey, (byte*)mode, NULL, NULL, NULL);
         return MEMORY_E;
     }
     XMEMSET(iv, 0, block);
@@ -296,7 +298,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
      * safe. The cleanup below also zeros the full allocation. */
     key = (byte*)XMALLOC(keySize, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (key == NULL) {
-        wolfCLU_freeBins(pwdKey, iv, NULL, NULL, NULL);
+        wolfCLU_freeBins(pwdKey, iv, (byte*)mode, NULL, NULL);
         return MEMORY_E;
     }
     XMEMSET(key, 0, keySize);
@@ -309,6 +311,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
         switch (option) {
         case ARG_FOUND_TWICE:
             wolfCLU_LogError("Found duplicate argument");
+            wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
             return WOLFCLU_FATAL_ERROR;
 
         case WOLFCLU_PASSWORD_SOURCE:

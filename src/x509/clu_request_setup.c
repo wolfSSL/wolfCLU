@@ -19,8 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-#include "wolfclu/clu_error_codes.h"
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/x509/clu_request.h>
@@ -783,7 +783,8 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case ARG_FOUND_TWICE:
                 wolfCLU_LogError("Found duplicate argument");
-                return WOLFCLU_FATAL_ERROR;
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
 
             case ':':
             case '?':
