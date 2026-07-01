@@ -367,12 +367,13 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 byte*  ivTmp = NULL;
                 word32 ivTmpSz = 0;
                 if (optarg == NULL) {
+                    wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
                     return WOLFCLU_FATAL_ERROR;
                 }
                 ivString = (char*)XMALLOC(XSTRLEN(optarg) + 1, HEAP_HINT,
                         DYNAMIC_TYPE_TMP_BUFFER);
                 if (ivString == NULL) {
-                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
                     return MEMORY_E;
                 }
                 XSTRLCPY(ivString, optarg, XSTRLEN(optarg) + 1);

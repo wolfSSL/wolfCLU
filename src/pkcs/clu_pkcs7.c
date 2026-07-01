@@ -80,7 +80,8 @@ int wolfCLU_PKCS7(int argc, char** argv)
         switch (option) {
             case ARG_FOUND_TWICE:
                 wolfCLU_LogError("Found duplicate argument");
-                return WOLFCLU_FATAL_ERROR;
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
 
             case WOLFCLU_CERTFILE:
                 printCerts = 1;
