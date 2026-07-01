@@ -185,7 +185,7 @@ class DgstLargeFileTest(unittest.TestCase):
     def test_hash_large_file(self):
         expected = "3e5915162b1974ac0d57a5a45113a1efcc1edc5e71e5e55ca69f9a7c60ca11fd"
 
-        r = run_wolfssl("-hash", "sha256", "-in", self.LARGE_FILE)
+        r = run_wolfssl("-hash", "-sha256", "-in", self.LARGE_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(expected, r.stdout,
                       "Failed to get expected hash with -hash")
@@ -193,14 +193,11 @@ class DgstLargeFileTest(unittest.TestCase):
     def test_sha256_large_file(self):
         expected = "3e5915162b1974ac0d57a5a45113a1efcc1edc5e71e5e55ca69f9a7c60ca11fd"
 
-        r = run_wolfssl("sha256", self.LARGE_FILE)
+        r = run_wolfssl("-sha256", self.LARGE_FILE)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(expected, r.stdout,
                       "Failed to get expected hash with sha256")
 
-    # Slow when run inside a Windows VM (large file I/O over network share)
-    @unittest.skipIf(os.environ.get("WOLFCLU_SKIP_SLOW_TESTS", "0") == "1",
-                      "slow test skipped via WOLFCLU_SKIP_SLOW_TESTS")
     def test_enc_dec_large_file(self):
         enc_file = "large-test.txt.enc"
         dec_file = "large-test.txt.dec"

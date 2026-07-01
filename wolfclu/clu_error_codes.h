@@ -34,6 +34,8 @@ enum {
     DER_TO_PEM_ERROR = -1004, /* converting der to pem failed */
     OUTPUT_FILE_ERROR = -1005,
     FEATURE_COMING_SOON = -1006, /* Feature not yet implemented */
+    ARG_FOUND_TWICE     = -1007,
+    END_OF_ARGS         = -1008,
 };
 
 #endif /* _WOLFSSL_CLU_ERROR_H_ */

@@ -78,8 +78,12 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   dsa_options, &longIndex )) != -1) {
+                   dsa_options, &longIndex )) != END_OF_ARGS) {
         switch (option) {
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                return WOLFCLU_FATAL_ERROR;
+
             case WOLFCLU_INFILE:
 #ifdef WOLFCLU_NO_FILESYSTEM
             WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");

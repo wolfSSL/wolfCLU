@@ -121,7 +121,7 @@ grep -q "WOLFSSL_SHA512" $OPTS && if [[ $? -eq $zero ]]; then
     hashing $SHA5
 fi
 cd $CURR_PATH/../../              #change to home directory
-grep -q "HAVE_BLAKE2" $OPTS && if [[ $? -eq $zero ]]; then
+grep -q "HAVE_BLAKE2B" $OPTS && if [[ $? -eq $zero ]]; then
     hashing $BLAKE
 fi
 cd $CURR_PATH

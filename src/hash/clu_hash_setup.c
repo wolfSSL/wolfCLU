@@ -20,7 +20,75 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
+#include <wolfclu/clu_optargs.h>
+#include <wolfssl/openssl/bio.h>
+
+#ifndef WOLFCLU_NO_FILESYSTEM
+static void wolfCLU_hashHelp(void)
+{
+    int i;
+
+    /* hash options */
+    const char* algsenc[] = {        /* list of acceptable algorithms */
+    "Algorithms: "
+#ifndef NO_MD5
+        ,"md5"
+#endif
+#ifndef NO_SHA
+        ,"sha"
+#endif
+#ifndef NO_SHA256
+        ,"sha256"
+#endif
+#ifdef WOLFSSL_SHA384
+        ,"sha384"
+#endif
+#ifdef WOLFSSL_SHA512
+        ,"sha512"
+#endif
+#ifdef HAVE_BLAKE2B
+        ,"blake2b <size arg>"
+#endif
+#ifndef NO_CODING
+    #ifdef WOLFSSL_BASE64_ENCODE
+        ,"base64enc"
+    #endif
+        ,"base64dec"
+#endif
+        };
+
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable algorithms with current configure settings:");
+    for (i = 0; i < (int) sizeof(algsenc)/(int) sizeof(algsenc[0]); i++) {
+        WOLFCLU_LOG(WOLFCLU_L0, "%s", algsenc[i]);
+    }
+            /* encryption/decryption help lists options */
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nUSAGE: wolfssl -hash <-algorithm> -in <file to hash>");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -hash -sha -in <some file>\n");
+}
+
+static const struct option hash_options[] = {
+    {"-in",   required_argument, 0, WOLFCLU_INFILE  },
+    {"-out",  required_argument, 0, WOLFCLU_OUTFILE },
+    {"-h",    no_argument,       0, WOLFCLU_HELP    },
+    {"-help", no_argument,       0, WOLFCLU_HELP    },
+
+    /* Algorithms */
+    {"-md5",        no_argument,       0, WOLFCLU_MD5      },
+    {"-sha",        no_argument,       0, WOLFCLU_SHA      },
+    {"-sha256",     no_argument,       0, WOLFCLU_SHA256   },
+    {"-sha384",     no_argument,       0, WOLFCLU_SHA384   },
+    {"-sha512",     no_argument,       0, WOLFCLU_SHA512   },
+    {"-base64enc",  no_argument,       0, WOLFCLU_BASE64ENC},
+    {"-base64dec",  no_argument,       0, WOLFCLU_BASE64DEC},
+    {"-blake2b",    required_argument, 0, WOLFCLU_BLAKE    },
+
+    {0, 0, 0, 0} /* terminal element */
+};
+#endif
 
 /*
  * hash argument function
@@ -29,138 +97,215 @@
 int wolfCLU_hashSetup(int argc, char** argv)
 {
 #ifndef WOLFCLU_NO_FILESYSTEM
-    WOLFSSL_BIO *bioIn = NULL;
-    WOLFSSL_BIO *bioOut = NULL;
+    int option;
+    int longIndex = 1;
+    int ret        =   WOLFCLU_SUCCESS;
 
-    int     ret        =   WOLFCLU_SUCCESS;
-    int     i          =   0;   /* loop variable */
-    const char* algs[]  =   {   /* list of acceptable algorithms */
-#ifndef NO_MD5
-        "md5",
-#endif
-#ifndef NO_SHA
-        "sha",
-#endif
-#ifndef NO_SHA256
-        "sha256",
-#endif
-#ifdef WOLFSSL_SHA384
-        "sha384",
-#endif
-#ifdef WOLFSSL_SHA512
-        "sha512",
-#endif
-#ifdef HAVE_BLAKE2
-        "blake2b",
-#endif
-#ifndef NO_CODING
-    #ifdef WOLFSSL_BASE64_ENCODE
-        "base64enc",
-    #endif
-        "base64dec",
-#endif
-        NULL /* terminal element (also stops the array from being 0-size */
-    };
-    size_t algsSz = sizeof(algs) / sizeof(algs[0]) - 1; /* -1 to ignore NULL */
-
-    char*   alg;                /* algorithm being used */
+    const char* alg =   NULL;   /* algorithm being used */
     int     algCheck=   0;      /* acceptable algorithm check */
-    int     inCheck =   0;      /* input check */
     int     size    =   0;      /* message digest size */
 
-#ifdef HAVE_BLAKE2
-    size = BLAKE2B_OUTBYTES;
-#endif
+    WOLFSSL_BIO *bioIn = NULL;
+    WOLFSSL_BIO *bioOut = NULL;
+    char* inFile = NULL;
+    char* outFile = NULL;
 
-    /* help checking */
-    ret = wolfCLU_checkForArg("-help", 5, argc, argv);
-    if (ret > 0) {
-        wolfCLU_hashHelp();
-        return WOLFCLU_SUCCESS;
-    }
 
-    for (i = 0; i < (int)algsSz; ++i) {
-        /* checks for acceptable algorithms */
-        if (XSTRCMP(argv[2], algs[i]) == 0) {
-            alg = argv[2];
-            algCheck = 1;
+    opterr = 0; /* do not display unrecognized options */
+    optind = 0; /* start at index 0 */
+    while ((option = wolfCLU_GetOpt(argc, argv, "", hash_options,
+                    &longIndex)) != END_OF_ARGS) {
+        switch (option) {
+            case WOLFCLU_HELP:
+                wolfCLU_hashHelp();
+                return WOLFCLU_SUCCESS;
+
+            case WOLFCLU_INFILE:
+                inFile = optarg;
+                break;
+
+            case WOLFCLU_OUTFILE:
+                outFile = optarg;
+                break;
+
+            case WOLFCLU_MD5:
+            #ifdef NO_MD5
+                wolfCLU_LogError("MD5 not avalable in your current wolfSSL "
+                        "build");
+                return WOLFCLU_FATAL_ERROR;
+            #else
+                if (alg != NULL) {
+                    wolfCLU_LogError("alg already set");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+                alg = "md5";
+                algCheck = 1;
+                size = WC_MD5_DIGEST_SIZE;
+            #endif
+                break;
+
+            case WOLFCLU_SHA:
+            #ifdef NO_SHA
+                wolfCLU_LogError("SHA not avalible in your current wolfSSL "
+                        "build");
+                return WOLFCLU_FATAL_ERROR;
+            #else
+                if (alg != NULL) {
+                    wolfCLU_LogError("alg already set");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+                alg = "sha";
+                algCheck = 1;
+                size = WC_SHA_DIGEST_SIZE;
+            #endif
+                break;
+
+            case WOLFCLU_SHA256:
+            #ifdef NO_SHA256
+                wolfCLU_LogError("SHA-256 not avalible in your current wolfSSL "
+                        "build");
+                return WOLFCLU_FATAL_ERROR;
+            #else
+                if (alg != NULL) {
+                    wolfCLU_LogError("alg already set");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+                alg = "sha256";
+                algCheck = 1;
+                size = WC_SHA256_DIGEST_SIZE;
+            #endif
+                break;
+
+            case WOLFCLU_SHA384:
+            #ifndef WOLFSSL_SHA384
+                wolfCLU_LogError("SHA-384 not avalible in your current wolfSSL "
+                        "build");
+                return WOLFCLU_FATAL_ERROR;
+            #else
+                if (alg != NULL) {
+                    wolfCLU_LogError("alg already set");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+
+                alg = "sha384";
+                algCheck = 1;
+                size = WC_SHA384_DIGEST_SIZE;
+            #endif
+                break;
+
+            case WOLFCLU_SHA512:
+            #ifndef WOLFSSL_SHA512
+                wolfCLU_LogError("SHA-512 not avalible in your current wolfSSL "
+                        "build");
+                return WOLFCLU_FATAL_ERROR;
+            #else
+                if (alg != NULL) {
+                    wolfCLU_LogError("alg already set");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+
+                alg = "sha512";
+                algCheck = 1;
+                size = WC_SHA512_DIGEST_SIZE;
+            #endif
+                break;
+
+            case WOLFCLU_BLAKE:
+            #ifndef HAVE_BLAKE2B
+                wolfCLU_LogError("BLAKE2 not avalible in your current wolfSSL "
+                        "build");
+                return WOLFCLU_FATAL_ERROR;
+            #else
+                if (alg != NULL) {
+                    wolfCLU_LogError("alg already set");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+
+                alg = "blake2b";
+                algCheck = 1;
+                if (optarg != NULL) {
+                    size = XATOI(optarg);
+                }
+                if (size < 1 || size > 64) {
+                    wolfCLU_LogError("-blake2b requires a size argument "
+                            "between [1, 64]");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            #endif
+                break;
+
+            case WOLFCLU_BASE64ENC:
+            #if defined(NO_CODING) || !defined(WOLFSSL_BASE64_ENCODE)
+                wolfCLU_LogError("BASE64 encoding not avalible in your "
+                        "current wolfSSL build");
+                return WOLFCLU_FATAL_ERROR;
+            #else
+                if (alg != NULL) {
+                    wolfCLU_LogError("alg already set");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+
+                alg = "base64enc";
+                algCheck = 1;
+            #endif
+                break;
+
+            case WOLFCLU_BASE64DEC:
+            #if defined(NO_CODING)
+                wolfCLU_LogError("BASE64 encoding not avalible in your "
+                        "current wolfSSL build");
+                return WOLFCLU_FATAL_ERROR;
+            #else
+                if (alg != NULL) {
+                    wolfCLU_LogError("alg already set");
+                    return WOLFCLU_FATAL_ERROR;
+                }
+
+                alg = "base64dec";
+                algCheck = 1;
+            #endif
+                break;
+
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                return WOLFCLU_FATAL_ERROR;
+
+            case ':':
+            case '?':
+                break;
+
+            default:
+                wolfCLU_LogError("Unsupported argument");
+                ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    if (algCheck == 0) {
+    if (ret == WOLFCLU_SUCCESS && algCheck == 0) {
         wolfCLU_LogError("Invalid algorithm");
-        return WOLFCLU_FATAL_ERROR;
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
-    /* returns location of the arg in question if present */
-    ret = wolfCLU_checkForArg("-in", 3, argc, argv);
-    if (ret > 0 && ret + 1 < argc) {
-        bioIn = wolfSSL_BIO_new_file(argv[ret+1], "rb");
+    if (ret == WOLFCLU_SUCCESS && inFile != NULL) {
+        bioIn = wolfSSL_BIO_new_file(inFile, "rb");
         if (bioIn == NULL) {
-            wolfCLU_LogError("unable to open file %s", argv[ret+1]);
-            return USER_INPUT_ERROR;
+            wolfCLU_LogError("unable to open file %s", inFile);
+            ret = USER_INPUT_ERROR;
         }
-        inCheck = 1;
     }
 
-    ret = wolfCLU_checkForArg("-out", 4, argc, argv);
-    if (ret > 0 && ret + 1 < argc) {
-        bioOut = wolfSSL_BIO_new_file(argv[ret+1], "wb");
+    if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
+        bioOut = wolfSSL_BIO_new_file(outFile, "wb");
         if (bioOut == NULL) {
-            wolfCLU_LogError("unable to open output file %s",
-                    argv[ret+1]);
-            return USER_INPUT_ERROR;
+            wolfCLU_LogError("unable to open output file %s", outFile);
+            ret = USER_INPUT_ERROR;
         }
     }
 
-    ret = wolfCLU_checkForArg("-size", 5, argc, argv);
-    if (ret > 0 && ret + 1 < argc) {
-        /* size of output */
-#ifndef HAVE_BLAKE2
-        wolfCLU_LogError("%s: -size is only valid when blake2 is enabled.",
-                argv[0]);
-#else
-        size = XATOI(argv[ret+1]);
-        if (size <= 0 || size > 64) {
-            wolfCLU_LogError("Invalid size, Must be between 1-64. Using default.");
-            size = BLAKE2B_OUTBYTES;
-        }
-#endif
+    if (ret == WOLFCLU_SUCCESS) {
+        /* hashing function */
+        ret = wolfCLU_hash(bioIn, bioOut, alg, size);
     }
 
-    if (inCheck == 0) {
-        wolfCLU_LogError("Must have input as either a file or standard I/O");
-        return WOLFCLU_FATAL_ERROR;
-    }
-
-    /* sets default size of algorithm */
-#ifndef NO_MD5
-    if (XSTRCMP(alg, "md5") == 0)
-        size = WC_MD5_DIGEST_SIZE;
-#endif
-
-#ifndef NO_SHA
-    if (XSTRCMP(alg, "sha") == 0)
-        size = WC_SHA_DIGEST_SIZE;
-#endif
-
-#ifndef NO_SHA256
-    if (XSTRCMP(alg, "sha256") == 0)
-        size = WC_SHA256_DIGEST_SIZE;
-#endif
-
-#ifdef WOLFSSL_SHA384
-    if (XSTRCMP(alg, "sha384") == 0)
-        size = WC_SHA384_DIGEST_SIZE;
-#endif
-
-#ifdef WOLFSSL_SHA512
-    if (XSTRCMP(alg, "sha512") == 0)
-        size = WC_SHA512_DIGEST_SIZE;
-#endif
-
-    /* hashing function */
-    ret = wolfCLU_hash(bioIn, bioOut, alg, size);
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
 

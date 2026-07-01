@@ -25,7 +25,6 @@
 #include <wolfclu/x509/clu_x509_sign.h>
 #include <wolfclu/x509/clu_cert.h>
 
-#include <ctype.h>
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
 #endif  /* HAVE_DILITHIUM */

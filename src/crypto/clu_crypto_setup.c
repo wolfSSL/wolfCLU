@@ -24,6 +24,78 @@
 #include <wolfclu/clu_optargs.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
+/*
+ * Decrypt Usage
+ */
+static void wolfCLU_decryptHelp(void)
+{
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable En/De crypt Algorithms with current configure "
+            "settings.\n");
+#ifndef NO_AES
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
+#endif
+#if defined(WOLFSSL_AES_COUNTER) && \
+    LIBWOLFSSL_VERSION_HEX >= 0x05009000
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
+#endif
+#ifndef NO_DES3
+    WOLFCLU_LOG(WOLFCLU_L0, "3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168");
+#endif
+#ifdef HAVE_CAMELLIA
+    WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
+            "camellia-cbc-256\n");
+#endif
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nDECRYPT USAGE: wolfssl -decrypt <algorithm> -in <encrypted file> "
+           "-pwd <password> -out <output file name>\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -decrypt aes-cbc-128 -pwd Thi$i$myPa$$w0rd"
+           " -in encryptedfile.txt -out decryptedfile.txt\n");
+}
+
+static void wolfCLU_encryptHelp(void)
+{
+    WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable En/De crypt Algorithms with current configure "
+            "settings.\n");
+#ifndef NO_AES
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-cbc-128\t\taes-cbc-192\t\taes-cbc-256");
+#endif
+#if defined(WOLFSSL_AES_COUNTER) && \
+    LIBWOLFSSL_VERSION_HEX >= 0x05009000
+    WOLFCLU_LOG(WOLFCLU_L0, "aes-ctr-128\t\taes-ctr-192\t\taes-ctr-256");
+#endif
+#ifndef NO_DES3
+    WOLFCLU_LOG(WOLFCLU_L0, "3des-cbc-56\t\t3des-cbc-112\t\t3des-cbc-168");
+#endif
+#ifdef HAVE_CAMELLIA
+    WOLFCLU_LOG(WOLFCLU_L0, "camellia-cbc-128\tcamellia-cbc-192\t"
+            "camellia-cbc-256\n");
+#endif
+
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
+    WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pwd password input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-k another option for password input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pass option for password source i.e pass:<password>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-key hex key input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-iv  hex iv input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey input file for key");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-pbkdf2 use kdf version 2");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-md specify hash algo to use i.e md5, sha256");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-d decrypt the input file");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-p display debug information (key / iv ...)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-base64 handle decoding a base64 input");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-nosalt do not use a salt input to kdf");
+    WOLFCLU_LOG(WOLFCLU_L0, " ");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nENCRYPT USAGE: wolfssl -encrypt <-algorithm> -in <filename> "
+           "-pwd <password> -out <output file name>\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
+    WOLFCLU_LOG(WOLFCLU_L0, "\nEXAMPLE: \n\nwolfssl -encrypt aes-cbc-128 -pwd Thi$i$myPa$$w0rd"
+           " -in somefile.txt -out encryptedfile.txt\n");
+}
 
 /* Decode a hex key string into the caller-provided keyOut buffer.
  *
@@ -207,13 +279,15 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
     /* initialize memory buffers */
     pwdKey = (byte*)XMALLOC(keySize + block, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (pwdKey == NULL)
+    if (pwdKey == NULL) {
+        wolfCLU_freeBins((byte*)mode, NULL, NULL, NULL, NULL);
         return MEMORY_E;
+    }
     XMEMSET(pwdKey, 0, keySize + block);
 
     iv = (byte*)XMALLOC(block, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (iv == NULL) {
-        wolfCLU_freeBins(pwdKey, NULL, NULL, NULL, NULL);
+        wolfCLU_freeBins(pwdKey, (byte*)mode, NULL, NULL, NULL);
         return MEMORY_E;
     }
     XMEMSET(iv, 0, block);
@@ -224,7 +298,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
      * safe. The cleanup below also zeros the full allocation. */
     key = (byte*)XMALLOC(keySize, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (key == NULL) {
-        wolfCLU_freeBins(pwdKey, iv, NULL, NULL, NULL);
+        wolfCLU_freeBins(pwdKey, iv, (byte*)mode, NULL, NULL);
         return MEMORY_E;
     }
     XMEMSET(key, 0, keySize);
@@ -232,9 +306,14 @@ int wolfCLU_setup(int argc, char** argv, char action)
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   crypt_options, &longIndex )) != -1) {
+                   crypt_options, &longIndex )) != END_OF_ARGS) {
 
         switch (option) {
+        case ARG_FOUND_TWICE:
+            wolfCLU_LogError("Found duplicate argument");
+            wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
+            return WOLFCLU_FATAL_ERROR;
+
         case WOLFCLU_PASSWORD_SOURCE:
             passwordSz = keySize;
             ret = wolfCLU_GetPassword((char*)pwdKey, &passwordSz, optarg);
@@ -288,12 +367,13 @@ int wolfCLU_setup(int argc, char** argv, char action)
                 byte*  ivTmp = NULL;
                 word32 ivTmpSz = 0;
                 if (optarg == NULL) {
+                    wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
                     return WOLFCLU_FATAL_ERROR;
                 }
                 ivString = (char*)XMALLOC(XSTRLEN(optarg) + 1, HEAP_HINT,
                         DYNAMIC_TYPE_TMP_BUFFER);
                 if (ivString == NULL) {
-                    wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                    wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
                     return MEMORY_E;
                 }
                 XSTRLCPY(ivString, optarg, XSTRLEN(optarg) + 1);
@@ -508,6 +588,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
             hashType = wolfSSL_EVP_get_digestbyname(optarg);
             if (hashType == NULL) {
                 wolfCLU_LogError("Invalid digest name");
+                wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
                 return WOLFCLU_FATAL_ERROR;
             }
             break;
