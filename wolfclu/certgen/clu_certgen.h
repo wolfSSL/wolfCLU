@@ -11,7 +11,6 @@
 #endif
 #ifndef NO_RSA
     #include <wolfssl/wolfcrypt/rsa.h>
-
 #endif
 
 #define HEAP_HINT NULL
