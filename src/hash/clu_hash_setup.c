@@ -23,8 +23,7 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
-#include <wolfssl/wolfcrypt/blake2-int.h>
-#include <wolfssl/wolfcrypt/sha512.h>
+#include <wolfssl/openssl/bio.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 static void wolfCLU_hashHelp(void)
@@ -76,7 +75,6 @@ static const struct option hash_options[] = {
     {"-out",  required_argument, 0, WOLFCLU_OUTFILE },
     {"-h",    no_argument,       0, WOLFCLU_HELP    },
     {"-help", no_argument,       0, WOLFCLU_HELP    },
-    {"-size", required_argument, 0, WOLFCLU_SIZE    },
 
     /* Algorithms */
     {"-md5",        no_argument,       0, WOLFCLU_MD5      },
@@ -86,7 +84,7 @@ static const struct option hash_options[] = {
     {"-sha512",     no_argument,       0, WOLFCLU_SHA512   },
     {"-base64enc",  no_argument,       0, WOLFCLU_BASE64ENC},
     {"-base64dec",  no_argument,       0, WOLFCLU_BASE64DEC},
-    {"-blake2b",    no_argument,       0, WOLFCLU_BLAKE    },
+    {"-blake2b",    required_argument, 0, WOLFCLU_BLAKE    },
 
     {0, 0, 0, 0} /* terminal element */
 };
@@ -287,12 +285,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    if (ret == WOLFCLU_SUCCESS && inFile == NULL) {
-        wolfCLU_LogError("Must have input as either a file or standard I/O");
-        ret = WOLFCLU_FATAL_ERROR;
-    }
-
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && inFile != NULL) {
         bioIn = wolfSSL_BIO_new_file(inFile, "rb");
         if (bioIn == NULL) {
             wolfCLU_LogError("unable to open file %s", inFile);

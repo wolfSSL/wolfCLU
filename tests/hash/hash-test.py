@@ -66,6 +66,12 @@ class HashCommandTest(unittest.TestCase):
         with open(CERT_FILE) as f:
             self.assertEqual(r.stdout.strip(), f.read().strip())
 
+    def test_blake2b(self):
+        r = run_wolfssl("-hash", "-blake2b", "64", "-in", CERT_FILE)
+        if r.returncode != 0 and "BLAKE2 not avalible" in (r.stdout + r.stderr):
+            self.skipTest("BLAKE2 not compiled into wolfSSL")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
 class HashShortcutTest(unittest.TestCase):
     """Tests using the shortcut subcommands (md5, sha256, etc.)."""
 

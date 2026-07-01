@@ -221,6 +221,7 @@ int wolfCLU_certSetup(int argc, char **argv)
                     if (in == NULL) {
                         wolfCLU_LogError("Unable to open file passed to -in %s"
                                 , inFile);
+                        ret = WOLFCLU_FATAL_ERROR;
                     }
                 }
                 break;
@@ -301,6 +302,7 @@ int wolfCLU_certSetup(int argc, char **argv)
             case ARG_FOUND_TWICE:
                 wolfCLU_LogError("Found duplicate argument");
                 ret = WOLFCLU_FATAL_ERROR;
+                break;
 
             case ':':
             case '?':

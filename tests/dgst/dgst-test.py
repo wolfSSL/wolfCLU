@@ -198,9 +198,6 @@ class DgstLargeFileTest(unittest.TestCase):
         self.assertIn(expected, r.stdout,
                       "Failed to get expected hash with sha256")
 
-    # Slow when run inside a Windows VM (large file I/O over network share)
-    @unittest.skipIf(os.environ.get("WOLFCLU_SKIP_SLOW_TESTS", "0") == "1",
-                      "slow test skipped via WOLFCLU_SKIP_SLOW_TESTS")
     def test_enc_dec_large_file(self):
         enc_file = "large-test.txt.enc"
         dec_file = "large-test.txt.dec"
