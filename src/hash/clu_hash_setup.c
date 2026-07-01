@@ -213,7 +213,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_BLAKE:
-            #ifdef HAVE_BLAKE2B
+            #ifndef HAVE_BLAKE2B
                 wolfCLU_LogError("BLAKE2 not avalible in your current wolfSSL "
                         "build");
                 return WOLFCLU_FATAL_ERROR;
@@ -225,7 +225,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
 
                 alg = "blake2b";
                 algCheck = 1;
-                if (optarg == NULL) {
+                if (optarg != NULL) {
                     size = XATOI(optarg);
                 }
                 if (size < 1 || size > 64) {
