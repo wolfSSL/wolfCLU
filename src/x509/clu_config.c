@@ -24,6 +24,8 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
+#include <wolfssl/wolfcrypt/ecc.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -347,7 +349,7 @@ static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
     byte oid[ASN1_OID_DOTTED_MAX_SZ];
     word32 oidSz = ASN1_OID_DOTTED_MAX_SZ;
     word32 decodedCount = 0;
-    word16 decoded[ASN1_OID_DOTTED_MAX_SZ];
+    word32 decoded[ASN1_OID_DOTTED_MAX_SZ];
 
     if (XSTRNCMP(name, "IP", 2) == 0) {
         ipStr = wolfSSL_a2i_IPADDRESS(value);
@@ -396,7 +398,8 @@ static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
 
             while (token != NULL) {
                 char* digit;
-                int n;
+                word32 n;
+
 
                 if (decodedCount >= ASN1_OID_DOTTED_MAX_SZ) {
                     wolfCLU_LogError("RID has too many components "
@@ -420,14 +423,14 @@ static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
                 if (ret != WOLFCLU_SUCCESS) {
                     break;
                 }
-                n = XATOI(token);
-                if (n < 0 || n > 0xFFFF) {
-                    wolfCLU_LogError("RID component out of range "
-                            "[0, 65535]: %s", token);
+                if (wolfCLU_StrToWord32(token, XSTRLEN(token), &n) ==
+                        WOLFCLU_FATAL_ERROR) {
+                    wolfCLU_LogError("RID component not a valid 32 bit"
+                            " integer : %s", token);
                     ret = WOLFCLU_FATAL_ERROR;
                     break;
                 }
-                decoded[decodedCount] = (word16)n;
+                decoded[decodedCount] = n;
                 decodedCount++;
                 token = XSTRTOK(NULL, ".", &ptr);
             }
@@ -457,6 +460,10 @@ static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
 
             wolfCLU_LogError("Couldn't encode RID. OID encoding is not"
                     " compiled in");
+        #if LIBWOLFSSL_VERSION_HEX <= 0x05009002
+            wolfCLU_LogError("Old Version of wolfSSL %s must be greater "
+                    "than 5.9.2 to use custom oids", WOLFSSL_VERSION);
+        #endif
             return WOLFCLU_FATAL_ERROR;
 
     #endif

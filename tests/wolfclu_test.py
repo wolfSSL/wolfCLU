@@ -164,6 +164,32 @@ def truncate_sparse(fileobj, size):
         raise ctypes.WinError()
 
 
+def config_defines():
+    """Return the set of macros defined in the generated wolfclu/config.h.
+
+    Some features are compile-time options (e.g. --enable-oid-table sets
+    HAVE_OID_TABLE) with no runtime flag to query, so tests that exercise
+    those paths need to read the build configuration.  config.h lives in the
+    build directory, which differs from the source tree under distcheck;
+    honour WOLFCLU_BUILDDIR, then fall back to the current working directory
+    and the source tree.  Disabled options appear as `/* #undef NAME */`,
+    which this deliberately does not count as defined.
+    """
+    defined = set()
+    builddir = os.environ.get("WOLFCLU_BUILDDIR") or os.getcwd()
+    for base in (builddir, _PROJECT_ROOT):
+        path = os.path.join(base, "wolfclu", "config.h")
+        if not os.path.isfile(path):
+            continue
+        with open(path) as f:
+            for line in f:
+                parts = line.split()
+                if len(parts) >= 2 and parts[0] == "#define":
+                    defined.add(parts[1])
+        break
+    return defined
+
+
 def test_main():
     """Run tests with automake-compatible exit codes.
 
