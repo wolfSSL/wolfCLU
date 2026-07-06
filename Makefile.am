@@ -150,7 +150,6 @@ if ENABLE_MANPAGES
 # -n keeps the output byte-reproducible (no embedded filename/mtime).
 MAN_GZ = $(man_MANS:.1=.1.gz)
 
-.PHONY: manpages-gz
 manpages-gz: $(MAN_GZ)
 
 manpages/%.1.gz: $(srcdir)/manpages/%.1
@@ -183,7 +182,7 @@ SBOM_CDX     = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).cdx.json
 SBOM_SPDX_J  = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).spdx.json
 SBOM_SPDX_TV = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).spdx
 
-.PHONY: sbom install-sbom uninstall-sbom
+.PHONY: manpages-gz sbom install-sbom uninstall-sbom
 
 sbom: all
 	@if test -z "$(WOLFSSL_DIR)"; then \
