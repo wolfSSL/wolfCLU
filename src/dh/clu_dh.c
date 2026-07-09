@@ -795,6 +795,9 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             XFREE(pem, NULL, DYNAMIC_TYPE_TMP_BUFFER);
         if (outBuf != NULL)
             XFREE(outBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+
+        /* wipe DH private key material off the stack before returning */
+        wolfCLU_ForceZero(priv, sizeof(priv));
     }
 
     wolfSSL_BIO_free(bioIn);
