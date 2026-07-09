@@ -64,6 +64,7 @@ extern "C" {
 #include <wolfssl/version.h>
 #include <wolfssl/openssl/bio.h>
 #include <wolfssl/openssl/pem.h>
+#include <wolfssl/openssl/hmac.h>
 #include <wolfssl/openssl/x509v3.h>
 #include <wolfssl/wolfcrypt/types.h>
 #include <wolfssl/wolfcrypt/dsa.h>
@@ -433,6 +434,19 @@ int wolfCLU_hash(WOLFSSL_BIO* bioIn, WOLFSSL_BIO* bioOut, const char* alg,
 int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
         byte* outDigest, word32* outDigestSz);
 
+/* stream data from BIO and create HMAC using HMAC init/update/final
+ *
+ * @param ctx        ptr to HMAC ctx object
+ * @param key        pointer to the HMAC key bytes (binary or plaintext)
+ * @param keyLen     length of key in bytes
+ * @param alg        hash type to use (converted to EVP type)
+ * @param in         input BIO to read data from in MAX_IO_CHUNK_SZ chunks
+ * @param out        buffer to output digest to
+ * @param outSz      On entry, capacity of out; on success, updated to number of
+  *                  bytes written to out.
+ */
+int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 keyLen,
+        enum wc_HashType alg, WOLFSSL_BIO* in, byte* out, word32* outSz);
 
 /**
  * @brief Used to create a hash from a specified algorithm
