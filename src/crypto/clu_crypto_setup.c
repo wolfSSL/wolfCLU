@@ -238,6 +238,12 @@ int wolfCLU_setup(int argc, char** argv, char action)
         case WOLFCLU_PASSWORD_SOURCE:
             passwordSz = keySize;
             ret = wolfCLU_GetPassword((char*)pwdKey, &passwordSz, optarg);
+            /* On an unsupported source wolfCLU_GetPassword zeroes the buffer
+             * and fails. Bail out so we do not encrypt under an empty key. */
+            if (ret != WOLFCLU_SUCCESS) {
+                wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
+                return ret;
+            }
             pwdKeyChk = 1;
             keyType   = WOLFCLU_KEYTYPE_PASSWORD;
             break;

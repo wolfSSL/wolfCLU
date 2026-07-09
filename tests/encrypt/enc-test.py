@@ -336,6 +336,90 @@ class EncInteropTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(orig, dec, shallow=False))
 
 
+class EncPassSourceTest(unittest.TestCase):
+    """Regression tests for issue 6133.
+
+    wolfCLU_GetPassword only supports the "stdin" and "pass:" password
+    sources. Any other source (env:, file:, fd:, ...) must make the tool
+    fail loudly. Previously -pass parsing errors were ignored and the file
+    was silently encrypted under an empty/zeroed password while the tool
+    reported success.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        if not os.path.isdir(CERTS_DIR):
+            raise unittest.SkipTest("certs directory not found")
+
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+
+    def _cleanup(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: os.remove(p)
+                            if os.path.exists(p) else None)
+
+    def _enc_with_pass(self, src, enc):
+        """Encrypt crl.der into enc using -pass <src>."""
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        return subprocess.run(
+            [WOLFSSL_BIN, "enc", "-aes-256-cbc",
+             "-in", orig, "-out", enc, "-pass", src],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+            timeout=60)
+
+    def test_unsupported_pass_sources_fail(self):
+        """Unsupported -pass sources must not silently encrypt."""
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        for src in ("env:WOLFCLU_TEST_PW", "file:somefile", "fd:3"):
+            enc = "test-pass-src.enc"
+            dec = "test-pass-src.dec"
+            self._cleanup(enc, dec)
+            if os.path.exists(enc):
+                os.remove(enc)
+
+            r = self._enc_with_pass(src, enc)
+            # The tool must report failure for an unsupported source.
+            self.assertNotEqual(r.returncode, 0,
+                "unsupported -pass source %r encrypted with returncode 0; "
+                "output may be under an empty password" % src)
+
+            # Defence in depth: if an output file was produced anyway, it
+            # must not be the plaintext encrypted under an empty password.
+            if os.path.exists(enc):
+                d = subprocess.run(
+                    [WOLFSSL_BIN, "enc", "-d", "-aes-256-cbc",
+                     "-in", enc, "-out", dec, "-pass", "pass:"],
+                    capture_output=True, text=True,
+                    stdin=subprocess.DEVNULL, timeout=60)
+                recovered = (d.returncode == 0 and os.path.exists(dec)
+                             and filecmp.cmp(orig, dec, shallow=False))
+                self.assertFalse(recovered,
+                    "unsupported -pass source %r produced ciphertext "
+                    "decryptable under an empty password" % src)
+
+    def test_supported_pass_source_still_works(self):
+        """The supported pass: source must keep round-tripping."""
+        enc = "test-pass-ok.enc"
+        dec = "test-pass-ok.dec"
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        self._cleanup(enc, dec)
+
+        r = self._enc_with_pass("pass:test password", enc)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        d = subprocess.run(
+            [WOLFSSL_BIN, "enc", "-d", "-aes-256-cbc",
+             "-in", enc, "-out", dec, "-pass", "pass:test password"],
+            capture_output=True, text=True, stdin=subprocess.DEVNULL,
+            timeout=60)
+        self.assertEqual(d.returncode, 0, d.stderr)
+        self.assertTrue(filecmp.cmp(orig, dec, shallow=False))
+
+
 class EncLegacyNamesTest(unittest.TestCase):
 
     @classmethod
