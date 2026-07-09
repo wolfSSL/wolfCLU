@@ -280,6 +280,9 @@ int wolfCLU_ecparam(int argc, char** argv)
             if (der != NULL) {
                 /* der was created by wolfSSL library so we assume
                  * that XMALLOC was used and call XFREE here */
+                if (derSz > 0) {
+                    wolfCLU_ForceZero(der, derSz);
+                }
                 XFREE(der, NULL, DYNAMIC_TYPE_TMP_BUFFER);
             }
         }
