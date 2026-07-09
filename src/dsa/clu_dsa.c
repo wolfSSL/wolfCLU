@@ -344,10 +344,14 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
 
-        if (pem != NULL)
+        if (pem != NULL) {
+            wolfCLU_ForceZero(pem, pemSz);
             XFREE(pem, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-        if (outBuf != NULL)
+        }
+        if (outBuf != NULL) {
+            wolfCLU_ForceZero(outBuf, outBufSz);
             XFREE(outBuf, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        }
     }
 
     wolfSSL_BIO_free(bioIn);
