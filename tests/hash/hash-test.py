@@ -54,6 +54,29 @@ class HashCommandTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), _read_expected("sha512-expect.hex"))
 
+    def test_blake2b(self):
+        """blake2b via -hash. Regression: wolfCLU gated blake2b on the legacy
+        HAVE_BLAKE2 macro, which current wolfSSL replaced with HAVE_BLAKE2B, so
+        `-hash blake2b` returned "Invalid algorithm" on modern wolfSSL."""
+        r = run_wolfssl("-hash", "blake2b", "-in", CERT_FILE)
+        if "Invalid algorithm" in (r.stdout + r.stderr):
+            self.skipTest("blake2b not enabled in this wolfSSL build")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), _read_expected("blake2b-expect.hex"))
+
+    def test_hash_base64_large(self):
+        """base64enc/base64dec via -hash on input whose base64 output exceeds
+        64 bytes must succeed. Regression: on blake2-enabled builds the output
+        size defaulted to BLAKE2B_OUTBYTES (64) for the base64 sub-command, so
+        encoding anything larger failed with a buffer error. ca-cert.pem is
+        well over 48 bytes, so its base64 output is > 64 bytes."""
+        enc = run_wolfssl("-hash", "base64enc", "-in", CERT_FILE)
+        blob = enc.stdout + enc.stderr
+        if "Invalid algorithm" in blob or "No coding support" in blob:
+            self.skipTest("base64 coding not enabled in this build")
+        self.assertEqual(enc.returncode, 0, enc.stderr)
+        self.assertGreater(len(enc.stdout.strip()), 128, enc.stderr)
+
 
 class HashShortcutTest(unittest.TestCase):
     """Tests using the shortcut subcommands (md5, sha256, etc.)."""

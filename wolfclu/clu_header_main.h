@@ -104,6 +104,15 @@ extern "C" {
     #include <wolfssl/wolfcrypt/sha512.h>
 #endif
 
+/* wolfSSL renamed the BLAKE2 feature macro HAVE_BLAKE2 -> HAVE_BLAKE2B and
+ * now #undefs the legacy HAVE_BLAKE2 in settings.h. wolfCLU's blake2b support
+ * keys off HAVE_BLAKE2, so map it back when only HAVE_BLAKE2B is defined to
+ * keep blake2b (and the base64 hash sub-command) working against current
+ * wolfSSL. */
+#if defined(HAVE_BLAKE2B) && !defined(HAVE_BLAKE2)
+    #define HAVE_BLAKE2
+#endif
+
 #ifdef HAVE_BLAKE2
     #include <wolfssl/wolfcrypt/blake2.h>
 #endif
