@@ -1104,6 +1104,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                         ret = wolfCLU_pKeyPEMtoPriKeyEnc(keyOutBio, pkey, DES3b,
                                 pass, passwordSz);
                     }
+                    wolfCLU_ForceZero(pass, MAX_PASSWORD_SIZE);
                 }
                 else {
                     ret = wolfCLU_pKeyPEMtoPriKeyEnc(keyOutBio, pkey, DES3b,
