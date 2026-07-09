@@ -162,47 +162,27 @@ endif
 test: check
 #DISTCLEANFILES+= wolfssl-config
 
-# SBOM generation. Requires WOLFSSL_DIR pointing to a wolfssl source tree
-# containing scripts/gen-sbom (feat/sbom-embedded branch, or master once
-# wolfSSL/wolfssl#10343 merges). wolfCLU ships a binary, not a .so, so the
-# artifact hash is computed from the compiled sources via --srcs.
-WOLFSSL_DIR ?=
-PRODUCT   = wolfclu
-VERSION   = $(shell grep CLUWOLFSSL_VERSION_STRING $(srcdir)/wolfclu/version.h 2>/dev/null | sed 's/.*"\(.*\)".*/\1/')
-GEN_SBOM  = $(WOLFSSL_DIR)/scripts/gen-sbom
-WOLFSSL_INCLUDEDIR ?= $(WOLFSSL_DIR)/include
-SBOM_OPTS = --name $(PRODUCT) \
-            --version $(VERSION) \
-            --supplier "wolfSSL Inc." \
-            --options-h $(WOLFSSL_INCLUDEDIR)/wolfssl/options.h \
-            --srcs $(addprefix $(srcdir)/,$(wolfssl_SOURCES))
+# manpages-gz is only a target under ENABLE_MANPAGES, but declare it .PHONY
+# unconditionally so it merges with the unconditional .PHONY in scripts/sbom.am
+# (a conditional + unconditional .PHONY pair trips automake -Werror).
+.PHONY: manpages-gz
 
-SBOM_OUT_DIR = $(builddir)
-SBOM_CDX     = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).cdx.json
-SBOM_SPDX_J  = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).spdx.json
-SBOM_SPDX_TV = $(SBOM_OUT_DIR)/$(PRODUCT)-$(VERSION).spdx
+# SBOM generation (CRA compliance).  The recipe is shared across the wolfSSL
+# stack's autotools products in scripts/sbom.am; wolfCLU just declares what it
+# is (a CLI program that links wolfSSL) and includes it.  WOLFSSL_DIR must point
+# to a wolfssl source tree containing scripts/gen-sbom.
+SBOM_PKGNAME      = wolfclu
+SBOM_LICENSE_FILE = $(srcdir)/COPYING
+SBOM_ARTIFACT     = bin
+SBOM_BIN_NAME     = wolfssl
+SBOM_DEP_WOLFSSL  = yes
 
-.PHONY: manpages-gz sbom install-sbom uninstall-sbom
+# wolfCLU is GPLv3-or-later (see source headers) or commercial.  Pin the SPDX id
+# so the SBOM is correct regardless of the gen-sbom version's licence detection;
+# commercial licensees can override (e.g. LicenseRef-wolfSSL-Commercial).
+SBOM_LICENSE_OVERRIDE ?= GPL-3.0-or-later
 
-sbom: all
-	@if test -z "$(WOLFSSL_DIR)"; then \
-	    echo "ERROR: WOLFSSL_DIR not set. Usage: make sbom WOLFSSL_DIR=/path/to/wolfssl"; \
-	    exit 1; \
-	fi
-	@if test -z "$(PYTHON3)"; then echo "ERROR: python3 not found in PATH."; exit 1; fi
-	$(PYTHON3) $(GEN_SBOM) $(SBOM_OPTS)
-
-install-sbom: sbom
-	$(MKDIR_P) $(DESTDIR)$(datadir)/doc/$(PRODUCT)
-	$(INSTALL_DATA) $(SBOM_CDX) $(SBOM_SPDX_J) $(SBOM_SPDX_TV) \
-	    $(DESTDIR)$(datadir)/doc/$(PRODUCT)/
-
-uninstall-sbom:
-	-rm -f $(DESTDIR)$(datadir)/doc/$(PRODUCT)/$(PRODUCT)-*.cdx.json
-	-rm -f $(DESTDIR)$(datadir)/doc/$(PRODUCT)/$(PRODUCT)-*.spdx.json
-	-rm -f $(DESTDIR)$(datadir)/doc/$(PRODUCT)/$(PRODUCT)-*.spdx
-
-uninstall-hook: uninstall-sbom
+include scripts/sbom.am
 
 
 maintainer-clean-local:

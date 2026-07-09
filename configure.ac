@@ -59,9 +59,12 @@ AM_PATH_PYTHON([3.6],, [:])
 AC_SUBST([PYTHON])
 AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != ":"])
 
-# SBOM generation prerequisites
-AC_CHECK_PROG([PYTHON3], [python3], [python3])
-AC_CHECK_PROG([PYSPDXTOOLS], [pyspdxtools], [pyspdxtools])
+# Tools used by the SBOM targets (see scripts/sbom.am `make sbom`).  GIT is used
+# only to derive SOURCE_DATE_EPOCH for reproducible SBOM output; all three are
+# optional and the target reports a clear error when a required one is missing.
+AC_PATH_PROG([PYTHON3], [python3])
+AC_PATH_PROG([PYSPDXTOOLS], [pyspdxtools])
+AC_PATH_PROG([GIT], [git])
 
 # Checks for headers/libraries
 AC_CHECK_HEADERS([sys/time.h string.h termios.h unistd.h])
