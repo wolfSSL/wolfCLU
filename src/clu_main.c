@@ -417,19 +417,22 @@ int clu_entry(const void* argument)
     }
 
     i = 0;
-    token = strtok(command, " ");
+    {
+        char* saveptr = NULL;
+        token = strtok_r(command, " ", &saveptr);
 
-    /* split the command string to correspond to separate argv[i] */
-    while (token != NULL && i < argc) {
-        argv[i] = XMALLOC(XSTRLEN(token)+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        XMEMSET(argv[i], 0, XSTRLEN(token)+1);
-        XSTRNCPY(argv[i], token, XSTRLEN(token));
-        i++;
-        if (i==(argc-1)) {
-            token = strtok(NULL, "\r");
-        }
-        else {
-            token = strtok(NULL, " ");
+        /* split the command string to correspond to separate argv[i] */
+        while (token != NULL && i < argc) {
+            argv[i] = XMALLOC(XSTRLEN(token)+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            XMEMSET(argv[i], 0, XSTRLEN(token)+1);
+            XSTRNCPY(argv[i], token, XSTRLEN(token));
+            i++;
+            if (i==(argc-1)) {
+                token = strtok_r(NULL, "\r", &saveptr);
+            }
+            else {
+                token = strtok_r(NULL, " ", &saveptr);
+            }
         }
     }
 
