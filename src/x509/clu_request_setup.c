@@ -1028,6 +1028,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
             }
             else {
                 wolfCLU_LogError("verify failed");
+                ret = WOLFCLU_FATAL_ERROR;
             }
         }
     }
