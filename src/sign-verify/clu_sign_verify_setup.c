@@ -205,7 +205,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     else {
         if (algCheck == RSA_SIG_VER) {
             WOLFCLU_LOG(WOLFCLU_L0, "Please specify an output file when "
-                   "signing or verifing with RSA.");
+                   "signing or verifying with RSA.");
             wolfCLU_signHelp(algCheck);
             wolfCLU_verifyHelp(algCheck);
             if (priv)

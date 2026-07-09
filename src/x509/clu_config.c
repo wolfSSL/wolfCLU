@@ -322,7 +322,7 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
     if (ext != NULL) {
         ret = wolfSSL_X509_add_ext(x509, ext, -1);
         if (ret != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("error %d adding extesion", ret);
+            wolfCLU_LogError("error %d adding extension", ret);
         }
         *idx = *idx + 1;
         wolfSSL_X509_EXTENSION_free(ext);

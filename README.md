@@ -55,7 +55,7 @@ man wolfssl-genkey
 man wolfssl-encrypt
 ```
 
-For instuctions on how to build windows, see [here](ide/winvs/README.md).
+For instructions on how to build windows, see [here](ide/winvs/README.md).
 
 ## Contributing to Documentation
 

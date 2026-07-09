@@ -443,7 +443,7 @@ void wolfCLU_certHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "-outform pem or der out format");
     WOLFCLU_LOG(WOLFCLU_L0, "-out output file to write to");
     WOLFCLU_LOG(WOLFCLU_L0, "-req input file is a CSR file");
-    WOLFCLU_LOG(WOLFCLU_L0, "-singkey a key for signing");
+    WOLFCLU_LOG(WOLFCLU_L0, "-signkey a key for signing");
     WOLFCLU_LOG(WOLFCLU_L0, "-* supported digests for signing");
     WOLFCLU_LOG(WOLFCLU_L0, "-extfile config file");
     WOLFCLU_LOG(WOLFCLU_L0, "-extensions section of the config file to use");
@@ -670,12 +670,12 @@ void wolfCLU_verifyHelp(int keyType) {
             #endif
             #ifdef HAVE_ED25519
             case ED25519_SIG_VER:
-                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verifiy with Private Key"
+                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verify with Private Key"
                        "wolfssl -ed25519 -verify -inkey "
                        "<priv_key> -sigfile <filename> -in <original>"
                        "\n");
                 WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
-                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verifiy with Public Key"
+                WOLFCLU_LOG(WOLFCLU_L0, "ED25519 Verify with Public Key"
                        "wolfssl -ed25519 -verify -inkey "
                        "<pub_key> -sigfile <filename> -in <original> -pubin"
                        "\n");
@@ -1115,7 +1115,7 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
 }
 
 /*
- * gets current time durring program execution
+ * gets current time during program execution
  */
 double wolfCLU_getTime(void)
 {

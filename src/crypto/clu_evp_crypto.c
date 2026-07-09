@@ -293,7 +293,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         for (z = 0; z < ivSz; z++)
             printf("%02X", iv[z]);
         printf("\n");
-        WOLFCLU_LOG(WOLFCLU_L0, "itterations = %d", iter);
+        WOLFCLU_LOG(WOLFCLU_L0, "iterations = %d", iter);
         WOLFCLU_LOG(WOLFCLU_L0, "PBKDF version = %d", pbkVersion);
     }
 

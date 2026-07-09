@@ -938,7 +938,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
             ret = wolfSSL_X509_add_ext(x509, newExt, -1);
             if (ret != WOLFSSL_SUCCESS) {
                 WOLFCLU_LOG(WOLFCLU_E0,
-                        "error %d adding Basic Constraints extesion", ret);
+                        "error %d adding Basic Constraints extension", ret);
             }
             wolfSSL_X509_EXTENSION_free(newExt);
         }

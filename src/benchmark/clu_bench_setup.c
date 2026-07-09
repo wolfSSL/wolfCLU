@@ -93,7 +93,7 @@ int wolfCLU_benchSetup(int argc, char** argv)
         }
     }
 
-    /* pull as many of the algorithms out of the argv as posible */
+    /* pull as many of the algorithms out of the argv as possible */
     for (i = 0; i < (int)algsSz; ++i) {
         ret = wolfCLU_checkForArg(algs[i], (int)XSTRLEN(algs[i]), argc, argv);
         if (ret > 0) {
