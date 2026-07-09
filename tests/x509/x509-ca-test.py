@@ -425,6 +425,21 @@ class TestCAKeyMismatch(unittest.TestCase):
                         os.path.join(CERTS_DIR, "ecc-key.pem"))
         self.assertNotEqual(r.returncode, 0)
 
+    def test_bad_request_after_ca_load_no_leak(self):
+        """CA cert and key load, then the request fails to parse. Under
+        ASan the loaded cert and key must not be reported as leaked."""
+        junk = _tmp("ca_junk.csr")
+        with open(junk, "w", encoding="utf-8") as f:
+            f.write("not a certificate request\n")
+        self.addCleanup(lambda: _cleanup(junk))
+        r = run_wolfssl("ca", "-config", self.conf,
+                        "-in", junk, "-out", "test_ca_junk.pem",
+                        "-cert", os.path.join(CERTS_DIR, "ca-cert.pem"),
+                        "-keyfile", os.path.join(CERTS_DIR, "ca-key.pem"))
+        self.addCleanup(lambda: _cleanup(_tmp("test_ca_junk.pem")))
+        self.assertNotEqual(r.returncode, 0)
+        self.assertNotIn("LeakSanitizer", r.stderr)
+
 
 
 class TestCAUniqueSubjectAndSerial(unittest.TestCase):
