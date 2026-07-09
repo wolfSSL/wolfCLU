@@ -921,8 +921,12 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
             XFCLOSE(file);
             file = NULL;
+            if (derBufSz > 0)
+                wolfCLU_ForceZero(derBuf, derBufSz);
             XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             derBuf = NULL;
+            if (pemBufSz > 0)
+                wolfCLU_ForceZero(pemBuf, pemBufSz);
             XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             pemBuf = NULL;
 
@@ -1014,9 +1018,13 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
         fOutNameBuf = NULL;
     }
     if (derBuf != NULL) {
+        if (derBufSz > 0)
+            wolfCLU_ForceZero(derBuf, derBufSz);
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (pemBuf != NULL) {
+        if (pemBufSz > 0)
+            wolfCLU_ForceZero(pemBuf, pemBufSz);
         XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
      if (file != NULL) {
