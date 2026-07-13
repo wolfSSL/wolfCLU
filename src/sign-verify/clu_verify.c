@@ -939,7 +939,7 @@ int wolfCLU_verify_signature_xmss(byte* sig, int sigSz,
     if (ret == 0) {
         ret = wc_XmssKey_Verify(key, sig, sigSz, msg, msgLen);
         if (ret != 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Invaild Signature.");
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid Signature.");
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");
@@ -1109,7 +1109,7 @@ int wolfCLU_verify_signature_xmssmt(byte* sig, int sigSz,
     if (ret == 0) {
         ret = wc_XmssKey_Verify(key, sig, sigSz, msg, msgLen);
         if (ret != 0) {
-            WOLFCLU_LOG(WOLFCLU_L0, "Invaild Signature.");
+            WOLFCLU_LOG(WOLFCLU_L0, "Invalid Signature.");
         }
         else {
             WOLFCLU_LOG(WOLFCLU_L0, "Valid Signature.");

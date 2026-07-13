@@ -395,7 +395,7 @@ int clu_entry(const void* argument)
 
     WOLFCLU_LOG(WOLFCLU_L0, "Please enter a wolfCLU command (wolfssl -h for help)");
 
-    /* Recieve the command from the UART console */
+    /* Receive the command from the UART console */
     do {
         halRet = HAL_UART_Receive(&HAL_CONSOLE_UART, buffer, (sizeof(buffer)-1), 100);
     } while (halRet != HAL_OK || buffer[0] == '\n' || buffer[0] == '\r');

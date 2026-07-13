@@ -1540,7 +1540,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 #endif /* HAVE_DILITHIUM */
 }
 
-/* The call back function of the writting xmss key */
+/* The call back function of the writing xmss key */
 #ifdef WOLFSSL_HAVE_XMSS
 enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
                                        word32 privSz, void * context)

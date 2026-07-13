@@ -29,7 +29,7 @@
 #endif /* HAVE_BLAKE2 */
 
 /*
- * benchmarking funciton
+ * benchmarking function
  */
 int wolfCLU_benchmark(int timer, int* option)
 {

@@ -796,7 +796,7 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
                                                     " buffer.\nRET: %d", ret);
         }
     }
-    /* sign the message usign Dilithium private key. Note that the context is
+    /* sign the message using Dilithium private key. Note that the context is
      * empty. This is for interoperability. */
     if (ret == 0) {
         ret = wc_dilithium_sign_ctx_msg(NULL, 0, data, dataSz, outBuf,
