@@ -2,6 +2,7 @@
 """Tests for wolfssl req and x509 -req (converted from x509-req-test.sh)."""
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -263,6 +264,107 @@ class TestReqNew(unittest.TestCase):
         self.assertEqual(r2.returncode, 0, r2.stderr)
         self.assertIn("CA:TRUE", r2.stdout)
 
+
+    def _get_san_line(self, stdout):
+        """Return the value line that follows an 'X509v3 Subject Alternative
+        Name' header in `x509 -text` output, or None if not found."""
+        lines = stdout.splitlines()
+        for i, line in enumerate(lines):
+            if "X509v3 Subject Alternative Name" in line:
+                self.assertLess(i + 1, len(lines), "Missing SAN value line")
+                return lines[i + 1]
+        return None
+
+    def test_req_inline_subjectaltname_openssl_compat(self):
+        """A config subjectAltName in the OpenSSL inline form (TYPE:value list,
+        not the @section indirection) is accepted and applied to the cert.
+
+        Pins the behavior in wolfCLU_setExtensions (clu_config.c): the inline
+        form is parsed via the same path as -addext (wolfCLU_setInlineAltNames),
+        so an OpenSSL-style config is neither silently dropped nor rejected.
+        Whitespace after the comma must be tolerated. Skipped on builds without
+        cert extensions, where the parsing path is absent."""
+        conf = _tmp("test_req_inline_san.conf")
+        out = _tmp("test_req_inline_san.crt")
+        self._clean(conf, out)
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                "[ req ]\n"
+                "distinguished_name = dn\n"
+                "prompt = no\n"
+                "x509_extensions = v3_ext\n"
+                "[ dn ]\n"
+                "commonName = inline-san-test\n"
+                "[ v3_ext ]\n"
+                "basicConstraints = CA:FALSE\n"
+                "subjectAltName = DNS:example.com, IP:10.0.0.1\n")
+        r = run_wolfssl("req", "-new", "-x509",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-config", conf, "-out", out)
+        combined = r.stdout + r.stderr
+        if "not compiled with cert extensions" in combined:
+            self.skipTest("cert extensions not compiled in")
+        if "WOLFSSL_ALT_NAMES" in combined:
+            self.skipTest("alt names not compiled in")
+        self.assertEqual(r.returncode, 0,
+                         "inline (OpenSSL-form) subjectAltName should be "
+                         "accepted: " + combined)
+        self.assertTrue(os.path.isfile(out) and os.path.getsize(out) > 0,
+                        "certificate should be written")
+        # The SAN must actually be present in the issued cert.
+        r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        san_line = self._get_san_line(r2.stdout)
+        self.assertIsNotNone(san_line, "SAN not found in cert output")
+        self.assertIn("DNS:example.com", san_line,
+                      "DNS SAN not applied from inline config form")
+        self.assertIn("IP Address:10.0.0.1", san_line,
+                      "IP SAN not applied from inline config form")
+
+    def test_req_inline_subjectaltname_trims_whitespace(self):
+        """Inline subjectAltName entries are trimmed of surrounding whitespace
+        like OpenSSL: whitespace BEFORE the comma (a trailing space on the
+        value) and AFTER the colon must not end up in the stored name. Pins the
+        trailing/leading trim in wolfCLU_setInlineAltNames (clu_config.c)."""
+        conf = _tmp("test_req_inline_san_ws.conf")
+        out = _tmp("test_req_inline_san_ws.crt")
+        self._clean(conf, out)
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                "[ req ]\n"
+                "distinguished_name = dn\n"
+                "prompt = no\n"
+                "x509_extensions = v3_ext\n"
+                "[ dn ]\n"
+                "commonName = inline-san-ws-test\n"
+                "[ v3_ext ]\n"
+                "basicConstraints = CA:FALSE\n"
+                # space before the comma (trailing on DNS value) and after the
+                # colon (leading on IP value)
+                "subjectAltName = DNS:trim.example.com , IP: 10.0.0.1\n")
+        r = run_wolfssl("req", "-new", "-x509",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-config", conf, "-out", out)
+        combined = r.stdout + r.stderr
+        if "not compiled with cert extensions" in combined:
+            self.skipTest("cert extensions not compiled in")
+        if "WOLFSSL_ALT_NAMES" in combined:
+            self.skipTest("alt names not compiled in")
+        self.assertEqual(r.returncode, 0,
+                         "inline subjectAltName with whitespace should be "
+                         "accepted: " + combined)
+        r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        san_line = self._get_san_line(r2.stdout)
+        self.assertIsNotNone(san_line, "SAN not found in cert output")
+        # Extract the exact DNS value; a trailing space would make this
+        # "trim.example.com " and fail the equality (assertIn would not).
+        m = re.search(r"DNS:([^,]*)", san_line)
+        self.assertIsNotNone(m, "DNS SAN missing: " + san_line)
+        self.assertEqual(m.group(1), "trim.example.com",
+                         "DNS SAN not trimmed of surrounding whitespace")
+        self.assertIn("IP Address:10.0.0.1", san_line,
+                      "IP SAN not applied/trimmed from inline config form")
 
     def test_req_x509_addext_subject_alt_name(self):
         """req -x509 -addext subjectAltName adds IP and DNS alt names."""

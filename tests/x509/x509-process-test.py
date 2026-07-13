@@ -492,13 +492,13 @@ class TestX509ProcessInvalidFiles(unittest.TestCase):
                          "output file should not be created on error")
 
     def test_4e_nonexistent_file_der(self):
-        r = run_wolfssl("x509", "-inform", "der", "-in", "ca-cert.pem",
+        r = run_wolfssl("x509", "-inform", "der", "-in", "nonexistent-file.pem",
                         "-outform", "der", "-out", "out.txt")
         self._clean("out.txt")
         self.assertNotEqual(r.returncode, 0)
 
     def test_4f_nonexistent_file_pem(self):
-        r = run_wolfssl("x509", "-inform", "pem", "-in", "ca-cert.pem",
+        r = run_wolfssl("x509", "-inform", "pem", "-in", "nonexistent-file.pem",
                         "-outform", "pem", "-out", "out.txt")
         self._clean("out.txt")
         self.assertNotEqual(r.returncode, 0)
