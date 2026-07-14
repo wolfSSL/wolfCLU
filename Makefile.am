@@ -182,6 +182,13 @@ SBOM_DEP_WOLFSSL  = yes
 # commercial licensees can override (e.g. LicenseRef-wolfSSL-Commercial).
 SBOM_LICENSE_OVERRIDE ?= GPL-3.0-or-later
 
+# wolfCLU declares AC_CONFIG_HEADERS([src/config.h]) and carries its feature
+# macros (-DHAVE_WOLFSSL_OPTIONS, -DWOLFCLU_NO_FILESYSTEM, ...) in AM_CFLAGS,
+# so point the SBOM build-options capture at the real config header.
+SBOM_CONFIG_H = $(abs_builddir)/src/config.h
+
+EXTRA_DIST += scripts/sbom.am
+
 include scripts/sbom.am
 
 

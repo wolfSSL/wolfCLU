@@ -62,7 +62,9 @@ AM_CONDITIONAL([HAVE_PYTHON], [test "$PYTHON" != ":"])
 # Tools used by the SBOM targets (see scripts/sbom.am `make sbom`).  GIT is used
 # only to derive SOURCE_DATE_EPOCH for reproducible SBOM output; all three are
 # optional and the target reports a clear error when a required one is missing.
-AC_PATH_PROG([PYTHON3], [python3])
+# Fall back to the AM_PATH_PYTHON-discovered interpreter ($PYTHON) when no
+# executable literally named `python3` is on PATH (e.g. python3.11 only).
+AC_PATH_PROG([PYTHON3], [python3], [$PYTHON])
 AC_PATH_PROG([PYSPDXTOOLS], [pyspdxtools])
 AC_PATH_PROG([GIT], [git])
 

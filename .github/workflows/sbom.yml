@@ -4,7 +4,7 @@ on:
   push:
     branches: [ 'master', 'main', 'release/**' ]
   pull_request:
-    branches: [ '*' ]
+    branches: [ '**' ]
   workflow_dispatch:
     inputs:
       wolfssl_ref:
@@ -125,11 +125,11 @@ jobs:
           rm -f wolfclu-*.cdx.json wolfclu-*.spdx.json wolfclu-*.spdx
           SOURCE_DATE_EPOCH=1700000000 make sbom \
               WOLFSSL_DIR="$GITHUB_WORKSPACE/wolfssl"
-          sha256sum wolfclu-*.cdx.json wolfclu-*.spdx.json > /tmp/a.sums
+          sha256sum wolfclu-*.cdx.json wolfclu-*.spdx.json wolfclu-*.spdx > /tmp/a.sums
           rm -f wolfclu-*.cdx.json wolfclu-*.spdx.json wolfclu-*.spdx
           SOURCE_DATE_EPOCH=1700000000 make sbom \
               WOLFSSL_DIR="$GITHUB_WORKSPACE/wolfssl"
-          sha256sum wolfclu-*.cdx.json wolfclu-*.spdx.json > /tmp/b.sums
+          sha256sum wolfclu-*.cdx.json wolfclu-*.spdx.json wolfclu-*.spdx > /tmp/b.sums
           diff /tmp/a.sums /tmp/b.sums
 
       - name: wolfssl recorded as a dependency
