@@ -321,6 +321,7 @@ int wolfCLU_Rand(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS) {
         WC_RNG rng;
+        XMEMSET(&rng, 0, sizeof(rng));
         if (wc_InitRng(&rng) != 0) {
             wolfCLU_LogError("Unable to initialize RNG");
             ret = WOLFCLU_FATAL_ERROR;
@@ -377,7 +378,7 @@ int wolfCLU_Rand(int argc, char** argv)
                 hex[2 * i]     = hexChars[(buf[i] >> 4) & 0x0F];
                 hex[2 * i + 1] = hexChars[buf[i] & 0x0F];
             }
-            wolfCLU_ForceZero(buf, size);
+            wc_ForceZero(buf, size);
             XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             buf  = hex;
             size = (int)hexSz;
@@ -410,7 +411,7 @@ int wolfCLU_Rand(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            wolfCLU_ForceZero(buf, size);
+            wc_ForceZero(buf, size);
             XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             buf  = base64;
             size = base64Sz;
@@ -434,7 +435,7 @@ int wolfCLU_Rand(int argc, char** argv)
     }
 
     if (buf != NULL) {
-        wolfCLU_ForceZero(buf, size);
+        wc_ForceZero(buf, size);
         XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     wolfSSL_BIO_free(bioOut);

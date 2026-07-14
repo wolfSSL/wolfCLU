@@ -141,6 +141,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "For x509:         wolfssl -x509 -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For key creation: wolfssl -genkey -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For certificate creation: wolfssl -req -help");
+    WOLFCLU_LOG(WOLFCLU_L0, "For ca signing:           wolfssl ca -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For RSA sign/ver: wolfssl -rsa -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For ECC sign/ver: wolfssl -ecc -help");
     WOLFCLU_LOG(WOLFCLU_L0, "For ED25519 sign/ver: wolfssl -ed25519 -help");
@@ -721,7 +722,16 @@ void wolfCLU_certgenHelp(void) {
     WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-addext add an extension, ie \"subjectAltName=IP:192.168.1.2,DNS:example.com\"");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey generate the private key to use with req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey <alg>:<param> generate a new private key to use with req,");
+#if defined(WOLFCLU_HAVE_MLDSA) && defined(WOLFSSL_CERT_GEN) && \
+    defined(WOLFSSL_CERT_REQ) && !defined(WOLFCLU_NO_FILESYSTEM)
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        e.g. rsa:2048, ml-dsa:[2|3|5], dilithium:[2|3|5]");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        Note: ML-DSA/dilithium keys are supported only for");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        self-signed certificates (-x509) and are written");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        unencrypted to <keyout>.priv and <keyout>.pub");
+#else
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        e.g. rsa:2048");
+#endif
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey private key to use with req");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-keyout file to output key to");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-subj use a specified subject name, ie O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit");
@@ -1573,10 +1583,64 @@ void wolfCLU_convertToLower(char* s, int sSz)
 }
 
 
-void wolfCLU_ForceZero(void* mem, unsigned int len)
+
+int wolfCLU_ReadFileToBuffer(const char* path, long maxSz, byte** outBuf,
+        int* outSz)
 {
-    volatile byte* z = (volatile byte*)mem;
-    while (len--) *z++ = 0;
+    int   sz;
+    long  fsz;
+    byte* buf = NULL;
+    XFILE f;
+
+    if (path == NULL || outBuf == NULL || outSz == NULL || maxSz <= 0) {
+        return BAD_FUNC_ARG;
+    }
+    *outBuf = NULL;
+    *outSz  = 0;
+
+    f = XFOPEN(path, "rb");
+    if (f == XBADFILE) {
+        return BAD_FUNC_ARG;
+    }
+
+    if (XFSEEK(f, 0, XSEEK_END) != 0) {
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    fsz = XFTELL(f);
+    if (XFSEEK(f, 0, XSEEK_SET) != 0) {
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (fsz <= 0) {
+        wolfCLU_LogError("%s: file is empty or unreadable", path);
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (fsz > maxSz || fsz > (long)INT_MAX) {
+        wolfCLU_LogError("%s: size %ld exceeds %ld-byte file limit",
+                path, fsz, maxSz);
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    sz = (int)fsz;
+
+    buf = (byte*)XMALLOC(sz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (buf == NULL) {
+        XFCLOSE(f);
+        return MEMORY_E;
+    }
+
+    if (XFREAD(buf, 1, (size_t)sz, f) != (size_t)sz) {
+        XFCLOSE(f);
+        XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        return WOLFCLU_FAILURE;
+    }
+    XFCLOSE(f);
+
+    *outBuf = buf;
+    *outSz  = sz;
+    return WOLFCLU_SUCCESS;
 }
 
 #ifndef WOLFCLU_NO_TERM_SUPPORT

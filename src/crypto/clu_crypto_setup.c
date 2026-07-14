@@ -62,7 +62,7 @@ static int wolfCLU_loadHexKeyInto(byte* keyOut, int keyBytes,
                            NULL, NULL, NULL,
                            NULL, NULL, NULL,
                            NULL, NULL, NULL);
-    wolfCLU_ForceZero(hexCopy, hexLen);
+    wc_ForceZero(hexCopy, hexLen);
     XFREE(hexCopy, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
     if (ret != WOLFCLU_SUCCESS) {
@@ -76,7 +76,7 @@ static int wolfCLU_loadHexKeyInto(byte* keyOut, int keyBytes,
     }
 
     XMEMCPY(keyOut, tmp, keyBytes);
-    wolfCLU_ForceZero(tmp, tmpSz);
+    wc_ForceZero(tmp, tmpSz);
     /* tmp was allocated by wolfCLU_hexToBin with a NULL heap hint
      * (see src/tools/clu_hex_to_bin.c); free it with the same hint. */
     XFREE(tmp, NULL, DYNAMIC_TYPE_TMP_BUFFER);
@@ -322,13 +322,13 @@ int wolfCLU_setup(int argc, char** argv, char action)
                     WOLFCLU_LOG(WOLFCLU_E0,
                         "IV length mismatch: expected %d bytes, got %u",
                         block, (unsigned int)ivTmpSz);
-                    wolfCLU_ForceZero(ivTmp, ivTmpSz);
+                    wc_ForceZero(ivTmp, ivTmpSz);
                     XFREE(ivTmp, NULL, DYNAMIC_TYPE_TMP_BUFFER);
                     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
                     return WOLFCLU_FATAL_ERROR;
                 }
                 XMEMCPY(iv, ivTmp, ivTmpSz);
-                wolfCLU_ForceZero(ivTmp, ivTmpSz);
+                wc_ForceZero(ivTmp, ivTmpSz);
                 /* hexToBin allocates with NULL heap hint; free with same. */
                 XFREE(ivTmp, NULL, DYNAMIC_TYPE_TMP_BUFFER);
                 ivCheck = 1;
@@ -413,7 +413,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
                 if (wolfSSL_BIO_read(keyBio, fileBuf, fileLen) != fileLen) {
                     wolfCLU_LogError("failed to read key file '%s'", optarg);
-                    wolfCLU_ForceZero(fileBuf, fileLen);
+                    wc_ForceZero(fileBuf, fileLen);
                     XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     wolfSSL_BIO_free(keyBio);
                     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
@@ -445,7 +445,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
                     keyString = (char*)XMALLOC(fileLen + 1, HEAP_HINT,
                             DYNAMIC_TYPE_TMP_BUFFER);
                     if (keyString == NULL) {
-                        wolfCLU_ForceZero(fileBuf, fileLen);
+                        wc_ForceZero(fileBuf, fileLen);
                         XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                         wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
                         return MEMORY_E;
@@ -463,9 +463,9 @@ int wolfCLU_setup(int argc, char** argv, char action)
 
                     ret = wolfCLU_loadHexKeyInto(key, keyBytes,
                             keyString, (word32)j);
-                    wolfCLU_ForceZero(keyString, j);
+                    wc_ForceZero(keyString, j);
                     XFREE(keyString, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                    wolfCLU_ForceZero(fileBuf, fileLen);
+                    wc_ForceZero(fileBuf, fileLen);
                     XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     if (ret != WOLFCLU_SUCCESS) {
                         wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
@@ -483,13 +483,13 @@ int wolfCLU_setup(int argc, char** argv, char action)
                                 keySize);
                         WOLFCLU_LOG(WOLFCLU_E0,
                                 "Invalid Key. Must match algorithm key size.");
-                        wolfCLU_ForceZero(fileBuf, fileLen);
+                        wc_ForceZero(fileBuf, fileLen);
                         XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                         wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
                         return WOLFCLU_FATAL_ERROR;
                     }
                     XMEMCPY(key, fileBuf, fileLen);
-                    wolfCLU_ForceZero(fileBuf, fileLen);
+                    wc_ForceZero(fileBuf, fileLen);
                     XFREE(fileBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 }
 
@@ -603,7 +603,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
     }
 
     if (pwdKeyChk == 1 && keyCheck == 1) {
-        XMEMSET(pwdKey, 0, keySize + block);
+        wc_ForceZero(pwdKey, keySize + block);
     }
 
     /* encryption function call */
@@ -663,9 +663,9 @@ int wolfCLU_setup(int argc, char** argv, char action)
      * the cipher key length doesn't leak material across XFREE.
      * ForceZero (not XMEMSET) so the compiler can't drop the wipe of these
      * soon-to-be-freed key buffers. */
-    wolfCLU_ForceZero(key, keySize);
-    wolfCLU_ForceZero(pwdKey, keySize + block);
-    wolfCLU_ForceZero(iv, block);
+    wc_ForceZero(key, keySize);
+    wc_ForceZero(pwdKey, keySize + block);
+    wc_ForceZero(iv, block);
     wolfCLU_freeBins(pwdKey, iv, key, NULL, NULL);
 
     if (mode != NULL)

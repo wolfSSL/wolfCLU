@@ -287,12 +287,12 @@ int wolfCLU_PKCS8(int argc, char** argv)
         }
     }
 
-    wolfCLU_ForceZero(password, MAX_PASSWORD_SIZE);
+    wc_ForceZero(password, MAX_PASSWORD_SIZE);
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_EVP_PKEY_free(pkey);
     if (stdinKeyBuf != NULL) {
-        wolfCLU_ForceZero(stdinKeyBuf, MAX_STDINSZ);
+        wc_ForceZero(stdinKeyBuf, MAX_STDINSZ);
         XFREE(stdinKeyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 

@@ -135,6 +135,9 @@ AC_CHECK_FUNC([wolfSSL_X509_REQ_print],
 AC_CHECK_FUNC([wc_EncodeObjectId],
     [],
     [AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
+AC_CHECK_FUNC([wc_MlDsaKey_Init],
+    [AM_CFLAGS="$AM_CFLAGS -DWOLFCLU_HAVE_MLDSA -DWOLFCLU_MLDSA_CHECKED"],
+    [AM_CFLAGS="$AM_CFLAGS -DWOLFCLU_MLDSA_CHECKED"])
 
 
 ###############################################

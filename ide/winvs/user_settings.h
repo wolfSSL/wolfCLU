@@ -56,4 +56,6 @@
 #define HAVE_OCSP
 #define HAVE_OCSP_RESPONDER
 
+#define WOLFSSL_HAVE_ERROR_QUEUE
+
 #endif /* _WIN_USER_SETTINGS_H_ */

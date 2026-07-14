@@ -411,7 +411,7 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         }
 
         ret = wolfCLU_genKey_ML_DSA(&rng, keyOutFName, directiveArg,
-                                    formatArg, keySz, level, withAlg);
+                                    formatArg, keySz, level, withAlg, NULL);
     #else
         wolfCLU_LogError("Invalid option, ML-DSA not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "

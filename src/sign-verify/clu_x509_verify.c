@@ -24,6 +24,9 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/x509/clu_cert.h>
+#ifdef WOLFCLU_HAVE_MLDSA
+#include <wolfclu/x509/clu_mldsa.h>
+#endif /* WOLFCLU_HAVE_MLDSA */
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -32,6 +35,7 @@ static const struct option verify_options[] = {
     {"-untrusted",     required_argument, 0, WOLFCLU_INTERMEDIATE  },
     {"-crl_check",     no_argument,       0, WOLFCLU_CHECK_CRL     },
     {"-partial_chain", no_argument,       0, WOLFCLU_PARTIAL_CHAIN },
+    {"-inform",        required_argument, 0, WOLFCLU_INFORM        },
     {"-help",          no_argument,       0, WOLFCLU_HELP          },
     {"-h",             no_argument,       0, WOLFCLU_HELP          },
 
@@ -43,15 +47,97 @@ static void wolfCLU_x509VerifyHelp(void)
 {
     WOLFCLU_LOG(WOLFCLU_L0, "./wolfssl verify -CAfile <ca file name> "
             "[-untrusted <intermidate file>] [-crl_check] "
-            "[-partial_chain] <cert to verify>");
+            "[-partial_chain] [-inform pem|der] <cert to verify>");
 
     WOLFCLU_LOG(WOLFCLU_L0, "Note: Current support only allows for loading "
             "1 cert as -untrusted");
-
+    WOLFCLU_LOG(WOLFCLU_L0, "Note: -inform is accepted for compatibility "
+            "and ignored; input format is auto-detected");
 }
-#endif
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 
-static X509* load_cert_from_file(const char* filename) {
+/* Returns 1 if cert is a self-signed root, 0 otherwise (or on hard error,
+ * with *hardErr set to a non-WOLFCLU_SUCCESS code). */
+static int cert_is_self_signed_root(WOLFSSL_X509* cert, int* hardErr) {
+    WOLFSSL_X509_NAME* subj = wolfSSL_X509_get_subject_name(cert);
+    WOLFSSL_X509_NAME* issu = wolfSSL_X509_get_issuer_name(cert);
+
+    *hardErr = WOLFCLU_SUCCESS;
+
+    if (subj == NULL || issu == NULL ||
+            wolfSSL_X509_NAME_cmp(subj, issu) != 0) {
+        return 0;
+    }
+
+#ifdef WOLFCLU_HAVE_MLDSA
+    {
+        int keyType = wolfSSL_X509_get_pubkey_type(cert);
+        if (wolfCLU_IsMLDSAKeyType(keyType)) {
+#if defined(OPENSSL_EXTRA) || defined(WOLFSSL_SMALL_CERT_VERIFY)
+            /* No EVP_PKEY support for ML-DSA yet; verify via wolfcrypt. */
+            const byte* certDer   = NULL;
+            byte*       pubDer    = NULL;
+            int         certDerSz = 0;
+            int         pubDerSz  = 0;
+            int         isRoot    = 0;
+
+            certDer = wolfSSL_X509_get_der(cert, &certDerSz);
+            if (certDer == NULL || certDerSz <= 0) {
+                *hardErr = WOLFCLU_FATAL_ERROR;
+                return 0;
+            }
+            if (wolfSSL_X509_get_pubkey_buffer(cert, NULL, &pubDerSz)
+                    != WOLFSSL_SUCCESS) {
+                *hardErr = WOLFCLU_FATAL_ERROR;
+                return 0;
+            }
+            if (pubDerSz <= 0 || pubDerSz > WOLFCLU_MLDSA_MAX_SPKI_DER_SZ) {
+                *hardErr = WOLFCLU_FATAL_ERROR;
+                return 0;
+            }
+            pubDer = (byte*)XMALLOC((size_t)pubDerSz, HEAP_HINT,
+                    DYNAMIC_TYPE_PUBLIC_KEY);
+            if (pubDer == NULL) {
+                *hardErr = MEMORY_E;
+                return 0;
+            }
+            if (wolfSSL_X509_get_pubkey_buffer(cert, pubDer, &pubDerSz)
+                    != WOLFSSL_SUCCESS) {
+                XFREE(pubDer, HEAP_HINT, DYNAMIC_TYPE_PUBLIC_KEY);
+                *hardErr = WOLFCLU_FATAL_ERROR;
+                return 0;
+            }
+            isRoot = (wc_CheckCertSigPubKey(certDer, (word32)certDerSz,
+                    HEAP_HINT, pubDer, (word32)pubDerSz, keyType) == 0);
+            XFREE(pubDer, HEAP_HINT, DYNAMIC_TYPE_PUBLIC_KEY);
+            return isRoot;
+#else
+            /* Missing OPENSSL_EXTRA or WOLFSSL_SMALL_CERT_VERIFY for
+             * wc_CheckCertSigPubKey. Fail explicitly. */
+            wolfCLU_LogError("Cannot verify ML-DSA self-signed certificates "
+                    "on this build; rebuild wolfSSL with OPENSSL_EXTRA or "
+                    "WOLFSSL_SMALL_CERT_VERIFY");
+            *hardErr = WOLFCLU_FATAL_ERROR;
+            return 0;
+#endif /* OPENSSL_EXTRA || WOLFSSL_SMALL_CERT_VERIFY */
+        }
+    }
+#endif /* WOLFCLU_HAVE_MLDSA */
+
+    {
+        WOLFSSL_EVP_PKEY* pubKey = wolfSSL_X509_get_pubkey(cert);
+        int isRoot;
+        if (pubKey == NULL) {
+            *hardErr = WOLFCLU_FATAL_ERROR;
+            return 0;
+        }
+        isRoot = (wolfSSL_X509_verify(cert, pubKey) == 1);
+        wolfSSL_EVP_PKEY_free(pubKey);
+        return isRoot;
+    }
+}
+
+static WOLFSSL_X509* load_cert_from_file(const char* filename) {
     WOLFSSL_BIO*  bio = NULL;
     WOLFSSL_X509* cert = NULL;
 
@@ -78,7 +164,6 @@ int wolfCLU_x509Verify(int argc, char** argv)
 {
 #ifndef WOLFCLU_NO_FILESYSTEM
     int ret    = WOLFCLU_SUCCESS;
-    int inForm = PEM_FORM;
     int crlCheck     = 0;
     int partialChain = 0;
     int longIndex    = 1;
@@ -87,11 +172,15 @@ int wolfCLU_x509Verify(int argc, char** argv)
     char* verifyCert = NULL;
     char* intermCert = NULL;
     WOLFSSL_X509_STORE*  store = NULL;
-    WOLFSSL_X509_LOOKUP* lookup = NULL;
     WOLFSSL_X509_STORE_CTX* ctx = NULL;
     WOLFSSL_X509* cert = NULL;
     WOLFSSL_X509* intermediate = NULL;
     STACK_OF(WOLFSSL_X509)* intermStack = NULL;
+    int loaded = 0;
+    int foundRoot = 0;
+    int hardErr = WOLFCLU_SUCCESS;
+    int rootErr = WOLFCLU_SUCCESS;
+    WOLFSSL_X509* caX509 = NULL;
 
     /* last parameter is the certificate to verify */
     if (XSTRNCMP("-h", argv[argc-1], 2) == 0) {
@@ -137,7 +226,14 @@ int wolfCLU_x509Verify(int argc, char** argv)
                     break;
 
                 case WOLFCLU_INFORM:
-                    inForm = wolfCLU_checkInform(optarg);
+                    /* Format is auto-detected; -inform is a compat no-op. */
+                    if (optarg != NULL &&
+                            XSTRNCMP(optarg, "pem", 4) != 0 &&
+                            XSTRNCMP(optarg, "PEM", 4) != 0) {
+                        WOLFCLU_LOG(WOLFCLU_L0,
+                                "Warning: -inform %s is ignored; "
+                                "verify auto-detects PEM then DER", optarg);
+                    }
                     break;
 
                 case WOLFCLU_HELP:
@@ -155,15 +251,17 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    cert = load_cert_from_file(verifyCert);
-    if (!cert) {
-        wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
-        ret = WOLFCLU_FATAL_ERROR;
+    if (ret == WOLFCLU_SUCCESS) {
+        cert = load_cert_from_file(verifyCert);
+        if (cert == NULL) {
+            wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
-    if (ret == WOLFCLU_SUCCESS && intermCert) {
+    if (ret == WOLFCLU_SUCCESS && intermCert != NULL) {
         intermediate = load_cert_from_file(intermCert);
-        if (!intermediate) {
+        if (intermediate == NULL) {
             wolfCLU_LogError("Failed to load cert: %s\n", intermCert);
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -176,53 +274,197 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
-        if (inForm != PEM_FORM) {
-            wolfCLU_LogError("Only handling PEM CA files");
+    /* Require -CAfile to contain a self-signed root CA unless -partial_chain. */
+    if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
+        XFILE caFp = XFOPEN(caCert, "rb");
+        loaded = 0;
+
+        if (caFp == XBADFILE) {
+            wolfCLU_LogError("Failed to open CA file %s", caCert);
             ret = WOLFCLU_FATAL_ERROR;
         }
-    }
+        else {
+            long sz = 0;
+            char* pem = NULL;
+            long max_sz = 10 * 1024 * 1024; /* 10 MB limit for CA bundle */
+            wolfSSL_ERR_clear_error();
 
-    if (ret == WOLFCLU_SUCCESS) {
-        lookup = wolfSSL_X509_STORE_add_lookup(store,
-                wolfSSL_X509_LOOKUP_file());
-        if (lookup == NULL) {
-            wolfCLU_LogError("Failed to setup lookup");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-
-    /* Confirm CA file is root CA unless partialChain enabled */
-    if (ret == WOLFCLU_SUCCESS){
-        if (!partialChain && caCert != NULL){
-            int error;
-
-            error = wolfSSL_CertManagerVerify(store->cm, caCert,
-                    WOLFSSL_FILETYPE_PEM);
-
-            if (error != ASN_SELF_SIGNED_E) {
-                wolfCLU_LogError("CA file is not root CA");
-                ret = WOLFCLU_FATAL_ERROR;
+            if (XFSEEK(caFp, 0, XSEEK_END) == 0) {
+                sz = XFTELL(caFp);
+                if (XFSEEK(caFp, 0, XSEEK_SET) != 0) {
+                    sz = 0;
+                }
             }
-            else {
-                /*
-                 * We're expecting these errors, since root certs are
-                 * self-signed so remove them from the error queue.
-                 */
-                if (wolfSSL_ERR_peek_error() == -ASN_NO_SIGNER_E) {
-                    wolfSSL_ERR_get_error();
-                    if (wolfSSL_ERR_peek_error() == -ASN_SELF_SIGNED_E) {
-                        wolfSSL_ERR_get_error();
+
+            if (sz <= 0 || sz > max_sz) {
+                wolfCLU_LogError("CA file %s is empty or too large (max 10MB)", caCert);
+                ret = WOLFCLU_FATAL_ERROR;
+                sz = 0;
+            }
+
+            if (sz > 0 && ret == WOLFCLU_SUCCESS) {
+                pem = (char*)XMALLOC((size_t)sz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                if (pem == NULL) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else if (XFREAD(pem, 1, (size_t)sz, caFp) != (size_t)sz) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    pem[sz] = '\0';
+                }
+            }
+
+            if (ret == WOLFCLU_SUCCESS && pem != NULL) {
+                char* curr = pem;
+                while (curr && curr < pem + sz && ret == WOLFCLU_SUCCESS) {
+                    char* nextCert = XSTRSTR(curr, "-----BEGIN CERTIFICATE-----");
+                    char* nextTrusted = XSTRSTR(curr, "-----BEGIN TRUSTED CERTIFICATE-----");
+                    char* nextCrl = XSTRSTR(curr, "-----BEGIN X509 CRL-----");
+                    char* best = NULL;
+                    int isCert = 0;
+                    int isCrl = 0;
+                    int isTrusted = 0;
+
+                    if (nextCert) { best = nextCert; isCert = 1; }
+                    if (nextTrusted && (!best || nextTrusted < best)) { best = nextTrusted; isCert = 1; isCrl = 0; isTrusted = 1; }
+                    if (nextCrl && (!best || nextCrl < best)) { best = nextCrl; isCrl = 1; isCert = 0; isTrusted = 0; }
+
+                    if (!best) {
+                        break;
+                    }
+
+                    if (isCert) {
+                        long remain = pem + sz - best;
+                        WOLFSSL_BIO* memBio = wolfSSL_BIO_new_mem_buf(best,
+                                (remain > (long)INT_MAX) ? INT_MAX : (int)remain);
+                        if (memBio) {
+                            /* TRUSTED CERTIFICATE blocks carry trailing trust
+                             * attributes after the DER; only the _AUX reader
+                             * understands that footer/format. */
+                            caX509 = isTrusted ?
+                                wolfSSL_PEM_read_bio_X509_AUX(memBio, NULL, NULL, NULL) :
+                                wolfSSL_PEM_read_bio_X509(memBio, NULL, NULL, NULL);
+                            if (caX509 != NULL) {
+                                int skipCert = 0;
+                                loaded++;
+                                if (!partialChain && wolfSSL_X509_get_isCA(caX509) != 1) {
+                                    skipCert = 1;
+                                }
+                                if (!skipCert && !partialChain && !foundRoot) {
+                                    if (cert_is_self_signed_root(caX509, &hardErr)) {
+                                        foundRoot = 1;
+                                    }
+                                    if (hardErr != WOLFCLU_SUCCESS && rootErr == WOLFCLU_SUCCESS) {
+                                        rootErr = hardErr;
+                                    }
+                                }
+                                if (!skipCert && wolfSSL_X509_STORE_add_cert(store, caX509) != WOLFSSL_SUCCESS) {
+                                    wolfCLU_LogError("Failed to add CA cert to trust store");
+                                    ret = WOLFCLU_FATAL_ERROR;
+                                }
+                                wolfSSL_X509_free(caX509);
+                            } else {
+                                wolfCLU_LogError("CA bundle contains corrupt or truncated certificate; aborting verification");
+                                ret = WOLFCLU_FATAL_ERROR;
+                            }
+                            wolfSSL_BIO_free(memBio);
+                        } else {
+                            wolfCLU_LogError("Failed to allocate memory BIO for CA certificate");
+                            ret = WOLFCLU_FATAL_ERROR;
+                        }
+
+                        char* footer = XSTRSTR(best, "-----END ");
+                        if (footer) {
+                            curr = footer + 9;
+                        } else {
+                            curr = pem + sz;
+                        }
+                    }
+                    else if (isCrl) {
+#ifdef HAVE_CRL
+                        if (crlCheck) {
+                            long remain = pem + sz - best;
+                            WOLFSSL_BIO* memBio = wolfSSL_BIO_new_mem_buf(best,
+                                    (remain > (long)INT_MAX) ? INT_MAX : (int)remain);
+                            if (memBio) {
+                                WOLFSSL_X509_CRL* crl = wolfSSL_PEM_read_bio_X509_CRL(memBio, NULL, NULL, NULL);
+                                if (crl != NULL) {
+                                    if (wolfSSL_X509_STORE_add_crl(store, crl) != WOLFSSL_SUCCESS) {
+                                        wolfCLU_LogError("Failed to add CRL to trust store");
+                                        ret = WOLFCLU_FATAL_ERROR;
+                                    }
+                                    wolfSSL_X509_CRL_free(crl);
+                                } else {
+                                    wolfCLU_LogError("CRL data in CA file is corrupt or truncated; aborting verification");
+                                    ret = WOLFCLU_FATAL_ERROR;
+                                }
+                                wolfSSL_BIO_free(memBio);
+                            } else {
+                                wolfCLU_LogError("Failed to allocate memory BIO for CRL");
+                                ret = WOLFCLU_FATAL_ERROR;
+                            }
+                        }
+#endif /* HAVE_CRL */
+                        char* footer = XSTRSTR(best, "-----END ");
+                        if (footer) {
+                            curr = footer + 9;
+                        } else {
+                            curr = pem + sz;
+                        }
                     }
                 }
             }
+            if (pem) {
+                XFREE(pem, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            }
+            XFCLOSE(caFp);
+
+            /* fall back to DER if file opened but had no PEM certs. */
+            if (ret == WOLFCLU_SUCCESS && loaded == 0) {
+                caX509 = load_cert_from_file(caCert);
+                if (caX509 == NULL) {
+                    wolfCLU_LogError("Failed to load CA file %s", caCert);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                /* Same CA:TRUE requirement as the PEM bundle path above. */
+                if (ret == WOLFCLU_SUCCESS && !partialChain &&
+                        wolfSSL_X509_get_isCA(caX509) != 1) {
+                    wolfCLU_LogError("CA file does not assert "
+                                     "basicConstraints CA:TRUE");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                if (ret == WOLFCLU_SUCCESS && !partialChain && !foundRoot) {
+                    if (cert_is_self_signed_root(caX509, &hardErr)) {
+                        foundRoot = 1;
+                    }
+                    /* Defer: a later cert may still be a valid root. */
+                    if (hardErr != WOLFCLU_SUCCESS &&
+                            rootErr == WOLFCLU_SUCCESS) {
+                        rootErr = hardErr;
+                    }
+                }
+                if (ret == WOLFCLU_SUCCESS &&
+                        wolfSSL_X509_STORE_add_cert(store, caX509)
+                            != WOLFSSL_SUCCESS) {
+                    wolfCLU_LogError("Failed to add CA cert to trust store");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                wolfSSL_X509_free(caX509);
+            }
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
-        if (wolfSSL_X509_LOOKUP_load_file(lookup, caCert, X509_FILETYPE_PEM)
-                != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Failed to load CA file via lookup");
+    if (ret == WOLFCLU_SUCCESS && !partialChain && caCert != NULL &&
+            !foundRoot) {
+        if (rootErr != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Error while checking CA bundle for a "
+                             "self-signed root CA");
+            ret = rootErr;
+        }
+        else {
+            wolfCLU_LogError("CA file does not contain a self-signed root CA "
+                             "(use -partial_chain to trust an intermediate)");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -276,5 +518,5 @@ int wolfCLU_x509Verify(int argc, char** argv)
     (void)argv;
     WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
     return WOLFCLU_FATAL_ERROR;
-#endif
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 }

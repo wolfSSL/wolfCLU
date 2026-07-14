@@ -126,6 +126,9 @@
     <ClCompile Include="src\x509\clu_x509_sign.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\x509\clu_mldsa.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\ocsp\clu_ocsp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -198,6 +201,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="wolfclu\x509\clu_request.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wolfclu\x509\clu_mldsa.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="wolfclu\x509\clu_x509_sign.h">
