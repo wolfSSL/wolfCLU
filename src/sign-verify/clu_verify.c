@@ -408,7 +408,14 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, (int)keyFileSz, pubIn);
         if (ret < 0) {
-            wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
+                WOLFCLU_LOG(WOLFCLU_L0,
+                    "No PEM header found, treating as DER.");
+                ret = 0;
+            }
+            else {
+                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            }
         }
         else {
             keyFileSz = ret;
@@ -561,7 +568,14 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, (int)keyFileSz, pubIn);
         if (ret < 0) {
-            wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
+                WOLFCLU_LOG(WOLFCLU_L0,
+                    "No PEM header found, treating as DER.");
+                ret = 0;
+            }
+            else {
+                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            }
         }
         else {
             keyFileSz = ret;
@@ -729,7 +743,14 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     if (inForm == PEM_FORM && ret == 0) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, (int)keyFileSz, pubIn);
         if (ret < 0) {
-            wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
+                WOLFCLU_LOG(WOLFCLU_L0,
+                    "No PEM header found, treating as DER.");
+                ret = 0;
+            }
+            else {
+                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+            }
         }
         else {
             keyFileSz = ret;
@@ -865,8 +886,8 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
 
     XFSEEK(keyFile, 0, SEEK_END);
     keyFileSz = XFTELL(keyFile);
-    if (keyFileSz < 0) {
-        wolfCLU_LogError("Failed to get size of public key FILE.");
+    if (keyFileSz <= 0) {
+        wolfCLU_LogError("Failed to get valid size of public key FILE.");
         XFCLOSE(keyFile);
         wc_dilithium_free(key);
     #ifdef WOLFSSL_SMALL_STACK
@@ -874,9 +895,8 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     #endif
         return BAD_FUNC_ARG;
     }
-    if (keyFileSz > WOLFCLU_MAX_FILE_SIZE) {
-        wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                "bytes.", keyPath, (unsigned)WOLFCLU_MAX_FILE_SIZE);
+    if (keyFileSz > DILITHIUM_MAX_BOTH_KEY_PEM_SIZE) {
+        wolfCLU_LogError("Incorrect public key file size: %ld", keyFileSz);
         XFCLOSE(keyFile);
         wc_dilithium_free(key);
     #ifdef WOLFSSL_SMALL_STACK
@@ -884,7 +904,8 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     #endif
         return WOLFCLU_FATAL_ERROR;
     }
-    keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+
+    keyBuf = (byte*)XMALLOC(keyFileSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (keyBuf == NULL) {
         wolfCLU_LogError("Failed to malloc key buffer.");
         XFCLOSE(keyFile);
@@ -894,7 +915,7 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     #endif
         return MEMORY_E;
     }
-    XMEMSET(keyBuf, 0, keyFileSz);
+    XMEMSET(keyBuf, 0, keyFileSz + 1);
 
     if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
         (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
@@ -914,13 +935,20 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     if (inForm == PEM_FORM) {
         ret = wolfCLU_KeyPemToDer(&keyBuf, (int)keyFileSz, 1);
         if (ret < 0) {
-            wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            wc_dilithium_free(key);
-        #ifdef WOLFSSL_SMALL_STACK
-            XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        #endif
-            return ret;
+            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
+                WOLFCLU_LOG(WOLFCLU_L0,
+                    "No PEM header found, treating as DER.");
+                ret = 0;
+            }
+            else {
+                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+                XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                wc_dilithium_free(key);
+            #ifdef WOLFSSL_SMALL_STACK
+                XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            #endif
+                return ret;
+            }
         }
         else {
             keyBufSz = ret;

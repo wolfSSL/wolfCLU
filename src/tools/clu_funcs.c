@@ -1103,8 +1103,13 @@ void wolfCLU_convertToLower(char* s, int sSz)
 
 void wolfCLU_ForceZero(void* mem, unsigned int len)
 {
+#ifndef WOLFSSL_NO_FORCE_ZERO
+    wc_ForceZero(mem, len);
+#else
+    /* wc_ForceZero unavailable in this build; use a volatile loop instead. */
     volatile byte* z = (volatile byte*)mem;
     while (len--) *z++ = 0;
+#endif
 }
 
 #ifndef WOLFCLU_NO_TERM_SUPPORT
@@ -1434,7 +1439,7 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
-        wc_ForceZero(chunk, sizeof(chunk));
+        wolfCLU_ForceZero(chunk, sizeof(chunk));
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -1455,6 +1460,6 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
         }
     }
 
-    wc_ForceZero(chunk, sizeof(chunk));
+    wolfCLU_ForceZero(chunk, sizeof(chunk));
     return ret;
 }
