@@ -159,6 +159,14 @@ int wolfCLU_hashSetup(int argc, char** argv)
         size = WC_SHA512_DIGEST_SIZE;
 #endif
 
+#ifndef NO_CODING
+    /* base64 enc/dec are not fixed-size digests; force size to 0 so
+     * wolfCLU_hash computes the output size from the input rather than
+     * inheriting the blake2b default. */
+    if (XSTRCMP(alg, "base64enc") == 0 || XSTRCMP(alg, "base64dec") == 0)
+        size = 0;
+#endif
+
     /* hashing function */
     ret = wolfCLU_hash(bioIn, bioOut, alg, size);
     wolfSSL_BIO_free(bioIn);
