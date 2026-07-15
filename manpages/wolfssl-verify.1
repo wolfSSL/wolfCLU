@@ -12,11 +12,9 @@ revocation.
 .SH OPTIONS
 -CAfile file          trusted CA certificate to verify against (PEM only).
 .br
-                      Must be a self-signed root CA unless \-partial_chain
+                      May be a bundle; must contain a self-signed root CA
 .br
-                      is given; an intermediate CA causes "CA file is not
-.br
-                      root CA".
+                      unless \-partial_chain is given. See NOTES.
 .br
 .LP
 -untrusted file       intermediate certificate file. Only one intermediate
@@ -52,11 +50,19 @@ wolfssl verify -CAfile ca-and-crl.pem -crl_check server-cert.pem
 .BR wolfssl-x509(1) ", " wolfssl-crl(1)
 .SH NOTES
 The certificate to verify is given as the final argument. -CAfile must be
-a PEM file. Unless -partial_chain is given, -CAfile must be a self-signed
-root CA; supplying an intermediate CA without -partial_chain fails with
-"CA file is not root CA". With -crl_check, revocation data must already be
-present in -CAfile (for example by concatenating the CRL PEM after the CA
-certificate). Available only when wolfSSL is built with filesystem support.
+a PEM file, and may contain a bundle of multiple certificates; the bundle
+is scanned in any order for a self-signed root CA. Every candidate CA
+certificate, including the self-signed root, must assert basicConstraints
+CA:TRUE; certificates without it are skipped when searching for a root
+unless -partial_chain is given. This is intentional hardening versus
+older wolfssl-clu releases, which accepted a self-signed root lacking
+basicConstraints. Unless -partial_chain is given, the bundle must contain
+a self-signed root CA; if none is found, verification fails with "CA file
+does not contain a self-signed root CA (use -partial_chain to trust an
+intermediate)". With -crl_check, revocation
+data must already be present in -CAfile (for example by concatenating the
+CRL PEM after the CA certificate). Available only when wolfSSL is built
+with filesystem support.
 .SH BUGS
 No known bugs at this time.
 .SH AUTHOR
