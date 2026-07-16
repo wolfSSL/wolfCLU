@@ -127,10 +127,20 @@ int wolfCLU_x509Verify(int argc, char** argv)
                 case WOLFCLU_CAFILE:
                     WOLFCLU_LOG(WOLFCLU_L0, "using CA file %s", optarg);
                     caCert = optarg;
+                    if (caCert == verifyCert) {
+                        wolfCLU_LogError("Malformed argument: last argument "
+                                "\"%s\" must not be a flag arg", verifyCert);
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                     break;
 
                 case WOLFCLU_INTERMEDIATE:
                     intermCert = optarg;
+                    if (intermCert == verifyCert) {
+                        wolfCLU_LogError("Malformed argument: last argument "
+                                "\"%s\" must not be a flag arg", verifyCert);
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                     break;
 
                 case WOLFCLU_PARTIAL_CHAIN:
@@ -156,20 +166,10 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-
-    /* Detect malformed arguments: the trailing positional argument (verifyCert
-     * == argv[argc-1]) is the certificate to verify and must be a distinct
-     * token from every option value. If it string-matches an option's argument,
-     * the last option consumed the token that was meant to be the cert to
-     * verify, so the command line is malformed. With -partial_chain the CA file
-     * may legitimately equal the verify cert (verifying a cert as its own
-     * partial-chain anchor), so that one pairing is allowed. The NULL guards
-     * keep the comparison safe when an option was not supplied. */
-    if ((caCert != NULL && !partialChain &&
-                caCert == verifyCert) ||
-            (intermCert != NULL && intermCert == verifyCert)) {
-        wolfCLU_LogError("Malformed argument: last argument \"%s\" must not be "
-                "a flag arg", verifyCert);
+    if (ret == WOLFCLU_SUCCESS && caCert != NULL && !partialChain &&
+            (XSTRCMP(caCert, verifyCert) == 0)) {
+        wolfCLU_LogError("Unless -partial_chain is passed as an argument "
+                "-CAFile cannot be the same as the cert to verify");
         ret = WOLFCLU_FATAL_ERROR;
     }
 

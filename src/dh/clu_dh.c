@@ -478,7 +478,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
         DerBuffer* pDer = NULL;
         byte* in = NULL;
-        long inSz = 0;
+        int inSz = 0;
         word32 idx  = 0;
 
         inSz = wolfSSL_BIO_get_len(bioIn);
@@ -489,7 +489,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS &&
-                    wolfSSL_BIO_read(bioIn, in, (int)inSz) <= 0) {
+                    wolfSSL_BIO_read(bioIn, in, inSz) <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
 
@@ -500,7 +500,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             }
 
             /* der should always be smaller then pem but check just in case */
-            if (ret == WOLFCLU_SUCCESS && inSz < pDer->length) {
+            if (ret == WOLFCLU_SUCCESS && (word32)inSz < pDer->length) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
 

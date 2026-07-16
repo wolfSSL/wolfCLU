@@ -395,7 +395,7 @@ static int ocspClient(OcspClientConfig* config)
 typedef struct IndexEntry {
     char status;
     time_t revocationTime;
-    char serial[65];
+    char serial[2 * EXTERNAL_SERIAL_SIZE + 1];
     struct IndexEntry* next;
 } IndexEntry;
 
