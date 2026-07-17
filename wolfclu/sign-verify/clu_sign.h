@@ -34,6 +34,11 @@
 #endif
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
+    /* Fallback for older wolfSSL builds predating this constant; 10267 is
+     * the largest possible key PEM size (DILITHIUM_LEVEL5_BOTH_KEY_PEM_SIZE). */
+    #ifndef DILITHIUM_MAX_BOTH_KEY_PEM_SIZE
+        #define DILITHIUM_MAX_BOTH_KEY_PEM_SIZE 10267
+    #endif
 #endif
 #ifdef WOLFSSL_HAVE_XMSS
     #include <wolfssl/wolfcrypt/wc_xmss.h>
