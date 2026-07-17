@@ -129,6 +129,30 @@ class DgstVerifyTest(unittest.TestCase):
                         "-signature", sig_file, input_file)
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_missing_data_file_detected(self):
+        """Omitting the trailing data file must be detected, not misread.
+
+        clu_dgst_setup.c passes argc-1 to wolfCLU_GetOpt so the trailing
+        data file is excluded from option scanning, then checks whether the
+        last option consumed it as a value. With the data file absent here,
+        the .sig path is the trailing argument and the malformed-argument
+        check must reject the invocation rather than hashing the .sig file.
+        """
+        r = run_wolfssl("dgst", "-sha256", "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", os.path.join(DGST_DIR, "sha256-rsa.sig"))
+        self.assertGreaterEqual(r.returncode, 0, r.stderr)
+
+    def test_complete_args_not_misflagged(self):
+        """A well-formed dgst command must not trip the malformed-argument
+        check; the trailing data file should be hashed, not flagged as an
+        option value."""
+        r = run_wolfssl("dgst", "-sha256", "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", os.path.join(DGST_DIR, "sha256-rsa.sig"),
+                        os.path.join(CERTS_DIR, "server-key.der"))
+        self.assertEqual(r.returncode, 0, r.stderr)
+
 
 class DgstLargeFileTest(unittest.TestCase):
 

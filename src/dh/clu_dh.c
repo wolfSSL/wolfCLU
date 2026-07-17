@@ -478,7 +478,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
         DerBuffer* pDer = NULL;
         byte* in = NULL;
-        word32 inSz = 0;
+        int inSz = 0;
         word32 idx  = 0;
 
         inSz = wolfSSL_BIO_get_len(bioIn);
@@ -500,7 +500,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             }
 
             /* der should always be smaller then pem but check just in case */
-            if (ret == WOLFCLU_SUCCESS && inSz < pDer->length) {
+            if (ret == WOLFCLU_SUCCESS && (word32)inSz < pDer->length) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
 
@@ -510,7 +510,7 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS &&
-                    wc_DhKeyDecode(in, &idx, &dh, inSz) != 0) {
+                    wc_DhKeyDecode(in, &idx, &dh, (int)inSz) != 0) {
                 wolfCLU_LogError("Unable to decode input params");
                 ret = WOLFCLU_FATAL_ERROR;
             }

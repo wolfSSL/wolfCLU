@@ -23,6 +23,14 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
+/* Windows opens stdout in text mode, expanding every 0x0A byte to 0x0D 0x0A.
+ * That corrupts raw binary random output (and adds stray bytes to encoded
+ * output), so stdout is switched to binary mode below before writing. */
+#if defined(_WIN32)
+    #include <io.h>
+    #include <fcntl.h>
+#endif
+
 /* Fallback for RNG configs that leave RNG_MAX_BLOCK_LEN undefined. If a build's
  * real per-call limit is smaller, wc_RNG_GenerateBlock fails cleanly. */
 #ifndef RNG_MAX_BLOCK_LEN
@@ -349,6 +357,12 @@ int wolfCLU_Rand(int argc, char** argv)
     /* setup output bio to stdout if not set */
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         outIsStdout = 1;
+#if defined(_WIN32)
+        /* Put stdout in binary mode so raw bytes pass through untranslated;
+         * otherwise a random 0x0A becomes 0x0D 0x0A and `rand N` emits N+1
+         * bytes. */
+        (void)_setmode(_fileno(stdout), _O_BINARY);
+#endif
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
         if (bioOut == NULL) {
             ret = WOLFCLU_FATAL_ERROR;

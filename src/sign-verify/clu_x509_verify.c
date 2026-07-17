@@ -24,6 +24,7 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/x509/clu_cert.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -126,10 +127,20 @@ int wolfCLU_x509Verify(int argc, char** argv)
                 case WOLFCLU_CAFILE:
                     WOLFCLU_LOG(WOLFCLU_L0, "using CA file %s", optarg);
                     caCert = optarg;
+                    if (caCert == verifyCert) {
+                        wolfCLU_LogError("Malformed argument: last argument "
+                                "\"%s\" must not be a flag arg", verifyCert);
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                     break;
 
                 case WOLFCLU_INTERMEDIATE:
                     intermCert = optarg;
+                    if (intermCert == verifyCert) {
+                        wolfCLU_LogError("Malformed argument: last argument "
+                                "\"%s\" must not be a flag arg", verifyCert);
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
                     break;
 
                 case WOLFCLU_PARTIAL_CHAIN:
@@ -155,10 +166,19 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    cert = load_cert_from_file(verifyCert);
-    if (!cert) {
-        wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
+    if (ret == WOLFCLU_SUCCESS && caCert != NULL && !partialChain &&
+            (XSTRCMP(caCert, verifyCert) == 0)) {
+        wolfCLU_LogError("Unless -partial_chain is passed as an argument "
+                "-CAFile cannot be the same as the cert to verify");
         ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        cert = load_cert_from_file(verifyCert);
+        if (!cert) {
+            wolfCLU_LogError("Failed to load cert: %s\n", verifyCert);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS && intermCert) {
