@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/server.h>
@@ -115,7 +116,7 @@ int wolfCLU_Server(int argc, char** argv)
     optind = 0;
 
     while ((option = wolfCLU_GetOpt(argc, argv, "", server_options, &longIndex))
-                    != -1) {
+                    != END_OF_ARGS) {
         switch (option) {
             case WOLFCLU_PORT:
                 if (ret == WOLFCLU_SUCCESS) {
@@ -185,6 +186,11 @@ int wolfCLU_Server(int argc, char** argv)
                 break;
             case WOLFCLU_HELP:
                 wolfCLU_ServerHelp();
+                goto exit;
+
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                ret = WOLFCLU_FATAL_ERROR;
                 goto exit;
         }
     }

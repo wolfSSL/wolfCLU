@@ -20,14 +20,41 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/x509/clu_request.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/pkey/clu_pkey.h>
 #include <wolfclu/certgen/clu_certgen.h>
+#include <wolfssl/openssl/ssl.h>
+#include <wolfssl/ssl.h>
+#include <wolfssl/wolfcrypt/error-crypt.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #if defined(WOLFSSL_CERT_REQ) && !defined(WOLFCLU_NO_FILESYSTEM)
+static void wolfCLU_certgenHelp(void) {
+    WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-out file to write to (default stdout)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-key public key to put into certificate request");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inform der or pem format for '-in'");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-outform der or pem format for '-out'");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to parse for certificate configuration");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-x509 generate self signed certificate");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-addext add an extension, ie \"subjectAltName=IP:192.168.1.2,DNS:example.com\"");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey generate the private key to use with req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-inkey private key to use with req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-keyout file to output key to");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-subj use a specified subject name, ie O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OU=org-unit");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-verify check the signature on the req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-text output human readable text of req");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-noout do not print out the generated results");
+}
+
 static const struct option req_options[] = {
 
     {"-sha",       no_argument,       0, WOLFCLU_CERT_SHA   },
@@ -598,8 +625,8 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = wolfCLU_GetOpt(argc, argv, "", req_options,
-                    &longIndex )) != -1) {
+    while (ret == WOLFCLU_SUCCESS && (option = wolfCLU_GetOpt(argc, argv, "",
+                    req_options, &longIndex )) != END_OF_ARGS) {
 
         switch (option) {
             case WOLFCLU_EXTENSIONS:
@@ -633,7 +660,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
                 if (ret == WOLFCLU_SUCCESS) {
                     int idx;
-
                     idx     = (int)strcspn(optarg, ":");
                     keyType = (char*)XMALLOC(idx + 1, HEAP_HINT,
                             DYNAMIC_TYPE_TMP_BUFFER);
@@ -754,6 +780,17 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_NEW:
                 break;
+
+            case ARG_FOUND_TWICE:
+                if (keyType != NULL) {
+                    XFREE(keyType, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+                }
+                wolfSSL_BIO_free(reqIn);
+                wolfSSL_BIO_free(keyIn);
+                wolfSSL_BIO_free(bioOut);
+                wolfSSL_X509_free(x509);
+                wolfSSL_EVP_PKEY_free(pkey);
+                return WOLFCLU_FATAL_ERROR;
 
             case ':':
             case '?':

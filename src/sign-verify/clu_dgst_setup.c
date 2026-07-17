@@ -616,7 +616,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   dgst_options, &longIndex )) != -1) {
+                   dgst_options, &longIndex )) != END_OF_ARGS) {
 
         switch (option) {
 
@@ -684,6 +684,10 @@ int wolfCLU_dgst_setup(int argc, char** argv)
                     wolfCLU_LogError("bad inform");
                     ret = USER_INPUT_ERROR;
                 }
+                break;
+
+            case ARG_FOUND_TWICE:
+                ret = WOLFCLU_FATAL_ERROR;
                 break;
 
             case ':':

@@ -19,8 +19,6 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
-#include <stdio.h>
-
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_error_codes.h>

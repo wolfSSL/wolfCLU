@@ -20,6 +20,7 @@
  */
 
 #include <wolfclu/clu_header_main.h>
+#include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
@@ -78,8 +79,13 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
 
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "",
-                   dsa_options, &longIndex )) != -1) {
+                   dsa_options, &longIndex )) != END_OF_ARGS) {
         switch (option) {
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+
             case WOLFCLU_INFILE:
 #ifdef WOLFCLU_NO_FILESYSTEM
             WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");

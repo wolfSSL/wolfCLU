@@ -78,9 +78,14 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = wolfCLU_GetOpt(argc, argv, "", crl_options,
-                    &longIndex )) != -1) {
+    while ((option = wolfCLU_GetOpt(argc, argv, "", crl_options, &longIndex ))
+            != END_OF_ARGS) {
         switch (option) {
+            case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+
             case WOLFCLU_OUTFILE:
                 out = optarg;
                 break;
