@@ -2,6 +2,7 @@
 """Key generation, signing, and verification tests for wolfCLU."""
 
 import os
+import subprocess
 import sys
 import unittest
 
@@ -325,6 +326,190 @@ class RsaTest(_GenkeySignVerifyBase):
                         "-in", self.SIGN_FILE, "-out", bad_sig)
         self.assertNotEqual(r.returncode, 0,
                             "RSA signing with empty key should have failed")
+
+
+def _icacls_entries(path):
+    """Return the list of ACE description strings icacls reports for path,
+    one string per trustee (e.g. "DOMAIN\\user:(F)")."""
+    r = subprocess.run(["icacls", path], capture_output=True, text=True,
+                       timeout=10)
+    if r.returncode != 0:
+        raise RuntimeError("icacls {} failed: {}".format(path, r.stderr))
+
+    entries = []
+    for line in r.stdout.splitlines():
+        line = line.rstrip()
+        if not line:
+            break
+        if line.lower().startswith("successfully processed"):
+            break
+        if line.startswith(path):
+            line = line[len(path):].strip()
+        else:
+            line = line.strip()
+        if line:
+            entries.append(line)
+    return entries
+
+
+class KeyFilePermissionsTest(unittest.TestCase):
+    """wolfCLU_OpenKeyFile must write private keys with owner-only
+    permissions (POSIX 0600 / Windows single-owner ACE), and must replace
+    (not append to) a pre-existing file.
+
+    On Windows this exercises the SDDL/CreateFileA branch of
+    wolfCLU_OpenKeyFile via icacls instead of POSIX mode bits, since NTFS
+    ACLs are the actual enforcement mechanism there, not the mode bits
+    os.stat() reports.
+    """
+
+    @classmethod
+    def tearDownClass(cls):
+        _cleanup_files(_TEMP_FILES)
+        _TEMP_FILES.clear()
+
+    def _assert_owner_only(self, priv, label):
+        if os.name == "nt":
+            entries = _icacls_entries(priv)
+            self.assertEqual(len(entries), 1,
+                             "{}: expected exactly one owner-only ACL "
+                             "entry, got: {}".format(label, entries))
+            entry = entries[0]
+            self.assertIn("(F)", entry,
+                         "{}: owner ACE missing full control: {}"
+                         .format(label, entry))
+            for forbidden in ("Everyone", "Authenticated Users",
+                              "BUILTIN\\Users", "NT AUTHORITY"):
+                self.assertNotIn(forbidden, entry,
+                                 "{}: unexpected broad-access principal "
+                                 "{!r} in ACL: {}"
+                                 .format(label, forbidden, entry))
+        else:
+            mode = os.stat(priv).st_mode & 0o777
+            self.assertEqual(mode, 0o600,
+                             "{}: private key file mode is {:o}, expected "
+                             "600".format(label, mode))
+
+    def _priv_mode(self, keybase):
+        priv = keybase + ".priv"
+        pub = keybase + ".pub"
+        _TEMP_FILES.extend([priv, pub])
+        r = run_wolfssl("-genkey", "rsa", "-size", "2048", "-out", keybase,
+                        "-outform", "der", "-output", "KEYPAIR")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return priv
+
+    def test_rsa_priv_key_mode_is_owner_only(self):
+        priv = self._priv_mode("rsakey-perm-test")
+        self._assert_owner_only(priv, "RSA")
+
+    def test_ecc_priv_key_mode_is_owner_only(self):
+        priv = "ecckey-perm-test.priv"
+        pub = "ecckey-perm-test.pub"
+        _TEMP_FILES.extend([priv, pub])
+        r = run_wolfssl("-genkey", "ecc", "-out", "ecckey-perm-test",
+                        "-outform", "der", "-output", "KEYPAIR")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self._assert_owner_only(priv, "ECC")
+
+    def test_ed25519_priv_key_mode_is_owner_only(self):
+        priv = "edkey-perm-test.priv"
+        pub = "edkey-perm-test.pub"
+        _TEMP_FILES.extend([priv, pub])
+        r = run_wolfssl("-genkey", "ed25519", "-out", "edkey-perm-test",
+                        "-outform", "der", "-output", "KEYPAIR")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self._assert_owner_only(priv, "Ed25519")
+
+    def test_dh_priv_key_mode_is_owner_only(self):
+        r = run_wolfssl("dhparam", "1024")
+        if "DH support not compiled into wolfSSL" in r.stdout + r.stderr:
+            self.skipTest("DH support not compiled in")
+
+        params_file = "dh-perm-test.params"
+        keyfile = "dh-perm-test.key"
+        _TEMP_FILES.extend([params_file, keyfile])
+
+        r = run_wolfssl("dhparam", "1024", "-out", params_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("dhparam", "-in", params_file, "-genkey",
+                        "-out", keyfile)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self._assert_owner_only(keyfile, "DH")
+
+    def test_dsa_priv_key_mode_is_owner_only(self):
+        r = run_wolfssl("dsaparam", "1024")
+        if "DSA support not compiled into wolfSSL" in r.stdout + r.stderr:
+            self.skipTest("DSA support not compiled in")
+
+        params_file = "dsa-perm-test.params"
+        keyfile = "dsa-perm-test.key"
+        _TEMP_FILES.extend([params_file, keyfile])
+
+        r = run_wolfssl("dsaparam", "-out", params_file, "1024")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("dsaparam", "-in", params_file, "-genkey",
+                        "-out", keyfile)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self._assert_owner_only(keyfile, "DSA")
+
+    @unittest.skipIf(os.name == "nt",
+                     "symlink attack path is POSIX-specific")
+    def test_symlink_at_priv_path_is_not_followed(self):
+        """A pre-existing symlink at the -out path must not be followed:
+        key material must never land at the symlink's target, and the
+        target's contents must be untouched."""
+        keybase = "rsakey-symlink-test"
+        priv = keybase + ".priv"
+        pub = keybase + ".pub"
+        target = "rsakey-symlink-target.txt"
+        _TEMP_FILES.extend([priv, pub, target])
+
+        with open(target, "wb") as f:
+            f.write(b"attacker-owned file; must not be overwritten")
+        os.symlink(target, priv)
+
+        r = run_wolfssl("-genkey", "rsa", "-size", "2048", "-out", keybase,
+                        "-outform", "der", "-output", "KEYPAIR")
+
+        with open(target, "rb") as f:
+            target_content = f.read()
+        self.assertEqual(target_content,
+                         b"attacker-owned file; must not be overwritten",
+                         "symlink target was written through; key "
+                         "material leaked to an attacker-controlled path")
+
+        if r.returncode == 0:
+            self.assertFalse(os.path.islink(priv),
+                             "priv path is still a symlink after a "
+                             "successful -genkey")
+            self._assert_owner_only(priv, "RSA (post-symlink)")
+
+    def test_preexisting_priv_file_is_replaced(self):
+        """A stale file at the target path must be replaced, not appended
+        to or left with mixed content, and must end up owner-only."""
+        keybase = "rsakey-replace-test"
+        priv = keybase + ".priv"
+        pub = keybase + ".pub"
+        _TEMP_FILES.extend([priv, pub])
+
+        with open(priv, "wb") as f:
+            f.write(b"stale placeholder content")
+        if os.name != "nt":
+            os.chmod(priv, 0o644)
+
+        r = run_wolfssl("-genkey", "rsa", "-size", "2048", "-out", keybase,
+                        "-outform", "der", "-output", "KEYPAIR")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        with open(priv, "rb") as f:
+            content = f.read()
+        self.assertNotIn(b"stale placeholder content", content,
+                         "stale content survived key generation")
+
+        self._assert_owner_only(priv, "replaced RSA")
 
 
 @unittest.skipUnless(_has_algorithm("dilithium"),

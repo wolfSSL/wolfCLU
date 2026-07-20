@@ -110,6 +110,70 @@ class DgstVerifyTest(unittest.TestCase):
                                 "-signature", sig_file, input_file)
                 self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_verify_stdin_data_with_existing_signature_file(self):
+        """The trailing "-signature <file>" value must not be mistaken for
+        a positional data file just because the file exists on disk;
+        with no positional file, data must still come from stdin.
+
+        Regression test: the last-arg heuristic used to skip its whole
+        option-matching loop whenever the last token was an existing file,
+        so an existing -signature/-verify value was silently read as the
+        data to hash instead of falling back to stdin.
+        """
+        sig_file = "dgst-stdin-verify-test.sig"
+        self.addCleanup(lambda: os.remove(sig_file)
+                        if os.path.exists(sig_file) else None)
+        data = "stdin verify regression test data"
+
+        r = run_wolfssl("dgst", "-sha256", "-sign",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", sig_file, stdin_data=data)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("dgst", "-sha256", "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", sig_file, stdin_data=data)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_trailing_token_matching_option_name_is_treated_as_flag(self):
+        """A trailing token that names a known option (e.g. a file called
+        "-sha256") must always be parsed as that option, never as the
+        positional data file, even if a same-named file exists on disk.
+
+        wolfCLU_GetOpt's argv scan parses the token as a flag regardless of
+        the last-arg heuristic's choice, so treating it as data too would
+        read it twice under conflicting interpretations. Data must fall
+        back to stdin instead: sign real content under a normal name, then
+        verify with a same-named-as-a-flag decoy file as the trailing arg
+        while feeding the *real* content over stdin. Verification must
+        succeed, proving stdin (not the on-disk decoy) was hashed.
+        """
+        real_content = "ground truth data for the -sha256 filename test"
+        decoy_file_content = "decoy on-disk data that must NOT be hashed"
+
+        normal_named_file = "dgst-option-collision-src.txt"
+        collision_named_file = "-sha256"
+        sig_file = "dgst-option-collision-test.sig"
+        for f in (normal_named_file, collision_named_file, sig_file):
+            self.addCleanup(lambda p=f: os.remove(p)
+                            if os.path.exists(p) else None)
+
+        with open(normal_named_file, "w", encoding="utf-8") as f:
+            f.write(real_content)
+        with open(collision_named_file, "w", encoding="utf-8") as f:
+            f.write(decoy_file_content)
+
+        r = run_wolfssl("dgst", "-sha256", "-sign",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", sig_file, normal_named_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("dgst", "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", sig_file, collision_named_file,
+                        stdin_data=real_content)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_dgst_out_roundtrip(self):
         """dgst -out creates the signature file; -signature round-trips."""
         sig_file = "dgst-out-test.sig"
@@ -178,8 +242,10 @@ class DgstLargeFileTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        for f in [cls.LARGE_FILE, "large-test.txt.enc", "large-test.txt.dec",
-                  "5000-server-key.sig"]:
+        # "5000-server-key.sig" is intentionally excluded: it's a
+        # checked-in fixture read by test_verify_large_file, not test
+        # output.
+        for f in [cls.LARGE_FILE, "large-test.txt.enc", "large-test.txt.dec"]:
             if os.path.exists(f):
                 os.remove(f)
 
@@ -192,7 +258,9 @@ class DgstLargeFileTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_sign_and_verify_large_file(self):
-        sig_file = "5000-server-key.sig"
+        # Must not collide with the checked-in "5000-server-key.sig"
+        # fixture that test_verify_large_file reads.
+        sig_file = "5000-server-key-roundtrip.sig"
         self.addCleanup(lambda: os.remove(sig_file)
                         if os.path.exists(sig_file) else None)
 
@@ -538,6 +606,23 @@ class DgstHmacTest(unittest.TestCase):
         """-mac HMAC with no hash flag must fail (no default hash)."""
         r = run_wolfssl("dgst", "-hmac",
                         "-mackey", self.KEY, self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_with_verify_flag_rejected(self):
+        """-hmac combined with -verify must fail, not silently ignore -verify."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", self.KEY, "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", os.path.join(DGST_DIR, "sha256-rsa.sig"),
+                        self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_with_sign_flag_rejected(self):
+        """-hmac combined with -sign must fail, not silently ignore -sign."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", self.KEY, "-sign",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        self.data_file)
         self.assertNotEqual(r.returncode, 0)
 
 

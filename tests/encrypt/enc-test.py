@@ -163,7 +163,7 @@ class EncDecryptTest(unittest.TestCase):
         self.assertGreater(len(r.stdout), 0)
 
     def test_explicit_hex_key_iv(self):
-        """Regression: explicit --key/--iv hex strings must be copied correctly."""
+        """Regression: explicit -key/-iv hex strings must be copied correctly."""
         src = "enc_hex_test.txt"
         enc = "enc_hex_test.enc"
         self._cleanup(src, enc)
@@ -173,8 +173,8 @@ class EncDecryptTest(unittest.TestCase):
 
         r = run_wolfssl("enc", "-aes-128-cbc", "-nosalt",
                         "-in", src, "-out", enc,
-                        "--key", "00112233445566778899aabbccddeeff",
-                        "--iv", "00112233445566778899aabb0011aab7")
+                        "-key", "00112233445566778899aabbccddeeff",
+                        "-iv", "00112233445566778899aabb0011aab7")
         self.assertEqual(r.returncode, 0,
                          "encrypt with explicit hex key/iv failed: "
                          "{}".format(r.stderr))

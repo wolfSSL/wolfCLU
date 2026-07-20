@@ -19,6 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include <limits.h>
+
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_error_codes.h>
@@ -976,6 +978,41 @@ static int wolfCLU_DerGetExtension(const byte* buf, word32 bufSz,
     return WOLFCLU_SUCCESS;
 }
 
+/* Given *extensions and *extensionsSz as wc_ParseCert leaves them in
+ * DecodedCert::extensions and DecodedCert::extensionsSz -- which may point
+ * at the raw `[3] EXPLICIT Extensions` tag (ASN_EXTENSIONS, wrapping a
+ * `SEQUENCE OF Extension`) rather than directly at the concatenated
+ * Extension entries that wolfCLU_DerGetExtension() expects -- skip the [3]
+ * wrapper (if present) and the inner SEQUENCE header so *extensions and
+ * *extensionsSz land exactly on the entries. Leaves *extensions and
+ * *extensionsSz unchanged if neither a [3] wrapper nor a bare SEQUENCE is
+ * found at offset 0, so wolfCLU_DerGetExtension() can fail loudly on truly
+ * malformed input rather than silently finding nothing.
+ *
+ * Split out of wolfCLU_GetX509RawExtensions() (and declared in clu_cert.h
+ * instead of kept file-static) purely so the unwrap logic can be unit
+ * tested directly against synthetic wrapped/bare-SEQUENCE buffers, without
+ * needing a full CERT_TYPE DER to drive it via wc_ParseCert(). */
+void wolfCLU_UnwrapX509Extensions(const byte** extensions, int* extensionsSz)
+{
+    const byte* buf = *extensions;
+    word32 bufSz = (word32)*extensionsSz;
+    word32 idx = 0;
+    byte tag;
+    word32 len;
+
+    if (wolfCLU_DerGetHeader(buf, bufSz, &idx, &tag, &len) !=
+            WOLFCLU_SUCCESS || tag != ASN_EXTENSIONS) {
+        idx = 0; /* not [3]-wrapped; try a bare SEQUENCE at offset 0 */
+    }
+
+    if (wolfCLU_DerGetHeader(buf, bufSz, &idx, &tag, &len) ==
+            WOLFCLU_SUCCESS && tag == (ASN_SEQUENCE | ASN_CONSTRUCTED)) {
+        *extensions = buf + idx;
+        *extensionsSz = (int)len;
+    }
+}
+
 /* Parse x509's raw DER into dCert and point it at its Extensions.
  * On WOLFCLU_SUCCESS the caller must wc_FreeDecodedCert(dCert) once done;
  * dCert->extensions/extensionsSz point into x509's own DER buffer (owned
@@ -1011,32 +1048,9 @@ static int wolfCLU_GetX509RawExtensions(WOLFSSL_X509* x509,
         return WOLFCLU_FATAL_ERROR;
     }
 
-    /* dCert->extensions/extensionsSz may point at the raw `[3] EXPLICIT
-     * Extensions` tag (ASN_EXTENSIONS, wrapping a `SEQUENCE OF Extension`)
-     * rather than directly at the concatenated Extension entries that
-     * wolfCLU_DerGetExtension() expects. Skip the [3] wrapper (if present)
-     * and the inner SEQUENCE header so extensions/extensionsSz land
-     * exactly on the entries. */
     if (dCert->extensions != NULL && dCert->extensionsSz > 0) {
-        const byte* buf = dCert->extensions;
-        word32 bufSz = (word32)dCert->extensionsSz;
-        word32 idx = 0;
-        byte tag;
-        word32 len;
-
-        if (wolfCLU_DerGetHeader(buf, bufSz, &idx, &tag, &len) !=
-                WOLFCLU_SUCCESS || tag != ASN_EXTENSIONS) {
-            idx = 0; /* not [3]-wrapped; try a bare SEQUENCE at offset 0 */
-        }
-
-        if (wolfCLU_DerGetHeader(buf, bufSz, &idx, &tag, &len) ==
-                WOLFCLU_SUCCESS && tag == (ASN_SEQUENCE | ASN_CONSTRUCTED)) {
-            dCert->extensions = buf + idx;
-            dCert->extensionsSz = (int)len;
-        }
-        /* else: leave extensions/extensionsSz as wc_ParseCert set them;
-         * wolfCLU_DerGetExtension() will fail loudly on truly malformed
-         * input rather than silently finding nothing. */
+        wolfCLU_UnwrapX509Extensions(&dCert->extensions,
+                &dCert->extensionsSz);
     }
 
     return WOLFCLU_SUCCESS;
@@ -1216,6 +1230,14 @@ int wolfCLU_SetCertNameFieldByNid(CertName* dst, int nid, const char* val,
     }
 
     if (field != NULL) {
+        /* Reject rather than silently truncate: earlier code here copied
+         * oversized DN values into the fixed CTC_NAME_SIZE buffer with
+         * XSTRLCPY, so a subject/issuer field over 63 bytes would be
+         * cut short and signing would continue anyway. That silently
+         * issues a certificate with a corrupted identity field, which is
+         * worse than failing loudly -- callers that relied on the old
+         * truncate-and-continue behavior for long -subj values will now
+         * need to shorten them. */
         if (valLen > CTC_NAME_SIZE - 1) {
             wolfCLU_LogError("DN field (nid %d) exceeds %d-byte limit",
                     nid, CTC_NAME_SIZE - 1);
@@ -1298,7 +1320,7 @@ int wolfCLU_Asn1TimeToCertDate(byte* out, int outSz,
         return BUFFER_E;
     }
 
-    sz = (int)SetLength((word32)t->length, out + 1) + 1;
+    sz = (int)wolfCLU_DerSetLength((word32)t->length, out + 1) + 1;
     if (sz + t->length > outSz) {
         return BUFFER_E;
     }
@@ -1483,6 +1505,12 @@ static int wolfCLU_OidDerToDotted(const byte* oid, word32 oidLen,
     firstArc = -1;
     i = 0;
     while (i < oidLen) {
+        /* reject a run of continuation bytes long enough to shift bits
+         * out of arc, rather than silently wrapping into a bogus arc
+         * value. */
+        if (arc > (ULONG_MAX >> 7)) {
+            return ASN_PARSE_E;
+        }
         arc = (arc << 7) | (unsigned long)(oid[i] & 0x7F);
         if ((oid[i] & 0x80) == 0) {
             firstArc = 1;
@@ -1510,6 +1538,9 @@ static int wolfCLU_OidDerToDotted(const byte* oid, word32 oidLen,
 
     arc = 0;
     for (; i < oidLen; i++) {
+        if (arc > (ULONG_MAX >> 7)) {
+            return ASN_PARSE_E;
+        }
         arc = (arc << 7) | (unsigned long)(oid[i] & 0x7F);
         if ((oid[i] & 0x80) == 0) {
             len = XSTRLEN(out);
@@ -1602,11 +1633,20 @@ static int wolfCLU_CopyX509ExtsToCertFromDCert(DecodedCert* dCert, Cert* cert,
                     }
                     if (wc_SetCustomExtension(cert, ext.critical, oidHeap,
                                 valHeap, ext.valLen) < 0) {
-                        wolfCLU_LogError("Failed to copy extension (OID %s) "
-                                "to the certificate", oid);
                         XFREE(oidHeap, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                         XFREE(valHeap, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                        ret = WOLFCLU_FATAL_ERROR;
+                        if (ext.critical) {
+                            wolfCLU_LogError("Failed to copy a critical "
+                                    "extension (OID %s); refusing to issue",
+                                    oid);
+                            ret = WOLFCLU_FATAL_ERROR;
+                        }
+                        else {
+                            wolfCLU_Log(WOLFCLU_L0,
+                                    "Warning: failed to copy extension "
+                                    "(OID %s) to the certificate", oid);
+                            uncopied = 1;
+                        }
                     }
                 }
             }

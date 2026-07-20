@@ -1292,6 +1292,8 @@ FILE* wolfCLU_OpenOutFile(const char* path)
 #else
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <limits.h>
+#include <stdlib.h>
 #ifndef O_NOFOLLOW
     #define O_NOFOLLOW 0
 #endif
@@ -1304,25 +1306,41 @@ FILE* wolfCLU_CreateSecureFile(const char* path, int access,
     mode_t      createMode = ownerOnly ? 0600 : 0666;
 
     /* Non-regular targets (character devices like /dev/null or
-     * /dev/stdout, FIFOs, etc.) can't be usefully hardened with
-     * unlink()+O_EXCL: unlink() on them commonly fails (they live in
-     * directories the caller can't modify) or, when it succeeds, would
-     * destroy and replace the special file with a plain regular file
-     * instead of writing through it. Fall back to a plain fopen() for
-     * these so redirecting output to them keeps working as it did before
-     * the O_EXCL hardening was added.
+     * /dev/stdout, FIFOs, symlinks to either, etc.) can't be usefully
+     * hardened with unlink()+O_EXCL: unlink() on them commonly fails
+     * (they live in directories the caller can't modify) or, when it
+     * succeeds, would destroy and replace the special file with a plain
+     * regular file instead of writing through it. Fall back to a plain
+     * fopen() for these so redirecting output to them (e.g. `-out
+     * /dev/stdout`, which is itself commonly a symlink) keeps working as
+     * it did before the O_EXCL hardening was added.
      *
-     * Symlinks are deliberately excluded from this fallback: lstat()
-     * reports S_IFLNK for a symlink regardless of what it points to, and
-     * following it here with a plain fopen() would let an attacker who
-     * pre-creates a symlink at path redirect key material to an
-     * arbitrary target -- exactly what the O_EXCL|O_NOFOLLOW path below
-     * exists to prevent. Symlinks fall through to that path, which
-     * unlinks the symlink and creates a fresh regular file in its place. */
+     * For secret (ownerOnly) output, and for a symlink that resolves to a
+     * regular file even when non-secret, this fallback is skipped and the
+     * symlink falls through to the unlink()+O_EXCL path below instead:
+     * following it here would let an attacker who pre-creates a symlink at
+     * path redirect key material -- or, for non-secret cert/CSR output,
+     * redirect the write to an unrelated regular file the symlink points
+     * at -- to an arbitrary target. A symlink to a non-regular target
+     * (e.g. /dev/stdout) has no such exposure for non-secret output
+     * (there's nothing sensitive to redirect away, and no regular file to
+     * silently overwrite), so it's still followed like any other special
+     * file. */
+    if (lstat(path, &st) == 0 && S_ISLNK(st.st_mode) && !ownerOnly) {
+        struct stat targetSt;
+        if (stat(path, &targetSt) == 0 && !S_ISREG(targetSt.st_mode)) {
+            return fopen(path, mode);
+        }
+    }
+
     if (lstat(path, &st) == 0 && !S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) {
         /* Open with O_NOFOLLOW instead of fopen() so a symlink swapped in
          * between the lstat() above and this open() is rejected rather
          * than followed. */
+        /* Without a native O_NOFOLLOW that guard is a no-op; fail closed. */
+        if (ownerOnly && O_NOFOLLOW == 0) {
+            return NULL;
+        }
         fd = open(path, access | O_NOFOLLOW);
         if (fd < 0)
             return NULL;
@@ -1371,6 +1389,42 @@ void wolfCLU_RemoveFile(const char* path)
     (void)_unlink(path);
 #else
     (void)unlink(path);
+#endif
+}
+
+int wolfCLU_PathsRefEqual(const char* pathA, const char* pathB)
+{
+#ifdef _WIN32
+    char fullA[MAX_PATH];
+    char fullB[MAX_PATH];
+#else
+    char fullA[PATH_MAX];
+    char fullB[PATH_MAX];
+#endif
+
+    if (pathA == NULL || pathB == NULL) {
+        return 0;
+    }
+    if (XSTRCMP(pathA, pathB) == 0) {
+        return 1;
+    }
+
+    /* Fall back to resolving both to an absolute, canonical (symlinks
+     * followed) form so e.g. "./key.pem" vs "key.pem", or a symlink
+     * pointing at the other path, are still caught. Only meaningful for
+     * paths that already exist -- a not-yet-created -out target simply
+     * fails to resolve here and is left to the exact-match check above. */
+#ifdef _WIN32
+    if (GetFullPathNameA(pathA, sizeof(fullA), fullA, NULL) == 0 ||
+            GetFullPathNameA(pathB, sizeof(fullB), fullB, NULL) == 0) {
+        return 0;
+    }
+    return (_stricmp(fullA, fullB) == 0);
+#else
+    if (realpath(pathA, fullA) == NULL || realpath(pathB, fullB) == NULL) {
+        return 0;
+    }
+    return (XSTRCMP(fullA, fullB) == 0);
 #endif
 }
 

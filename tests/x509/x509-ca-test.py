@@ -727,6 +727,42 @@ class TestCAChimera(unittest.TestCase):
             "-cert", ca_chimera, "-out", server_chimera_name)
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_chimera_cert_oversized_subj_field(self):
+        """altextend on a CA cert whose subject DN field exceeds
+        CTC_NAME_SIZE must fail cleanly, not silently truncate."""
+        ca_cert_name = "tmp_chimera_ca_oversized.pem"
+        ca_cert = _tmp(ca_cert_name)
+        self._clean(ca_cert)
+
+        # 200 bytes exceeds CTC_NAME_SIZE (64 or 128, build-dependent);
+        # -subj reparsing must reject rather than truncate.
+        oversized_o = "O" * 200
+
+        r = run_wolfssl("req", "-new", "-x509",
+                        "-key", os.path.join(CERTS_DIR, "ca-ecc-key.pem"),
+                        "-subj",
+                        "O={}/C=US/ST=WA/L=Seattle/CN=A/OU=org-unit-A"
+                        .format(oversized_o),
+                        "-out", ca_cert, "-outform", "PEM")
+        if r.returncode != 0:
+            # If req fails early because the build's wolfSSL enforces
+            # CTC_NAME_SIZE in the compat layer (e.g. on Windows CI),
+            # that's fine too - it didn't silently truncate.
+            return
+
+        r = run_wolfssl("ca", "-altextend", "-in", ca_cert,
+                        "-keyfile", os.path.join(CERTS_DIR, "ca-ecc-key.pem"),
+                        "-altkey",
+                        os.path.join(CERTS_DIR, "ca-mldsa44-key.pem"),
+                        "-altpub",
+                        os.path.join(CERTS_DIR, "ca-mldsa44-keyPub.pem"),
+                        "-out", "tmp_chimera_ca_oversized_chimera.pem")
+        self.addCleanup(lambda: _cleanup(
+            _tmp("tmp_chimera_ca_oversized_chimera.pem")))
+        self.assertNotEqual(r.returncode, 0,
+                "altextend should reject an oversized subject DN field "
+                "instead of silently truncating it")
+
 
 
 class TestCAOutdirPath(unittest.TestCase):

@@ -80,6 +80,7 @@ int wolfCLU_RSA(int argc, char** argv)
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
     WOLFSSL_RSA *rsa = NULL;
+    const char  *outPath = NULL;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -101,10 +102,7 @@ int wolfCLU_RSA(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfCLU_OpenKeyFileBio(optarg);
-                if (bioOut == NULL) {
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                outPath = optarg;
                 break;
 
             case WOLFCLU_INFORM:
@@ -199,6 +197,16 @@ int wolfCLU_RSA(int argc, char** argv)
         }
     }
 
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        /* !pubOut: the write below puts RSAPublicKey DER/PEM into this
+         * bio when pubOut is set and RSAPrivateKey DER/PEM otherwise, so
+         * it holds secret material exactly when pubOut is false. */
+        bioOut = wolfCLU_OpenOutOrKeyFileBio(outPath, !pubOut);
+        if (bioOut == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
     /* print to stdout if no -out was used */
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
@@ -219,6 +227,8 @@ int wolfCLU_RSA(int argc, char** argv)
         unsigned char *pt; /* use pt with i2d to handle potential pointer
                               increment */
         int derSz = 0;
+        int allocSz = 0; /* der's allocation size, kept separate from derSz
+                             since a failing second i2d call overwrites it */
         int pemType;
         int heapType;
 
@@ -232,6 +242,7 @@ int wolfCLU_RSA(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS) {
+                allocSz = derSz;
                 der = (unsigned char*)XMALLOC(derSz, HEAP_HINT, heapType);
                 if (der == NULL) {
                     ret = WOLFCLU_FATAL_ERROR;
@@ -256,6 +267,7 @@ int wolfCLU_RSA(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS) {
+                allocSz = derSz;
                 der = (unsigned char*)XMALLOC(derSz, HEAP_HINT, heapType);
                 if (der == NULL) {
                     ret = WOLFCLU_FATAL_ERROR;
@@ -281,8 +293,8 @@ int wolfCLU_RSA(int argc, char** argv)
         }
 
         if (der != NULL) {
-            if (derSz > 0) {
-                wolfCLU_ForceZero(der, derSz);
+            if (allocSz > 0) {
+                wolfCLU_ForceZero(der, allocSz);
             }
             XFREE(der, HEAP_HINT, heapType);
         }
