@@ -590,12 +590,15 @@ int wolfCLU_dgst_setup(int argc, char** argv)
         int j;
 
         for (j = 0; dgst_options[j].name != NULL; j++) {
+            /* An option name always wins, even if a same-named file exists
+             * on disk: wolfCLU_GetOpt below parses it as that flag either
+             * way, so treating it as data here would read it twice. */
             if (XSTRCMP(lastArg, dgst_options[j].name) == 0) {
                 isPositional = 0; /* last token is itself an option */
                 break;
             }
-            if (argc >= 2 && dgst_options[j].has_arg == required_argument &&
-                    XSTRCMP(argv[argc-2], dgst_options[j].name) == 0) {
+            if (argc >= 2 && dgst_options[j].has_arg == required_argument
+                    && XSTRCMP(argv[argc-2], dgst_options[j].name) == 0) {
                 isPositional = 0; /* last token is that option's value */
                 break;
             }
@@ -689,6 +692,11 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             case ARG_FOUND_TWICE:
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
+            case WOLFCLU_HELP:
+                wolfCLU_dgstHelp();
+                wolfSSL_BIO_free(dataBio);
+                wolfSSL_BIO_free(pubKeyBio);
+                return WOLFCLU_SUCCESS;
 
             case ':':
             case '?':
@@ -702,6 +710,16 @@ int wolfCLU_dgst_setup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS && dataBio == NULL) {
         wolfCLU_LogError("error with reading signature or data");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    /* -hmac and -sign/-verify/-signature are mutually exclusive; -hmac
+     * silently wins dispatch below, so reject the combination instead of
+     * discarding those flags without telling the user. */
+    if (ret == WOLFCLU_SUCCESS && hmac == 1 &&
+            (pubKeyBio != NULL || sigFile != NULL)) {
+        wolfCLU_LogError(
+                "-hmac cannot be combined with -sign, -verify, or -signature");
         ret = WOLFCLU_FATAL_ERROR;
     }
 

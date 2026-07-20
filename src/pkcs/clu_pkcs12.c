@@ -62,6 +62,9 @@ int wolfCLU_PKCS12(int argc, char** argv)
 #if defined(HAVE_PKCS12) && !defined(WOLFCLU_NO_FILESYSTEM)
     char password[MAX_PASSWORD_SIZE] = "";
     int passwordSz = MAX_PASSWORD_SIZE;
+    char passOut[MAX_PASSWORD_SIZE] = "";
+    int passOutSz = MAX_PASSWORD_SIZE;
+    int hasPassOut = 0;
     int ret    = WOLFCLU_SUCCESS;
     int useDES = 1;     /* default to yes */
     int printCerts = 1; /* default to yes*/
@@ -74,6 +77,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     WOLF_STACK_OF(WOLFSSL_X509) *extra = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
+    char        *outPath = NULL;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -99,10 +103,19 @@ int wolfCLU_PKCS12(int argc, char** argv)
 
             case WOLFCLU_PASSWORD:
                 passwordSz = MAX_PASSWORD_SIZE;
-                ret = wolfCLU_GetPassword(password, &passwordSz, optarg);
+                if (wolfCLU_GetPassword(password, &passwordSz, optarg)
+                        != WOLFCLU_SUCCESS) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
                 break;
 
             case WOLFCLU_PASSWORD_OUT:
+                passOutSz = MAX_PASSWORD_SIZE;
+                hasPassOut = (wolfCLU_GetPassword(passOut, &passOutSz,
+                        optarg) == WOLFCLU_SUCCESS);
+                if (!hasPassOut) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
                 break;
 
             case WOLFCLU_INFILE:
@@ -115,16 +128,14 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                outPath = optarg;
                 break;
 
             case WOLFCLU_HELP:
                 wolfCLU_pKeyHelp();
+                wolfCLU_ForceZero(password, MAX_PASSWORD_SIZE);
+                wolfCLU_ForceZero(passOut, MAX_PASSWORD_SIZE);
+                wolfSSL_BIO_free(bioIn);
                 return WOLFCLU_SUCCESS;
 
             case ':':
@@ -187,6 +198,14 @@ int wolfCLU_PKCS12(int argc, char** argv)
         }
     }
 
+    /* deferred until it's known whether a key will actually be written */
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        bioOut = wolfCLU_OpenOutOrKeyFileBio(outPath, printKeys && pkey != NULL);
+        if (bioOut == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
     /* setup output bio to stdout if not already set */
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
@@ -226,10 +245,15 @@ int wolfCLU_PKCS12(int argc, char** argv)
     /* print out the key */
     if (ret == WOLFCLU_SUCCESS && pkey != NULL && printKeys) {
         if (useDES) {
-            passwordSz = MAX_PASSWORD_SIZE;
-            wolfCLU_GetStdinPassword((byte*)password, (word32*)&passwordSz);
-            ret = wolfCLU_pKeyPEMtoPriKeyEnc(bioOut, pkey, DES3b,
-                    (byte*)password, passwordSz);
+            if (!hasPassOut) {
+                passOutSz = MAX_PASSWORD_SIZE;
+                ret = wolfCLU_GetStdinPassword((byte*)passOut,
+                        (word32*)&passOutSz);
+            }
+            if (ret == WOLFCLU_SUCCESS) {
+                ret = wolfCLU_pKeyPEMtoPriKeyEnc(bioOut, pkey, DES3b,
+                        (byte*)passOut, passOutSz);
+            }
         }
         else {
             ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);
@@ -241,6 +265,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     }
 
     wolfCLU_ForceZero(password, MAX_PASSWORD_SIZE);
+    wolfCLU_ForceZero(passOut, MAX_PASSWORD_SIZE);
     wolfSSL_BIO_free(bioIn);
     wolfSSL_BIO_free(bioOut);
     wolfSSL_EVP_PKEY_free(pkey);

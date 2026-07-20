@@ -26,11 +26,28 @@
 
 #if defined(WOLFSSL_KEY_GEN) && !defined(NO_ASN)
 
+#include <errno.h>
+#include <string.h> /* strerror */
+
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
+
+/* wolfCLU_OpenKeyFile/wolfCLU_CreateSecureFile now live in src/tools/clu_funcs.c
+ * (declared in wolfclu/clu_header_main.h) so every caller writing sensitive
+ * key material -- not just genkey's own -- can get owner-only permissions. */
+#ifndef _WIN32
+#include <fcntl.h>
+#include <sys/stat.h>
+#ifndef O_NOFOLLOW
+    #define O_NOFOLLOW 0
+#endif
+#else
+#include <windows.h>
+#endif /* !_WIN32 */
+
 
 #ifdef HAVE_ED25519
 /* return WOLFCLU_SUCCESS on success */
@@ -121,7 +138,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
             /* open the file for writing the private key */
             if (ret == 0) {
-                file = XFOPEN(finalOutFNm, "wb");
+                file = wolfCLU_OpenKeyFile(finalOutFNm);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -216,7 +233,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
             /* open the file for writing the public key */
             if (ret == 0) {
-                file = XFOPEN(finalOutFNm, "wb");
+                file = wolfCLU_OpenOutFile(finalOutFNm);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -663,11 +680,9 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
                     WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
 
-                    bioPri = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
+                    bioPri = wolfCLU_OpenKeyFileBio(fOutNameBuf);
                     if (bioPri == NULL) {
-                        wolfCLU_LogError("unable to read outfile %s",
-                                fOutNameBuf);
-                        ret = MEMORY_E;
+                        ret = OUTPUT_FILE_ERROR;
                     }
                 }
 
@@ -697,11 +712,9 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
                     WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
-                    bioPub = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
+                    bioPub = wolfCLU_OpenOutFileBio(fOutNameBuf);
                     if (bioPub == NULL) {
-                        wolfCLU_LogError("unable to read outfile %s",
-                                fOutNameBuf);
-                        ret = MEMORY_E;
+                        ret = OUTPUT_FILE_ERROR;
                     }
                 }
 
@@ -849,7 +862,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
             /* open the file for writing the private key */
             if (ret == WOLFCLU_SUCCESS) {
-                file = XFOPEN(fOutNameBuf, "wb");
+                file = wolfCLU_OpenKeyFile(fOutNameBuf);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -934,7 +947,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
             /* open the file for writing the public key */
             if (ret == WOLFCLU_SUCCESS) {
-                file = XFOPEN(fOutNameBuf, "wb");
+                file = wolfCLU_OpenOutFile(fOutNameBuf);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -1160,18 +1173,16 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                     }
                 }
 
-                /* open file and write Private key */
+                /* open file and write Private key with owner-only perms */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        wolfCLU_LogError("unable to open file %s",
-                                        fOutNameBuf);
+                    file = wolfCLU_OpenKeyFile(fOutNameBuf);
+                    if (file == NULL) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
-                    if ((int)XFWRITE(outBuf, 1, outBufSz, file) <= 0) {
+                    if (XFWRITE(outBuf, 1, outBufSz, file) != (size_t)outBufSz) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
@@ -1187,7 +1198,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                 derBuf = NULL;
                 if (pemBuf != NULL) {
                     wolfCLU_ForceZero(pemBuf, pemBufSz);
-                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     pemBuf = NULL;
                 }
 
@@ -1229,16 +1240,14 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Public key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        wolfCLU_LogError("unable to open file %s",
-                                        fOutNameBuf);
+                    file = wolfCLU_OpenOutFile(fOutNameBuf);
+                    if (file == NULL) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
-                    if ((int)XFWRITE(outBuf, 1, outBufSz, file) <= 0) {
+                    if (XFWRITE(outBuf, 1, outBufSz, file) != (size_t)outBufSz) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
@@ -1260,7 +1269,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
     if (pemBuf != NULL) {
         wolfCLU_ForceZero(pemBuf, pemBufSz);
-        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     if (fOutNameBuf != NULL) {
@@ -1408,18 +1417,16 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                     }
                 }
 
-                /* open file and write Private key */
+                /* open file and write Private key with owner-only perms */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        wolfCLU_LogError("unable to open file %s",
-                                        fOutNameBuf);
+                    file = wolfCLU_OpenKeyFile(fOutNameBuf);
+                    if (file == NULL) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
-                    if ((int)XFWRITE(outBuf, 1, outBufSz, file) <= 0) {
+                    if (XFWRITE(outBuf, 1, outBufSz, file) != (size_t)outBufSz) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
@@ -1435,7 +1442,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                 derBuf = NULL;
                 if (pemBuf != NULL) {
                     wolfCLU_ForceZero(pemBuf, pemBufSz);
-                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+                    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                     pemBuf = NULL;
                 }
 
@@ -1482,16 +1489,14 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Public key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        wolfCLU_LogError("unable to open file %s",
-                                        fOutNameBuf);
+                    file = wolfCLU_OpenOutFile(fOutNameBuf);
+                    if (file == NULL) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
-                    if ((int)XFWRITE(outBuf, 1, outBufSz, file) <= 0) {
+                    if (XFWRITE(outBuf, 1, outBufSz, file) != (size_t)outBufSz) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
@@ -1514,7 +1519,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
     if (pemBuf != NULL) {
         wolfCLU_ForceZero(pemBuf, pemBufSz);
-        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
+        XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     if (fOutNameBuf != NULL) {
@@ -1554,78 +1559,101 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
     int          err = 0;
 
     if (priv == NULL || context == NULL || privSz == 0) {
-        fprintf(stderr, "error: invalid write args\n");
+        XFPRINTF(stderr, "error: invalid write args\n");
         return WC_XMSS_RC_BAD_ARG;
     }
 
     filename = context;
 
     /* Open file for read and write. */
-    file = fopen(filename, "rb+");
-    if (!file) {
-        /* Create the file if it didn't exist. */
-        file = fopen(filename, "wb+");
-        if (!file) {
-            fprintf(stderr, "error: fopen(%s, \"w+\") failed.\n", filename);
+    errno = 0;
+    file = XFOPEN(filename, "rb+");
+    if (file == XBADFILE) {
+        /* Only fall through to create-and-replace when the file genuinely
+         * doesn't exist yet. Any other open failure (e.g. permission
+         * denied, a transient I/O error) must NOT be treated the same way:
+         * wolfCLU_CreateSecureFile unconditionally unlinks its target
+         * before recreating it, and XMSS repeatedly reopens/updates this
+         * file in place to track one-time-signature state across the
+         * key's lifetime, so blindly recreating it here would silently
+         * destroy that persisted state instead of failing safely. */
+        if (errno != ENOENT) {
+            XFPRINTF(stderr, "error: fopen(%s, \"rb+\") failed: %s\n",
+                    filename, strerror(errno));
+            return WC_XMSS_RC_WRITE_FAIL;
+        }
+
+        /* XMSS reopens/updates this file in place, so it can't use
+         * wolfCLU_OpenKeyFile's create-and-replace pattern; lock down
+         * perms on creation here instead. */
+#ifndef _WIN32
+        file = wolfCLU_CreateSecureFile(filename, O_RDWR, "wb+", 1);
+#else
+        file = wolfCLU_CreateSecureFile(filename, GENERIC_READ | GENERIC_WRITE, "wb+", 1);
+#endif
+        if (file == XBADFILE) {
+            XFPRINTF(stderr, "error: fopen(%s, \"w+\") failed.\n", filename);
             return WC_XMSS_RC_WRITE_FAIL;
         }
     }
 
-    n_write = fwrite(priv, 1, privSz, file);
+    n_write = XFWRITE(priv, 1, privSz, file);
 
     if (n_write != privSz) {
-        fprintf(stderr, "error: wrote %zu, expected %d: %d\n", n_write, privSz,
+        XFPRINTF(stderr, "error: wrote %zu, expected %d: %d\n", n_write, privSz,
                 ferror(file));
-        fclose(file);
+        XFCLOSE(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
-    err = fclose(file);
+    err = XFCLOSE(file);
     if (err) {
-        fprintf(stderr, "error: fclose returned %d\n", err);
+        XFPRINTF(stderr, "error: fclose returned %d\n", err);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
     /* Verify private key data has actually been written to persistent
      * storage correctly. */
-    file = fopen(filename, "rb+");
-    if (!file) {
-        fprintf(stderr, "error: fopen(%s, \"r+\") failed.\n", filename);
+    file = XFOPEN(filename, "rb+");
+    if (file == XBADFILE) {
+        XFPRINTF(stderr, "error: fopen(%s, \"r+\") failed.\n", filename);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
-    buff = malloc(privSz);
+    buff = (byte*)XMALLOC(privSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (buff == NULL) {
-        fprintf(stderr, "error: malloc(%d) failed\n", privSz);
-        fclose(file);
+        XFPRINTF(stderr, "error: malloc(%d) failed\n", privSz);
+        XFCLOSE(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
     XMEMSET(buff, 0, n_write);
 
-    n_read = fread(buff, 1, n_write, file);
+    n_read = XFREAD(buff, 1, n_write, file);
 
     if (n_read != n_write) {
-        fprintf(stderr, "error: read %zu, expected %zu: %d\n", n_read, n_write,
+        XFPRINTF(stderr, "error: read %zu, expected %zu: %d\n", n_read, n_write,
                 ferror(file));
-        free(buff);
-        fclose(file);
+        wolfCLU_ForceZero(buff, privSz);
+        XFREE(buff, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        XFCLOSE(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
     n_cmp = XMEMCMP(buff, priv, n_write);
-    free(buff);
+    wolfCLU_ForceZero(buff, privSz);
+    XFREE(buff, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     buff = NULL;
 
     if (n_cmp != 0) {
-        fprintf(stderr, "error: write data was corrupted: %d\n", n_cmp);
-        fclose(file);
+        XFPRINTF(stderr, "error: write data was corrupted: %d\n", n_cmp);
+        XFCLOSE(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
-    err = fclose(file);
+    err = XFCLOSE(file);
     if (err) {
-        fprintf(stderr, "error: fclose returned %d\n", err);
+        XFPRINTF(stderr, "error: fclose returned %d\n", err);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
@@ -1640,28 +1668,28 @@ enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte * priv,
     size_t       n_read = 0;
 
     if (priv == NULL || context == NULL || privSz == 0) {
-        fprintf(stderr, "error: invalid read args\n");
+        XFPRINTF(stderr, "error: invalid read args\n");
         return WC_XMSS_RC_BAD_ARG;
     }
 
     filename = context;
 
-    file = fopen(filename, "rb");
-    if (!file) {
-        fprintf(stderr, "error: fopen(%s, \"rb\") failed\n", filename);
+    file = XFOPEN(filename, "rb");
+    if (file == XBADFILE) {
+        XFPRINTF(stderr, "error: fopen(%s, \"rb\") failed\n", filename);
         return WC_XMSS_RC_READ_FAIL;
     }
 
-    n_read = fread(priv, 1, privSz, file);
+    n_read = XFREAD(priv, 1, privSz, file);
 
     if (n_read != privSz) {
-        fprintf(stderr, "error: read %zu, expected %d: %d\n", n_read, privSz,
+        XFPRINTF(stderr, "error: read %zu, expected %d: %d\n", n_read, privSz,
                 ferror(file));
-        fclose(file);
+        XFCLOSE(file);
         return WC_XMSS_RC_READ_FAIL;
     }
 
-    fclose(file);
+    XFCLOSE(file);
 
     return WC_XMSS_RC_READ_TO_MEMORY;
 }
@@ -1777,7 +1805,7 @@ int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
         WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
         /* open the file for writing the public key */
-        file = XFOPEN(fOutNameBuf, "wb");
+        file = wolfCLU_OpenOutFile(fOutNameBuf);
         if (file == NULL) {
             ret = OUTPUT_FILE_ERROR;
             wolfCLU_LogError("unable to open file %s\nRET: %d", fOutNameBuf, ret);

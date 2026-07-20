@@ -197,10 +197,11 @@ int wolfCLU_DsaParamSetup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");
             ret = WOLFCLU_FATAL_ERROR;
 #else
-            bioOut = wolfSSL_BIO_new_file(out, "wb");
+            /* -genkey writes a DSA private key to this same bio, so lock
+             * it down like any other private key output; DSA params alone
+             * aren't secret, so use default perms otherwise. */
+            bioOut = wolfCLU_OpenOutOrKeyFileBio(out, genKey);
             if (bioOut == NULL) {
-                wolfCLU_LogError("Unable to open output file %s",
-                        optarg);
                 ret = WOLFCLU_FATAL_ERROR;
             }
 #endif
