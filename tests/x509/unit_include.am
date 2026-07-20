@@ -1,0 +1,17 @@
+# vim:ft=automake
+# included from top level Makefile.am
+# All paths should be given relative to root directory
+#
+# Native C unit tests for tests/x509. Unlike tests/x509/include.am (Python
+# CLI tests, only built if HAVE_PYTHON), these do not depend on Python and
+# so are included unconditionally.
+
+check_PROGRAMS += tests/x509/cert_setup_unit_test
+
+tests_x509_cert_setup_unit_test_SOURCES = \
+                    tests/x509/cert_setup_unit_test.c \
+                    src/clu_log.c \
+                    src/x509/clu_cert_setup.c \
+                    src/x509/clu_parse.c \
+                    src/x509/clu_config.c \
+                    src/tools/clu_funcs.c

@@ -135,6 +135,9 @@ AC_CHECK_FUNC([wolfSSL_X509_REQ_print],
 AC_CHECK_FUNC([wc_EncodeObjectId],
     [],
     [AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
+AC_CHECK_FUNC([wc_SetAltNamesFromList],
+    [AM_CFLAGS="$AM_CFLAGS -DHAVE_WC_SET_ALT_NAMES_FROM_LIST"],
+    [])
 
 
 ###############################################

@@ -62,3 +62,4 @@ compile_commands.json.bak
 /serial-file-test
 /rand-file-test
 manpages/*.1.gz
+tests/x509/cert_setup_unit_test
