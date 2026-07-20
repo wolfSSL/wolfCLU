@@ -150,7 +150,6 @@ if ENABLE_MANPAGES
 # -n keeps the output byte-reproducible (no embedded filename/mtime).
 MAN_GZ = $(man_MANS:.1=.1.gz)
 
-.PHONY: manpages-gz
 manpages-gz: $(MAN_GZ)
 
 manpages/%.1.gz: $(srcdir)/manpages/%.1
@@ -162,6 +161,35 @@ endif
 
 test: check
 #DISTCLEANFILES+= wolfssl-config
+
+# manpages-gz is only a target under ENABLE_MANPAGES, but declare it .PHONY
+# unconditionally so it merges with the unconditional .PHONY in scripts/sbom.am
+# (a conditional + unconditional .PHONY pair trips automake -Werror).
+.PHONY: manpages-gz
+
+# SBOM generation (CRA compliance).  The recipe is shared across the wolfSSL
+# stack's autotools products in scripts/sbom.am; wolfCLU just declares what it
+# is (a CLI program that links wolfSSL) and includes it.  WOLFSSL_DIR must point
+# to a wolfssl source tree containing scripts/gen-sbom.
+SBOM_PKGNAME      = wolfclu
+SBOM_LICENSE_FILE = $(srcdir)/COPYING
+SBOM_ARTIFACT     = bin
+SBOM_BIN_NAME     = wolfssl
+SBOM_DEP_WOLFSSL  = yes
+
+# wolfCLU is GPLv3-or-later (see source headers) or commercial.  Pin the SPDX id
+# so the SBOM is correct regardless of the gen-sbom version's licence detection;
+# commercial licensees can override (e.g. LicenseRef-wolfSSL-Commercial).
+SBOM_LICENSE_OVERRIDE ?= GPL-3.0-or-later
+
+# wolfCLU declares AC_CONFIG_HEADERS([src/config.h]) and carries its feature
+# macros (-DHAVE_WOLFSSL_OPTIONS, -DWOLFCLU_NO_FILESYSTEM, ...) in AM_CFLAGS,
+# so point the SBOM build-options capture at the real config header.
+SBOM_CONFIG_H = $(abs_builddir)/src/config.h
+
+EXTRA_DIST += scripts/sbom.am
+
+include scripts/sbom.am
 
 
 maintainer-clean-local:

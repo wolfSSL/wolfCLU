@@ -334,6 +334,51 @@ wolfssl ocsp \
 
 The `-index` file uses OpenSSL's CA index format.
 
+## SBOM / EU CRA Compliance
+
+wolfCLU generates a Software Bill of Materials (SBOM) in CycloneDX 1.6 and
+SPDX 2.3 formats to support compliance with the EU Cyber Resilience Act (CRA).
+The SBOM records the configured build options, hashes the built `wolfssl`
+command-line binary (ELF, Mach-O, or PE), and (with a sufficiently new
+`gen-sbom`) lists wolfSSL as a dependency so vulnerability scanners can
+associate wolfSSL advisories with a wolfCLU deployment. Output is reproducible:
+set `SOURCE_DATE_EPOCH` (or build from a git checkout, which uses the last
+commit time) and repeated runs are byte-identical.
+
+```sh
+make sbom WOLFSSL_DIR=/path/to/wolfssl
+```
+
+Requires `python3` and `pyspdxtools` (`pip install spdx-tools`). `WOLFSSL_DIR`
+must point to a wolfssl source tree containing `scripts/gen-sbom` (branch
+`feat/sbom-embedded`, or `master` once wolfSSL/wolfssl#10343 merges).
+
+Output: `wolfclu-<version>.cdx.json`, `wolfclu-<version>.spdx.json`, `wolfclu-<version>.spdx`
+
+Optional overrides:
+
+- `SBOM_LICENSE_OVERRIDE` - SPDX expression to use instead of the licence
+  parsed from `COPYING` (defaults to `GPL-3.0-or-later`; e.g.
+  `LicenseRef-wolfSSL-Commercial` for commercial licensees).
+- `SBOM_LICENSE_TEXT` - path to the licence text for any `LicenseRef-*` used in
+  `SBOM_LICENSE_OVERRIDE` (required by SPDX 2.3).
+- `SBOM_WOLFSSL_VERSION` - version recorded for the wolfSSL dependency;
+  auto-detected from `WOLFSSL_DIR/wolfssl/version.h` when unset.
+
+```sh
+make install-sbom    # installs to $(datadir)/doc/wolfclu/
+make uninstall-sbom
+```
+
+The SBOM recipe is the shared `scripts/sbom.am` fragment used across the
+wolfSSL stack's autotools products; wolfCLU only declares that it is a CLI
+program linking wolfSSL. Recording wolfSSL as a dependency and emitting
+wolfCLU-specific project URLs require the `gen-sbom` from wolfSSL/wolfssl#10343;
+against an older `gen-sbom`, `make sbom` still succeeds and produces a valid
+SBOM, but omits the wolfSSL dependency entry and inherits wolfSSL's project URLs.
+
+For further CRA guidance see [wolfssl/doc/CRA.md](https://github.com/wolfSSL/wolfssl/blob/master/doc/CRA.md).
+
 ## Contacts
 
 Please contact support@wolfssl.com with any questions or comments.
