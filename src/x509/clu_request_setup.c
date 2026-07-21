@@ -714,6 +714,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_HELP:
                 wolfCLU_certgenHelp();
+                wolfCLU_ForceZero(password, MAX_PASSWORD_SIZE);
                 return WOLFCLU_SUCCESS;
 
             case WOLFCLU_RSA:
@@ -1141,6 +1142,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                         ret = wolfCLU_pKeyPEMtoPriKeyEnc(keyOutBio, pkey, DES3b,
                                 pass, passwordSz);
                     }
+                    wolfCLU_ForceZero(pass, MAX_PASSWORD_SIZE);
                 }
                 else {
                     ret = wolfCLU_pKeyPEMtoPriKeyEnc(keyOutBio, pkey, DES3b,
@@ -1167,6 +1169,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     wolfSSL_BIO_free(bioOut);
     wolfSSL_X509_free(x509);
     wolfSSL_EVP_PKEY_free(pkey);
+    wolfCLU_ForceZero(password, MAX_PASSWORD_SIZE);
     return ret;
 #endif
 }
