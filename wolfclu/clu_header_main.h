@@ -112,6 +112,14 @@ extern "C" {
     #include <wolfssl/wolfcrypt/camellia.h>
 #endif
 
+/* API break introduced in 5.9.3 so compile out affected functionality
+ * when using previous version */
+#if LIBWOLFSSL_VERSION_HEX <= 0x05009002
+#ifndef NO_WC_ENCODE_OBJECT_ID
+    #define NO_WC_ENCODE_OBJECT_ID
+#endif
+#endif
+
 #include <wolfssl/wolfcrypt/coding.h>
 
 #define BLOCK_SIZE 16384
@@ -447,6 +455,16 @@ int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
  */
 int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 keyLen,
         enum wc_HashType alg, WOLFSSL_BIO* in, byte* out, word32* outSz);
+
+/* convert string to word32.
+ *
+ * @param  str   input string of digits.
+ * @param  strSz size of input string.
+ * @param  out   pointer to word32 that out put will be placed in on success.
+ * @return       wolfCLU_FATAL_ERROR of str contains non-digit
+ *               characters or overflows word32 size.
+ * */
+int wolfCLU_StrToWord32(const char* arg, unsigned long strSz, word32* out);
 
 /**
  * @brief Used to create a hash from a specified algorithm
