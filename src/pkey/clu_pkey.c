@@ -96,7 +96,9 @@ static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
         }
 
         if (der != NULL) {
-            wolfCLU_ForceZero(der, derSz);
+            if (derSz > 0) {
+                wolfCLU_ForceZero(der, derSz);
+            }
             XFREE(der, NULL, DYNAMIC_TYPE_OPENSSL);
         }
     }
@@ -423,6 +425,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     int pubOut = 0;
     int option;
     int longIndex = 1;
+    char* outPath = NULL;
     WOLFSSL_EVP_PKEY *pkey = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
@@ -455,12 +458,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                outPath = optarg;
                 break;
 
             case WOLFCLU_INFORM:
@@ -508,6 +506,17 @@ int wolfCLU_pKeySetup(int argc, char** argv)
         if (pkey == NULL) {
             wolfCLU_LogError("Error reading key from file");
             ret = USER_INPUT_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        /* !pubOut: the write below (pubOut==1 vs pubOut==0 branches further
+         * down) puts the public key into this bio when pubOut is set and
+         * the private key otherwise, so it holds secret material exactly
+         * when pubOut is false. */
+        bioOut = wolfCLU_OpenOutOrKeyFileBio(outPath, !pubOut);
+        if (bioOut == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 

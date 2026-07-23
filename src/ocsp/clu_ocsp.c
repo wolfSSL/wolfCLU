@@ -865,12 +865,12 @@ static int ocspResponder(OcspResponderConfig* config)
         if (transportSendResponse(clientfd, transportType, respBuffer, (int)respSz) != 0)
             goto continue_loop;
 
-        if (ocspStatus == OCSP_SUCCESSFUL) {
-            /* Only count successfully processed requests toward the -nrequest
-             * limit. Failed reads/sends jump to continue_loop above, so a
-             * misbehaving client cannot exhaust the budget. */
-            requestsProcessed++;
-        }
+        /* Counts toward -nrequest for any request that got a response, even
+         * an OCSP-level error; only transport failures above are excluded.
+         * A client sending only malformed requests must still exhaust the
+         * budget, or it could keep the responder running indefinitely
+         * (see test_13_malformed_request_counts_toward_nrequest). */
+        requestsProcessed++;
 
         /* Check if we've hit the request limit */
         if (config->nrequest > 0 && requestsProcessed >= config->nrequest) {

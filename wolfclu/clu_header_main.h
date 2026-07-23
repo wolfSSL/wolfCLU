@@ -614,6 +614,63 @@ int wolfCLU_PKCS12(int argc, char** argv);
 void wolfCLU_ForceZero(void* mem, unsigned int len);
 
 /**
+ * @brief DER definite-length encoder. Returns bytes written.
+ */
+word32 wolfCLU_DerSetLength(word32 length, byte* output);
+
+/**
+ * @brief Read file to newly allocated buffer, capped at maxSz.
+ */
+int wolfCLU_ReadFileToBuffer(const char* path, long maxSz, byte** outBuf,
+        int* outSz);
+
+/**
+ * @brief Atomically replace path with fresh regular file.
+ */
+#ifdef _WIN32
+FILE* wolfCLU_CreateSecureFile(const char* path, DWORD access,
+        const char* mode, int ownerOnly);
+#else
+FILE* wolfCLU_CreateSecureFile(const char* path, int access,
+        const char* mode, int ownerOnly);
+#endif
+
+/**
+ * @brief Open path for writing with owner-only permissions.
+ */
+FILE* wolfCLU_OpenKeyFile(const char* path);
+
+/**
+ * @brief Open path for writing with default permissions.
+ */
+FILE* wolfCLU_OpenOutFile(const char* path);
+
+/**
+ * @brief Remove the file at path.
+ */
+void wolfCLU_RemoveFile(const char* path);
+
+/**
+ * @brief Check if two path strings name the same file.
+ */
+int wolfCLU_PathsRefEqual(const char* pathA, const char* pathB);
+
+/**
+ * @brief Open path for writing with owner-only permissions and wrap in BIO.
+ */
+WOLFSSL_BIO* wolfCLU_OpenKeyFileBio(const char* path);
+
+/**
+ * @brief Open path for writing with default permissions and wrap in BIO.
+ */
+WOLFSSL_BIO* wolfCLU_OpenOutFileBio(const char* path);
+
+/**
+ * @brief Call wolfCLU_OpenKeyFileBio or wolfCLU_OpenOutFileBio based on isSecret.
+ */
+WOLFSSL_BIO* wolfCLU_OpenOutOrKeyFileBio(const char* path, int isSecret);
+
+/**
  * @brief example client
  */
 int wolfCLU_Client(int argc, char** argv);

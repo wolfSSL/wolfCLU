@@ -19,6 +19,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#include <limits.h>
+
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_error_codes.h>
@@ -844,3 +846,1127 @@ int wolfCLU_certSetup(int argc, char **argv)
     return WOLFCLU_FATAL_ERROR;
 #endif
 }
+
+
+#ifdef WOLFSSL_CERT_GEN
+
+/* Native (non-OPENSSL_EXTRA) extension access.
+ *
+ * Reading extensions is done directly off the DER here to avoid
+ * requiring the full OPENSSL_EXTRA/OPENSSL_ALL compatibility layer.
+ * Only used by the WOLFSSL_CERT_EXT code below. SAN copying uses
+ * wc_SetAltNamesBuffer() directly (see wolfCLU_CopyX509SanToCert).
+ */
+#ifdef WOLFSSL_CERT_EXT
+
+/* DER content bytes (tag/length already stripped) of the extension OIDs
+ * this file recognizes explicitly elsewhere. */
+static const byte kOidBasicConstraints[]       = {0x55, 0x1D, 0x13}; /* 2.5.29.19 */
+static const byte kOidKeyUsage[]               = {0x55, 0x1D, 0x0F}; /* 2.5.29.15 */
+static const byte kOidExtKeyUsage[]            = {0x55, 0x1D, 0x25}; /* 2.5.29.37 */
+static const byte kOidSubjectKeyIdentifier[]   = {0x55, 0x1D, 0x0E}; /* 2.5.29.14 */
+static const byte kOidAuthorityKeyIdentifier[] = {0x55, 0x1D, 0x23}; /* 2.5.29.35 */
+static const byte kOidSubjectAltName[]         = {0x55, 0x1D, 0x11}; /* 2.5.29.17 */
+
+/* One decoded `Extension ::= SEQUENCE { extnID OID, critical BOOLEAN
+ * DEFAULT FALSE, extnValue OCTET STRING }` entry. oid/val point into the
+ * caller-owned DER buffer; nothing here allocates. */
+typedef struct WOLFCLU_X509_EXT {
+    const byte* oid;
+    word32      oidLen;
+    int         critical;
+    const byte* val;
+    word32      valLen;
+} WOLFCLU_X509_EXT;
+
+static int wolfCLU_OidEquals(const byte* oid, word32 oidLen,
+        const byte* known, word32 knownLen)
+{
+    return oid != NULL && oidLen == knownLen &&
+            XMEMCMP(oid, known, knownLen) == 0;
+}
+
+/* Decode a DER tag+length header at buf[*idx]. On success *idx is advanced
+ * past the header, *tag is the raw tag byte, and *len is the content
+ * length (already bounds-checked against bufSz). */
+static int wolfCLU_DerGetHeader(const byte* buf, word32 bufSz, word32* idx,
+        byte* tag, word32* len)
+{
+    word32 i = *idx;
+    byte lenByte;
+
+    if (i >= bufSz) {
+        return BUFFER_E;
+    }
+    *tag = buf[i++];
+
+    if (i >= bufSz) {
+        return BUFFER_E;
+    }
+    lenByte = buf[i++];
+
+    if ((lenByte & 0x80) == 0) {
+        *len = lenByte;
+    }
+    else {
+        int nBytes = lenByte & 0x7F;
+        word32 l = 0;
+        int j;
+
+        if (nBytes == 0 || nBytes > (int)sizeof(word32) ||
+                i + (word32)nBytes > bufSz) {
+            return ASN_PARSE_E;
+        }
+        for (j = 0; j < nBytes; j++) {
+            l = (l << 8) | buf[i++];
+        }
+        *len = l;
+    }
+
+    if (*len > bufSz - i) {
+        return BUFFER_E;
+    }
+    *idx = i;
+    return WOLFCLU_SUCCESS;
+}
+
+/* Decode one `Extension` SEQUENCE-OF entry at buf[*idx], advancing *idx
+ * past it on success. buf/bufSz cover the whole Extensions content (i.e.
+ * DecodedCert::extensions/extensionsSz). */
+static int wolfCLU_DerGetExtension(const byte* buf, word32 bufSz,
+        word32* idx, WOLFCLU_X509_EXT* ext)
+{
+    byte tag;
+    word32 len;
+    word32 seqIdx;
+    word32 seqEnd;
+    int ret;
+
+    ret = wolfCLU_DerGetHeader(buf, bufSz, idx, &tag, &len);
+    if (ret != WOLFCLU_SUCCESS || tag != (ASN_SEQUENCE | ASN_CONSTRUCTED)) {
+        return ASN_PARSE_E;
+    }
+    seqIdx = *idx;
+    seqEnd = seqIdx + len;
+    *idx = seqEnd;
+
+    ret = wolfCLU_DerGetHeader(buf, seqEnd, &seqIdx, &tag, &len);
+    if (ret != WOLFCLU_SUCCESS || tag != ASN_OBJECT_ID) {
+        return ASN_PARSE_E;
+    }
+    ext->oid = buf + seqIdx;
+    ext->oidLen = len;
+    seqIdx += len;
+
+    ext->critical = 0;
+    if (seqIdx < seqEnd && buf[seqIdx] == ASN_BOOLEAN) {
+        ret = wolfCLU_DerGetHeader(buf, seqEnd, &seqIdx, &tag, &len);
+        if (ret != WOLFCLU_SUCCESS || len != 1) {
+            return ASN_PARSE_E;
+        }
+        ext->critical = (buf[seqIdx] != 0);
+        seqIdx += len;
+    }
+
+    ret = wolfCLU_DerGetHeader(buf, seqEnd, &seqIdx, &tag, &len);
+    if (ret != WOLFCLU_SUCCESS || tag != ASN_OCTET_STRING) {
+        return ASN_PARSE_E;
+    }
+    ext->val = buf + seqIdx;
+    ext->valLen = len;
+
+    return WOLFCLU_SUCCESS;
+}
+
+/* Given *extensions and *extensionsSz as wc_ParseCert leaves them in
+ * DecodedCert::extensions and DecodedCert::extensionsSz -- which may point
+ * at the raw `[3] EXPLICIT Extensions` tag (ASN_EXTENSIONS, wrapping a
+ * `SEQUENCE OF Extension`) rather than directly at the concatenated
+ * Extension entries that wolfCLU_DerGetExtension() expects -- skip the [3]
+ * wrapper (if present) and the inner SEQUENCE header so *extensions and
+ * *extensionsSz land exactly on the entries. Leaves *extensions and
+ * *extensionsSz unchanged if neither a [3] wrapper nor a bare SEQUENCE is
+ * found at offset 0, so wolfCLU_DerGetExtension() can fail loudly on truly
+ * malformed input rather than silently finding nothing.
+ *
+ * Split out of wolfCLU_GetX509RawExtensions() (and declared in clu_cert.h
+ * instead of kept file-static) purely so the unwrap logic can be unit
+ * tested directly against synthetic wrapped/bare-SEQUENCE buffers, without
+ * needing a full CERT_TYPE DER to drive it via wc_ParseCert(). */
+void wolfCLU_UnwrapX509Extensions(const byte** extensions, int* extensionsSz)
+{
+    const byte* buf = *extensions;
+    word32 bufSz = (word32)*extensionsSz;
+    word32 idx = 0;
+    byte tag;
+    word32 len;
+
+    if (wolfCLU_DerGetHeader(buf, bufSz, &idx, &tag, &len) !=
+            WOLFCLU_SUCCESS || tag != ASN_EXTENSIONS) {
+        idx = 0; /* not [3]-wrapped; try a bare SEQUENCE at offset 0 */
+    }
+
+    if (wolfCLU_DerGetHeader(buf, bufSz, &idx, &tag, &len) ==
+            WOLFCLU_SUCCESS && tag == (ASN_SEQUENCE | ASN_CONSTRUCTED)) {
+        *extensions = buf + idx;
+        *extensionsSz = (int)len;
+    }
+}
+
+/* Parse x509's raw DER into dCert and point it at its Extensions.
+ * On WOLFCLU_SUCCESS the caller must wc_FreeDecodedCert(dCert) once done;
+ * dCert->extensions/extensionsSz point into x509's own DER buffer (owned
+ * by x509, not by dCert), so dCert must not outlive x509.
+ *
+ * Uses CERT_TYPE (Certificate/TBSCertificate), not CERTREQ_TYPE
+ * (CertificationRequest) -- required, not just currently convenient:
+ * wolfCLU_X509FillCert() also runs x509's raw DER through
+ * wc_SetAltNamesBuffer() (see wolfCLU_CopyX509SanToCert()), which
+ * internally hardcodes CERT_TYPE parsing with no override. So x509 must
+ * always be a self-signed placeholder cert (wc_MakeCert + wc_SignCert),
+ * never raw, unmodified CSR DER, for this whole fill pipeline to work --
+ * switching just this call to CERTREQ_TYPE would still break on genuine
+ * CSR input at the SAN-copy step. */
+static int wolfCLU_GetX509RawExtensions(WOLFSSL_X509* x509,
+        DecodedCert* dCert)
+{
+    const byte* der;
+    int derSz = 0;
+    int ret;
+
+    der = wolfSSL_X509_get_der(x509, &derSz);
+    if (der == NULL || derSz <= 0) {
+        wolfCLU_LogError("Could not get CSR's raw DER");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    wc_InitDecodedCert(dCert, der, (word32)derSz, NULL);
+    ret = wc_ParseCert(dCert, CERT_TYPE, NO_VERIFY, NULL);
+    if (ret != 0) {
+        wolfCLU_LogError("Could not parse CSR's DER to read extensions");
+        wc_FreeDecodedCert(dCert);
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    if (dCert->extensions != NULL && dCert->extensionsSz > 0) {
+        wolfCLU_UnwrapX509Extensions(&dCert->extensions,
+                &dCert->extensionsSz);
+    }
+
+    return WOLFCLU_SUCCESS;
+}
+
+/* Find the first extension in an already-parsed CSR's extensions matching
+ * the given OID. Returns WOLFCLU_SUCCESS with *found set, or a fatal error
+ * on a malformed CSR. dCert must already be parsed via
+ * wolfCLU_GetX509RawExtensions(). */
+static int wolfCLU_FindX509Ext(DecodedCert* dCert, const byte* oid,
+        word32 oidLen, WOLFCLU_X509_EXT* ext, int* found)
+{
+    word32 idx = 0;
+
+    *found = 0;
+
+    while (idx < (word32)dCert->extensionsSz) {
+        WOLFCLU_X509_EXT cur;
+
+        if (wolfCLU_DerGetExtension(dCert->extensions,
+                (word32)dCert->extensionsSz, &idx, &cur) != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Malformed extension in CSR extensions");
+            return WOLFCLU_FATAL_ERROR;
+        }
+        if (wolfCLU_OidEquals(cur.oid, cur.oidLen, oid, oidLen)) {
+            *ext = cur;
+            *found = 1;
+            break;
+        }
+    }
+
+    return WOLFCLU_SUCCESS;
+}
+
+/* DER content bytes of the standard extKeyUsage purpose OIDs
+ * (id-kp-* under 1.3.6.1.5.5.7.3.* and anyExtendedKeyUsage). */
+static const byte kOidEkuServerAuth[]   = {0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x01};
+static const byte kOidEkuClientAuth[]   = {0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x02};
+static const byte kOidEkuCodeSigning[]  = {0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x03};
+static const byte kOidEkuEmailProt[]    = {0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x04};
+static const byte kOidEkuTimeStamping[] = {0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x08};
+static const byte kOidEkuOcspSigning[]  = {0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x09};
+static const byte kOidEkuAny[]          = {0x55,0x1D,0x25,0x00}; /* 2.5.29.37.0 */
+
+/* Decode an extKeyUsage extnValue (`ExtKeyUsageSyntax ::= SEQUENCE OF
+ * KeyPurposeId`) into wolfcrypt's EXTKEYUSE_* bitmask. Unrecognized
+ * purpose OIDs (e.g. SGC, DVCS) are silently skipped, matching how they
+ * had no EXTKEYUSE_* bit to map to previously either. */
+static byte wolfCLU_DerGetExtKeyUsageBits(const byte* val, word32 valLen)
+{
+    byte eku = 0;
+    byte tag;
+    word32 len;
+    word32 idx = 0;
+    word32 seqEnd;
+
+    if (wolfCLU_DerGetHeader(val, valLen, &idx, &tag, &len) !=
+                WOLFCLU_SUCCESS ||
+            tag != (ASN_SEQUENCE | ASN_CONSTRUCTED)) {
+        return 0;
+    }
+    seqEnd = idx + len;
+
+    while (idx < seqEnd) {
+        word32 oidIdx = idx;
+        const byte* oid;
+
+        if (wolfCLU_DerGetHeader(val, seqEnd, &oidIdx, &tag, &len) !=
+                    WOLFCLU_SUCCESS ||
+                tag != ASN_OBJECT_ID) {
+            break;
+        }
+        oid = val + oidIdx;
+
+        if (wolfCLU_OidEquals(oid, len, kOidEkuServerAuth,
+                (word32)sizeof(kOidEkuServerAuth))) {
+            eku |= EXTKEYUSE_SERVER_AUTH;
+        }
+        else if (wolfCLU_OidEquals(oid, len, kOidEkuClientAuth,
+                (word32)sizeof(kOidEkuClientAuth))) {
+            eku |= EXTKEYUSE_CLIENT_AUTH;
+        }
+        else if (wolfCLU_OidEquals(oid, len, kOidEkuEmailProt,
+                (word32)sizeof(kOidEkuEmailProt))) {
+            eku |= EXTKEYUSE_EMAILPROT;
+        }
+        else if (wolfCLU_OidEquals(oid, len, kOidEkuCodeSigning,
+                (word32)sizeof(kOidEkuCodeSigning))) {
+            eku |= EXTKEYUSE_CODESIGN;
+        }
+        else if (wolfCLU_OidEquals(oid, len, kOidEkuOcspSigning,
+                (word32)sizeof(kOidEkuOcspSigning))) {
+            eku |= EXTKEYUSE_OCSP_SIGN;
+        }
+        else if (wolfCLU_OidEquals(oid, len, kOidEkuTimeStamping,
+                (word32)sizeof(kOidEkuTimeStamping))) {
+            eku |= EXTKEYUSE_TIMESTAMP;
+        }
+        else if (wolfCLU_OidEquals(oid, len, kOidEkuAny,
+                (word32)sizeof(kOidEkuAny))) {
+            eku |= EXTKEYUSE_ANY;
+        }
+
+        idx = oidIdx + len;
+    }
+
+    return eku;
+}
+#endif /* WOLFSSL_CERT_EXT */
+
+int wolfCLU_SetCertNameFieldByNid(CertName* dst, int nid, const char* val,
+        int valLen)
+{
+    char* field = NULL;
+
+    if (dst == NULL || val == NULL || valLen <= 0) {
+        return BAD_FUNC_ARG;
+    }
+
+    switch (nid) {
+        case NID_countryName:
+            field = dst->country;
+            break;
+        case NID_stateOrProvinceName:
+            field = dst->state;
+            break;
+        case NID_localityName:
+            field = dst->locality;
+            break;
+        case NID_organizationName:
+            field = dst->org;
+            break;
+        case NID_organizationalUnitName:
+            field = dst->unit;
+            break;
+        case NID_commonName:
+            field = dst->commonName;
+            break;
+        case NID_emailAddress:
+            field = dst->email;
+            break;
+        case NID_streetAddress:
+            field = dst->street;
+            break;
+        case NID_surname:
+            field = dst->sur;
+            break;
+        case NID_serialNumber:
+            field = dst->serialDev;
+            break;
+        case NID_userId:
+            field = dst->userId;
+            break;
+        case NID_postalCode:
+            field = dst->postalCode;
+            break;
+#ifdef WOLFSSL_CERT_NAME_ALL
+        case NID_givenName:
+            field = dst->givenName;
+            break;
+        case NID_dnQualifier:
+            field = dst->dnQualifier;
+            break;
+#endif
+#ifdef WOLFSSL_CERT_EXT
+        case NID_businessCategory:
+            field = dst->busCat;
+            break;
+#endif
+        default:
+            /* No CertName field for this NID: the DN component is
+             * dropped from the issued certificate's subject/issuer. */
+            wolfCLU_Log(WOLFCLU_L0,
+                    "Warning: DN field (nid %d) has no destination in "
+                    "the issued certificate and was dropped", nid);
+            break;
+    }
+
+    if (field != NULL) {
+        /* Reject rather than silently truncate: earlier code here copied
+         * oversized DN values into the fixed CTC_NAME_SIZE buffer with
+         * XSTRLCPY, so a subject/issuer field over 63 bytes would be
+         * cut short and signing would continue anyway. That silently
+         * issues a certificate with a corrupted identity field, which is
+         * worse than failing loudly -- callers that relied on the old
+         * truncate-and-continue behavior for long -subj values will now
+         * need to shorten them. */
+        if (valLen > CTC_NAME_SIZE - 1) {
+            wolfCLU_LogError("DN field (nid %d) exceeds %d-byte limit",
+                    nid, CTC_NAME_SIZE - 1);
+            return WOLFCLU_FATAL_ERROR;
+        }
+        XMEMCPY(field, val, (size_t)valLen);
+        field[valLen] = '\0';
+    }
+
+    return WOLFCLU_SUCCESS;
+}
+
+int wolfCLU_CopyX509NameToCert(WOLFSSL_X509_NAME* name, CertName* dst)
+{
+    int i;
+
+    if (name == NULL || dst == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    for (i = 0; i < wolfSSL_X509_NAME_entry_count(name); i++) {
+        WOLFSSL_X509_NAME_ENTRY* e;
+        WOLFSSL_ASN1_OBJECT* obj;
+        WOLFSSL_ASN1_STRING* str;
+        const char* val;
+        int nid;
+        int valLen;
+        int ret;
+
+        e = wolfSSL_X509_NAME_get_entry(name, i);
+        if (e == NULL) {
+            continue;
+        }
+        obj = wolfSSL_X509_NAME_ENTRY_get_object(e);
+        str = wolfSSL_X509_NAME_ENTRY_get_data(e);
+        if (obj == NULL || str == NULL) {
+            continue;
+        }
+
+        nid    = wolfSSL_OBJ_obj2nid(obj);
+        val    = (const char*)wolfSSL_ASN1_STRING_data(str);
+        valLen = wolfSSL_ASN1_STRING_length(str);
+        if (val == NULL || valLen <= 0) {
+            continue;
+        }
+
+        ret = wolfCLU_SetCertNameFieldByNid(dst, nid, val, valLen);
+        if (ret != WOLFCLU_SUCCESS) {
+            return ret;
+        }
+    }
+
+    return WOLFCLU_SUCCESS;
+}
+
+/* Re-encode a WOLFSSL_ASN1_TIME as a DER tag+length+value suitable for
+ * Cert->beforeDate/afterDate. Returns the encoded length or a negative
+ * error code. */
+int wolfCLU_Asn1TimeToCertDate(byte* out, int outSz,
+        const WOLFSSL_ASN1_TIME* t)
+{
+    int sz, i;
+
+    /* Sanity bound on t->length vs ASN1_TIME's own buffer; not the output
+     * capacity check -- that's the t->length + 2 > outSz check below. */
+    if (out == NULL || t == NULL || t->length <= 0 ||
+            t->length > CTC_DATE_SIZE) {
+        return BUFFER_E;
+    }
+    /* Validate DER tag: UTCTime (23) or GeneralizedTime (24) expected. */
+    if (t->type != V_ASN1_UTCTIME && t->type != V_ASN1_GENERALIZEDTIME) {
+        return BUFFER_E;
+    }
+    if (outSz <= 0) {
+        return BUFFER_E;
+    }
+    /* t->length <= 32 always DER-encodes with a 1-byte tag + 1-byte
+     * short-form length; this is the real output-capacity check. */
+    if (t->length + 2 > outSz) {
+        return BUFFER_E;
+    }
+
+    sz = (int)wolfCLU_DerSetLength((word32)t->length, out + 1) + 1;
+    if (sz + t->length > outSz) {
+        return BUFFER_E;
+    }
+
+    out[0] = (byte)t->type;
+    for (i = 0; i < t->length; i++) {
+        out[sz + i] = t->data[i];
+    }
+    return t->length + sz;
+}
+
+/* Copy subjectAltName from an already-parsed dCert onto cert. dCert must
+ * have been parsed with SAN extensions decoded (dCert->altNames populated
+ * regardless of whether it was parsed as CERT_TYPE or CERTREQ_TYPE -- SAN
+ * decoding happens at the extension level and doesn't care about the
+ * outer structure type). Lets a caller that already has a parsed dCert
+ * (e.g. wolfCLU_X509FillCert) avoid the second, independent re-parse that
+ * wc_SetAltNamesBuffer()'s own wc_SetCert_LoadDer() would otherwise do. */
+#if defined(WOLFSSL_ALT_NAMES) && defined(HAVE_WC_SET_ALT_NAMES_FROM_LIST)
+static int wolfCLU_CopyX509SanToCertFromDCert(DecodedCert* dCert, Cert* cert)
+{
+    if (dCert == NULL || cert == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    if (cert->altNamesSz > 0) {
+        wolfCLU_Log(WOLFCLU_L0, "Warning: wolfCLU_CopyX509SanToCert called "
+                "on a Cert that already has altNames; skipping to avoid "
+                "double-population");
+        return WOLFCLU_SUCCESS;
+    }
+
+    if (wc_SetAltNamesFromList(cert, dCert->altNames) != 0) {
+        wolfCLU_LogError("Error copying subjectAltName from CSR");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    return WOLFCLU_SUCCESS;
+}
+#endif /* WOLFSSL_ALT_NAMES && HAVE_WC_SET_ALT_NAMES_FROM_LIST */
+
+/* Copy subjectAltName from CSR to cert. Returns WOLFCLU_SUCCESS or error. */
+#if defined(WOLFSSL_ALT_NAMES)
+int wolfCLU_CopyX509SanToCert(WOLFSSL_X509* x509, Cert* cert)
+{
+#if defined(HAVE_WC_SET_ALT_NAMES_FROM_LIST) && defined(WOLFSSL_CERT_EXT)
+    /* Parse just for dCert->altNames -- avoids wc_SetAltNamesBuffer()'s
+     * own internal, CERT_TYPE-only re-parse of x509's whole raw DER. */
+    DecodedCert dCert;
+    int ret;
+
+    if (x509 == NULL || cert == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    ret = wolfCLU_GetX509RawExtensions(x509, &dCert);
+    if (ret != WOLFCLU_SUCCESS) {
+        return ret;
+    }
+
+    ret = wolfCLU_CopyX509SanToCertFromDCert(&dCert, cert);
+    wc_FreeDecodedCert(&dCert);
+    return ret;
+#else
+    /* wc_SetAltNamesFromList() unavailable in this wolfSSL build (or
+     * wolfCLU_GetX509RawExtensions() isn't compiled in without
+     * WOLFSSL_CERT_EXT); fall back to wc_SetAltNamesBuffer(), which takes
+     * the CSR's whole raw DER (not just the SAN extension bytes) and
+     * re-parses it with wolfCrypt's own SAN decoder internally -- reusing
+     * that instead of hand-rolling SAN parsing here avoids
+     * re-implementing GeneralName-type handling (dNSName, iPAddress,
+     * dirName, ...) and needs nothing from OPENSSL_EXTRA. */
+    const byte* der;
+    int derSz = 0;
+
+    if (x509 == NULL || cert == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    if (cert->altNamesSz > 0) {
+        wolfCLU_Log(WOLFCLU_L0, "Warning: wolfCLU_CopyX509SanToCert called "
+                "on a Cert that already has altNames; skipping to avoid "
+                "double-population");
+        return WOLFCLU_SUCCESS;
+    }
+
+    der = wolfSSL_X509_get_der(x509, &derSz);
+    if (der == NULL || derSz <= 0) {
+        wolfCLU_LogError("Could not get CSR's raw DER");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    if (wc_SetAltNamesBuffer(cert, der, derSz) != 0) {
+        wolfCLU_LogError("Error copying subjectAltName from CSR");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    return WOLFCLU_SUCCESS;
+#endif /* HAVE_WC_SET_ALT_NAMES_FROM_LIST && WOLFSSL_CERT_EXT */
+}
+#endif /* WOLFSSL_ALT_NAMES */
+
+#ifdef WOLFSSL_CERT_EXT
+/* Extensions that wolfCLU_X509FillCert already handles explicitly. */
+typedef struct {
+    int         nid;
+    const byte* oid;
+    word32      oidLen;
+} wolfCLU_HandledExt;
+
+static const wolfCLU_HandledExt kHandledExts[] = {
+    { NID_basic_constraints,        kOidBasicConstraints,
+            (word32)sizeof(kOidBasicConstraints) },
+    { NID_key_usage,                kOidKeyUsage,
+            (word32)sizeof(kOidKeyUsage) },
+    { NID_ext_key_usage,            kOidExtKeyUsage,
+            (word32)sizeof(kOidExtKeyUsage) },
+    { NID_subject_key_identifier,   kOidSubjectKeyIdentifier,
+            (word32)sizeof(kOidSubjectKeyIdentifier) },
+    { NID_authority_key_identifier, kOidAuthorityKeyIdentifier,
+            (word32)sizeof(kOidAuthorityKeyIdentifier) },
+#if defined(WOLFSSL_ALT_NAMES)
+    /* Only claim SAN as handled when wolfCLU_CopyX509SanToCert actually
+     * runs to copy it (guarded the same way, see clu_cert.h). */
+    { NID_subject_alt_name,         kOidSubjectAltName,
+            (word32)sizeof(kOidSubjectAltName) },
+#endif
+};
+#define WOLFCLU_NUM_HANDLED_EXTS \
+        (sizeof(kHandledExts) / sizeof(kHandledExts[0]))
+
+int wolfCLU_ExtHandledNid(int nid)
+{
+    size_t i;
+
+    for (i = 0; i < WOLFCLU_NUM_HANDLED_EXTS; i++) {
+        if (kHandledExts[i].nid == nid) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Look up handled extensions by raw OID DER. */
+static int wolfCLU_ExtHandledOid(const byte* oid, word32 oidLen)
+{
+    size_t i;
+
+    for (i = 0; i < WOLFCLU_NUM_HANDLED_EXTS; i++) {
+        if (wolfCLU_OidEquals(oid, oidLen, kHandledExts[i].oid,
+                kHandledExts[i].oidLen)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+#if defined(WOLFSSL_ASN_TEMPLATE) && defined(WOLFSSL_CUSTOM_OID) && \
+    defined(HAVE_OID_ENCODING)
+/* Decode DER-encoded OID content bytes into a NUL-terminated dotted-decimal string. */
+static int wolfCLU_OidDerToDotted(const byte* oid, word32 oidLen,
+        char* out, size_t outSz)
+{
+    word32 i;
+    int written;
+    int firstArc;
+    unsigned long arc;
+    size_t len;
+
+    if (oid == NULL || oidLen == 0 || out == NULL || outSz == 0) {
+        return BAD_FUNC_ARG;
+    }
+    /* last base-128 group must be complete (continuation bit clear). */
+    if ((oid[oidLen - 1] & 0x80) != 0) {
+        return ASN_PARSE_E;
+    }
+
+    /* The first identifier component (encoding the first two arcs as
+     * 40*X+Y) is itself base-128 encoded just like every later arc, so it
+     * must be accumulated across continuation bytes before being split
+     * back into X/Y -- a single-byte read here mis-decodes any OID whose
+     * first two arcs combine to >= 128 (e.g. 2.100.3 is {0x81,0x34,0x03}). */
+    arc = 0;
+    firstArc = -1;
+    i = 0;
+    while (i < oidLen) {
+        /* reject a run of continuation bytes long enough to shift bits
+         * out of arc, rather than silently wrapping into a bogus arc
+         * value. */
+        if (arc > (ULONG_MAX >> 7)) {
+            return ASN_PARSE_E;
+        }
+        arc = (arc << 7) | (unsigned long)(oid[i] & 0x7F);
+        if ((oid[i] & 0x80) == 0) {
+            firstArc = 1;
+            i++;
+            break;
+        }
+        i++;
+    }
+    if (firstArc < 0) {
+        return ASN_PARSE_E;
+    }
+
+    if (arc < 40) {
+        written = XSNPRINTF(out, outSz, "0.%lu", arc);
+    }
+    else if (arc < 80) {
+        written = XSNPRINTF(out, outSz, "1.%lu", arc - 40);
+    }
+    else {
+        written = XSNPRINTF(out, outSz, "2.%lu", arc - 80);
+    }
+    if (written < 0 || (size_t)written >= outSz) {
+        return BUFFER_E;
+    }
+
+    arc = 0;
+    for (; i < oidLen; i++) {
+        if (arc > (ULONG_MAX >> 7)) {
+            return ASN_PARSE_E;
+        }
+        arc = (arc << 7) | (unsigned long)(oid[i] & 0x7F);
+        if ((oid[i] & 0x80) == 0) {
+            len = XSTRLEN(out);
+            written = XSNPRINTF(out + len, outSz - len, ".%lu", arc);
+            if (written < 0 || (size_t)written >= outSz - len) {
+                return BUFFER_E;
+            }
+            arc = 0;
+        }
+    }
+    return WOLFCLU_SUCCESS;
+}
+#endif /* WOLFSSL_ASN_TEMPLATE && WOLFSSL_CUSTOM_OID && HAVE_OID_ENCODING */
+
+/* Carry unhandled CSR extensions onto the wolfcrypt Cert. */
+static int wolfCLU_CopyX509ExtsToCertFromDCert(DecodedCert* dCert, Cert* cert,
+        int* extsDropped)
+{
+    int ret = WOLFCLU_SUCCESS;
+    int uncopied = 0;
+    word32 idx = 0;
+
+    if (extsDropped != NULL) {
+        *extsDropped = 0;
+    }
+    if (dCert == NULL || cert == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    while (ret == WOLFCLU_SUCCESS && idx < (word32)dCert->extensionsSz) {
+        WOLFCLU_X509_EXT ext;
+
+        if (wolfCLU_DerGetExtension(dCert->extensions,
+                (word32)dCert->extensionsSz, &idx, &ext) != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Malformed extension in CSR extensions");
+            ret = WOLFCLU_FATAL_ERROR;
+            continue;
+        }
+        if (wolfCLU_ExtHandledOid(ext.oid, ext.oidLen)) {
+            continue; /* already copied explicitly by wolfCLU_X509FillCert */
+        }
+
+#if defined(WOLFSSL_ASN_TEMPLATE) && defined(WOLFSSL_CUSTOM_OID) && \
+    defined(HAVE_OID_ENCODING)
+        {
+            char oid[80];
+
+            if (wolfCLU_OidDerToDotted(ext.oid, ext.oidLen, oid,
+                    sizeof(oid)) != WOLFCLU_SUCCESS) {
+                if (ext.critical) {
+                    wolfCLU_LogError("Could not encode a critical "
+                            "extension's OID; refusing to issue");
+                    ret = WOLFCLU_FATAL_ERROR;
+                    continue;
+                }
+                wolfCLU_Log(WOLFCLU_L0,
+                        "Warning: could not encode an extension "
+                        "OID; not copied to the certificate");
+                uncopied = 1;
+                continue;
+            }
+            /* wc_SetCustomExtension keeps these pointers as-is, and both
+             * point into x509's DER buffer; heap-copy so cert doesn't
+             * depend on x509 outliving encoding. */
+            {
+                char* oidHeap = (char*)XMALLOC(XSTRLEN(oid) + 1, HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                byte* valHeap = NULL;
+
+                if (oidHeap == NULL) {
+                    ret = MEMORY_E;
+                }
+                else {
+                    /* +1 so a legitimately empty (zero-length) extnValue
+                     * doesn't turn into a 0-byte XMALLOC() call, which some
+                     * allocators return NULL for -- that would otherwise be
+                     * mistaken for a real out-of-memory failure below. */
+                    valHeap = (byte*)XMALLOC((size_t)ext.valLen + 1, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (valHeap == NULL) {
+                        XFREE(oidHeap, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        ret = MEMORY_E;
+                    }
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    XMEMCPY(oidHeap, oid, XSTRLEN(oid) + 1);
+                    if (ext.valLen > 0) {
+                        XMEMCPY(valHeap, ext.val, (size_t)ext.valLen);
+                    }
+                    if (wc_SetCustomExtension(cert, ext.critical, oidHeap,
+                                valHeap, ext.valLen) < 0) {
+                        XFREE(oidHeap, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        XFREE(valHeap, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        if (ext.critical) {
+                            wolfCLU_LogError("Failed to copy a critical "
+                                    "extension (OID %s); refusing to issue",
+                                    oid);
+                            ret = WOLFCLU_FATAL_ERROR;
+                        }
+                        else {
+                            wolfCLU_Log(WOLFCLU_L0,
+                                    "Warning: failed to copy extension "
+                                    "(OID %s) to the certificate", oid);
+                            uncopied = 1;
+                        }
+                    }
+                }
+            }
+        }
+#else
+        if (ext.critical) {
+            wolfCLU_LogError("This build cannot copy a critical CSR "
+                    "extension; refusing to issue");
+            ret = WOLFCLU_FATAL_ERROR;
+            continue;
+        }
+        uncopied = 1; /* this build cannot copy arbitrary extensions */
+#endif /* WOLFSSL_ASN_TEMPLATE && WOLFSSL_CUSTOM_OID && HAVE_OID_ENCODING */
+    }
+
+    if (ret == WOLFCLU_SUCCESS && uncopied) {
+        wolfCLU_Log(WOLFCLU_L0,
+                "Warning: this build only carries basicConstraints, "
+                "keyUsage, extKeyUsage, subjectKeyIdentifier, "
+                "authorityKeyIdentifier and subjectAltName; other CSR "
+                "extensions were not copied (build wolfSSL with "
+                "WOLFSSL_CUSTOM_OID + HAVE_OID_ENCODING to carry arbitrary "
+                "extensions)");
+        if (extsDropped != NULL) {
+            *extsDropped = 1;
+        }
+    }
+
+    return ret;
+}
+
+/* Carry CSR extensions that wolfCLU_X509FillCert does not handle explicitly
+ * onto the wolfcrypt Cert. */
+int wolfCLU_CopyX509ExtsToCert(WOLFSSL_X509* x509, Cert* cert,
+        int* extsDropped)
+{
+    int ret;
+    DecodedCert dCert;
+
+    if (x509 == NULL || cert == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    ret = wolfCLU_GetX509RawExtensions(x509, &dCert);
+    if (ret != WOLFCLU_SUCCESS) {
+        return ret;
+    }
+
+    ret = wolfCLU_CopyX509ExtsToCertFromDCert(&dCert, cert, extsDropped);
+    if (ret != WOLFCLU_SUCCESS) {
+        /* Free any custom-extension buffers a partial copy already
+         * attached to cert before returning the failure. */
+        wolfCLU_FreeCertCustomExts(cert);
+    }
+    wc_FreeDecodedCert(&dCert);
+    return ret;
+}
+
+/* Frees the oid/val buffers allocated by wolfCLU_CopyX509ExtsToCert; call
+ * once the Cert is done being used (after signing/encoding). */
+void wolfCLU_FreeCertCustomExts(Cert* cert)
+{
+#ifdef WOLFSSL_CUSTOM_OID
+    int i;
+
+    if (cert == NULL) {
+        return;
+    }
+    for (i = 0; i < cert->customCertExtCount; i++) {
+        if (cert->customCertExt[i].oid != NULL) {
+            XFREE((void*)cert->customCertExt[i].oid, HEAP_HINT,
+                    DYNAMIC_TYPE_TMP_BUFFER);
+            cert->customCertExt[i].oid = NULL;
+        }
+        if (cert->customCertExt[i].val != NULL) {
+            XFREE((void*)cert->customCertExt[i].val, HEAP_HINT,
+                    DYNAMIC_TYPE_TMP_BUFFER);
+            cert->customCertExt[i].val = NULL;
+        }
+    }
+#else
+    (void)cert;
+#endif /* WOLFSSL_CUSTOM_OID */
+}
+#endif /* WOLFSSL_CERT_EXT */
+
+/* Populate a wolfcrypt Cert from a CSR for CA signing. */
+int wolfCLU_X509FillCert(WOLFSSL_X509* x509, Cert* cert, int sigType,
+        void* subjWcKey, int subjWcKeyType,
+        void* caWcKey, int caWcKeyType, WOLFSSL_X509* caCert,
+        int policySanitized, int* extsDropped)
+{
+    int ret = WOLFCLU_SUCCESS;
+    int ku;
+    int isCA;
+    WOLFSSL_X509_NAME* name;
+    const WOLFSSL_ASN1_TIME* nb;
+    const WOLFSSL_ASN1_TIME* na;
+#ifdef WOLFSSL_CERT_EXT
+    DecodedCert dCert;
+    int dCertValid = 0;
+#endif
+
+    if (extsDropped != NULL) {
+        *extsDropped = 0;
+    }
+
+    if (x509 == NULL || cert == NULL || subjWcKey == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    /* x509's basicConstraints/keyUsage can be attacker-controlled CSR content;
+     * refuse to sign unless policySanitized says it's safe. */
+    if (!policySanitized) {
+        wolfCLU_LogError("CSR policy not sanitized; refusing to sign");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    ku = wolfSSL_X509_get_keyUsage(x509);
+    /* Use get_isCA() to read the in-memory isCA field, which correctly
+     * reflects any config overrides applied via wolfSSL_X509_add_ext(). */
+    isCA = wolfSSL_X509_get_isCA(x509);
+
+    if (wc_InitCert(cert) != 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    cert->version = 2; /* X.509 v3; wc_InitCert default */
+    cert->sigType = sigType;
+
+    cert->isCA = isCA ? 1 : 0;
+    cert->pathLen = 0;
+    cert->pathLenSet = 0;
+    /* Propagate the CSR/config's pathLenConstraint if set. */
+    if (isCA && wolfSSL_X509_get_isSet_pathLength(x509)) {
+        cert->pathLen = wolfSSL_X509_get_pathLength(x509);
+        cert->pathLenSet = 1;
+    }
+
+#ifdef WOLFSSL_CERT_EXT
+    if (isCA) {
+        /* A CA cert's keyUsage is always exactly keyCertSign/cRLSign; the
+         * CSR's requested keyUsage (ku) is intentionally ignored here so a
+         * CSR cannot grant itself extra key usages on a CA certificate. */
+        cert->keyUsage = KU_KEY_CERT_SIGN | KU_CRL_SIGN;
+    }
+    else {
+        /* Only RSA keys are also used for key encipherment; other types
+         * are signature-only. subjWcKeyType is the CertType space
+         * (RSA_TYPE/ECC_TYPE/...) also used below by
+         * wc_SetSubjectKeyIdFromPublicKey_ex(). */
+        cert->keyUsage = (subjWcKeyType == RSA_TYPE) ?
+                (KU_DIGITAL_SIGNATURE | KU_KEY_ENCIPHERMENT) :
+                KU_DIGITAL_SIGNATURE;
+        /* CSR keyUsage can only add bits on top of the default, never
+         * narrow it; CA-only bits are masked out so a leaf CSR can't grant
+         * itself keyCertSign/cRLSign. */
+        if (ku >= 0) {
+            int leafKu = ku & ~(KU_KEY_CERT_SIGN | KU_CRL_SIGN);
+            if (leafKu > 0)
+                cert->keyUsage |= (word16)leafKu;
+        }
+    }
+
+    /* Parse the CSR's DER once and reuse it for every wolfCLU_FindX509Ext()
+     * lookup below, instead of each lookup re-parsing the same DER. */
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfCLU_GetX509RawExtensions(x509, &dCert);
+        dCertValid = (ret == WOLFCLU_SUCCESS);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        /* wolfSSL_X509_get_extended_key_usage() needs full OPENSSL_EXTRA;
+         * read the extKeyUsage extension natively instead. */
+        WOLFCLU_X509_EXT ext;
+        int found = 0;
+
+        ret = wolfCLU_FindX509Ext(&dCert, kOidExtKeyUsage,
+                (word32)sizeof(kOidExtKeyUsage), &ext, &found);
+        cert->extKeyUsage = (ret == WOLFCLU_SUCCESS && found) ?
+                wolfCLU_DerGetExtKeyUsageBits(ext.val, ext.valLen) : 0;
+    }
+#else
+    (void)isCA;
+    (void)ku;
+#endif /* WOLFSSL_CERT_EXT */
+
+    nb = wolfSSL_X509_get_notBefore(x509);
+    na = wolfSSL_X509_get_notAfter(x509);
+    if (ret == WOLFCLU_SUCCESS && nb != NULL) {
+        cert->beforeDateSz = wolfCLU_Asn1TimeToCertDate(cert->beforeDate,
+                CTC_DATE_SIZE, nb);
+        if (cert->beforeDateSz <= 0) {
+            wolfCLU_LogError("Error converting notBefore date");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+    if (ret == WOLFCLU_SUCCESS && na != NULL) {
+        cert->afterDateSz = wolfCLU_Asn1TimeToCertDate(cert->afterDate,
+                CTC_DATE_SIZE, na);
+        if (cert->afterDateSz <= 0) {
+            wolfCLU_LogError("Error converting notAfter date");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        byte serial[EXTERNAL_SERIAL_SIZE];
+        int serialSz = EXTERNAL_SERIAL_SIZE;
+
+        if (wolfSSL_X509_get_serial_number(x509, serial, &serialSz) !=
+                WOLFSSL_SUCCESS || serialSz <= 0) {
+            wolfCLU_LogError("Error reading serial number");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (serialSz > CTC_SERIAL_SIZE) {
+            wolfCLU_LogError("Serial number too large");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            XMEMCPY(cert->serial, serial, (size_t)serialSz);
+            cert->serialSz = serialSz;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        name = wolfSSL_X509_get_subject_name(x509);
+        if (name == NULL) {
+            wolfCLU_LogError("CSR has no subject name");
+            ret = BAD_FUNC_ARG;
+        }
+        else {
+            ret = wolfCLU_CopyX509NameToCert(name, &cert->subject);
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        /*CA-signed: issuer is CA's subject. */
+        name = (caCert != NULL)
+                ? wolfSSL_X509_get_subject_name(caCert)
+                : wolfSSL_X509_get_subject_name(x509);
+        cert->selfSigned = (caCert == NULL) ? 1 : 0;
+        if (name != NULL) {
+            ret = wolfCLU_CopyX509NameToCert(name, &cert->issuer);
+        }
+        else if (caCert != NULL) {
+            wolfCLU_LogError("CA certificate has no subject name");
+            ret = BAD_FUNC_ARG;
+        }
+    }
+
+#ifdef WOLFSSL_CERT_EXT
+    if (ret == WOLFCLU_SUCCESS) {
+        WOLFCLU_X509_EXT ext;
+        int found = 0;
+
+        ret = wolfCLU_FindX509Ext(&dCert, kOidSubjectKeyIdentifier,
+                (word32)sizeof(kOidSubjectKeyIdentifier), &ext, &found);
+        if (ret == WOLFCLU_SUCCESS && found) {
+            /* subjWcKey != NULL is enforced by the parameter validation
+             * above. */
+            if (wc_SetSubjectKeyIdFromPublicKey_ex(cert, subjWcKeyType,
+                        subjWcKey) < 0) {
+                wolfCLU_LogError("Error setting subject key identifier");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && caWcKey != NULL) {
+        WOLFCLU_X509_EXT ext;
+        int found = 0;
+
+        ret = wolfCLU_FindX509Ext(&dCert, kOidAuthorityKeyIdentifier,
+                (word32)sizeof(kOidAuthorityKeyIdentifier), &ext, &found);
+        if (ret == WOLFCLU_SUCCESS && found) {
+            if (wc_SetAuthKeyIdFromPublicKey_ex(cert, caWcKeyType,
+                        caWcKey) < 0) {
+                wolfCLU_LogError("Error setting authority key identifier");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+    }
+
+    /* Carry any remaining CSR extensions (or warn that they were dropped),
+     * reusing the dCert parsed above instead of paying for a second
+     * wc_ParseCert() over the identical CSR DER. */
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfCLU_CopyX509ExtsToCertFromDCert(&dCert, cert, extsDropped);
+    }
+
+#if defined(WOLFSSL_ALT_NAMES) && defined(HAVE_WC_SET_ALT_NAMES_FROM_LIST)
+    /* Also reuse dCert for SAN copying, avoiding wc_SetAltNamesBuffer()'s
+     * own independent CERT_TYPE-only re-parse of the same CSR DER. */
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfCLU_CopyX509SanToCertFromDCert(&dCert, cert);
+    }
+#endif
+
+    if (dCertValid) {
+        wc_FreeDecodedCert(&dCert);
+        dCertValid = 0;
+    }
+#endif /* WOLFSSL_CERT_EXT */
+
+#if defined(WOLFSSL_ALT_NAMES) && \
+        !(defined(WOLFSSL_CERT_EXT) && defined(HAVE_WC_SET_ALT_NAMES_FROM_LIST))
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfCLU_CopyX509SanToCert(x509, cert);
+    }
+#endif
+
+#ifdef WOLFSSL_CERT_EXT
+    /* On failure, free any buffers a partial wolfCLU_CopyX509ExtsToCert()
+     * already handed to cert. On success, the caller owns cert and must
+     * call wolfCLU_FreeCertCustomExts() itself. */
+    if (ret != WOLFCLU_SUCCESS) {
+        wolfCLU_FreeCertCustomExts(cert);
+    }
+#endif /* WOLFSSL_CERT_EXT */
+
+    return ret;
+}
+#endif /* WOLFSSL_CERT_GEN */

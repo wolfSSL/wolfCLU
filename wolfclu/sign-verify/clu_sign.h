@@ -44,6 +44,12 @@
     #include <wolfssl/wolfcrypt/wc_xmss.h>
 #endif
 
+/* Upper bound (256MB) on a signature, hash, or message file the sign/verify
+ * paths will read into memory. */
+#ifndef WOLFCLU_MAX_FILE_SIZE
+#define WOLFCLU_MAX_FILE_SIZE 0xFFFFFFF
+#endif /* WOLFCLU_MAX_FILE_SIZE */
+
 enum {
     RSA_SIG_VER,
     ECC_SIG_VER,

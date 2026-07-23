@@ -664,26 +664,16 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
                     break;
                 }
 
-                if (XSTRCMP(key, "C") == 0) {
-                    XSTRLCPY(newCert.subject.country, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "ST") == 0) {
-                    XSTRLCPY(newCert.subject.state, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "L") == 0) {
-                    XSTRLCPY(newCert.subject.locality, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "O") == 0) {
-                    XSTRLCPY(newCert.subject.org, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "OU") == 0) {
-                    XSTRLCPY(newCert.subject.unit, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "CN") == 0) {
-                    XSTRLCPY(newCert.subject.commonName, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "emailAddress") == 0) {
-                    XSTRLCPY(newCert.subject.email, value, CTC_NAME_SIZE);
+                {
+                    int subjNid = wolfSSL_OBJ_sn2nid(key);
+
+                    if (subjNid != 0) {
+                        ret = wolfCLU_SetCertNameFieldByNid(&newCert.subject,
+                                subjNid, value, (int)XSTRLEN(value));
+                        if (ret != WOLFCLU_SUCCESS) {
+                            break;
+                        }
+                    }
                 }
 
                 token = XSTRTOK(NULL, "/", &slash);
@@ -903,9 +893,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        out = wolfSSL_BIO_new_file(outFileName, "wb");
+        out = wolfCLU_OpenOutFileBio(outFileName);
         if (out == NULL) {
-            wolfCLU_LogError("Unable to open out file %s", outFileName);
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -1517,10 +1506,8 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
     /* create WOLFSSL_BIO for output */
     if (ret == WOLFCLU_SUCCESS) {
-        out = wolfSSL_BIO_new_file(csign->outDir, "wb");
+        out = wolfCLU_OpenOutFileBio(csign->outDir);
         if (out == NULL) {
-            wolfCLU_LogError("Could not open output file %s",
-                    csign->outDir);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

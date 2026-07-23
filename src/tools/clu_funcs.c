@@ -1101,6 +1101,35 @@ void wolfCLU_convertToLower(char* s, int sSz)
 }
 
 
+/* DER definite-length encoder. */
+word32 wolfCLU_DerSetLength(word32 length, byte* output)
+{
+    word32 i;
+    word32 sz = 1;
+
+    if (length < 0x80) {
+        if (output != NULL)
+            output[0] = (byte)length;
+    }
+    else {
+        word32 len = length;
+
+        while (len != 0) {
+            sz++;
+            len >>= 8;
+        }
+        if (output != NULL) {
+            output[0] = (byte)(0x80 | (sz - 1));
+            for (i = 1; i < sz; i++) {
+                output[sz - i] = (byte)(length & 0xFF);
+                length >>= 8;
+            }
+        }
+    }
+
+    return sz;
+}
+
 void wolfCLU_ForceZero(void* mem, unsigned int len)
 {
 #ifndef WOLFSSL_NO_FORCE_ZERO
@@ -1110,6 +1139,324 @@ void wolfCLU_ForceZero(void* mem, unsigned int len)
     volatile byte* z = (volatile byte*)mem;
     while (len--) *z++ = 0;
 #endif
+}
+
+int wolfCLU_ReadFileToBuffer(const char* path, long maxSz, byte** outBuf,
+        int* outSz)
+{
+    int   sz;
+    long  fsz;
+    byte* buf = NULL;
+    XFILE f;
+
+    if (path == NULL || outBuf == NULL || outSz == NULL || maxSz <= 0) {
+        return BAD_FUNC_ARG;
+    }
+    *outBuf = NULL;
+    *outSz  = 0;
+
+    f = XFOPEN(path, "rb");
+    if (f == XBADFILE) {
+        wolfCLU_LogError("unable to open file %s", path);
+        return BAD_FUNC_ARG;
+    }
+
+    if (XFSEEK(f, 0, XSEEK_END) != 0) {
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    fsz = XFTELL(f);
+    if (XFSEEK(f, 0, XSEEK_SET) != 0) {
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (fsz <= 0) {
+        wolfCLU_LogError("%s: file is empty or unreadable", path);
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (fsz > maxSz || fsz > (long)INT_MAX) {
+        wolfCLU_LogError("%s: size %ld exceeds %ld-byte file limit",
+                path, fsz, maxSz);
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    sz = (int)fsz;
+
+    /* +1/NUL-terminate: matches other PEM-buffer readers in this codebase. */
+    buf = (byte*)XMALLOC((size_t)sz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (buf == NULL) {
+        XFCLOSE(f);
+        return MEMORY_E;
+    }
+
+    /* short/long read here catches a file that changed size after XFTELL. */
+    if (XFREAD(buf, 1, (size_t)sz, f) != (size_t)sz) {
+        XFCLOSE(f);
+        wolfCLU_ForceZero(buf, sz);
+        XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    buf[sz] = '\0';
+    XFCLOSE(f);
+
+    *outBuf = buf;
+    *outSz  = sz;
+    return WOLFCLU_SUCCESS;
+}
+
+/* Atomically replaces path with fresh, owner-only regular file. */
+#ifdef _WIN32
+#include <windows.h>
+#include <sddl.h>
+#include <io.h>
+#include <fcntl.h>
+#pragma comment(lib, "advapi32.lib")
+
+FILE* wolfCLU_CreateSecureFile(const char* path, DWORD access,
+        const char* mode, int ownerOnly)
+{
+    SECURITY_ATTRIBUTES sa;
+    SECURITY_ATTRIBUTES* pSA = NULL;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+    HANDLE hFile;
+    int fd;
+    FILE* f = NULL;
+    const char* sddl = "D:P(A;;FA;;;OW)";
+    int crtFlags = _O_CREAT | _O_TRUNC |
+            ((access & GENERIC_READ) ?
+                    ((access & GENERIC_WRITE) ? _O_RDWR : _O_RDONLY) :
+                    _O_WRONLY);
+
+    (void)_unlink(path);
+
+    if (ownerOnly) {
+        if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(sddl,
+                SDDL_REVISION_1, &pSD, NULL)) {
+            return NULL;
+        }
+        sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+        sa.bInheritHandle = FALSE;
+        sa.lpSecurityDescriptor = pSD;
+        pSA = &sa;
+    }
+
+    hFile = CreateFileA(path, access, 0, pSA, CREATE_NEW,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    if (hFile != INVALID_HANDLE_VALUE) {
+        DWORD attrs = GetFileAttributesA(path);
+        if (attrs != INVALID_FILE_ATTRIBUTES &&
+                (attrs & FILE_ATTRIBUTE_REPARSE_POINT)) {
+            /* path was replaced with a symlink/junction between the
+             * _unlink() above and this CreateFileA(); refuse to write
+             * through it. */
+            CloseHandle(hFile);
+            hFile = INVALID_HANDLE_VALUE;
+            (void)_unlink(path);
+        }
+    }
+    if (hFile != INVALID_HANDLE_VALUE) {
+        fd = _open_osfhandle((intptr_t)hFile, crtFlags);
+        if (fd != -1) {
+            f = _fdopen(fd, mode);
+        }
+        if (f == NULL) {
+            if (fd != -1) _close(fd);
+            else CloseHandle(hFile);
+            (void)_unlink(path);
+        }
+    }
+    if (pSD != NULL) {
+        LocalFree(pSD);
+    }
+    return f;
+}
+
+FILE* wolfCLU_OpenKeyFile(const char* path)
+{
+    FILE* f = wolfCLU_CreateSecureFile(path, GENERIC_WRITE, "wb", 1);
+    if (f == NULL) {
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+    return f;
+}
+
+FILE* wolfCLU_OpenOutFile(const char* path)
+{
+    FILE* f = wolfCLU_CreateSecureFile(path, GENERIC_WRITE, "wb", 0);
+    if (f == NULL) {
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+    return f;
+}
+#else
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <limits.h>
+#include <stdlib.h>
+#ifndef O_NOFOLLOW
+    #define O_NOFOLLOW 0
+#endif
+FILE* wolfCLU_CreateSecureFile(const char* path, int access,
+        const char* mode, int ownerOnly)
+{
+    int         fd;
+    FILE*       f;
+    struct stat st;
+    mode_t      createMode = ownerOnly ? 0600 : 0666;
+
+    /* Non-regular targets (character devices like /dev/null or
+     * /dev/stdout, FIFOs, symlinks to either, etc.) can't be usefully
+     * hardened with unlink()+O_EXCL: unlink() on them commonly fails
+     * (they live in directories the caller can't modify) or, when it
+     * succeeds, would destroy and replace the special file with a plain
+     * regular file instead of writing through it. Fall back to a plain
+     * fopen() for these so redirecting output to them (e.g. `-out
+     * /dev/stdout`, which is itself commonly a symlink) keeps working as
+     * it did before the O_EXCL hardening was added.
+     *
+     * For secret (ownerOnly) output, and for a symlink that resolves to a
+     * regular file even when non-secret, this fallback is skipped and the
+     * symlink falls through to the unlink()+O_EXCL path below instead:
+     * following it here would let an attacker who pre-creates a symlink at
+     * path redirect key material -- or, for non-secret cert/CSR output,
+     * redirect the write to an unrelated regular file the symlink points
+     * at -- to an arbitrary target. A symlink to a non-regular target
+     * (e.g. /dev/stdout) has no such exposure for non-secret output
+     * (there's nothing sensitive to redirect away, and no regular file to
+     * silently overwrite), so it's still followed like any other special
+     * file. */
+    if (lstat(path, &st) == 0 && S_ISLNK(st.st_mode) && !ownerOnly) {
+        struct stat targetSt;
+        if (stat(path, &targetSt) == 0 && !S_ISREG(targetSt.st_mode)) {
+            return fopen(path, mode);
+        }
+    }
+
+    if (lstat(path, &st) == 0 && !S_ISREG(st.st_mode) && !S_ISLNK(st.st_mode)) {
+        /* Open with O_NOFOLLOW instead of fopen() so a symlink swapped in
+         * between the lstat() above and this open() is rejected rather
+         * than followed. */
+        /* Without a native O_NOFOLLOW that guard is a no-op; fail closed. */
+        if (ownerOnly && O_NOFOLLOW == 0) {
+            return NULL;
+        }
+        fd = open(path, access | O_NOFOLLOW);
+        if (fd < 0)
+            return NULL;
+        f = fdopen(fd, mode);
+        if (f == NULL)
+            close(fd);
+        return f;
+    }
+
+    /* Ignore the result (including ENOENT if the file doesn't exist yet);
+     * this just ensures the O_EXCL open below gets a fresh inode. */
+    (void)unlink(path);
+    fd = open(path, O_CREAT | O_EXCL | access | O_NOFOLLOW, createMode);
+    if (fd < 0)
+        return NULL;
+    f = fdopen(fd, mode);
+    if (f == NULL) {
+        close(fd);
+        (void)unlink(path); /* remove the stray empty file we just created */
+    }
+    return f;
+}
+
+FILE* wolfCLU_OpenKeyFile(const char* path)
+{
+    FILE* f = wolfCLU_CreateSecureFile(path, O_WRONLY, "wb", 1);
+    if (f == NULL) {
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+    return f;
+}
+
+FILE* wolfCLU_OpenOutFile(const char* path)
+{
+    FILE* f = wolfCLU_CreateSecureFile(path, O_WRONLY, "wb", 0);
+    if (f == NULL) {
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+    return f;
+}
+#endif /* _WIN32 */
+
+void wolfCLU_RemoveFile(const char* path)
+{
+#ifdef _WIN32
+    (void)_unlink(path);
+#else
+    (void)unlink(path);
+#endif
+}
+
+int wolfCLU_PathsRefEqual(const char* pathA, const char* pathB)
+{
+#ifdef _WIN32
+    char fullA[MAX_PATH];
+    char fullB[MAX_PATH];
+#else
+    char fullA[PATH_MAX];
+    char fullB[PATH_MAX];
+#endif
+
+    if (pathA == NULL || pathB == NULL) {
+        return 0;
+    }
+    if (XSTRCMP(pathA, pathB) == 0) {
+        return 1;
+    }
+
+    /* Fall back to resolving both to an absolute, canonical (symlinks
+     * followed) form so e.g. "./key.pem" vs "key.pem", or a symlink
+     * pointing at the other path, are still caught. Only meaningful for
+     * paths that already exist -- a not-yet-created -out target simply
+     * fails to resolve here and is left to the exact-match check above. */
+#ifdef _WIN32
+    if (GetFullPathNameA(pathA, sizeof(fullA), fullA, NULL) == 0 ||
+            GetFullPathNameA(pathB, sizeof(fullB), fullB, NULL) == 0) {
+        return 0;
+    }
+    return (_stricmp(fullA, fullB) == 0);
+#else
+    if (realpath(pathA, fullA) == NULL || realpath(pathB, fullB) == NULL) {
+        return 0;
+    }
+    return (XSTRCMP(fullA, fullB) == 0);
+#endif
+}
+
+static WOLFSSL_BIO* wolfCLU_WrapSecureFileBio(FILE* f, const char* path)
+{
+    WOLFSSL_BIO* bioOut = (f != NULL) ?
+            wolfSSL_BIO_new_fp(f, BIO_CLOSE) : NULL;
+
+    if (bioOut == NULL && f != NULL) {
+        /* wolfCLU_OpenKeyFile()/wolfCLU_OpenOutFile() already logged when
+         * f itself was NULL; only log here for the BIO-wrap failure. */
+        XFCLOSE(f);
+        wolfCLU_RemoveFile(path);
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+    return bioOut;
+}
+
+WOLFSSL_BIO* wolfCLU_OpenKeyFileBio(const char* path)
+{
+    return wolfCLU_WrapSecureFileBio(wolfCLU_OpenKeyFile(path), path);
+}
+
+WOLFSSL_BIO* wolfCLU_OpenOutFileBio(const char* path)
+{
+    return wolfCLU_WrapSecureFileBio(wolfCLU_OpenOutFile(path), path);
+}
+
+WOLFSSL_BIO* wolfCLU_OpenOutOrKeyFileBio(const char* path, int isSecret)
+{
+    return isSecret ? wolfCLU_OpenKeyFileBio(path) :
+            wolfCLU_OpenOutFileBio(path);
 }
 
 #ifndef WOLFCLU_NO_TERM_SUPPORT
@@ -1313,18 +1660,64 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
 }
 
 
+/* Stream bioIn in chunks to update(). */
+static int wolfCLU_bioReadUpdate(WOLFSSL_BIO* bioIn,
+        int (*update)(void* updateCtx, const byte* data, word32 sz),
+        void* updateCtx)
+{
+    byte chunk[MAX_IO_CHUNK_SZ];
+    int bytesRead;
+    int ret = WOLFCLU_SUCCESS;
+
+    while (ret == WOLFCLU_SUCCESS) {
+        bytesRead = wolfSSL_BIO_read(bioIn, chunk, sizeof(chunk));
+        if (bytesRead < 0) {
+            wolfCLU_LogError("Error reading data");
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+        else if (bytesRead == 0) {
+            break;
+        }
+        if (update(updateCtx, chunk, (word32)bytesRead) != 0) {
+            wolfCLU_LogError("Hash update failed");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    wolfCLU_ForceZero(chunk, sizeof(chunk));
+    return ret;
+}
+
+struct wolfCLU_hashUpdateCtx {
+    wc_HashAlg* hashAlg;
+    enum wc_HashType hashType;
+};
+
+static int wolfCLU_hashUpdateCb(void* updateCtx, const byte* data, word32 sz)
+{
+    struct wolfCLU_hashUpdateCtx* ctx =
+            (struct wolfCLU_hashUpdateCtx*)updateCtx;
+    return wc_HashUpdate(ctx->hashAlg, ctx->hashType, data, sz);
+}
+
+static int wolfCLU_hmacUpdateCb(void* updateCtx, const byte* data, word32 sz)
+{
+    return (wolfSSL_HMAC_Update((WOLFSSL_HMAC_CTX*)updateCtx, data, sz)
+            == WOLFSSL_SUCCESS) ? 0 : WOLFCLU_FATAL_ERROR;
+}
+
 /* Stream-hash data read from bioIn using hashType and write the digest to
  * outDigest. On entry *outDigestSz is the capacity of outDigest; on success
  * it is updated to the actual digest length. */
 int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
         byte* outDigest, word32* outDigestSz)
 {
-    byte chunk[MAX_IO_CHUNK_SZ];
     wc_HashAlg hashAlg;
+    struct wolfCLU_hashUpdateCtx updateCtx;
     int hashInit = 0;
-    int bytesRead;
     int dsz;
-    int ret = WOLFCLU_SUCCESS;
+    int ret;
 
     if (bioIn == NULL || outDigest == NULL || outDigestSz == NULL) {
         return BAD_FUNC_ARG;
@@ -1342,21 +1735,9 @@ int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
     }
     hashInit = 1;
 
-    while (ret == WOLFCLU_SUCCESS) {
-        bytesRead = wolfSSL_BIO_read(bioIn, chunk, sizeof(chunk));
-        if (bytesRead < 0) {
-            wolfCLU_LogError("Error reading data");
-            ret = WOLFCLU_FATAL_ERROR;
-            break;
-        }
-        else if (bytesRead == 0) {
-            break;
-        }
-        if (wc_HashUpdate(&hashAlg, hashType, chunk, (word32)bytesRead) != 0) {
-            wolfCLU_LogError("Hash update failed");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
+    updateCtx.hashAlg = &hashAlg;
+    updateCtx.hashType = hashType;
+    ret = wolfCLU_bioReadUpdate(bioIn, wolfCLU_hashUpdateCb, &updateCtx);
 
     if (ret == WOLFCLU_SUCCESS) {
         if (wc_HashFinal(&hashAlg, hashType, outDigest) != 0) {
@@ -1392,7 +1773,12 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
      * Cast to int so unrelated hash types don't trip -Wswitch-enum. */
     switch ((int)alg) {
         case WC_HASH_TYPE_MD5:
+        #ifndef NO_MD5
             md = wolfSSL_EVP_md5();
+        #else
+            wolfCLU_LogError("MD5 not compiled in");
+            ret = WOLFCLU_FATAL_ERROR;
+        #endif
             break;
         case WC_HASH_TYPE_SHA:
             md = wolfSSL_EVP_sha1();
@@ -1422,24 +1808,7 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        int bytesRead = 0;
-        while (ret == WOLFCLU_SUCCESS) {
-            bytesRead = wolfSSL_BIO_read(in, chunk, sizeof(chunk));
-            if (bytesRead < 0) {
-                wolfCLU_LogError("Error reading data");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-            else if (bytesRead == 0) {
-                break;
-            }
-            if (wolfSSL_HMAC_Update(ctx, chunk, (word32)bytesRead)
-                    != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Hash update failed");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-        wolfCLU_ForceZero(chunk, sizeof(chunk));
+        ret = wolfCLU_bioReadUpdate(in, wolfCLU_hmacUpdateCb, ctx);
     }
 
     if (ret == WOLFCLU_SUCCESS) {

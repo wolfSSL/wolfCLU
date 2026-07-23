@@ -89,6 +89,7 @@ endif
 
 include src/include.am
 include wolfclu/include.am
+include tests/x509/unit_include.am
 if HAVE_PYTHON
 include tests/dh/include.am
 include tests/dsa/include.am
