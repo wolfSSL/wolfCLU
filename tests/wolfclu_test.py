@@ -182,7 +182,7 @@ def truncate_sparse(fileobj, size):
 
 
 def config_defines():
-    """Return the set of macros defined in the generated wolfclu/config.h.
+    """Return the set of macros defined in the generated src/config.h.
 
     Some features are compile-time options (e.g. --enable-oid-table sets
     HAVE_OID_TABLE) with no runtime flag to query, so tests that exercise
@@ -195,7 +195,7 @@ def config_defines():
     defined = set()
     builddir = os.environ.get("WOLFCLU_BUILDDIR") or os.getcwd()
     for base in (builddir, _PROJECT_ROOT):
-        path = os.path.join(base, "wolfclu", "config.h")
+        path = os.path.join(base, "src", "config.h")
         if not os.path.isfile(path):
             continue
         with open(path) as f:

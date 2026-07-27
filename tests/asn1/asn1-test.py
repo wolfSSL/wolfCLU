@@ -32,7 +32,7 @@ def oid_encoding_supported():
     """True when the build can DER-encode the OIDs from an -oid file.
 
     -oid relies on wc_EncodeObjectId, which is compiled out via
-    NO_WC_ENCODE_OBJECT_ID for libwolfssl <= 5.9.1 (set in configure.ac).
+    NO_WC_ENCODE_OBJECT_ID for libwolfssl <= 5.9.2 (set in configure.ac).
     In that build -oid reports a fatal error instead of encoding anything.
     The flag is a -D in AM_CFLAGS rather than a config.h define, so it cannot
     be read via config_defines(); probe the binary directly instead.  A
@@ -89,7 +89,6 @@ class TestBasicFunctions(unittest.TestCase):
     def test_out_arg_is_DER(self):
         """The -out file is the processed DER that was input"""
         out_file = "test-asn1.out"
-        open(out_file, "w").close()
         self.addCleanup(lambda: os.remove(out_file)
                         if os.path.exists(out_file) else None)
         result = run_wolfssl("asn1parse", "-inform", "DER", "-noout", "-in", self.der,
@@ -97,7 +96,7 @@ class TestBasicFunctions(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         with open(out_file, "rb") as out:
             with open(self.der, "rb") as infile:
-                self.assertEqual(str(out.read()), str(infile.read()))
+                self.assertEqual(out.read(), infile.read())
 
     def test_out_arg(self):
         """The -out flag (output file must exist) runs without error."""
@@ -270,7 +269,7 @@ class TestBasicFunctions(unittest.TestCase):
         self.assertIn("MyArc2Oid", result.stdout)
 
     @unittest.skipUnless("HAVE_OID_TABLE" in config_defines(),
-                         "built with --enable-oid-table")
+                         "built without --enable-oid-table")
     def test_builtin_oid_table(self):
         """The built-in OID table resolves an OID with no -oid file supplied.
 
@@ -358,18 +357,18 @@ class TestBasicFunctions(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
 
     def test_input_file_too_large(self):
-        """A file larger than the 0xFFFFFFFEU byte max is rejected up front.
+        """A file larger than the 0x7FFFFFFEU byte max is rejected up front.
 
-        asn1_ReadFile caps the input at 0xFFFFFFFEU bytes so that the +1 for the
+        asn1_ReadFile caps the input at 0x7FFFFFFEU bytes so that the +1 for the
         null terminator still fits in a word32.  A file one byte over that limit
-        (0xFFFFFFFFU) must be refused before any ~4GB buffer is allocated or
+        (0x7FFFFFFFU) must be refused before any ~2GB buffer is allocated or
         read, so the check has to fire on file size alone.  The file is created
         sparse (no real disk use) via truncate; skip if the platform/filesystem
         cannot represent a file that large.
         """
         big_file = "test-asn1-toobig.der"
-        # 0xFFFFFFF == one byte past the 0xFFFFFFEU maximum accepted length.
-        size = 0xFFFFFFF
+        # 0x7FFFFFFF == one byte past the 0x7FFFFFFEU maximum accepted length.
+        size = 0x7FFFFFFF
         try:
             with open(big_file, "wb") as f:
                 truncate_sparse(f, size)
