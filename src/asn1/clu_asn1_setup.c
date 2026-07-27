@@ -84,7 +84,7 @@ static void wolfCLU_Asn1Help(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\n               Pluses indicate primitive types");
     WOLFCLU_LOG(WOLFCLU_L0, "                     0: 4 +   7  (0) ┌INTEGER");
     WOLFCLU_LOG(WOLFCLU_L0, "\nOid File:\n");
-    WOLFCLU_LOG(WOLFCLU_L0, "       Pass in a file to -oid in this format:")
+    WOLFCLU_LOG(WOLFCLU_L0, "       Pass in a file to -oid in this format:");
     WOLFCLU_LOG(WOLFCLU_L0, "           1.2.3.4 shortName Long name with "
                             "spaces");
     WOLFCLU_LOG(WOLFCLU_L0, "           5.6.7.8 shortName2 spaces with "
@@ -108,7 +108,7 @@ static int Asn1ParseOptions_clean_up(WOLFCLU_ASN1_PARSE_OPTIONS *opt)
         XFCLOSE(opt->outputFile);
     }
 
-    *opt = (WOLFCLU_ASN1_PARSE_OPTIONS){ 0 };
+    wc_ForceZero(opt, sizeof(WOLFCLU_ASN1_PARSE_OPTIONS));
 
     return WOLFCLU_SUCCESS;
 }
@@ -119,14 +119,14 @@ static int checkFileArg(const char *file, const char *flag, const char *mode,
 {
     int ret = WOLFCLU_FATAL_ERROR;
 
+    if (*file_out != NULL) {
+        wolfCLU_LogError("File for %s was already opened", flag);
+        return WOLFCLU_FATAL_ERROR;
+    }
+
     if (file != NULL) {
         XFILE f = XFOPEN(file, mode);
         if (f != NULL) {
-            if (*file_out != NULL) {
-                wolfCLU_LogError("File for %s was already opened", flag);
-                XFCLOSE(f);
-                return WOLFCLU_FATAL_ERROR;
-            }
             *file_out = f;
             ret = WOLFCLU_SUCCESS;
         }
@@ -182,8 +182,8 @@ static int checkStrParse(const char *arg, word32 *outSz, const word32 cap,
         }
         else {
             out[(*outSz)++] = val;
+            token = XSTRTOK(NULL, ",", &end);
         }
-        token = XSTRTOK(NULL, ",", &end);
     }
 
     XFREE(tmp, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -247,6 +247,7 @@ int wolfCLU_Asn1Setup(int argc, char *argv[])
     int ret = WOLFCLU_SUCCESS;
     int option;
     int longIndex = 1;
+    /* reduce stack size */
     static WOLFCLU_ASN1_PARSE_OPTIONS asn1Config = { 0 };
 
     opterr = 0;
@@ -315,6 +316,7 @@ int wolfCLU_Asn1Setup(int argc, char *argv[])
 
             case ARG_FOUND_TWICE:
                 ret = WOLFCLU_FATAL_ERROR;
+                wolfCLU_LogError("Arg found twice for asn1parse");
                 break;
 
             case '?':

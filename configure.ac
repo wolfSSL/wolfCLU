@@ -154,22 +154,6 @@ AC_CHECK_FUNC([wc_EncodeObjectId],
     [],
     [AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
 
-# wc_EncodeObjectId is not usable in libwolfssl <= 5.9.2, so disable it based
-# on the version when the symbol is present but too old.
-AC_MSG_CHECKING([whether libwolfssl version supports wc_EncodeObjectId])
-AC_COMPILE_IFELSE(
-    [AC_LANG_PROGRAM(
-        [[#include <wolfssl/version.h>]],
-        [[
-        #if LIBWOLFSSL_VERSION_HEX <= 0x05009002
-        #error "libwolfssl version too old for wc_EncodeObjectId"
-        #endif
-        ]])],
-    [AC_MSG_RESULT([yes])],
-    [AC_MSG_RESULT([no])
-     AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
-
-
 ###############################################
 #                                             #
 #     Need a genKey check                     #

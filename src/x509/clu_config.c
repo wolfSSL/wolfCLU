@@ -24,7 +24,6 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
-#include <wolfssl/wolfcrypt/ecc.h>
 #include <wolfssl/wolfcrypt/types.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM

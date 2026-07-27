@@ -35,11 +35,10 @@
 
 #if defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM)
 
-
-static int Asn1Print(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* opts)
+static int Asn1Print(Asn1 *asn1, const WOLFCLU_ASN1_PARSE_OPTIONS *opts)
 {
     int ret = WOLFCLU_SUCCESS;
-    Asn1PrintOptions PrintOpts = {0};
+    Asn1PrintOptions PrintOpts = { 0 };
 
     /* wc_Asn1_Init (called once in wolfCLU_Asn1Parse) leaves the output
      * file as XBADFILE; point it at stdout and wire up the OID-to-name
@@ -53,22 +52,21 @@ static int Asn1Print(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* opts)
     if (wc_Asn1PrintOptions_Init(&PrintOpts) != 0)
         return WOLFCLU_FATAL_ERROR;
     if (wc_Asn1PrintOptions_Set(&PrintOpts, ASN1_PRINT_OPT_INDENT,
-            opts->indent) != 0)
+                                opts->indent) != 0)
         return WOLFCLU_FATAL_ERROR;
-    if (wc_Asn1PrintOptions_Set(&PrintOpts, ASN1_PRINT_OPT_DRAW_BRANCH,
-            1) != 0)
+    if (wc_Asn1PrintOptions_Set(&PrintOpts, ASN1_PRINT_OPT_DRAW_BRANCH, 1) != 0)
         return WOLFCLU_FATAL_ERROR;
 
     /* this shows the hex in a readable print out and hides text data
      * so there is no double reporting on BIT STRING and OCTET STRINGS */
     if (wc_Asn1PrintOptions_Set(&PrintOpts, ASN1_PRINT_OPT_SHOW_DATA,
-            opts->dump) != 0)
+                                opts->dump) != 0)
         return WOLFCLU_FATAL_ERROR;
     if (wc_Asn1PrintOptions_Set(&PrintOpts, ASN1_PRINT_OPT_SHOW_OID,
-            opts->dump) != 0)
+                                opts->dump) != 0)
         return WOLFCLU_FATAL_ERROR;
     if (wc_Asn1PrintOptions_Set(&PrintOpts, ASN1_PRINT_OPT_SHOW_NO_TEXT,
-            opts->dump) != 0)
+                                opts->dump) != 0)
         return WOLFCLU_FATAL_ERROR;
 
     ret = wc_Asn1_PrintAll(asn1, &PrintOpts, asn1->data, asn1->max);
@@ -92,14 +90,13 @@ enum {
     ASN_PART_DATA,
 };
 
-
 /* Apply the -strparse offsets in po->strParse in order. Each entry is an
  * absolute byte offset from the current position to an OCTET STRING or BIT
  * STRING whose contents are themselves ASN.1; the parser descends into that
  * content so the next offset (and the final print) operate on the nested
  * structure. Returns WOLFCLU_SUCCESS on success or a negative error code.
  */
-static int StrParse(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* po)
+static int StrParse(Asn1 *asn1, const WOLFCLU_ASN1_PARSE_OPTIONS *po)
 {
     int ret = WOLFCLU_SUCCESS;
     word32 idx = 0;
@@ -111,25 +108,27 @@ static int StrParse(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* po)
         if (po->strParse[idx] >= asn1->max) {
             ret = WOLFCLU_FATAL_ERROR;
             wolfCLU_LogError("-strparse %u with value %u "
-                    "tried to jump to invalid location. "
-                    "Unable to parse", idx, po->strParse[idx]);
+                             "tried to jump to invalid location. "
+                             "Unable to parse",
+                             idx, po->strParse[idx]);
             break;
         }
 
         /* Advance into the buffer and shrink the remaining length to match so
          * later bounds checks stay accurate. */
         asn1->data = asn1->data + po->strParse[idx];
-        asn1->max  = asn1->max - po->strParse[idx];
+        asn1->max = asn1->max - po->strParse[idx];
 
         /* Mask off the constructed bit to compare the base tag. */
         asn1->item.tag = asn1->data[asn1->curr] & (byte)~ASN_CONSTRUCTED;
 
         if (asn1->item.tag != ASN_OCTET_STRING &&
-                asn1->item.tag != ASN_BIT_STRING) {
+            asn1->item.tag != ASN_BIT_STRING) {
             ret = WOLFCLU_FATAL_ERROR;
             wolfCLU_LogError("-strparse %u with value %u "
-                    "did not find an octet string "
-                    "unable to parse", idx, po->strParse[idx]);
+                             "did not find an octet string "
+                             "unable to parse",
+                             idx, po->strParse[idx]);
             break;
         }
 
@@ -143,21 +142,24 @@ static int StrParse(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* po)
             break;
         }
 
+        if (len <= 0) {
+            ret = WOLFCLU_FATAL_ERROR;
+            wolfCLU_LogError("Asn1 stucture for -strparse %u has a length of 0",
+                             idx);
+            break;
+        }
+
         /* The decoded length must fit within the bytes remaining after the
          * tag and length octets. */
-        if (len < 0 || (word32)len > asn1->max - asn1->curr) {
+        if ((word32)len > asn1->max - asn1->curr) {
             ret = WOLFCLU_FATAL_ERROR;
             wolfCLU_LogError("-strparse %u decoded length runs past the end "
-                    "of the buffer. Unable to parse", idx);
+                             "of the buffer. Unable to parse",
+                             idx);
             break;
         }
 
         if (asn1->item.tag == ASN_BIT_STRING) {
-            if (len < 1) {
-                ret = WOLFCLU_FATAL_ERROR;
-                wolfCLU_LogError("-strparse %u BIT STRING has no content", idx);
-                break;
-            }
             asn1->curr++;
             len--;
         }
@@ -177,16 +179,16 @@ static int StrParse(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* po)
  *
  * return WOLFCLU_SUCCESS on success,
  * WOLFLCU_FATAL_ERROR otherwise */
-static int Asn1Fmt(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* opts,
-                      byte* data, word32 dataSz)
+static int Asn1Fmt(Asn1 *asn1, const WOLFCLU_ASN1_PARSE_OPTIONS *opts,
+                   byte *data, word32 dataSz)
 {
     int ret = WOLFCLU_SUCCESS;
     /* Reject an offset that points past the end of the buffer. Both values
      * are word32, so an out-of-range offset would make the length below
      * underflow and produce a near-4GB out-of-bounds read. */
-    if (opts->offset > dataSz) {
+    if (opts->offset >= dataSz) {
         wolfCLU_LogError("-offset %u is past the end of the input (%u bytes)",
-                opts->offset, dataSz);
+                         opts->offset, dataSz);
         return WOLFCLU_FATAL_ERROR;
     }
 
@@ -194,8 +196,8 @@ static int Asn1Fmt(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* opts,
      * offset. */
     if (opts->length > 0 && opts->length > dataSz - opts->offset) {
         wolfCLU_LogError("-length %u runs past the end of the input "
-                "(%u bytes remaining after offset)",
-                opts->length, dataSz - opts->offset);
+                         "(%u bytes remaining after offset)",
+                         opts->length, dataSz - opts->offset);
         return WOLFCLU_FATAL_ERROR;
     }
 
@@ -223,8 +225,8 @@ static int Asn1Fmt(Asn1* asn1, const WOLFCLU_ASN1_PARSE_OPTIONS* opts,
  *
  * Returns WOLFCLU_SUCCESS on success.
  * */
-static int wolfCLU_Asn1Write(Asn1* asn1,
-        const WOLFCLU_ASN1_PARSE_OPTIONS* opts, byte* data, word32 dataSz)
+static int wolfCLU_Asn1Write(Asn1 *asn1, const WOLFCLU_ASN1_PARSE_OPTIONS *opts,
+                             byte *data, word32 dataSz)
 {
     int ret = WOLFCLU_SUCCESS;
 
@@ -250,8 +252,6 @@ static int wolfCLU_Asn1Write(Asn1* asn1,
     return ret;
 }
 
-
-
 /* Find the next PEM block.
  *
  * @param [in]  data    PEM data.
@@ -260,8 +260,8 @@ static int wolfCLU_Asn1Write(Asn1* asn1,
  * @param [out] start   Start of Base64 encoding.
  * @param [out] end     End of Base64 encoding.
  */
-static int FindPem(unsigned char* data, word32 offset, word32 len,
-    word32* start, word32* end)
+static int FindPem(unsigned char *data, word32 offset, word32 len,
+                   word32 *start, word32 *end)
 {
     int ret = WOLFCLU_SUCCESS;
     word32 i = 0;
@@ -270,7 +270,7 @@ static int FindPem(unsigned char* data, word32 offset, word32 len,
     /* Find header. */
     for (i = offset; i < len; i++) {
         if ((data[i] == '-') &&
-                (XSTRNCMP((char*)data + i, "-----BEGIN", 10) == 0)) {
+            (XSTRNCMP((char *)data + i, "-----BEGIN", 10) == 0)) {
             i += (sizeof("-----BEGIN") - 1); /* Skip -----BEGIN text */
             break;
         }
@@ -284,7 +284,7 @@ static int FindPem(unsigned char* data, word32 offset, word32 len,
         /* Confirm header. */
         for (; i < len; i++) {
             if ((data[i] == '-') &&
-                    (XSTRNCMP((char*)data + i, "-----", 5) == 0)) {
+                (XSTRNCMP((char *)data + i, "-----", 5) == 0)) {
                 break;
             }
         }
@@ -299,7 +299,7 @@ static int FindPem(unsigned char* data, word32 offset, word32 len,
         /* Find footer. */
         for (j = i + 1; j < len; j++) {
             if ((data[j] == '-') &&
-                    (XSTRNCMP((char*)data + j, "-----END", 8) == 0)) {
+                (XSTRNCMP((char *)data + j, "-----END", 8) == 0)) {
                 break;
             }
         }
@@ -320,7 +320,7 @@ static int FindPem(unsigned char* data, word32 offset, word32 len,
 
 /* Allocate buffer to read returns length of file read if success.
  * and returns negative code on failure. */
-static long asn1_ReadFile(XFILE fp, byte** buffer, word32* bufLen)
+static long asn1_ReadFile(XFILE fp, byte **buffer, word32 *bufLen)
 {
     long fileLen;
 
@@ -328,7 +328,7 @@ static long asn1_ReadFile(XFILE fp, byte** buffer, word32* bufLen)
         return WOLFCLU_FATAL_ERROR;
     }
 
-    if (XFSEEK(fp, 0,SEEK_END) != 0) {
+    if (XFSEEK(fp, 0, SEEK_END) != 0) {
         return WOLFCLU_FATAL_ERROR;
     }
 
@@ -339,20 +339,20 @@ static long asn1_ReadFile(XFILE fp, byte** buffer, word32* bufLen)
         return WOLFCLU_FATAL_ERROR;
     }
 
-    /* A file at or below 0xFFFFFFEU still lets the +1 for the null terminator
+    /* A file at or below 0x7FFFFFFEU still lets the +1 for the null terminator
      * fit in a int (windows); anything larger would overflow the length below, so
      * reject it here rather than allocate and read a near-2GB buffer. */
-    if (fileLen > (0xFFFFFFEU)) {
-        wolfCLU_LogError("File is longer than 0xFFFFFFEU byte max");
+    if (fileLen > (0x7FFFFFFEU)) {
+        wolfCLU_LogError("File is longer than 0x7FFFFFFEU byte max");
         return WOLFCLU_FATAL_ERROR;
     }
 
-    if (XFSEEK(fp, 0,SEEK_SET) != 0) {
+    if (XFSEEK(fp, 0, SEEK_SET) != 0) {
         return WOLFCLU_FATAL_ERROR;
     }
     /* add 1 for null terminator */
-    *buffer = (byte*)XMALLOC(fileLen + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if(*buffer == NULL) {
+    *buffer = (byte *)XMALLOC(fileLen + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (*buffer == NULL) {
         return MEMORY_E;
     }
 
@@ -361,7 +361,7 @@ static long asn1_ReadFile(XFILE fp, byte** buffer, word32* bufLen)
         *buffer = NULL;
         return WOLFCLU_FATAL_ERROR;
     }
-    (*buffer)[fileLen] = '\0';/* add null terminator */
+    (*buffer)[fileLen] = '\0'; /* add null terminator */
 
     if (bufLen != NULL) {
         *bufLen = (word32)fileLen;
@@ -369,14 +369,14 @@ static long asn1_ReadFile(XFILE fp, byte** buffer, word32* bufLen)
     return fileLen;
 }
 
-static int WOLFCLU_OID_TO_NAME_free(WOLFCLU_OID_TO_NAME* p)
+static int WOLFCLU_OID_TO_NAME_free(WOLFCLU_OID_TO_NAME *p)
 {
     if (p->dataBuffer != NULL) {
         XFREE(p->dataBuffer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     if (p->entries != NULL) {
-        XFREE(p->entries , HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        XFREE(p->entries, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     wc_ForceZero(p, sizeof(*p));
@@ -386,16 +386,24 @@ static int WOLFCLU_OID_TO_NAME_free(WOLFCLU_OID_TO_NAME* p)
 
 /* take in dot separated oid string and fill it with Der encoding *
 *  return wolfCLU_SUCCESS on success */
-static int OidToDer(char* oid, word32* oidSz)
+static int OidToDer(char *oid, word32 *oidSz)
 {
 #ifndef NO_WC_ENCODE_OBJECT_ID
     int ret = WOLFCLU_SUCCESS;
     int err;
     int idx = 0;
-    char* token;
-    char* end;
-    word32* arc = (word32*)XMALLOC(sizeof(*arc) * *oidSz,
-            HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    char *token;
+    char *end;
+    word32 arcCap = 1;
+    const char *p = oid;
+    while (*p != '\0') {
+        if (*p == '.') {
+            arcCap++;
+        }
+        p++;
+    }
+    word32 *arc = (word32 *)XMALLOC(sizeof(*arc) * arcCap, HEAP_HINT,
+                                    DYNAMIC_TYPE_TMP_BUFFER);
     if (arc == NULL) {
         return MEMORY_E;
     }
@@ -403,11 +411,11 @@ static int OidToDer(char* oid, word32* oidSz)
     token = XSTRTOK(oid, ".", &end);
     while (token != NULL && ret == WOLFCLU_SUCCESS) {
         word32 tmp = 0;
-        if (wolfCLU_StrToWord32(token, XSTRLEN(token), &tmp)
-                == WOLFCLU_SUCCESS) {
+        if (wolfCLU_StrToWord32(token, XSTRLEN(token), &tmp) ==
+            WOLFCLU_SUCCESS) {
             arc[idx++] = tmp;
         }
-        else{
+        else {
             wolfCLU_LogError("Could not parse oid dot form");
             ret = WOLFCLU_FATAL_ERROR;
             break;
@@ -418,7 +426,7 @@ static int OidToDer(char* oid, word32* oidSz)
     if (ret == WOLFCLU_SUCCESS) {
         /* oid is overwritten by and replaces with DER encoding */
         XMEMSET(oid, '\0', *oidSz);
-        if ((err = wc_EncodeObjectId(arc, idx, (byte*)oid, oidSz)) != 0) {
+        if ((err = wc_EncodeObjectId(arc, idx, (byte *)oid, oidSz)) != 0) {
             wolfCLU_LogError("%s", wc_GetErrorString(err));
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -429,26 +437,26 @@ static int OidToDer(char* oid, word32* oidSz)
     return ret;
 #else
     wolfCLU_LogError("Old Version of wolfSSL %s must be greater than 5.9.2 to "
-            "use custom oids", WOLFSSL_VERSION);
+                     "use custom oids",
+                     WOLFSSL_VERSION);
     (void)oid;
     (void)oidSz;
     return WOLFCLU_FATAL_ERROR;
-#endif
-
+#endif /*NO_WC_ENCODE_OBJECT_ID*/
 }
 
 /* return WOLFCLU_SUCCESS if successful
  * if this function returns success you must call
  * WOLFCLU_OID_TO_NAME_free. */
-static int WOLFCLU_OID_TO_NAME_initWFile(WOLFCLU_OID_TO_NAME* newOids, XFILE fp)
+static int WOLFCLU_OID_TO_NAME_initWFile(WOLFCLU_OID_TO_NAME *newOids, XFILE fp)
 {
 #ifndef NO_WC_ENCODE_OBJECT_ID
     int ret = WOLFCLU_SUCCESS;
-    OidName* tmpPtr;
-    byte* fileBuffer;
-    char* tracker;
-    char* token;
-    char* oid;
+    OidName *tmpPtr;
+    byte *fileBuffer;
+    char *tracker;
+    char *token;
+    char *oid;
 
     if (newOids == NULL) {
         wolfCLU_LogError("WOLFCLU_OID_TO_NAME was null");
@@ -465,7 +473,7 @@ static int WOLFCLU_OID_TO_NAME_initWFile(WOLFCLU_OID_TO_NAME* newOids, XFILE fp)
     /* file format is <byte string> <shortname> <longName>\n
      * we load the first token and go until error or all lines are hit
      * and loaded */
-    token = XSTRTOK((char*)fileBuffer, " ", &tracker);
+    token = XSTRTOK((char *)fileBuffer, " ", &tracker);
     while (ret == WOLFCLU_SUCCESS && token != NULL) {
         word32 len;
         oid = token;
@@ -474,15 +482,16 @@ static int WOLFCLU_OID_TO_NAME_initWFile(WOLFCLU_OID_TO_NAME* newOids, XFILE fp)
         ret = OidToDer(oid, &len);
         if (ret != WOLFCLU_SUCCESS) {
             wolfCLU_LogError("Could not convert Oid : %s to der check line %u",
-                    token, newOids->len + 1);
+                             token, newOids->len + 1);
             break;
         }
 
         /* skip short name */
         token = XSTRTOK(NULL, " ", &tracker);
-        if (token == NULL) {
+        if (token == NULL || XSTRSTR(token, "\n") != NULL) {
             wolfCLU_LogError("malformed tokens, check line %u for bad "
-                    "formatting; wanted short name", newOids->len + 1);
+                             "formatting; wanted short name",
+                             newOids->len + 1);
             ret = WOLFCLU_FATAL_ERROR;
             break;
         }
@@ -490,17 +499,17 @@ static int WOLFCLU_OID_TO_NAME_initWFile(WOLFCLU_OID_TO_NAME* newOids, XFILE fp)
         token = XSTRTOK(NULL, "\n", &tracker);
         if (token == NULL) {
             wolfCLU_LogError("malformed tokens, check line %u for bad "
-                    "formatting; wanted long name", newOids->len + 1);
+                             "formatting; wanted long name",
+                             newOids->len + 1);
             ret = WOLFCLU_FATAL_ERROR;
             break;
         }
 
         /* realloc array if need more slots */
         if (newOids->len >= newOids->cap) {
-
             tmpPtr = XREALLOC(newOids->entries,
-                    sizeof(OidName) * (newOids->cap + 10),
-                    HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                              sizeof(OidName) * (newOids->cap + 10), HEAP_HINT,
+                              DYNAMIC_TYPE_TMP_BUFFER);
 
             if (tmpPtr == NULL) {
                 ret = MEMORY_E;
@@ -508,12 +517,12 @@ static int WOLFCLU_OID_TO_NAME_initWFile(WOLFCLU_OID_TO_NAME* newOids, XFILE fp)
             }
             else {
                 newOids->entries = tmpPtr;
-                newOids->cap    += 10;
+                newOids->cap += 10;
             }
         }
 
         newOids->entries[newOids->len].name = token;
-        newOids->entries[newOids->len].oid = (byte*)oid;
+        newOids->entries[newOids->len].oid = (byte *)oid;
         newOids->entries[newOids->len].len = len;
         newOids->len++;
 
@@ -532,24 +541,25 @@ static int WOLFCLU_OID_TO_NAME_initWFile(WOLFCLU_OID_TO_NAME* newOids, XFILE fp)
     (void)newOids;
     (void)fp;
     return OidToDer(NULL, NULL);
-#endif
+#endif /* NO_WC_ENCODE_OBJECT_ID */
 }
 
 /* Callback that wolfSSL uses to assign byte oids to names */
-static WOLFCLU_OID_TO_NAME AdditionalOidNames = {0};
-static const char* OidToNameCallback (unsigned char* oid, word32 len)
+static WOLFCLU_OID_TO_NAME asn1parse_AdditionalOidNames = { 0 };
+static const char *OidToNameCallback(unsigned char *oid, word32 len)
 {
     word32 i;
-    for (i = 0; i < AdditionalOidNames.len; i++){
-        if ((len == AdditionalOidNames.entries[i].len) &&
-                (XMEMCMP(oid, AdditionalOidNames.entries[i].oid, len) == 0)) {
-            return AdditionalOidNames.entries[i].name;
+    for (i = 0; i < asn1parse_AdditionalOidNames.len; i++) {
+        if ((len == asn1parse_AdditionalOidNames.entries[i].len) &&
+            (XMEMCMP(oid, asn1parse_AdditionalOidNames.entries[i].oid, len) ==
+             0)) {
+            return asn1parse_AdditionalOidNames.entries[i].name;
         }
     }
 
-    for (i = 0; i < oid_names_len; i++){
+    for (i = 0; i < oid_names_len; i++) {
         if ((len == oid_name_table[i].len) &&
-                (XMEMCMP(oid, oid_name_table[i].oid, len) == 0)) {
+            (XMEMCMP(oid, oid_name_table[i].oid, len) == 0)) {
             return oid_name_table[i].name;
         }
     }
@@ -558,8 +568,8 @@ static const char* OidToNameCallback (unsigned char* oid, word32 len)
 }
 
 /* Decode the input data from base64 based on file type */
-static int HandleProcessing(const WOLFCLU_ASN1_PARSE_OPTIONS* po,
-        byte** inputFileBuffer, word32* inputFileLen)
+static int HandleProcessing(const WOLFCLU_ASN1_PARSE_OPTIONS *po,
+                            byte **inputFileBuffer, word32 *inputFileLen)
 {
     int ret = WOLFCLU_SUCCESS;
     word32 i = 0;
@@ -568,22 +578,22 @@ static int HandleProcessing(const WOLFCLU_ASN1_PARSE_OPTIONS* po,
     if (po == NULL)
         return WOLFCLU_FATAL_ERROR;
 
-    switch (po->inForm){
+    switch (po->inForm) {
         case WOLFCLU_ASN1_PEM:
             /* Find start and end of PEM Base64 data. */
             ret = FindPem(*inputFileBuffer, j, *inputFileLen, &i, &j);
             /* Decode data between header and footer. */
             if ((ret == WOLFCLU_SUCCESS) &&
-                    (Base64_Decode((*inputFileBuffer) + i, j - i,
-                            *inputFileBuffer, inputFileLen) != 0)) {
+                (Base64_Decode((*inputFileBuffer) + i, j - i, *inputFileBuffer,
+                               inputFileLen) != 0)) {
                 wolfCLU_LogError("PEM input is not base64 encoded");
                 ret = WOLFCLU_FATAL_ERROR;
             }
             break;
 
         case WOLFCLU_ASN1_B64:
-            if (Base64_Decode(*inputFileBuffer, *inputFileLen,
-                *inputFileBuffer, inputFileLen) != 0) {
+            if (Base64_Decode(*inputFileBuffer, *inputFileLen, *inputFileBuffer,
+                              inputFileLen) != 0) {
                 wolfCLU_LogError("input is not base64 encoded");
                 ret = WOLFCLU_FATAL_ERROR;
             }
@@ -602,26 +612,29 @@ static int HandleProcessing(const WOLFCLU_ASN1_PARSE_OPTIONS* po,
 
     return ret;
 }
-
-#endif
-
+#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM) */
 
 /* Performs the ASN.1 operation described by parseOptions: decodes the input
  * (DER, base64 or PEM), applies the offset/length/string-parse selections, and
  * writes the formatted structure to the configured output target(s).
  * Returns WOLFCLU_SUCCESS on success. */
-int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS* po)
+int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS *po)
 {
 #if defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM)
     int ret = WOLFCLU_SUCCESS;
-    byte* inputFileBuffer = NULL;
+    byte *inputFileBuffer = NULL;
     word32 inputFileLen = 0;
-    po->nameCb = OidToNameCallback;
-    Asn1 asn1Master = {0};
+    Asn1 asn1Master = { 0 };
+
+    if (po == NULL)
+        return USER_INPUT_ERROR;
 
     if (po->oidFile != NULL) {
-        ret = WOLFCLU_OID_TO_NAME_initWFile(&AdditionalOidNames, po->oidFile);
+        ret = WOLFCLU_OID_TO_NAME_initWFile(&asn1parse_AdditionalOidNames,
+                                            po->oidFile);
     }
+
+    po->nameCb = OidToNameCallback;
 
     if (ret == WOLFCLU_SUCCESS && po->noOut && po->outputFile == NULL) {
         ret = WOLFCLU_FATAL_ERROR;
@@ -629,8 +642,8 @@ int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS* po)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wc_Asn1_Init(&asn1Master) == 0 ?
-            WOLFCLU_SUCCESS : WOLFCLU_FATAL_ERROR;
+        ret = wc_Asn1_Init(&asn1Master) == 0 ? WOLFCLU_SUCCESS
+                                             : WOLFCLU_FATAL_ERROR;
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -640,8 +653,8 @@ int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS* po)
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            if (asn1_ReadFile(po->inputFile, &inputFileBuffer,
-                &inputFileLen) < 0){
+            if (asn1_ReadFile(po->inputFile, &inputFileBuffer, &inputFileLen) <
+                0) {
                 ret = WOLFCLU_FATAL_ERROR;
                 wolfCLU_LogError("Could not open input file");
             }
@@ -659,7 +672,7 @@ int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS* po)
     if (inputFileBuffer != NULL) {
         XFREE(inputFileBuffer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
-    WOLFCLU_OID_TO_NAME_free(&AdditionalOidNames);
+    WOLFCLU_OID_TO_NAME_free(&asn1parse_AdditionalOidNames);
     return ret;
 #else
 #if !defined(WOLFSSL_ASN_PRINT)
@@ -669,6 +682,5 @@ int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS* po)
     wolfCLU_LogError("NO_FILESYSTEM option is set. Cannot Parse Asn1.");
 #endif
     return WOLFCLU_FATAL_ERROR;
-#endif
+#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM) */
 }
-

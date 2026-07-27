@@ -22,7 +22,9 @@ jobs:
           - '--enable-wolfclu --enable-experimental --enable-dilithium'
           - '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium'
           - '--enable-all'
+
         sanitize: ['CC="cc -fsanitize=address" CFLAGS="-g"']
+
         include:
           - os: ubuntu-latest
             config: '--enable-wolfclu'
