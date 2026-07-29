@@ -1,7 +1,5 @@
-clu_src/stamp*
 libtool
 wolfssl_clu-config
-clu_src/config.h
 Makefile
 Makefile.in
 aclocal.m4

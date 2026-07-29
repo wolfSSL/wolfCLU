@@ -184,8 +184,9 @@ def truncate_sparse(fileobj, size):
 def config_defines():
     """Return the set of macros defined in the generated src/config.h.
 
-    Some features are compile-time options (e.g. --enable-oid-table sets
-    HAVE_OID_TABLE) with no runtime flag to query, so tests that exercise
+    Some features are compile-time options (e.g. the OID name table sets
+    HAVE_OID_TABLE unless --disable-oid-table) with no runtime flag to
+    query, so tests that exercise
     those paths need to read the build configuration.  config.h lives in the
     build directory, which differs from the source tree under distcheck;
     honour WOLFCLU_BUILDDIR, then fall back to the current working directory
