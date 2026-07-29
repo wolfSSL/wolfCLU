@@ -10,7 +10,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import (
     CERTS_DIR,
-    config_defines,
+    have_oid_table,
     run_wolfssl,
     test_main,
     truncate_sparse,
@@ -34,10 +34,9 @@ def oid_encoding_supported():
     -oid relies on wc_EncodeObjectId, which is compiled out via
     NO_WC_ENCODE_OBJECT_ID for libwolfssl <= 5.9.2 (set in configure.ac).
     In that build -oid reports a fatal error instead of encoding anything.
-    The flag is a -D in AM_CFLAGS rather than a config.h define, so it cannot
-    be read via config_defines(); probe the binary directly instead.  A
-    nonexistent file is enough: the disabled path errors during argument
-    handling before the file is ever opened.
+    The flag is a -D in AM_CFLAGS, so probe the binary for the behaviour
+    instead.  A nonexistent file is enough: the disabled path errors during
+    argument handling before the file is ever opened.
     """
     result = run_wolfssl("asn1parse", "-oid", "asn1-oid-probe.nonexistent")
     return _NO_OID_ENCODE_MSG not in (result.stdout + result.stderr)
@@ -268,7 +267,7 @@ class TestBasicFunctions(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("MyArc2Oid", result.stdout)
 
-    @unittest.skipUnless("HAVE_OID_TABLE" in config_defines(),
+    @unittest.skipUnless(have_oid_table(),
                          "built with --disable-oid-table")
     def test_builtin_oid_table(self):
         """The built-in OID table resolves an OID with no -oid file supplied.
