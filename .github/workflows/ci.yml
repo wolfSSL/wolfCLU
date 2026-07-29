@@ -24,6 +24,13 @@ jobs:
           - '--enable-all'
 
         sanitize: ['CC="cc -fsanitize=address" CFLAGS="-g"']
+        # Single-valued on purpose: --disable-oid-table only affects wolfCLU's
+        # own compilation, so sweeping it across every wolfSSL config would
+        # rebuild wolfSSL 12 extra times to test the same code.  It gets one
+        # dedicated job via include below.  Keeping the key here (rather than
+        # omitting it) means that include entry overwrites an original matrix
+        # value, so it adds a job instead of mutating an existing one.
+        wolfCLUOpts: ['']
 
         include:
           - os: ubuntu-latest
@@ -33,7 +40,17 @@ jobs:
             config: '--enable-wolfclu'
             sanitize: ''
 
-    name: ${{ matrix.os }} ${{ matrix.sanitize && 'ASAN' || '' }} (${{ matrix.config }})
+          - os: ubuntu-latest
+            config: '--enable-wolfclu'
+            sanitize: 'CC="cc -fsanitize=address"'
+            wolfCLUOpts: '--disable-oid-table'
+
+          - os: macos-latest
+            config: '--enable-wolfclu'
+            sanitize: 'CC="cc -fsanitize=address"'
+            wolfCLUOpts: '--disable-oid-table'
+
+    name: ${{ matrix.os }} ${{ matrix.sanitize && 'ASAN' || '' }} (${{ matrix.config }})${{ matrix.wolfCLUOpts && format(' [{0}]', matrix.wolfCLUOpts) || '' }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
 
@@ -75,7 +92,8 @@ jobs:
         working-directory: ./wolfclu
         run: |
           ./autogen.sh
-          ./configure ${{ matrix.sanitize }} --with-wolfssl=$GITHUB_WORKSPACE/build-dir
+          ./configure ${{ matrix.wolfCLUOpts }} ${{ matrix.sanitize }} \
+              --with-wolfssl=$GITHUB_WORKSPACE/build-dir
           make -j
 
       - name: Run tests

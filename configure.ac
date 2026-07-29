@@ -96,16 +96,17 @@ AC_ARG_ENABLE([manpages],
 AM_CONDITIONAL([ENABLE_MANPAGES], [test "x$ENABLED_MANPAGES" != "xno"])
 
 # OID Name Table Build
-ENABLED_OIDTABLE_DEFAULT=no
+ENABLED_OIDTABLE_DEFAULT=yes
 AC_ARG_ENABLE([oid-table],
-    [AS_HELP_STRING([--enable-oid-table],[Enable OID-to-name lookup table (default: disabled)])],
+    [AS_HELP_STRING([--disable-oid-table],[Disable OID-to-name lookup table (default: enabled)])],
     [ ENABLED_OIDTABLE=$enableval ],
     [ ENABLED_OIDTABLE=$ENABLED_OIDTABLE_DEFAULT ]
     )
 
-if test "$ENABLED_OIDTABLE" = "yes"
+if test "x$ENABLED_OIDTABLE" != "xno"
 then
-    AM_CFLAGS="$AM_CFLAGS -DHAVE_OID_TABLE"
+    AC_DEFINE([HAVE_OID_TABLE], [1],
+              [Enable OID-to-name lookup table])
 fi
 
 

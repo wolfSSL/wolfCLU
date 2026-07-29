@@ -33,7 +33,7 @@
 #include <wolfssl/wolfcrypt/types.h>
 #include <wolfssl/wolfcrypt/wc_port.h>
 
-#if defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM)
+#if defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM)
 
 static int Asn1Print(Asn1 *asn1, const WOLFCLU_ASN1_PARSE_OPTIONS *opts)
 {
@@ -612,7 +612,7 @@ static int HandleProcessing(const WOLFCLU_ASN1_PARSE_OPTIONS *po,
 
     return ret;
 }
-#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM) */
+#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM) */
 
 /* Performs the ASN.1 operation described by parseOptions: decodes the input
  * (DER, base64 or PEM), applies the offset/length/string-parse selections, and
@@ -620,7 +620,7 @@ static int HandleProcessing(const WOLFCLU_ASN1_PARSE_OPTIONS *po,
  * Returns WOLFCLU_SUCCESS on success. */
 int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS *po)
 {
-#if defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM)
+#if defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM)
     int ret = WOLFCLU_SUCCESS;
     byte *inputFileBuffer = NULL;
     word32 inputFileLen = 0;
@@ -678,9 +678,9 @@ int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS *po)
 #if !defined(WOLFSSL_ASN_PRINT)
     wolfCLU_LogError("WOLFSSL_ASN_PRINT option not set. Cannot Parse Asn1.");
 #endif
-#if defined(NO_FILESYSTEM)
+#if defined(WOLFCLU_NO_FILESYSTEM)
     wolfCLU_LogError("NO_FILESYSTEM option is set. Cannot Parse Asn1.");
 #endif
     return WOLFCLU_FATAL_ERROR;
-#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM) */
+#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM) */
 }

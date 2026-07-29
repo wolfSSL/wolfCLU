@@ -269,12 +269,12 @@ class TestBasicFunctions(unittest.TestCase):
         self.assertIn("MyArc2Oid", result.stdout)
 
     @unittest.skipUnless("HAVE_OID_TABLE" in config_defines(),
-                         "built without --enable-oid-table")
+                         "built with --disable-oid-table")
     def test_builtin_oid_table(self):
         """The built-in OID table resolves an OID with no -oid file supplied.
 
         Exercises the second loop in OidToNameCallback (the static
-        oid_name_table), which is only compiled with --enable-oid-table.
+        oid_name_table), which is not compiled with --disable-oid-table.
         2.16.840.1.114171.500.9 ("Wells Fargo EV policy") is in the table but
         not otherwise known to wolfSSL, so the callback is consulted and the
         table name must be printed without any -oid mapping.

@@ -27,7 +27,7 @@
 #include <wolfclu/asn1/clu_asn1.h>
 
 
-#if defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM)
+#if defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM)
 
 static const struct option asn1_options[] = {
     { "-oid", required_argument, 0, WOLFCLU_OID },
@@ -51,9 +51,9 @@ static void wolfCLU_Asn1Help(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-help                Display this text");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-oid <infile>        File of extra oid "
                             "definitions");
-    wolfCLU_Log(WOLFCLU_L0, "\t                     To use built in Oid Table "
-                            "configure with:");
-    wolfCLU_Log(WOLFCLU_L0, "\t                     --enable-oid-table");
+    wolfCLU_Log(WOLFCLU_L0, "\t                     The built in Oid Table is "
+                            "on unless configured");
+    wolfCLU_Log(WOLFCLU_L0, "\t                     with: --disable-oid-table");
 
     WOLFCLU_LOG(WOLFCLU_L0, "\nI/O Options:");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inform <file type>  Input file format "
@@ -238,12 +238,12 @@ static int checkInForm(char *inform, word8 *inform_id_out)
     }
     return ret;
 }
-#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM) */
+#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM) */
 
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_Asn1Setup(int argc, char *argv[])
 {
-#if defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM)
+#if defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM)
     int ret = WOLFCLU_SUCCESS;
     int option;
     int longIndex = 1;
@@ -338,9 +338,9 @@ int wolfCLU_Asn1Setup(int argc, char *argv[])
 #if !defined(WOLFSSL_ASN_PRINT)
     wolfCLU_LogError("WOLFSSL_ASN_PRINT option not set. Cannot parse Asn1.");
 #endif /* !defined(WOLFSSL_ASN_PRINT) */
-#if defined(NO_FILESYSTEM)
-    wolfCLU_LogError("NO_FILESYSTEM option is set. Cannot parse Asn1.");
-#endif /* defined(NO_FILESYSTEM) */
+#if defined(WOLFCLU_NO_FILESYSTEM)
+    wolfCLU_LogError("WOLFCLU_NO_FILESYSTEM option is set. Cannot parse Asn1.");
+#endif /* defined(WOLFCLU_NO_FILESYSTEM) */
     return WOLFCLU_FATAL_ERROR;
-#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(NO_FILESYSTEM) */
+#endif /* defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM) */
 }
