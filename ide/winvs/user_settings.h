@@ -57,4 +57,6 @@
 #define HAVE_OCSP
 #define HAVE_OCSP_RESPONDER
 
+#define HAVE_OID_TABLE
+
 #endif /* _WIN_USER_SETTINGS_H_ */

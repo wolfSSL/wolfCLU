@@ -38,7 +38,7 @@
 #endif
 
 typedef struct WOLFCLU_ASN1_PARSE_OPTIONS
-#if !defined(NO_FILESYSTEM) && defined(WOLFSSL_ASN_PRINT)
+#if !defined(WOLFCLU_NO_FILESYSTEM) && defined(WOLFSSL_ASN_PRINT)
 {
     XFILE  inputFile;
     XFILE  outputFile;

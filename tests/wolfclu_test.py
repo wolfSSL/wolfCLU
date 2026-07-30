@@ -89,31 +89,26 @@ def run_wolfssl(*args, stdin_data=None, timeout=60):
     return subprocess.run(cmd, **kwargs)
 
 
-# A bare OBJECT IDENTIFIER (06 05 02 82 06 01 0a == 0.2.262.1.10) used to probe
-# for the built-in OID table.  The OID is the first entry of oid_name_table in
-# wolfclu/asn1/clu_oid_name_table.h and is not one wolfSSL knows internally, so
-# the table's name for it is printed only when the table is compiled in.
-_OID_TABLE_PROBE_DER = bytes([0x06, 0x05, 0x02, 0x82, 0x06, 0x01, 0x0a])
-_OID_TABLE_PROBE_NAME = "Telesec"
-
 
 def have_oid_table():
     """True when the build includes the built-in OID-to-name table.
-
-    The table is a compile-time option (HAVE_OID_TABLE, compiled out by
-    --disable-oid-table) with no runtime flag to query, so probe the binary
-    for the behaviour itself: asn1parse a lone OBJECT IDENTIFIER that the
-    table names and check whether that name is printed.  Without the table the
-    OID prints in dotted-decimal form instead.  Uses a different table entry
-    than the OID-table tests assert on, so those tests still fail rather than
-    silently skip if the table stops resolving.
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        der = os.path.join(tmpdir, "oid-table-probe.der")
-        with open(der, "wb") as f:
-            f.write(_OID_TABLE_PROBE_DER)
-        result = run_wolfssl("asn1parse", "-inform", "DER", "-in", der)
-    return _OID_TABLE_PROBE_NAME in result.stdout
+    # The string you want to look for
+    table_entry = "Security Communication (SECOM) EV policy"
+
+    # Convert the text string into bytes (usually UTF-8 or ASCII)
+    table_entry_bytes = table_entry.encode('utf-8')
+
+    with open(WOLFSSL_BIN, 'rb') as file:
+        file_content = file.read()
+
+        # Find the starting byte position
+        position = file_content.find(table_entry_bytes)
+
+        if position != -1:
+            return 1
+        else:
+            return 0
 
 
 def is_fips():

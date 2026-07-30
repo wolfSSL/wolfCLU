@@ -41,7 +41,7 @@ typedef struct WOLFCLU_OID_TO_NAME{
     word32 cap;
 }WOLFCLU_OID_TO_NAME;
 
-#if defined(HAVE_OID_TABLE) && !defined(NO_FILESYSTEM) && \
+#if defined(HAVE_OID_TABLE) && !defined(WOLFCLU_NO_FILESYSTEM) && \
     defined(WOLFSSL_ASN_PRINT)
 /* taken from examples/asn1/oid_names.h in wolfssl */
 static const OidName oid_name_table[] = {
@@ -5589,7 +5589,7 @@ static const word32 oid_names_len =
 static const OidName oid_name_table[1] = {0};
 static const word32 oid_names_len = 0;
 
-#endif /* defined(HAVE_OID_TABLE) && !defined(NO_FILESYSTEM) &&
+#endif /* defined(HAVE_OID_TABLE) && !defined(WOLFCLU_NO_FILESYSTEM) &&
     defined(WOLFSSL_ASN_PRINT) */
 
 #endif /* CLU_OID_NAME_TABLE_H */

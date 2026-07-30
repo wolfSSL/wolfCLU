@@ -72,9 +72,10 @@ wolfssl asn1parse -in cert.pem -inform PEM -dump
 .SH SEE ALSO
 .BR wolfssl-x509(1) ", " wolfssl-req(1)
 .SH NOTES
-Available only when wolfSSL is built with WOLFSSL_ASN_PRINT and without
-NO_FILESYSTEM. The -oid option additionally requires object id encoding
-support (NO_WC_ENCODE_OBJECT_ID must not be defined).
+Available only when wolfSSL is built with WOLFSSL_ASN_PRINT and wolfCLU is
+built with filesystem support (not WOLFCLU_NO_FILESYSTEM). The -oid option
+additionally requires object id encoding support (NO_WC_ENCODE_OBJECT_ID
+must not be defined).
 .SH BUGS
 No known bugs at this time.
 .SH AUTHOR
