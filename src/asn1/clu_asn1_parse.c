@@ -679,7 +679,7 @@ int wolfCLU_Asn1Parse(WOLFCLU_ASN1_PARSE_OPTIONS *po)
     wolfCLU_LogError("WOLFSSL_ASN_PRINT option not set. Cannot Parse Asn1.");
 #endif
 #if defined(WOLFCLU_NO_FILESYSTEM)
-    wolfCLU_LogError("NO_FILESYSTEM option is set. Cannot Parse Asn1.");
+    wolfCLU_LogError("WOLFCLU_NO_FILESYSTEM option is set. Cannot Parse Asn1.");
 #endif
     return WOLFCLU_FATAL_ERROR;
 #endif /* defined(WOLFSSL_ASN_PRINT) && !defined(WOLFCLU_NO_FILESYSTEM) */
