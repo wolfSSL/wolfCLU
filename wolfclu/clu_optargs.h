@@ -1,6 +1,6 @@
 /* clu_optargs.h
  *
- * Copyright (C) 2006-2025 wolfSSL Inc.
+ * Copyright (C) 2006-2026 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -68,6 +68,7 @@ enum {
     WOLFCLU_READY_FILE,
     WOLFCLU_CHECK_CRL,
     WOLFCLU_PARTIAL_CHAIN,
+    WOLFCLU_LEGACY_CA,
     WOLFCLU_PASSWORD,
     WOLFCLU_PASSWORD_OUT,
     WOLFCLU_PASSWORD_SOURCE,

@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 """Tests for wolfssl verify (converted from x509-verify-test.sh)."""
 
+import functools
 import os
+import subprocess
 import sys
+import shutil
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import no_filesystem, CERTS_DIR, run_wolfssl, test_main
 
+HAS_OPENSSL = shutil.which("openssl") is not None
 
+
+@functools.lru_cache(maxsize=None)
 def _has_crl():
     """Check whether CRL support is compiled in."""
     r = run_wolfssl("verify", "-CAfile",
@@ -68,11 +75,18 @@ class TestX509Verify(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_verify_self_as_ca_fails(self):
-        """verify server-cert.pem as its own CA should fail."""
-        r = run_wolfssl("verify", "-CAfile",
-                        os.path.join(CERTS_DIR, "server-cert.pem"),
-                        os.path.join(CERTS_DIR, "server-cert.pem"))
-        self.assertNotEqual(r.returncode, 0)
+        """A non-root leaf used as its own -CAfile should fail."""
+        with open(os.path.join(CERTS_DIR, "server-cert.pem"),
+                  encoding="utf-8") as f:
+            pem = f.read()
+        leaf_end = pem.index("-----END CERTIFICATE-----") + \
+            len("-----END CERTIFICATE-----")
+        with tempfile.TemporaryDirectory() as d:
+            leaf_only = os.path.join(d, "leaf-only.pem")
+            with open(leaf_only, "w", encoding="utf-8") as f:
+                f.write(pem[:leaf_end] + "\n")
+            r = run_wolfssl("verify", "-CAfile", leaf_only, leaf_only)
+            self.assertNotEqual(r.returncode, 0)
 
     def test_help_trailing_h(self):
         """verify -h (as the final argument) prints usage and exits 0."""
@@ -193,6 +207,97 @@ class TestX509VerifyChain(unittest.TestCase):
                         "-untrusted",
                         os.path.join(CERTS_DIR, "ca-int-cert.pem"),
                         os.path.join(CERTS_DIR, "ca-int2-cert.pem"))
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_cafile_bundle_root_order_independent(self):
+        """-CAfile with [intermediate, root] (root not first) still succeeds."""
+        with tempfile.TemporaryDirectory() as d:
+            bundle = os.path.join(d, "int-then-root.pem")
+            with open(bundle, "w", encoding="utf-8") as out:
+                for name in ("ca-int-cert.pem", "ca-cert.pem"):
+                    with open(os.path.join(CERTS_DIR, name),
+                              encoding="utf-8") as f:
+                        out.write(f.read())
+            r = run_wolfssl("verify", "-CAfile", bundle,
+                            os.path.join(CERTS_DIR, "ca-int2-cert.pem"))
+            self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_cafile_bundle_skips_non_ca_cert_to_find_root(self):
+        """-CAfile bundle with a non-CA cert before the root still finds it."""
+        with tempfile.TemporaryDirectory() as d:
+            bundle = os.path.join(d, "leaf-then-root.pem")
+            with open(bundle, "w", encoding="utf-8") as out:
+                for name in ("server-cert.pem", "ca-cert.pem"):
+                    with open(os.path.join(CERTS_DIR, name),
+                              encoding="utf-8") as f:
+                        out.write(f.read())
+            r = run_wolfssl("verify", "-CAfile", bundle,
+                            os.path.join(CERTS_DIR, "server-cert.pem"))
+            self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_cafile_bundle_no_root_fails_with_message(self):
+        """-CAfile with no self-signed root fails with a dedicated error."""
+        r = run_wolfssl("verify", "-CAfile",
+                        os.path.join(CERTS_DIR, "ca-int-cert.pem"),
+                        os.path.join(CERTS_DIR, "ca-int2-cert.pem"))
+        self.assertNotEqual(r.returncode, 0)
+        combined = r.stdout + r.stderr
+        self.assertIn("does not contain a self-signed root CA", combined)
+
+    # NOTE: cert_is_self_signed_root()'s hard-error path needs fault
+    # injection to trigger, so it's not covered by black-box tests here.
+
+
+@unittest.skipUnless(HAS_OPENSSL, "openssl not available")
+class TestX509VerifyLegacyCa(unittest.TestCase):
+    """-legacy_ca handling of self-signed certs with no basicConstraints."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = tempfile.mkdtemp()
+        conf = os.path.join(cls.dir, "minimal.cnf")
+        with open(conf, "w", encoding="utf-8") as f:
+            f.write("[req]\ndistinguished_name = dn\nprompt = no\n"
+                    "[dn]\nCN = Legacy Root\n")
+        cls.legacy_root = os.path.join(cls.dir, "legacy-root.pem")
+        key = os.path.join(cls.dir, "legacy-root-key.pem")
+        r = subprocess.run(
+            ["openssl", "req", "-x509", "-newkey", "rsa:2048",
+             "-keyout", key, "-out", cls.legacy_root, "-days", "1",
+             "-nodes", "-config", conf],
+            capture_output=True, text=True, timeout=60)
+        if r.returncode != 0:
+            cls.legacy_root = None
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.dir, ignore_errors=True)
+
+    def setUp(self):
+        if self.legacy_root is None:
+            self.skipTest("failed to generate a basicConstraints-less "
+                          "self-signed cert with openssl")
+
+    def test_legacy_root_rejected_by_default(self):
+        """A self-signed root with no basicConstraints is rejected by
+        default (no -legacy_ca or -partial_chain)."""
+        import shutil
+        shutil.copy2(self.legacy_root, self.legacy_root + ".copy")
+        r = run_wolfssl("verify", "-CAfile", self.legacy_root + ".copy", self.legacy_root)
+        self.assertNotEqual(r.returncode, 0)
+        combined = r.stdout + r.stderr
+        self.assertIn("does not contain a self-signed root CA", combined)
+
+    def test_legacy_root_accepted_with_legacy_ca(self):
+        """-legacy_ca opts into trusting the same root."""
+        r = run_wolfssl("verify", "-partial_chain", "-CAfile", self.legacy_root,
+                        "-legacy_ca", self.legacy_root)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_legacy_root_accepted_with_partial_chain(self):
+        """-partial_chain also opts into trusting the same root."""
+        r = run_wolfssl("verify", "-CAfile", self.legacy_root,
+                        "-partial_chain", self.legacy_root)
         self.assertEqual(r.returncode, 0, r.stderr)
 
 

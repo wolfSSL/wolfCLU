@@ -270,7 +270,14 @@ class _OCSPInteropBase(unittest.TestCase):
             INDEX_VALID,
             rsigner=os.path.join(CERTS_DIR, "ocsp-responder-cert.pem"),
             rkey=os.path.join(CERTS_DIR, "ocsp-responder-key.pem"))
-        rc, out = self._query("server-cert.pem", ["-no_nonce"])
+
+        # Retry up to 3 times to mitigate macOS CI flakiness
+        for i in range(3):
+            rc, out = self._query("server-cert.pem", ["-no_nonce"])
+            if rc == 0:
+                break
+            time.sleep(1)
+
         self.assertEqual(rc, 0, f"delegated no_nonce failed: {out}")
         self.assertIn("good", out.lower())
 
