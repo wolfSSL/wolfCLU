@@ -96,7 +96,9 @@ static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
         }
 
         if (der != NULL) {
-            wolfCLU_ForceZero(der, derSz);
+            if (derSz > 0) {
+                wolfCLU_ForceZero(der, derSz);
+            }
             XFREE(der, NULL, DYNAMIC_TYPE_OPENSSL);
         }
     }
@@ -426,7 +428,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     WOLFSSL_EVP_PKEY *pkey = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
-    char *outPath = NULL;
+    const char *outPath = NULL;
 
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "", pkey_options,
@@ -515,6 +517,14 @@ int wolfCLU_pKeySetup(int argc, char** argv)
         if (pkey == NULL) {
             wolfCLU_LogError("Error reading key from file");
             ret = USER_INPUT_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        /* bio holds secret material exactly when pubOut is false */
+        bioOut = wolfCLU_OpenOutOrKeyFileBio(outPath, !pubOut);
+        if (bioOut == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 

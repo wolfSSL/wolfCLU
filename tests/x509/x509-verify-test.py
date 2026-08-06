@@ -114,11 +114,9 @@ class TestX509Verify(unittest.TestCase):
         self.assertIn("Malformed argument", r.stdout + r.stderr)
 
     def test_partial_chain_no_cafile_no_crash(self):
-        """-partial_chain with -untrusted but no -CAfile must not crash.
-
-        caCert is NULL in this path; the malformed-argument check must
-        tolerate that rather than dereferencing it.
-        """
+        """-partial_chain with -untrusted but no -CAfile must not crash:
+        caCert is NULL here, and the malformed-argument check must
+        tolerate that rather than dereference it."""
         r = run_wolfssl("verify", "-partial_chain",
                         "-untrusted", os.path.join(CERTS_DIR, "server-cert.pem"),
                         os.path.join(CERTS_DIR, "server-cert.pem"))

@@ -109,6 +109,56 @@ class DgstVerifyTest(unittest.TestCase):
                                 "-signature", sig_file, input_file)
                 self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_verify_stdin_data_with_existing_signature_file(self):
+        """A trailing -signature file must not be misread as the positional
+        data file just because it exists on disk; with none given, data
+        must still come from stdin."""
+        sig_file = "dgst-stdin-verify-test.sig"
+        self.addCleanup(lambda: os.remove(sig_file)
+                        if os.path.exists(sig_file) else None)
+        data = "stdin verify regression test data"
+
+        r = run_wolfssl("dgst", "-sha256", "-sign",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", sig_file, stdin_data=data)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("dgst", "-sha256", "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", sig_file, stdin_data=data)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_trailing_token_matching_option_name_is_treated_as_flag(self):
+        """A trailing token that names a known option (e.g. a file called
+        "-sha256") is always parsed as that option, never as positional
+        data, even if a same-named file exists on disk; data must fall
+        back to stdin instead."""
+        real_content = "ground truth data for the -sha256 filename test"
+        decoy_file_content = "decoy on-disk data that must NOT be hashed"
+
+        normal_named_file = "dgst-option-collision-src.txt"
+        collision_named_file = "-sha256"
+        sig_file = "dgst-option-collision-test.sig"
+        for f in (normal_named_file, collision_named_file, sig_file):
+            self.addCleanup(lambda p=f: os.remove(p)
+                            if os.path.exists(p) else None)
+
+        with open(normal_named_file, "w", encoding="utf-8") as f:
+            f.write(real_content)
+        with open(collision_named_file, "w", encoding="utf-8") as f:
+            f.write(decoy_file_content)
+
+        r = run_wolfssl("dgst", "-sha256", "-sign",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", sig_file, normal_named_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("dgst", "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", sig_file, collision_named_file,
+                        stdin_data=real_content)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_dgst_out_roundtrip(self):
         """dgst -out creates the signature file; -signature round-trips."""
         sig_file = "dgst-out-test.sig"
@@ -129,14 +179,8 @@ class DgstVerifyTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_missing_data_file_detected(self):
-        """Omitting the trailing data file must be detected, not misread.
-
-        clu_dgst_setup.c passes argc-1 to wolfCLU_GetOpt so the trailing
-        data file is excluded from option scanning, then checks whether the
-        last option consumed it as a value. With the data file absent here,
-        the .sig path is the trailing argument and the malformed-argument
-        check must reject the invocation rather than hashing the .sig file.
-        """
+        """Omitting the trailing data file must be rejected, not hash the
+        .sig path as if it were the data."""
         r = run_wolfssl("dgst", "-sha256", "-verify",
                         os.path.join(CERTS_DIR, "server-keyPub.pem"),
                         "-signature", os.path.join(DGST_DIR, "sha256-rsa.sig"))
@@ -174,8 +218,9 @@ class DgstLargeFileTest(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        for f in [cls.LARGE_FILE, "large-test.txt.enc", "large-test.txt.dec",
-                  "5000-server-key.sig"]:
+        # "5000-server-key.sig" excluded: it's a checked-in fixture for
+        # test_verify_large_file, not test output.
+        for f in [cls.LARGE_FILE, "large-test.txt.enc", "large-test.txt.dec"]:
             if os.path.exists(f):
                 os.remove(f)
 
@@ -188,7 +233,9 @@ class DgstLargeFileTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_sign_and_verify_large_file(self):
-        sig_file = "5000-server-key.sig"
+        # Must not collide with the checked-in "5000-server-key.sig"
+        # fixture that test_verify_large_file reads.
+        sig_file = "5000-server-key-roundtrip.sig"
         self.addCleanup(lambda: os.remove(sig_file)
                         if os.path.exists(sig_file) else None)
 
@@ -389,15 +436,9 @@ class DgstSignVerifyRoundtripTest(unittest.TestCase):
 
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstHmacTest(unittest.TestCase):
-    """HMAC test vectors for `dgst -mac HMAC`.
-
-    Mirrors the wolfCrypt hmac_*_test functions in
-    wolfssl/wolfcrypt/test/test.c. The hex-key vectors come from RFC 4231
-    Test Case 1 (a 20-byte 0x0b key over "Hi There"). The plaintext-key
-    vectors use a 16-byte key over 50 bytes of 0xdd, generated with OpenSSL
-    and confirmed with wolfSSL. Both keys are at or above the FIPS minimum
-    HMAC key length (112 bits), so these run under FIPS too.
-    """
+    """HMAC test vectors for `dgst -mac HMAC` (RFC 4231 Test Case 1 hex key;
+    OpenSSL-generated plaintext key). Both keys meet the FIPS HMAC minimum
+    (112 bits), so these run under FIPS too."""
 
     HEXKEY = "hexkey:0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
     HEXKEY_DATA = "Hi There"
@@ -416,8 +457,8 @@ class DgstHmacTest(unittest.TestCase):
                   "be9d914eeb61f1702e696c203a126854")
         }
 
-    # Plaintext 16-byte key (>= FIPS minimum) over 50 bytes of 0xdd. The
-    # expected values were generated with OpenSSL and confirmed with wolfSSL.
+    # Plaintext key (>= FIPS minimum); vectors below were generated with
+    # OpenSSL and confirmed with wolfSSL.
     KEY = "key:thisisthelongkey"
     DATA = b"\xdd" * 50
 
@@ -470,8 +511,7 @@ class DgstHmacTest(unittest.TestCase):
 
     def test_hmac_wrong_key(self):
         """A different key must not produce the reference HMAC."""
-         # Use a different 20-byte key (FIPS-valid length) than the reference
-         # plaintext key used to generate VECTORS.
+        # Different 20-byte (FIPS-valid) key than the one used for VECTORS.
         r = run_wolfssl("dgst", "-sha256", "-hmac",
                         "-mackey", "hexkey:" + "bb" * 20, self.data_file)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -492,9 +532,8 @@ class DgstHmacTest(unittest.TestCase):
 
     def test_hmac_plaintext_key_with_colon(self):
         """A plaintext key containing ':' is used verbatim, not truncated."""
-        # Both keys are >= the FIPS minimum length so this runs under FIPS.
-        # "key:aaaaaaaaaaaaaa:bb" -> the HMAC key is "aaaaaaaaaaaaaa:bb",
-        # not just "aaaaaaaaaaaaaa".
+        # "key:aaaaaaaaaaaaaa:bb" -> key is "aaaaaaaaaaaaaa:bb", not
+        # truncated at the colon; both keys meet the FIPS HMAC minimum.
         r_full = run_wolfssl("dgst", "-sha256", "-hmac",
                              "-mackey", "key:aaaaaaaaaaaaaa:bb", self.data_file)
         self.assertEqual(r_full.returncode, 0, r_full.stderr)
@@ -531,6 +570,31 @@ class DgstHmacTest(unittest.TestCase):
         """-mac HMAC with no hash flag must fail (no default hash)."""
         r = run_wolfssl("dgst", "-hmac",
                         "-mackey", self.KEY, self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_with_verify_flag_rejected(self):
+        """-hmac combined with -verify must fail, not silently ignore -verify."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", self.KEY, "-verify",
+                        os.path.join(CERTS_DIR, "server-keyPub.pem"),
+                        "-signature", os.path.join(DGST_DIR, "sha256-rsa.sig"),
+                        self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_with_sign_flag_rejected(self):
+        """-hmac combined with -sign must fail, not silently ignore -sign."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", self.KEY, "-sign",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        self.data_file)
+        self.assertNotEqual(r.returncode, 0)
+
+    def test_hmac_with_bare_signature_flag_rejected(self):
+        """-hmac combined with bare -signature (no -verify) must fail."""
+        r = run_wolfssl("dgst", "-sha256", "-hmac",
+                        "-mackey", self.KEY, "-signature",
+                        os.path.join(DGST_DIR, "sha256-rsa.sig"),
+                        self.data_file)
         self.assertNotEqual(r.returncode, 0)
 
 

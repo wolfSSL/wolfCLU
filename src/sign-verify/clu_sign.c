@@ -25,9 +25,8 @@
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/genkey/clu_genkey.h>  /* for xmss callback functions */
 
-#include <limits.h>
-
-/* Upper bound on DER size out of wolfCLU_KeyPemToDer, covering all key types. */
+/* Upper bound on DER size out of wolfCLU_KeyPemToDer, covering all key
+ * types. */
 #ifndef WOLFCLU_MAX_KEY_PEM_DER_SZ
 #define WOLFCLU_MAX_KEY_PEM_DER_SZ 65536
 #endif /* WOLFCLU_MAX_KEY_PEM_DER_SZ */
@@ -113,46 +112,58 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
     return ret;
 }
 
+/* Treats ASN_NO_PEM_HEADER as "already DER" (returns 0, buffer untouched)
+ * instead of an error, logging either way. Returns the new positive size on a
+ * successful conversion. Deliberately not exported: two entry points for the
+ * same operation with different return conventions is a trap, so callers use
+ * wolfCLU_KeyPemToDerFallback_ex() below. */
+static int wolfCLU_KeyPemToDerFallback(unsigned char** pkeyBuf, int pkeySz,
+        int pubIn)
+{
+    int ret = wolfCLU_KeyPemToDer(pkeyBuf, pkeySz, pubIn);
+
+    if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
+        WOLFCLU_LOG(WOLFCLU_L0, "No PEM header found, treating as DER.");
+        ret = 0;
+    }
+    else if (ret < 0) {
+        wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+    }
+
+    return ret;
+}
+
+/* Prefer at call sites: 0 on success, updates *pkeySz when converted. */
+int wolfCLU_KeyPemToDerFallback_ex(unsigned char** pkeyBuf, int* pkeySz,
+        int pubIn)
+{
+    int ret;
+
+    if (pkeyBuf == NULL || pkeySz == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    ret = wolfCLU_KeyPemToDerFallback(pkeyBuf, *pkeySz, pubIn);
+    if (ret < 0) {
+        return ret;
+    }
+    if (ret > 0) {
+        *pkeySz = ret;
+    }
+    return 0;
+}
+
 int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
                       int inForm)
 {
     int ret;
     int fSz;
-    long fTell;
-    XFILE f;
     byte *data = NULL;
 
-    f = XFOPEN(in, "rb");
-    if (f == NULL) {
-        wolfCLU_LogError("unable to open file %s", in);
-        return BAD_FUNC_ARG;
-    }
-    if (XFSEEK(f, 0, SEEK_END) != 0) {
-        wolfCLU_LogError("Failed to seek to end of file.");
-        XFCLOSE(f);
+    if (wolfCLU_ReadFileToBuffer(in, WOLFCLU_MAX_FILE_SIZE, &data, &fSz) !=
+            WOLFCLU_SUCCESS) {
         return WOLFCLU_FATAL_ERROR;
     }
-    fTell = XFTELL(f);
-    if (fTell <= 0 || fTell > INT_MAX) {
-        wolfCLU_LogError("Incorrect input file size: %ld", fTell);
-        XFCLOSE(f);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    fSz = (int)fTell;
-
-    data = (byte*)XMALLOC((size_t)fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (data == NULL) {
-        XFCLOSE(f);
-        return MEMORY_E;
-    }
-
-    if (XFSEEK(f, 0, SEEK_SET) != 0 ||
-            XFREAD(data, 1, (size_t)fSz, f) != (size_t)fSz) {
-        XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        XFCLOSE(f);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    XFCLOSE(f);
 
     switch(keyType) {
 
@@ -202,7 +213,6 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     int privFileSz = 0;
     word32 index = 0;
 
-    XFILE privKeyFile = NULL;
     byte* keyBuf = NULL;
 
     RsaKey key;
@@ -240,59 +250,14 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
 
     /* open, read, and store RSA key */
     if (ret == 0) {
-        /* Private key read: refuse to follow a symlink, but don't rewrite
-         * the mode of a key that may be provisioned by another account. */
-        privKeyFile = wolfCLU_OpenExistingSecureFile(privKey, "rb", 0);
-        if (privKeyFile == NULL) {
-            wolfCLU_LogError("unable to open file %s", privKey);
-            ret = BAD_FUNC_ARG;
-        }
-    }
-    if (ret == 0) {
-        if (XFSEEK(privKeyFile, 0, SEEK_END) != 0) {
-            wolfCLU_LogError("Failed to seek to end of file.");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        privFileSz = (int)XFTELL(privKeyFile);
-        if (privFileSz > 0 && privFileSz <= (RSA_MAX_SIZE / 8 * 16)) {
-            keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
-                                    DYNAMIC_TYPE_TMP_BUFFER);
-            if (keyBuf == NULL) {
-                ret = MEMORY_E;
-            }
-        }
-        else {
-            wolfCLU_LogError("Incorrect private key file size: %d", privFileSz);
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        XMEMSET(keyBuf, 0, privFileSz+1);
-        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
+        int rfRet = wolfCLU_ReadKeyFileToBuffer(privKey,
+                (long)(RSA_MAX_SIZE / 8 * 16), &keyBuf, &privFileSz);
+        ret = (rfRet == WOLFCLU_SUCCESS) ? 0 : WOLFCLU_FATAL_ERROR;
     }
 
-    /* convert PEM to DER if necessary */
+    /* convert PEM to DER if necessary; negative ret propagates */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, privFileSz, 0);
-        if (ret < 0) {
-            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
-                WOLFCLU_LOG(WOLFCLU_L0,
-                    "No PEM header found, treating as DER.");
-                ret = 0;
-            }
-            else {
-                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            }
-        }
-        else {
-            privFileSz = ret;
-            ret = 0;
-        }
+        ret = wolfCLU_KeyPemToDerFallback_ex(&keyBuf, &privFileSz, 0);
     }
 
     /* retrieving private key and storing in the RsaKey */
@@ -345,10 +310,6 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
     }
 
     /* cleanup allocated resources */
-    if (privKeyFile != NULL) {
-        XFCLOSE(privKeyFile);
-    }
-
     if (keyBuf!= NULL) {
         wolfCLU_ForceZero(keyBuf, (unsigned int)privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -377,7 +338,6 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     word32 outLen = 0;
 
     byte* keyBuf = NULL;
-    XFILE privKeyFile = NULL;
 
     ecc_key key;
     WC_RNG rng;
@@ -404,59 +364,14 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
 
     /* open, read, and store ecc key */
     if (ret == 0) {
-        /* Private key read: refuse to follow a symlink, but don't rewrite
-         * the mode of a key that may be provisioned by another account. */
-        privKeyFile = wolfCLU_OpenExistingSecureFile(privKey, "rb", 0);
-        if (privKeyFile == NULL) {
-            wolfCLU_LogError("unable to open file %s", privKey);
-            ret = BAD_FUNC_ARG;
-        }
-    }
-    if (ret == 0) {
-        if (XFSEEK(privKeyFile, 0, SEEK_END) != 0) {
-            wolfCLU_LogError("Failed to seek to end of file.");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        privFileSz = (int)XFTELL(privKeyFile);
-        if (privFileSz > 0 && privFileSz <= (MAX_ECC_BITS_NEEDED / 8 * 16)) {
-            keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
-                                    DYNAMIC_TYPE_TMP_BUFFER);
-            if (keyBuf == NULL) {
-                ret = MEMORY_E;
-            }
-        }
-        else {
-            wolfCLU_LogError("Incorrect private key file size: %d", privFileSz);
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        XMEMSET(keyBuf, 0, privFileSz+1);
-        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
+        int rfRet = wolfCLU_ReadKeyFileToBuffer(privKey,
+                (long)(MAX_ECC_BITS_NEEDED / 8 * 16), &keyBuf, &privFileSz);
+        ret = (rfRet == WOLFCLU_SUCCESS) ? 0 : WOLFCLU_FATAL_ERROR;
     }
 
-    /* convert PEM to DER if necessary */
+    /* convert PEM to DER if necessary; negative ret propagates */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, privFileSz, 0);
-        if (ret < 0) {
-            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
-                WOLFCLU_LOG(WOLFCLU_L0,
-                    "No PEM header found, treating as DER.");
-                ret = 0;
-            }
-            else {
-                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            }
-        }
-        else {
-            privFileSz = ret;
-            ret = 0;
-        }
+        ret = wolfCLU_KeyPemToDerFallback_ex(&keyBuf, &privFileSz, 0);
     }
 
     /* retrieving private key and storing in the Ecc Key */
@@ -533,10 +448,6 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
     }
 
     /* cleanup allocated resources */
-    if (privKeyFile != NULL) {
-        XFCLOSE(privKeyFile);
-    }
-
     if (keyBuf!= NULL) {
         wolfCLU_ForceZero(keyBuf, (unsigned int)privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -564,7 +475,6 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     word32 index = 0;
     word32 outLen = 0;
 
-    XFILE privKeyFile = NULL;
     byte* keyBuf = NULL;
     byte* outBuf = NULL;
     int   outBufSz = 0;
@@ -591,59 +501,14 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
 
     /* open, read, and store ED25519 key */
     if (ret == 0) {
-        /* Private key read: refuse to follow a symlink, but don't rewrite
-         * the mode of a key that may be provisioned by another account. */
-        privKeyFile = wolfCLU_OpenExistingSecureFile(privKey, "rb", 0);
-        if (privKeyFile == NULL) {
-            wolfCLU_LogError("unable to open file %s", privKey);
-            ret = BAD_FUNC_ARG;
-        }
-    }
-    if (ret == 0) {
-        if (XFSEEK(privKeyFile, 0, SEEK_END) != 0) {
-            wolfCLU_LogError("Failed to seek to end of file.");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        privFileSz = (int)XFTELL(privKeyFile);
-        if (privFileSz > 0 && privFileSz <= (ED25519_PRV_KEY_SIZE * 16)) {
-            keyBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
-                                    DYNAMIC_TYPE_TMP_BUFFER);
-            if (keyBuf == NULL) {
-                ret = MEMORY_E;
-            }
-        }
-        else {
-            wolfCLU_LogError("Incorrect private key file size: %d", privFileSz);
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        XMEMSET(keyBuf, 0, privFileSz+1);
-        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(keyBuf, 1, privFileSz, privKeyFile) != privFileSz) {
-            ret = WOLFCLU_FATAL_ERROR;
-        }
+        int rfRet = wolfCLU_ReadKeyFileToBuffer(privKey,
+                (long)(ED25519_PRV_KEY_SIZE * 16), &keyBuf, &privFileSz);
+        ret = (rfRet == WOLFCLU_SUCCESS) ? 0 : WOLFCLU_FATAL_ERROR;
     }
 
-    /* convert PEM to DER if necessary */
+    /* convert PEM to DER if necessary; negative ret propagates */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&keyBuf, privFileSz, 0);
-        if (ret < 0) {
-            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
-                WOLFCLU_LOG(WOLFCLU_L0,
-                    "No PEM header found, treating as DER.");
-                ret = 0;
-            }
-            else {
-                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            }
-        }
-        else {
-            privFileSz = ret;
-            ret = 0;
-        }
+        ret = wolfCLU_KeyPemToDerFallback_ex(&keyBuf, &privFileSz, 0);
     }
 
     /* retrieve RAW private key and store in the ED25519 Key */
@@ -709,10 +574,6 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
     }
 
     /* cleanup allocated resources */
-    if (privKeyFile != NULL) {
-        XFCLOSE(privKeyFile);
-    }
-
     if (keyBuf!= NULL) {
         wolfCLU_ForceZero(keyBuf, (unsigned int)privFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -739,7 +600,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     int privFileSz = 0;
     word32 index = 0;
 
-    XFILE privKeyFile = NULL;
     byte* privBuf = NULL;
 
     word32 privBufSz = 0;
@@ -783,62 +643,19 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
     /* open and read private key */
     if (ret == 0) {
-        /* Private key read: refuse to follow a symlink, but don't rewrite
-         * the mode of a key that may be provisioned by another account. */
-        privKeyFile = wolfCLU_OpenExistingSecureFile(privKey, "rb", 0);
-        if (privKeyFile == NULL) {
-            wolfCLU_LogError("Failed to open Private key FILE.");
-            ret = BAD_FUNC_ARG;
-        }
-    }
-    if (ret == 0) {
-        if (XFSEEK(privKeyFile, 0, SEEK_END) != 0) {
-            wolfCLU_LogError("Failed to seek to end of file.");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
+        int rfRet = wolfCLU_ReadKeyFileToBuffer(privKey,
+                (long)WOLFCLU_MAX_PQ_KEY_PEM_SIZE, &privBuf, &privFileSz);
+        ret = (rfRet == WOLFCLU_SUCCESS) ? 0 : WOLFCLU_FATAL_ERROR;
         if (ret == 0) {
-            privFileSz = (int)XFTELL(privKeyFile);
-            if (privFileSz > 0 &&
-                privFileSz <= DILITHIUM_MAX_BOTH_KEY_PEM_SIZE) {
-                privBuf = (byte*)XMALLOC(privFileSz+1, HEAP_HINT,
-                                                    DYNAMIC_TYPE_TMP_BUFFER);
-                if (privBuf == NULL) {
-                    ret = MEMORY_E;
-                }
-            } else {
-                wolfCLU_LogError("Incorrect private key file size: %d",
-                                privFileSz);
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-    }
-    if (ret == 0) {
-        XMEMSET(privBuf, 0, privFileSz+1);
-        privBufSz = privFileSz;
-        if (XFSEEK(privKeyFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(privBuf, 1, privFileSz, privKeyFile) != privFileSz) {
-            wolfCLU_LogError("Failed to read private key file.");
-            ret = WOLFCLU_FATAL_ERROR;
+            privBufSz = (word32)privFileSz;
         }
     }
 
-    /* convert PEM to DER if necessary */
+    /* convert PEM to DER if necessary; negative ret propagates */
     if (inForm == PEM_FORM && ret == 0) {
-        ret = wolfCLU_KeyPemToDer(&privBuf, privFileSz, 0);
-        if (ret < 0) {
-            if (ret == WC_NO_ERR_TRACE(ASN_NO_PEM_HEADER)) {
-                WOLFCLU_LOG(WOLFCLU_L0,
-                    "No PEM header found, treating as DER.");
-                ret = 0;
-            }
-            else {
-                wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
-            }
-        }
-        else {
-            /* update privBuf and privFileSz with the converted DER data */
-            privBufSz = privFileSz = ret;
-            ret = 0;
+        ret = wolfCLU_KeyPemToDerFallback_ex(&privBuf, &privFileSz, 0);
+        if (ret == 0) {
+            privBufSz = (word32)privFileSz;
         }
     }
 
@@ -888,9 +705,6 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     }
 
     /* cleanup allocated resources */
-    if (privKeyFile != NULL)
-        XFCLOSE(privKeyFile);
-
     if (privBuf != NULL) {
         wolfCLU_ForceZero(privBuf, (unsigned int)privBufSz);
         XFREE(privBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -901,8 +715,8 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
     }
 
     wc_dilithium_free(key);
-    /* rng zeroed via XMEMSET before wc_InitRng, so even if wc_InitRng failed:
-     * wolfSSL checks rng->drbg internally before freeing. */
+    /* rng is zeroed before wc_InitRng, so wc_FreeRng is safe even on init
+     * failure. */
     wc_FreeRng(&rng);
 #ifdef WOLFSSL_SMALL_STACK
     XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);

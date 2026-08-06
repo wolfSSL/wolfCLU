@@ -50,22 +50,9 @@ int wolfCLU_printDer(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    /* get pem size alloc buffer and convert to pem format */
     if (ret == WOLFCLU_SUCCESS) {
-        pemSz = wc_DerToPemEx(der, derSz, NULL, 0, NULL, pemType);
-        if (pemSz > 0) {
-            pem = (unsigned char*)XMALLOC(pemSz, NULL, heapType);
-            if (pem == NULL) {
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                if (wc_DerToPemEx(der, derSz, pem, pemSz, NULL, pemType)
-                        <= 0) {
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
-            }
-        }
-        else {
+        pemSz = wolfCLU_KeyDerToPem(der, derSz, &pem, pemType, heapType);
+        if (pemSz <= 0) {
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -78,7 +65,7 @@ int wolfCLU_printDer(WOLFSSL_BIO* bio, unsigned char* der, int derSz,
 
     if (pem != NULL) {
         wolfCLU_ForceZero(pem, pemSz);
-        XFREE(pem, NULL, heapType);
+        XFREE(pem, HEAP_HINT, heapType);
     }
 
     return ret;

@@ -317,8 +317,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
         case WOLFCLU_PASSWORD_SOURCE:
             passwordSz = keySize;
             ret = wolfCLU_GetPassword((char*)pwdKey, &passwordSz, optarg);
-            /* On an unsupported source wolfCLU_GetPassword zeroes the buffer
-             * and fails. Bail out so we do not encrypt under an empty key. */
+            /* bail on unsupported password source to avoid empty key */
             if (ret != WOLFCLU_SUCCESS) {
                 wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
                 return ret;
@@ -610,43 +609,6 @@ int wolfCLU_setup(int argc, char** argv, char action)
         }
     }
 
-    if (pwdKeyChk == 0 && keyCheck == 0) {
-        if (decCheck == 1) {
-            WOLFCLU_LOG(WOLFCLU_L0, "\nDECRYPT ERROR:");
-            wolfCLU_LogError("no key or passphrase set");
-            WOLFCLU_LOG(WOLFCLU_L0,
-                    "Please type \"wolfssl -decrypt -help\" for decryption"
-                                                            " usage \n");
-            wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
-            return WOLFCLU_FATAL_ERROR;
-        }
-        /* if no pwdKey is provided */
-        else {
-            /* Pass the pwdKey buffer capacity, NOT &keySize:
-             * wolfCLU_GetStdinPassword writes the entered length back through
-             * this pointer, and keySize (the algorithm key size in bits) is
-             * still needed for key derivation and cleanup below. */
-            word32 pwdBufSz = (word32)(keySize + block);
-            WOLFCLU_LOG(WOLFCLU_L0,
-                    "No -pwd flag set, please enter a password to use for"
-                    " encrypting.");
-            ret = wolfCLU_GetStdinPassword(pwdKey, &pwdBufSz);
-            pwdKeyChk = 1;
-        }
-    }
-
-    if (inCheck == 0 && encCheck == 1) {
-        ret = wolfCLU_readFilename(inName, sizeof(inName),
-                "-in flag was not set, please enter a string or"
-                " file name to be encrypted: ");
-        if (ret != WOLFCLU_SUCCESS) {
-            wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
-            return WOLFCLU_FATAL_ERROR;
-        }
-        WOLFCLU_LOG(WOLFCLU_L0, "Encrypting :\"%s\"", inName);
-        inCheck = 1;
-    }
-
     if (encCheck == 1 && decCheck == 1) {
         WOLFCLU_LOG(WOLFCLU_E0,
                 "Encrypt and decrypt simultaneously is invalid");
@@ -683,8 +645,47 @@ int wolfCLU_setup(int argc, char** argv, char action)
         return WOLFCLU_FATAL_ERROR;
     }
 
+    if (pwdKeyChk == 0 && keyCheck == 0) {
+        if (decCheck == 1) {
+            WOLFCLU_LOG(WOLFCLU_L0, "\nDECRYPT ERROR:");
+            wolfCLU_LogError("no key or passphrase set");
+            WOLFCLU_LOG(WOLFCLU_L0,
+                    "Please type \"wolfssl -decrypt -help\" for decryption"
+                                                            " usage \n");
+            wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
+            return WOLFCLU_FATAL_ERROR;
+        }
+        /* if no pwdKey is provided */
+        else {
+            /* use separate pwdBufSz since GetStdinPassword overwrites it */
+            word32 pwdBufSz = (word32)(keySize + block);
+            WOLFCLU_LOG(WOLFCLU_L0,
+                    "No -pwd flag set, please enter a password to use for"
+                    " encrypting.");
+            ret = wolfCLU_GetStdinPassword(pwdKey, &pwdBufSz);
+            if (ret != WOLFCLU_SUCCESS) {
+                wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
+                return WOLFCLU_FATAL_ERROR;
+            }
+            pwdKeyChk = 1;
+        }
+    }
+
+    if (inCheck == 0 && encCheck == 1) {
+        ret = wolfCLU_readFilename(inName, sizeof(inName),
+                "-in flag was not set, please enter a string or"
+                " file name to be encrypted: ");
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_freeBins(pwdKey, iv, key, (byte*)mode, NULL);
+            return WOLFCLU_FATAL_ERROR;
+        }
+        WOLFCLU_LOG(WOLFCLU_L0, "Encrypting :\"%s\"", inName);
+        inCheck = 1;
+    }
+
+
     if (pwdKeyChk == 1 && keyCheck == 1) {
-        XMEMSET(pwdKey, 0, keySize + block);
+        wolfCLU_ForceZero(pwdKey, keySize + block);
     }
 
     /* encryption function call */

@@ -104,12 +104,9 @@ def _cleanup(*files):
 
 
 def _flip_last_der_byte(src, dst):
-    """Copy a DER file to dst with its final byte flipped.
-
-    A CSR's DER encoding ends with the signature BIT STRING, so flipping
-    the last byte corrupts the signature value while leaving every ASN.1
-    length intact: the request still parses, but the signature no longer
-    verifies."""
+    """Copy src to dst with its final DER byte flipped -- corrupts the
+    trailing signature BIT STRING while leaving ASN.1 lengths intact, so
+    the CSR still parses but no longer verifies."""
     with open(src, "rb") as f:
         data = bytearray(f.read())
     assert len(data) > 0, "empty DER file"
@@ -281,14 +278,10 @@ class TestReqNew(unittest.TestCase):
         return None
 
     def test_req_inline_subjectaltname_openssl_compat(self):
-        """A config subjectAltName in the OpenSSL inline form (TYPE:value list,
-        not the @section indirection) is accepted and applied to the cert.
-
-        Pins the behavior in wolfCLU_setExtensions (clu_config.c): the inline
-        form is parsed via the same path as -addext (wolfCLU_setInlineAltNames),
-        so an OpenSSL-style config is neither silently dropped nor rejected.
-        Whitespace after the comma must be tolerated. Skipped on builds without
-        cert extensions, where the parsing path is absent."""
+        """A config subjectAltName in OpenSSL inline form (TYPE:value list,
+        not @section indirection) is parsed via the same path as -addext
+        (wolfCLU_setInlineAltNames in clu_config.c), not dropped or
+        rejected. Skipped where cert extensions aren't compiled in."""
         conf = _tmp("test_req_inline_san.conf")
         out = _tmp("test_req_inline_san.crt")
         self._clean(conf, out)
@@ -316,7 +309,6 @@ class TestReqNew(unittest.TestCase):
                          "accepted: " + combined)
         self.assertTrue(os.path.isfile(out) and os.path.getsize(out) > 0,
                         "certificate should be written")
-        # The SAN must actually be present in the issued cert.
         r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
         self.assertEqual(r2.returncode, 0, r2.stderr)
         san_line = self._get_san_line(r2.stdout)
@@ -327,10 +319,9 @@ class TestReqNew(unittest.TestCase):
                       "IP SAN not applied from inline config form")
 
     def test_req_inline_subjectaltname_trims_whitespace(self):
-        """Inline subjectAltName entries are trimmed of surrounding whitespace
-        like OpenSSL: whitespace BEFORE the comma (a trailing space on the
-        value) and AFTER the colon must not end up in the stored name. Pins the
-        trailing/leading trim in wolfCLU_setInlineAltNames (clu_config.c)."""
+        """Inline subjectAltName values are trimmed like OpenSSL: whitespace
+        before the comma and after the colon must not end up in the stored
+        name (wolfCLU_setInlineAltNames, clu_config.c)."""
         conf = _tmp("test_req_inline_san_ws.conf")
         out = _tmp("test_req_inline_san_ws.crt")
         self._clean(conf, out)
@@ -362,8 +353,7 @@ class TestReqNew(unittest.TestCase):
         self.assertEqual(r2.returncode, 0, r2.stderr)
         san_line = self._get_san_line(r2.stdout)
         self.assertIsNotNone(san_line, "SAN not found in cert output")
-        # Extract the exact DNS value; a trailing space would make this
-        # "trim.example.com " and fail the equality (assertIn would not).
+        # assertEqual, not assertIn: a trailing space would still match assertIn.
         m = re.search(r"DNS:([^,]*)", san_line)
         self.assertIsNotNone(m, "DNS SAN missing: " + san_line)
         self.assertEqual(m.group(1), "trim.example.com",
@@ -483,6 +473,18 @@ class TestReqNew(unittest.TestCase):
         self._addext_fails("subjectAltName=otherName:foo",
                            "test_req_addext_badtype.crt")
 
+    def test_req_days_validation(self):
+        """req -days rejects anything outside [1, 36500] instead of using 0."""
+        for bad in ("0", "-1", "abc", "12x", "36501", ""):
+            tmp = _tmp("test_req_days.cert")
+            self._clean(tmp)
+            r = run_wolfssl("req", "-new", "-days", bad,
+                            "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                            "-subj", "O=wolfSSL/C=US/CN=wolfSSL",
+                            "-out", tmp, "-x509")
+            self.assertNotEqual(r.returncode, 0,
+                                "-days {!r} should be rejected".format(bad))
+
 
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqPemDerRoundTrip(unittest.TestCase):
@@ -530,7 +532,7 @@ class TestReqPemDerRoundTrip(unittest.TestCase):
 
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqVerify(unittest.TestCase):
-    """Test req -verify, including that a tampered CSR fails (F-5363)."""
+    """Test req -verify, including that a tampered CSR fails."""
 
     @classmethod
     def setUpClass(cls):
@@ -560,7 +562,7 @@ class TestReqVerify(unittest.TestCase):
         self.assertIn("verify OK", r.stdout + r.stderr)
 
     def test_verify_tampered_csr_der_fails(self):
-        """A CSR with a corrupted signature must fail verification (F-5363)."""
+        """A CSR with a corrupted signature must fail verification."""
         bad = _tmp("test_req_verify_bad.der")
         self._clean(bad)
         _flip_last_der_byte(self.csr_der, bad)
@@ -574,10 +576,9 @@ class TestReqVerify(unittest.TestCase):
                                 "{}".format(r.returncode))
 
     def test_verify_tampered_csr_no_output(self):
-        """A failed verify must not emit the CSR even without -noout (F-5363).
-
-        Output handling is gated on the verify result, so a tampered CSR
-        produces no PEM body on stdout."""
+        """A failed verify must not emit the CSR even without -noout:
+        output is gated on the verify result, so a tampered CSR prints no
+        PEM body."""
         bad = _tmp("test_req_verify_bad2.der")
         self._clean(bad)
         _flip_last_der_byte(self.csr_der, bad)
@@ -880,6 +881,49 @@ class TestReqFIPS(unittest.TestCase):
                         stdin_data="long test password\n")
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_newkey_keyout_same_as_out_rejected(self):
+        """-out and -keyout naming the same file is rejected, not silently
+        overwritten (the second secure-file open would otherwise destroy
+        what the first just wrote)."""
+        if is_fips():
+            self.skipTest("FIPS build")
+        same = _tmp("test_req_fips_same_out_keyout.pem")
+        self._clean(same)
+        r = run_wolfssl("req", "-newkey", "rsa:2048", "-keyout", same,
+                        "-config", self.conf_file, "-out", same)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("-out and -keyout must not be the same file",
+                       r.stderr + r.stdout)
+
+    def test_newkey_keyout_same_as_out_relative_path_rejected(self):
+        """Same collision, caught even via a differently-spelled path
+        (relative vs. absolute) to the same existing file."""
+        if is_fips():
+            self.skipTest("FIPS build")
+        name = "test_req_fips_relpath_same.pem"
+        abs_path = _tmp(name)
+        with open(abs_path, "w", encoding="utf-8") as f:
+            f.write("placeholder\n")
+        self._clean(abs_path)
+        r = run_wolfssl("req", "-newkey", "rsa:2048", "-keyout", name,
+                        "-config", self.conf_file, "-out", abs_path)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("-out and -keyout must not be the same file",
+                       r.stderr + r.stdout)
+
+    def test_keyout_same_as_out_without_newkey_accepted(self):
+        """-keyout is inert without -newkey (no key is ever written through
+        it), so naming the same path as -out is harmless and must not be
+        rejected by the -out/-keyout collision check."""
+        if is_fips():
+            self.skipTest("FIPS build")
+        same = _tmp("test_req_fips_same_out_keyout_no_newkey.pem")
+        self._clean(same)
+        r = run_wolfssl("req", "-new", "-x509",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-keyout", same, "-config", self.conf_file,
+                        "-out", same)
+        self.assertEqual(r.returncode, 0, r.stderr)
 
 
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")

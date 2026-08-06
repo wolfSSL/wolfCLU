@@ -15,9 +15,8 @@ from wolfclu_test import (
     no_filesystem, CERTS_DIR, WOLFSSL_BIN, run_wolfssl, test_main
 )
 
-# The interactive password prompt only reads from stdin when stdin is a real
-# terminal (wolfCLU_GetStdinPassword -> tcgetattr fails on a pipe), so driving
-# it requires a pseudo-terminal. The pty module is POSIX-only.
+# wolfCLU_GetStdinPassword only reads from a real terminal (tcgetattr
+# fails on a pipe), so testing it needs a pty. POSIX-only.
 try:
     import pty as _pty
     HAVE_PTY = True
@@ -202,7 +201,7 @@ class EncDecryptTest(unittest.TestCase):
         self.assertGreater(len(r.stdout), 0)
 
     def test_explicit_hex_key_iv(self):
-        """Regression: explicit --key/--iv hex strings must be copied correctly."""
+        """Regression: explicit -key/-iv hex strings must be copied correctly."""
         src = "enc_hex_test.txt"
         enc = "enc_hex_test.enc"
         self._cleanup(src, enc)
@@ -212,8 +211,8 @@ class EncDecryptTest(unittest.TestCase):
 
         r = run_wolfssl("enc", "-aes-128-cbc", "-nosalt",
                         "-in", src, "-out", enc,
-                        "--key", "00112233445566778899aabbccddeeff",
-                        "--iv", "00112233445566778899aabb0011aab7")
+                        "-key", "00112233445566778899aabbccddeeff",
+                        "-iv", "00112233445566778899aabb0011aab7")
         self.assertEqual(r.returncode, 0,
                          "encrypt with explicit hex key/iv failed: "
                          "{}".format(r.stderr))
@@ -378,14 +377,9 @@ class EncInteropTest(unittest.TestCase):
 
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncPassSourceTest(unittest.TestCase):
-    """Regression tests for issue 6133.
-
-    wolfCLU_GetPassword only supports the "stdin" and "pass:" password
-    sources. Any other source (env:, file:, fd:, ...) must make the tool
-    fail loudly. Previously -pass parsing errors were ignored and the file
-    was silently encrypted under an empty/zeroed password while the tool
-    reported success.
-    """
+    """wolfCLU_GetPassword supports only the "stdin" and "pass:" sources;
+    any other -pass source (env:, file:, fd:, ...) must fail loudly, not
+    silently encrypt under an empty password."""
 
     @classmethod
     def setUpClass(cls):
@@ -419,13 +413,12 @@ class EncPassSourceTest(unittest.TestCase):
                 os.remove(enc)
 
             r = self._enc_with_pass(src, enc)
-            # The tool must report failure for an unsupported source.
             self.assertNotEqual(r.returncode, 0,
                 "unsupported -pass source %r encrypted with returncode 0; "
                 "output may be under an empty password" % src)
 
-            # Defence in depth: if an output file was produced anyway, it
-            # must not be the plaintext encrypted under an empty password.
+            # Defence in depth: any output produced must not decrypt under
+            # an empty password.
             if os.path.exists(enc):
                 d = subprocess.run(
                     [WOLFSSL_BIN, "enc", "-d", "-aes-256-cbc",
@@ -948,23 +941,18 @@ class EncKeyInputTest(unittest.TestCase):
 @unittest.skipUnless(HAVE_PTY, "pty not available (non-POSIX)")
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncStdinPasswordTest(unittest.TestCase):
-    """Interactive stdin-password path of `encrypt` (F-5970).
+    """Interactive stdin-password path of `encrypt`.
 
-    Running `encrypt` without -pwd/-pass/-key prompts for a password on the
-    terminal via wolfCLU_GetStdinPassword, which writes the typed length back
-    through its size pointer. The caller passed &keySize (the algorithm key
-    size in bits), so keySize was overwritten by the password length. With
-    -pbkdf2 the EVP derivation length is (keySize+7)/8, collapsing the derived
-    key to a couple of bytes. These tests drive the prompt over a pty.
-    """
+    wolfCLU_GetStdinPassword writes the typed password length back through
+    its size pointer, which aliases the algorithm keySize (bits); this
+    corrupted the -pbkdf2 derived key length. Driven over a pty since the
+    prompt only reads from a real terminal."""
 
-    # >= 14 chars to satisfy the FIPS HMAC minimum (HMAC_FIPS_MIN_KEY) for the
-    # PBKDF2 path, while still truncating the bit-size keySize far below a real
-    # cipher key, so the buggy derivation collapses to a few key bytes.
+    # >= 14 chars for the FIPS HMAC minimum on the PBKDF2 path, while still
+    # short enough that the aliased-keySize bug would collapse the key.
     PASSWORD = "correcthorsebatterystaple"
     PLAINTEXT = b"F-5970 interactive password regression payload\n"
-    # AES-256 key length in bytes.
-    FULL_KEY_BYTES = 32
+    FULL_KEY_BYTES = 32  # AES-256 key length in bytes.
 
     @classmethod
     def setUpClass(cls):
@@ -989,13 +977,11 @@ class EncStdinPasswordTest(unittest.TestCase):
         import select
         import signal
 
-        # fgets() reads a line, so the password must be newline-terminated or
-        # the child blocks forever waiting for end-of-line.
+        # fgets() needs a newline or the child blocks waiting for it.
         line = (password + "\n").encode()
         argv = [WOLFSSL_BIN, "encrypt"] + list(args)
         pid, fd = _pty.fork()
         if pid == 0:
-            # Child: become the encrypt process with the pty as its stdin.
             try:
                 os.execvpe(argv[0], argv, os.environ)
             except Exception:
@@ -1054,10 +1040,9 @@ class EncStdinPasswordTest(unittest.TestCase):
         return code, output.decode(errors="replace")
 
     def test_pbkdf2_full_key_derivation(self):
-        """A typed password with -pbkdf2 must derive the full cipher key.
-
-        Before the fix keySize was overwritten by the password length, so the
-        `-p` debug print reported a few key bytes instead of 32."""
+        """A typed password with -pbkdf2 must derive the full cipher key,
+        not a truncated one (keySize used to be overwritten by the
+        password length)."""
         plain = "f5970_keylen_in.txt"
         cipher = "f5970_keylen.bin"
         self._cleanup(plain, cipher)
@@ -1076,8 +1061,8 @@ class EncStdinPasswordTest(unittest.TestCase):
                              m.group(1), self.FULL_KEY_BYTES))
 
     def test_pbkdf2_stdin_decrypts_with_pass(self):
-        """A file encrypted with a typed password + -pbkdf2 must decrypt with
-        the same password supplied via -pass (interoperability, F-5970)."""
+        """A file encrypted with a typed password + -pbkdf2 must decrypt
+        with the same password supplied via -pass."""
         plain = "f5970_interop_in.txt"
         cipher = "f5970_interop.bin"
         dec = "f5970_interop_out.txt"
@@ -1102,9 +1087,8 @@ class EncStdinPasswordTest(unittest.TestCase):
                              "decrypted plaintext mismatch")
 
     def test_default_kdf_stdin_decrypts_with_pass(self):
-        """Regression guard: the default (BytesToKey) path already interops
-        because the key length comes from the cipher; the fix must keep it
-        working."""
+        """The default (BytesToKey) path already interops since the key
+        length comes from the cipher, not the aliased keySize pointer."""
         plain = "f5970_def_in.txt"
         cipher = "f5970_def.bin"
         dec = "f5970_def_out.txt"

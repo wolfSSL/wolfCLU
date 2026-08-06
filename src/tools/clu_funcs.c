@@ -1158,6 +1158,35 @@ word32 wolfCLU_DerSetLength(word32 length, byte* output)
     return sz;
 }
 
+/* Parse decimal days string into [1, WOLFCLU_MAX_CERT_DAYS].
+ * Returns WOLFCLU_SUCCESS or USER_INPUT_ERROR. Avoids strtol/errno. */
+int wolfCLU_ParseDaysArg(const char* arg, int* daysOut)
+{
+    word32 days = 0;
+    const char* cur;
+
+    if (arg == NULL || daysOut == NULL || arg[0] == '\0') {
+        return USER_INPUT_ERROR;
+    }
+
+    for (cur = arg; *cur != '\0'; cur++) {
+        if (*cur < '0' || *cur > '9') {
+            return USER_INPUT_ERROR;
+        }
+        days = (days * 10) + (word32)(*cur - '0');
+        if (days > (word32)WOLFCLU_MAX_CERT_DAYS) {
+            return USER_INPUT_ERROR;
+        }
+    }
+
+    if (days < 1) {
+        return USER_INPUT_ERROR;
+    }
+
+    *daysOut = (int)days;
+    return WOLFCLU_SUCCESS;
+}
+
 void wolfCLU_ForceZero(void* mem, unsigned int len)
 {
 #ifndef WOLFSSL_NO_FORCE_ZERO
@@ -2642,5 +2671,98 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
     }
 
     wolfCLU_ForceZero(digest, sizeof(digest));
+    return ret;
+}
+
+/* helper function to convert a key to PEM format. Creates new 'out' buffer on
+ * success.
+ * returns size of PEM buffer created on success
+ * returns 0 or negative value on failure */
+int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
+        int heapType)
+{
+    int pemBufSz;
+    byte* pemBuf = NULL;
+
+    if (out == NULL || der == NULL || derSz <= 0) {
+        return 0;
+    }
+
+    pemBufSz = wc_DerToPemEx(der, derSz, NULL, 0, NULL, pemType);
+    if (pemBufSz > 0) {
+        pemBuf = (byte*)XMALLOC(pemBufSz, HEAP_HINT, heapType);
+        if (pemBuf == NULL) {
+            pemBufSz = 0;
+        }
+        else {
+            pemBufSz = wc_DerToPemEx(der, derSz, pemBuf, pemBufSz, NULL,
+                    pemType);
+        }
+    }
+
+    if (pemBufSz <= 0 && pemBuf != NULL) {
+        XFREE(pemBuf, HEAP_HINT, heapType);
+        pemBuf = NULL;
+    }
+    *out = pemBuf;
+    return pemBufSz;
+}
+
+int wolfCLU_DerToPemBuf(const byte* der, int derSz, int pemType,
+        byte** outBuf, int* outBufSz)
+{
+    int   pemSz;
+    byte* pemBuf = NULL;
+
+    if (der == NULL || derSz <= 0 || outBuf == NULL || outBufSz == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    pemSz = wolfCLU_KeyDerToPem(der, derSz, &pemBuf, pemType,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (pemSz <= 0) {
+        wolfCLU_LogError("DER to PEM conversion failed: %d", pemSz);
+        return (pemSz < 0) ? pemSz : WOLFCLU_FATAL_ERROR;
+    }
+
+    *outBuf = pemBuf;
+    *outBufSz = pemSz;
+    return WOLFCLU_SUCCESS;
+}
+
+/* Write signed cert DER to bioOut; returns WOLFCLU_SUCCESS or an error code. */
+int wolfCLU_WriteCertBio(WOLFSSL_BIO* bioOut, int outForm,
+        const byte* certBuf, int certDerSz, int pemType)
+{
+    int   ret = WOLFCLU_SUCCESS;
+    int   pemOutSz = 0;
+    byte* pemBuf = NULL;
+
+    if (bioOut == NULL || certBuf == NULL || certDerSz <= 0) {
+        return BAD_FUNC_ARG;
+    }
+
+    if (outForm == DER_FORM) {
+        if (wolfSSL_BIO_write(bioOut, certBuf, certDerSz) != certDerSz) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        return ret;
+    }
+
+    ret = wolfCLU_DerToPemBuf(certBuf, certDerSz, pemType, &pemBuf,
+            &pemOutSz);
+    if (ret != WOLFCLU_SUCCESS) {
+        return ret;
+    }
+
+    if (wolfSSL_BIO_write(bioOut, pemBuf, pemOutSz) != pemOutSz) {
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+    else {
+        ret = WOLFCLU_SUCCESS;
+    }
+
+    wolfCLU_ForceZero(pemBuf, pemOutSz);
+    XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     return ret;
 }

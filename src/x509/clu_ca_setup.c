@@ -105,11 +105,13 @@ int wolfCLU_CASetup(int argc, char** argv)
     int days = 0;
     int selfSigned = 0;
     int altSign = 0;
+    int x509Owned = 0;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
-    while ((option = wolfCLU_GetOpt(argc, argv, "", ca_options,
-                    &longIndex )) != END_OF_ARGS) {
+    while (ret == WOLFCLU_SUCCESS &&
+            (option = wolfCLU_GetOpt(argc, argv, "", ca_options,
+                    &longIndex)) != END_OF_ARGS) {
 
         switch (option) {
             case WOLFCLU_INFILE:
@@ -205,7 +207,14 @@ int wolfCLU_CASetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_DAYS:
-                days = XATOI(optarg);
+                /* #5879: validate -days to prevent RFC 5280 notAfter
+                 * overflow. */
+                if (wolfCLU_ParseDaysArg(optarg, &days) != WOLFCLU_SUCCESS) {
+                    wolfCLU_LogError("-days must be a positive integer "
+                            "in [1, %d], got: %s", WOLFCLU_MAX_CERT_DAYS,
+                            optarg);
+                    ret = USER_INPUT_ERROR;
+                }
                 break;
 
             case WOLFCLU_EXTENSIONS:
@@ -214,7 +223,8 @@ int wolfCLU_CASetup(int argc, char** argv)
 
             case WOLFCLU_HELP:
                 wolfCLU_CAHelp();
-                return WOLFCLU_SUCCESS;
+                ret = WOLFCLU_SUCCESS;
+                goto cleanup;
 
             case ARG_FOUND_TWICE:
                 wolfCLU_LogError("Found duplicate argument");
@@ -234,7 +244,7 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
     }
 
-    if (reqIn == NULL && !altSign) {
+    if (ret == WOLFCLU_SUCCESS && reqIn == NULL && !altSign) {
         wolfCLU_LogError("Expecting CSR input");
         ret = WOLFCLU_FATAL_ERROR;
     }
@@ -242,10 +252,10 @@ int wolfCLU_CASetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && config != NULL) {
         signer = wolfCLU_readSignConfig(config, (char*)"ca");
     }
-    else {
+    else if (ret == WOLFCLU_SUCCESS) {
         signer = wolfCLU_CertSignNew();
     }
-    if (signer == NULL) {
+    if (ret == WOLFCLU_SUCCESS && signer == NULL) {
         wolfCLU_LogError("Unable to create a signer struct");
         ret = WOLFCLU_FATAL_ERROR;
     }
@@ -289,11 +299,7 @@ int wolfCLU_CASetup(int argc, char** argv)
 
     if (ret == WOLFCLU_SUCCESS && (pkey != NULL || ca != NULL ||
             altKey != NULL || altKeyPub != NULL)) {
-        if (selfSigned) {
-            wolfCLU_CertSignSetCA(signer, x509, pkey,
-                    wolfCLU_GetTypeFromPKEY(pkey));
-        }
-        else if (altSign) {
+        if (altSign) {
             char* subjName = wolfSSL_X509_NAME_oneline(
                 wolfSSL_X509_get_subject_name(x509), 0, 0);
             if (subjName != NULL) {
@@ -306,8 +312,17 @@ int wolfCLU_CASetup(int argc, char** argv)
             }
         }
         else {
-            wolfCLU_CertSignSetCA(signer, ca, pkey,
-                    wolfCLU_GetTypeFromPKEY(pkey));
+            int pkeyType = wolfCLU_GetTypeFromPKEY(pkey);
+            wolfCLU_CertSignSetCA(signer, selfSigned ? x509 : ca, pkey,
+                    pkeyType);
+            if (selfSigned) {
+                /* ownership of x509 was transferred to signer */
+                x509Owned = 1;
+            }
+            if (pkeyType == RSAk || pkeyType == ECDSAk) {
+                /* ownership of pkey was transferred to signer */
+                pkey = NULL;
+            }
         }
     }
 
@@ -327,6 +342,7 @@ int wolfCLU_CASetup(int argc, char** argv)
         ret = wolfCLU_CertSign(signer, x509);
     }
 
+cleanup:
     wolfSSL_BIO_free(reqIn);
     wolfSSL_BIO_free(keyIn);
     if (altKey != NULL) {
@@ -338,11 +354,14 @@ int wolfCLU_CASetup(int argc, char** argv)
     if (subjKey != NULL) {
         wolfSSL_BIO_free(subjKey);
     }
-    if (!selfSigned) {
+    if (!x509Owned) {
         wolfSSL_X509_free(x509);
     }
     if ((selfSigned || altSign) && ca != NULL) {
         wolfSSL_X509_free(ca);
+    }
+    if (pkey != NULL) {
+        wolfSSL_EVP_PKEY_free(pkey);
     }
 
     /* check for success on signer free since random data is output */

@@ -714,7 +714,8 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_HELP:
                 wolfCLU_certgenHelp();
-                return WOLFCLU_SUCCESS;
+                ret = WOLFCLU_SUCCESS;
+                goto cleanup;
 
             case WOLFCLU_RSA:
                 algCheck = 1;
@@ -729,7 +730,12 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_DAYS:
-                days = XATOI(optarg);
+                if (wolfCLU_ParseDaysArg(optarg, &days) != WOLFCLU_SUCCESS) {
+                    wolfCLU_LogError("-days must be a positive integer "
+                            "in [1, %d], got: %s", WOLFCLU_MAX_CERT_DAYS,
+                            optarg);
+                    ret = USER_INPUT_ERROR;
+                }
                 break;
 
             case WOLFCLU_CERT_SHA:
@@ -804,6 +810,18 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 ret = WOLFCLU_FATAL_ERROR;
                 wolfCLU_certgenHelp();
         }
+    }
+
+    /* -out and -keyout opening the same path would silently discard
+     * whichever file was written first. wolfCLU_PathsRefEqual() also
+     * catches equivalent paths (symlinks, relative vs. absolute).
+     * Only applies when -keyout is actually written, i.e. -newkey was
+     * given (keyType/keyInfo set); otherwise -keyout is inert. */
+    if (ret == WOLFCLU_SUCCESS && keyType != NULL && keyInfo != NULL &&
+            out != NULL && keyOut != NULL &&
+            wolfCLU_PathsRefEqual(out, keyOut)) {
+        wolfCLU_LogError("-out and -keyout must not be the same file");
+        ret = USER_INPUT_ERROR;
     }
 
     /* default to sha256 if not set */
@@ -1124,7 +1142,9 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
 
         if (keyOutBio == NULL) {
-            wolfCLU_LogError("Error opening keyout file %s", keyOut);
+            if (keyOut == NULL) {
+                wolfCLU_LogError("Error opening keyout file for stdout");
+            }
             ret = WOLFCLU_FATAL_ERROR;
         }
 
@@ -1155,6 +1175,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         wolfSSL_BIO_free(keyOutBio);
     }
 
+cleanup:
     (void)algCheck;
     (void)in;
     (void)oid;

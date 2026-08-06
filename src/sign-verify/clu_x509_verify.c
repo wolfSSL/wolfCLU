@@ -172,13 +172,6 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && caCert != NULL && !partialChain &&
-            (XSTRCMP(caCert, verifyCert) == 0)) {
-        wolfCLU_LogError("Unless -partial_chain is passed as an argument "
-                "-CAFile cannot be the same as the cert to verify");
-        ret = WOLFCLU_FATAL_ERROR;
-    }
-
     if (ret == WOLFCLU_SUCCESS) {
         cert = load_cert_from_file(verifyCert);
         if (!cert) {
@@ -214,6 +207,14 @@ int wolfCLU_x509Verify(int argc, char** argv)
                 wolfSSL_X509_LOOKUP_file());
         if (lookup == NULL) {
             wolfCLU_LogError("Failed to setup lookup");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
+        if (!partialChain && wolfCLU_PathsRefEqual(caCert, verifyCert)) {
+            wolfCLU_LogError("Cannot verify a certificate against itself "
+                    "as a CA without -partial_chain");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

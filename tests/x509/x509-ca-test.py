@@ -225,6 +225,28 @@ class TestCAHelp(unittest.TestCase):
         r = run_wolfssl("ca", "-help")
         self.assertEqual(r.returncode, 0, r.stderr)
 
+class TestCAInvalidDays(unittest.TestCase):
+    """Negative tests for the -days argument on the ca command."""
+
+    def test_days_zero(self):
+        r = run_wolfssl("ca", "-days", "0")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("-days must be a positive integer", r.stderr + r.stdout)
+
+    def test_days_negative(self):
+        r = run_wolfssl("ca", "-days", "-1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("-days must be a positive integer", r.stderr + r.stdout)
+
+    def test_days_non_numeric(self):
+        r = run_wolfssl("ca", "-days", "abc")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("-days must be a positive integer", r.stderr + r.stdout)
+
+    def test_days_out_of_bounds(self):
+        r = run_wolfssl("ca", "-days", "9999999999")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("-days must be a positive integer", r.stderr + r.stdout)
 
 
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")
@@ -312,6 +334,74 @@ class TestCASelfSign(unittest.TestCase):
 
 
 
+CA_TRUE_REQ_CONF = """\
+[ req ]
+distinguished_name = req_distinguished_name
+prompt = no
+[ req_distinguished_name ]
+countryName = US
+commonName = testing
+[ v3_alt_ca ]
+basicConstraints = CA:TRUE
+keyUsage = digitalSignature
+"""
+
+
+class TestCARejectsCsrCaTrue(unittest.TestCase):
+    """A CSR asserting CA:TRUE must not be able to grant itself CA status
+    when signed by a distinct CA with no -extensions override."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ca_conf = _tmp("ca_catrue.conf")
+        with open(cls.ca_conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(CA_CONF)
+        cls.req_conf = _tmp("ca_catrue_req.conf")
+        with open(cls.req_conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(CA_TRUE_REQ_CONF)
+        _touch(_tmp("index.txt"))
+        cls.csr = _tmp("ca_catrue.csr")
+        r = run_wolfssl("req", "-key",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-config", cls.req_conf, "-extensions", "v3_alt_ca",
+                        "-out", cls.csr)
+        assert r.returncode == 0, "CSR creation failed: " + r.stderr
+
+    @classmethod
+    def tearDownClass(cls):
+        _cleanup(cls.ca_conf, cls.req_conf, cls.csr, _tmp("index.txt"))
+
+    def test_catrue_csr_neutralized_without_extensions(self):
+        """CA:TRUE CSR signed by a distinct CA, no -extensions: the request
+        is signed, but issued as CA:FALSE rather than refused."""
+        out_name = "tmp_catrue_neutralized.pem"
+        out = _tmp(out_name)
+        self.addCleanup(lambda: _cleanup(out))
+        r = run_wolfssl("ca", "-config", self.ca_conf,
+                        "-in", self.csr, "-out", out_name, "-md", "sha256",
+                        "-keyfile", os.path.join(CERTS_DIR, "ca-key.pem"),
+                        "-cert", os.path.join(CERTS_DIR, "ca-cert.pem"))
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        rt = run_wolfssl("x509", "-in", out, "-text", "-noout")
+        self.assertEqual(rt.returncode, 0, rt.stderr)
+        self.assertNotIn("CA:TRUE", rt.stdout + rt.stderr,
+                         "a CSR's CA:TRUE must not survive signing without "
+                         "an explicit -extensions override")
+
+    def test_catrue_csr_accepted_with_selfsign(self):
+        """CA:TRUE CSR is trusted when the operator supplies both the
+        request and the signing key (-selfsign)."""
+        out_name = "tmp_catrue_selfsign.pem"
+        out = _tmp(out_name)
+        self.addCleanup(lambda: _cleanup(out))
+        r = run_wolfssl("ca", "-config", self.ca_conf,
+                        "-in", self.csr, "-out", out_name, "-md", "sha256",
+                        "-selfsign",
+                        "-keyfile", os.path.join(CERTS_DIR, "server-key.pem"))
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCACreateAndVerify(unittest.TestCase):
     """ca certificate creation and verification."""
@@ -352,6 +442,46 @@ class TestCACreateAndVerify(unittest.TestCase):
                          os.path.join(CERTS_DIR, "ca-cert.pem"), out)
         self.assertEqual(r2.returncode, 0, r2.stderr)
 
+
+
+BAD_KEYUSAGE_CONF = CA_CONF.replace(
+    "[ usr_cert ]\n",
+    "[ bad_ku ]\n\nbasicConstraints=CA:FALSE\n"
+    "keyUsage=digitalSignatureX\n\n[ usr_cert ]\n")
+
+
+class TestCABadKeyUsage(unittest.TestCase):
+    """An unparsable keyUsage must fail rather than silently issuing a
+    certificate with no keyUsage at all."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.conf = _tmp("ca_bad_ku.conf")
+        with open(cls.conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(BAD_KEYUSAGE_CONF)
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
+        cls.csr = _tmp("ca_bad_ku.csr")
+        r = run_wolfssl("req", "-key",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj",
+                        "/O=wolfSSL/C=US/ST=MT/L=Bozeman/CN=wolfSSL/OU=org-unit",
+                        "-out", cls.csr)
+        assert r.returncode == 0, "CSR creation failed: " + r.stderr
+
+    @classmethod
+    def tearDownClass(cls):
+        _cleanup(cls.conf, cls.csr, _tmp("index.txt"))
+
+    def test_unparsable_keyusage_fails(self):
+        out_name = "test_ca_bad_ku.pem"
+        out = _tmp(out_name)
+        self.addCleanup(lambda: _cleanup(out))
+        r = run_wolfssl("ca", "-config", self.conf, "-in", self.csr,
+                        "-out", out_name, "-extensions", "bad_ku")
+        self.assertNotEqual(r.returncode, 0,
+                            "unparsable keyUsage was accepted; the issued "
+                            "certificate would carry no keyUsage at all")
 
 
 @unittest.skipIf(no_filesystem(), "filesystem support disabled")
@@ -396,6 +526,22 @@ class TestCAOverrideConfig(unittest.TestCase):
                         "-keyfile",
                         os.path.join(CERTS_DIR, "ca-ecc-key.pem"))
         self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_ca_days_validation(self):
+        """ca -days rejects anything outside [1, 36500] instead of using 0."""
+        for bad in ("0", "-1", "abc", "12x", "36501", ""):
+            out_name = "test_ca_days.pem"
+            out = _tmp(out_name)
+            self._clean(out)
+            r = run_wolfssl("ca", "-config", self.conf,
+                            "-in", self.csr, "-out", out_name,
+                            "-days", bad,
+                            "-cert",
+                            os.path.join(CERTS_DIR, "ca-ecc-cert.pem"),
+                            "-keyfile",
+                            os.path.join(CERTS_DIR, "ca-ecc-key.pem"))
+            self.assertNotEqual(r.returncode, 0,
+                                "-days {!r} should be rejected".format(bad))
 
 
 class TestCAKeyMismatch(unittest.TestCase):
@@ -734,6 +880,42 @@ class TestCAChimera(unittest.TestCase):
             "-subjkey", os.path.join(CERTS_DIR, "server-ecc-key.pem"),
             "-cert", ca_chimera, "-out", server_chimera_name)
         self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_chimera_cert_oversized_subj_field(self):
+        """altextend on a CA cert whose subject DN field exceeds
+        CTC_NAME_SIZE must fail cleanly, not silently truncate."""
+        ca_cert_name = "tmp_chimera_ca_oversized.pem"
+        ca_cert = _tmp(ca_cert_name)
+        self._clean(ca_cert)
+
+        # 200 bytes exceeds CTC_NAME_SIZE (64 or 128, build-dependent);
+        # -subj reparsing must reject rather than truncate.
+        oversized_o = "O" * 200
+
+        r = run_wolfssl("req", "-new", "-x509",
+                        "-key", os.path.join(CERTS_DIR, "ca-ecc-key.pem"),
+                        "-subj",
+                        "O={}/C=US/ST=WA/L=Seattle/CN=A/OU=org-unit-A"
+                        .format(oversized_o),
+                        "-out", ca_cert, "-outform", "PEM")
+        if r.returncode != 0:
+            # Some builds (e.g. Windows CI) enforce CTC_NAME_SIZE in the
+            # compat layer and reject earlier in req; fine too, it didn't
+            # truncate.
+            return
+
+        r = run_wolfssl("ca", "-altextend", "-in", ca_cert,
+                        "-keyfile", os.path.join(CERTS_DIR, "ca-ecc-key.pem"),
+                        "-altkey",
+                        os.path.join(CERTS_DIR, "ca-mldsa44-key.pem"),
+                        "-altpub",
+                        os.path.join(CERTS_DIR, "ca-mldsa44-keyPub.pem"),
+                        "-out", "tmp_chimera_ca_oversized_chimera.pem")
+        self.addCleanup(lambda: _cleanup(
+            _tmp("tmp_chimera_ca_oversized_chimera.pem")))
+        self.assertNotEqual(r.returncode, 0,
+                "altextend should reject an oversized subject DN field "
+                "instead of silently truncating it")
 
 
 

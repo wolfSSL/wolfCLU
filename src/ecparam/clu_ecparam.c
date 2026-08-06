@@ -260,7 +260,7 @@ int wolfCLU_ecparam(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && key != NULL) {
-        wolfCLU_EcparamPrintOID(bioOut, key, outForm);
+        ret = wolfCLU_EcparamPrintOID(bioOut, key, outForm);
     }
 
     if (ret == WOLFCLU_SUCCESS && key != NULL && genKey) {

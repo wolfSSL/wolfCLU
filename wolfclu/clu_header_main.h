@@ -620,6 +620,17 @@ void wolfCLU_ForceZero(void* mem, unsigned int len);
  */
 word32 wolfCLU_DerSetLength(word32 length, byte* output);
 
+/* RFC 5280-oriented upper bound for -days / default_days (~100 years). */
+#ifndef WOLFCLU_MAX_CERT_DAYS
+#define WOLFCLU_MAX_CERT_DAYS 36500
+#endif
+
+/**
+ * @brief Parse a decimal -days argument into [1, WOLFCLU_MAX_CERT_DAYS].
+ *        Returns WOLFCLU_SUCCESS or USER_INPUT_ERROR.
+ */
+int wolfCLU_ParseDaysArg(const char* arg, int* daysOut);
+
 /*
  * These helpers deliberately work in terms of FILE* and POSIX/Win32 file
  * descriptors rather than wolfSSL's XFILE/XFOPEN porting macros: the
@@ -955,6 +966,43 @@ int wolfCLU_ReadCertDer(const char* filename, byte** outDer);
  * @brief function to prompt user for password from stdin
  */
 int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz);
+
+/**
+ * @brief PEM-encode a DER buffer into a newly allocated buffer
+ * @param der    DER input
+ * @param derSz  size of der
+ * @param type   wolfSSL PEM type, e.g. CERT_TYPE
+ * @param outBuf receives the PEM buffer; caller must XFREE it
+ * @param outBufSz receives the PEM size
+ * @return WOLFCLU_SUCCESS on success
+ */
+int wolfCLU_DerToPemBuf(const byte* der, int derSz, int type, byte** outBuf,
+        int* outBufSz);
+
+/**
+ * @brief PEM-encode a DER key into a newly allocated buffer
+ * @param der      DER input
+ * @param derSz    size of der
+ * @param out      receives the PEM buffer; caller must XFREE it
+ * @param pemType  wolfSSL PEM type, e.g. PRIVATEKEY_TYPE
+ * @param heapType dynamic type used for the allocation
+ * @return size of the PEM buffer on success, 0 or negative on failure
+ */
+int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
+        int heapType);
+
+/**
+ * @brief Write a DER buffer to a BIO, PEM-encoding it first when outForm is
+ *        PEM_FORM
+ * @param bioOut   destination BIO
+ * @param outForm  PEM_FORM or DER_FORM
+ * @param derBuf   DER input
+ * @param derBufSz size of derBuf
+ * @param type     wolfSSL PEM type used when outForm is PEM_FORM
+ * @return WOLFCLU_SUCCESS on success
+ */
+int wolfCLU_WriteCertBio(WOLFSSL_BIO* bioOut, int outForm, const byte* derBuf,
+        int derBufSz, int type);
 
 #ifdef __cplusplus
 }

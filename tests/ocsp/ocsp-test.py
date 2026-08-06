@@ -309,6 +309,39 @@ class _OCSPInteropBase(unittest.TestCase):
         log = resp.read_log()
         self.assertIn("wolfssl exiting gracefully", log)
 
+    def test_13_malformed_request_counts_toward_nrequest(self):
+        """A malformed (non-OCSP) request must still count toward
+        -nrequest, or a client sending only malformed requests could keep
+        the responder running indefinitely."""
+        if self.RESPONDER_BIN != WOLFSSL_BIN:
+            self.skipTest("nrequest counting only checked for wolfssl")
+
+        resp = self._start_responder(INDEX_VALID, nrequest=1)
+
+        body = b"not a valid OCSP request"
+        request = (
+            b"POST / HTTP/1.0\r\n"
+            b"Content-Type: application/ocsp-request\r\n"
+            b"Content-Length: " + str(len(body)).encode() + b"\r\n"
+            b"\r\n" + body
+        )
+        import socket
+        with socket.create_connection(("127.0.0.1", self.PORT),
+                                      timeout=5) as s:
+            s.sendall(request)
+            s.recv(4096)
+
+        # poll for up to 2 seconds for graceful shutdown log
+        for _ in range(20):
+            time.sleep(0.1)
+            log = resp.read_log()
+            if "wolfssl exiting gracefully" in log:
+                break
+        self.assertIn("wolfssl exiting gracefully", log,
+                "responder did not shut down after a single malformed "
+                "request with -nrequest 1 -- malformed requests must "
+                "still count toward the request budget")
+
 
 # Concrete test classes for each client/responder combination.
 # Each gets a dynamically assigned port in setUpClass to avoid conflicts.

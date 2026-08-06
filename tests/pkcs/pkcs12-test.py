@@ -85,6 +85,36 @@ class Pkcs12Test(unittest.TestCase):
                         "-out", os.path.join("no-such-dir", "out.pem"))
         self.assertNotEqual(r.returncode, 0)
 
+    def test_passout_encrypts_key_with_supplied_password(self):
+        """-passout must actually be used to DES-encrypt the extracted
+        private key, not silently ignored: the output must be an
+        encrypted PEM block, decryptable with that exact password and
+        not with a different one."""
+        out = "pkcs12-passout-test.pem"
+        self.addCleanup(lambda: os.remove(out) if os.path.exists(out) else None)
+
+        r = run_wolfssl("pkcs12", "-nocerts", "-passin", 'pass:wolfSSL test',
+                        "-passout", "pass:my-passout-secret",
+                        "-in", P12_FILE, "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        with open(out, "r") as f:
+            content = f.read()
+        self.assertIn("ENCRYPTED", content,
+                      "-passout key output was not encrypted")
+
+        r = run_wolfssl("rsa", "-in", out, "-noout",
+                        "-passin", "pass:my-passout-secret")
+        self.assertEqual(r.returncode, 0,
+                         "failed to decrypt -passout key with the correct "
+                         "password: {}".format(r.stderr))
+
+        r = run_wolfssl("rsa", "-in", out, "-noout",
+                        "-passin", "pass:wrong-password")
+        self.assertNotEqual(r.returncode, 0,
+                            "decrypting -passout key with the wrong "
+                            "password should have failed")
+
     def test_nocerts_with_passout(self):
         r = subprocess.run(
             [WOLFSSL_BIN, "pkcs12", "-passin", "stdin", "-passout", "pass:",

@@ -100,13 +100,14 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt,
 int wolfCLU_genKey_PWDBASED(WC_RNG* rng, byte* pwdKey, int size, byte* salt,
                                                                        int pad);
 
-void wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
+/* returns WOLFCLU_SUCCESS on success, WOLFCLU_FATAL_ERROR on failure */
+int wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
         int fmt);
 
 WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name);
 
-int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
-        int heapType);
+/* wolfCLU_KeyDerToPem() lives in clu_funcs.c and is declared in
+ * clu_header_main.h. */
 
 /**
  * generate a Dilithium key

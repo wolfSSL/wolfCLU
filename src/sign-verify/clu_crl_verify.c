@@ -74,7 +74,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
     char* out = NULL;
     WOLFSSL_BIO* bioIn  = NULL;
     WOLFSSL_BIO* bioOut = NULL;
-    WOLFSSL_X509_CRL* test;
+    WOLFSSL_X509_CRL* test = NULL;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -121,7 +121,8 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
             case WOLFCLU_HELP:
                 wolfCLU_CRLVerifyHelp();
-                return WOLFCLU_SUCCESS;
+                ret = WOLFCLU_SUCCESS;
+                goto cleanup;
 
             case ':':
             case '?':
@@ -295,6 +296,7 @@ int wolfCLU_CRLVerify(int argc, char** argv)
         wolfSSL_CertManagerFree(cm);
     }
 
+cleanup:
     if (der != NULL) {
         XFREE(der, HEAP_HINT, DYNAMIC_TYPE_CRL);
     }

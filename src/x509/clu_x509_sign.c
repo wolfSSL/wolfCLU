@@ -206,13 +206,50 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
                     break;
 
                 default:
+                    /* ownership of 'key' is NOT taken here, unlike the
+                     * RSA/ECDSA cases above -- caller must free it. */
                     WOLFCLU_LOG(WOLFCLU_E0,
                             "keytype needs added to wolfCLU_CertSignSetCA");
+                    break;
             }
             csign->keyType = keyType;
         }
     }
 }
+
+#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
+/* Read BIO's underlying file into buf. Returns WOLFCLU_SUCCESS on success
+ * (sets *outSz), BAD_FUNC_ARG on bad args, or WOLFCLU_FATAL_ERROR. */
+static int _ReadBioToBuf(WOLFSSL_BIO *bio, byte *buf, int bufSz, int *outSz)
+{
+    int ret;
+    XFILE fp = NULL;
+
+    if (bio == NULL || buf == NULL || outSz == NULL || bufSz <= 0) {
+        return BAD_FUNC_ARG;
+    }
+
+    ret = (int)wolfSSL_BIO_get_fp(bio, &fp);
+    if (ret != WOLFSSL_SUCCESS) {
+        wolfCLU_LogError("Error getting fp from BIO");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    if (XFSEEK(fp, 0, XSEEK_SET) != 0) {
+        wolfCLU_LogError("Error seeking to start of file");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    ret = (int)XFREAD(buf, 1, bufSz, fp);
+    if (ret <= 0) {
+        wolfCLU_LogError("Error reading from file");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    *outSz = ret;
+    return WOLFCLU_SUCCESS;
+}
+#endif
 
 /* ref: https://github.com/wolfssl/wolfssl-examples/X9.146/gen_ecdsa_mldsa_dual_keysig_cert.c */
 int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
@@ -240,10 +277,6 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     int initAltCaKey  = 0;
     int initPreTBS    = 0;
 
-    XFILE caKeyFp       = NULL;
-    XFILE altCaKeyFp    = NULL;
-    XFILE altCaPubKeyFp = NULL;
-    XFILE serverKeyFp   = NULL;
     WOLFSSL_BIO *out    = NULL;
 
     char *token   = NULL;
@@ -317,13 +350,10 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         altSigValBuf = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         derBuf       = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         outBuf       = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        caCertBuf    = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        serverKeyBuf = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
 
         if (caKeyBuf == NULL || altCaKeyBuf == NULL || sapkiBuf == NULL ||
             altSigAlgBuf == NULL || scratchBuf == NULL || preTbsBuf == NULL ||
-            altSigValBuf == NULL || derBuf == NULL || outBuf == NULL ||
-            caCertBuf == NULL || serverKeyBuf == NULL) {
+            altSigValBuf == NULL || derBuf == NULL || outBuf == NULL) {
             ret = MEMORY_E;
         }
         else {
@@ -336,6 +366,20 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             XMEMSET(altSigValBuf, 0, LARGE_TEMP_SZ);
             XMEMSET(derBuf,       0, LARGE_TEMP_SZ);
             XMEMSET(outBuf,       0, LARGE_TEMP_SZ);
+        }
+    }
+
+    /* caCertBuf/serverKeyBuf are only needed on the server-cert path */
+    if (ret == WOLFCLU_SUCCESS && !isCA) {
+        caCertBuf    = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT,
+                DYNAMIC_TYPE_TMP_BUFFER);
+        serverKeyBuf = (byte*)XMALLOC(LARGE_TEMP_SZ, HEAP_HINT,
+                DYNAMIC_TYPE_TMP_BUFFER);
+
+        if (caCertBuf == NULL || serverKeyBuf == NULL) {
+            ret = MEMORY_E;
+        }
+        else {
             XMEMSET(caCertBuf,    0, LARGE_TEMP_SZ);
             XMEMSET(serverKeyBuf, 0, LARGE_TEMP_SZ);
         }
@@ -360,6 +404,10 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
             wolfCLU_LogError("Error getting DER from CA cert");
             ret = WOLFCLU_FATAL_ERROR;
         }
+        else if (caCertSz > LARGE_TEMP_SZ) {
+            wolfCLU_LogError("CA cert DER too large for temp buffer");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
         else {
             XMEMCPY(caCertBuf, tmpBuf, caCertSz);
             ret = WOLFCLU_SUCCESS;
@@ -368,44 +416,13 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 
     /* open CA ecc private key */
     if (ret == WOLFCLU_SUCCESS) {
-        ret = (int)wolfSSL_BIO_get_fp(bioCaKey, &caKeyFp);
-        if (ret != WOLFCLU_SUCCESS) {
-            wolfCLU_LogError("Error cannot get CA key fd");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            XFSEEK(caKeyFp, 0, SEEK_SET);
-            ret = (int)XFREAD(caKeyBuf, 1, caKeySz, caKeyFp);
-            if (ret <= 0) {
-                wolfCLU_LogError("Error reading CA key");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                caKeySz = ret;
-                ret = WOLFCLU_SUCCESS;
-            }
-        }
+        ret = _ReadBioToBuf(bioCaKey, caKeyBuf, caKeySz, &caKeySz);
     }
 
     /* open server ecc private key */
     if (ret == WOLFCLU_SUCCESS && !isCA) {
-        ret = (int)wolfSSL_BIO_get_fp(bioSubjKey, &serverKeyFp);
-        if (ret != WOLFCLU_SUCCESS) {
-            wolfCLU_LogError("Error cannot get server key fd");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            XFSEEK(serverKeyFp, 0, SEEK_SET);
-            ret = (int)XFREAD(serverKeyBuf, 1, serverKeySz, serverKeyFp);
-            if (ret <= 0) {
-                wolfCLU_LogError("Error reading server key");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                serverKeySz = ret;
-                ret = WOLFCLU_SUCCESS;
-            }
-        }
+        ret = _ReadBioToBuf(bioSubjKey, serverKeyBuf, serverKeySz,
+                &serverKeySz);
     }
 
     /* open CA ecc private key */
@@ -424,11 +441,18 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         }
 
         if (ret == 0) {
-            XMEMSET(caKeyBuf, 0, caKeySz); /* clear original buffer */
-            caKeySz = derObj->length;
-            XMEMCPY(caKeyBuf, derObj->buffer, caKeySz);
-            wc_FreeDer(&derObj);
-            ret = WOLFCLU_SUCCESS;
+            if (derObj->length > LARGE_TEMP_SZ) {
+                wolfCLU_LogError("CA key DER too large for temp buffer");
+                wc_FreeDer(&derObj);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                XMEMSET(caKeyBuf, 0, caKeySz); /* clear original buffer */
+                caKeySz = derObj->length;
+                XMEMCPY(caKeyBuf, derObj->buffer, caKeySz);
+                wc_FreeDer(&derObj);
+                ret = WOLFCLU_SUCCESS;
+            }
         }
     }
 
@@ -471,11 +495,19 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
         }
 
         if (ret == 0) {
-            XMEMSET(serverKeyBuf, 0, serverKeySz); /* clear original buffer */
-            serverKeySz = derObj->length;
-            XMEMCPY(serverKeyBuf, derObj->buffer, serverKeySz);
-            wc_FreeDer(&derObj);
-            ret = WOLFCLU_SUCCESS;
+            if (derObj->length > LARGE_TEMP_SZ) {
+                wolfCLU_LogError("Server key DER too large for temp buffer");
+                wc_FreeDer(&derObj);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                /* clear original buffer */
+                XMEMSET(serverKeyBuf, 0, serverKeySz);
+                serverKeySz = derObj->length;
+                XMEMCPY(serverKeyBuf, derObj->buffer, serverKeySz);
+                wc_FreeDer(&derObj);
+                ret = WOLFCLU_SUCCESS;
+            }
         }
     }
 
@@ -506,23 +538,7 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 
     /* load alternative CA public key */
     if (ret == WOLFCLU_SUCCESS) {
-        ret = (int)wolfSSL_BIO_get_fp(bioAltSubjPubKey, &altCaPubKeyFp);
-        if (ret != WOLFCLU_SUCCESS) {
-            wolfCLU_LogError("Error get AltCAkey fd");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            XFSEEK(altCaPubKeyFp, 0, SEEK_SET);
-            ret = (int)XFREAD(sapkiBuf, 1, sapkiSz, altCaPubKeyFp);
-            if (ret <= 0) {
-                wolfCLU_LogError("Error cannot read ML-DSA key");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                sapkiSz = ret;
-                ret = WOLFCLU_SUCCESS;
-            }
-        }
+        ret = _ReadBioToBuf(bioAltSubjPubKey, sapkiBuf, sapkiSz, &sapkiSz);
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -530,6 +546,11 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
                             &derObj, HEAP_HINT, NULL, NULL);
         if (ret < 0) {
             wolfCLU_LogError("Error convert file pem to der");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (derObj->length > LARGE_TEMP_SZ) {
+            wolfCLU_LogError("Alt public key DER too large for temp buffer");
+            wc_FreeDer(&derObj);
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -555,23 +576,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        ret = (int)wolfSSL_BIO_get_fp(bioAltCaKey, &altCaKeyFp);
-        if (ret != WOLFCLU_SUCCESS) {
-            wolfCLU_LogError("Error cannot get AltCA key fd");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            XFSEEK(altCaKeyFp, 0, SEEK_SET);
-            ret = (int)XFREAD(altCaKeyBuf, 1, altCaKeySz, altCaKeyFp);
-            if (ret <= 0) {
-                wolfCLU_LogError("Error reading alternative CA key");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                altCaKeySz = ret;
-                ret = WOLFCLU_SUCCESS;
-            }
-        }
+        ret = _ReadBioToBuf(bioAltCaKey, altCaKeyBuf, altCaKeySz,
+                &altCaKeySz);
     }
 
     if (ret == WOLFCLU_SUCCESS) {
@@ -579,6 +585,11 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
                             &derObj, HEAP_HINT, NULL, NULL);
         if (ret < 0) {
             wolfCLU_LogError("Error convert pem to der");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (derObj->length > LARGE_TEMP_SZ) {
+            wolfCLU_LogError("Alt CA key DER too large for temp buffer");
+            wc_FreeDer(&derObj);
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -664,26 +675,23 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
                     break;
                 }
 
-                if (XSTRCMP(key, "C") == 0) {
-                    XSTRLCPY(newCert.subject.country, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "ST") == 0) {
-                    XSTRLCPY(newCert.subject.state, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "L") == 0) {
-                    XSTRLCPY(newCert.subject.locality, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "O") == 0) {
-                    XSTRLCPY(newCert.subject.org, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "OU") == 0) {
-                    XSTRLCPY(newCert.subject.unit, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "CN") == 0) {
-                    XSTRLCPY(newCert.subject.commonName, value, CTC_NAME_SIZE);
-                }
-                else if (XSTRCMP(key, "emailAddress") == 0) {
-                    XSTRLCPY(newCert.subject.email, value, CTC_NAME_SIZE);
+                {
+                    int subjNid = wolfSSL_OBJ_sn2nid(key);
+
+                    if (subjNid == 0) {
+                        /* Reject rather than skip: silently ignoring a
+                         * component would sign a subject the caller did not
+                         * ask for. */
+                        wolfCLU_LogError("Unknown subject component \"%s\" "
+                                "in -subj", key);
+                        ret = WOLFCLU_FATAL_ERROR;
+                        break;
+                    }
+                    ret = wolfCLU_SetCertNameFieldByNid(&newCert.subject,
+                            subjNid, value, (int)XSTRLEN(value));
+                    if (ret != WOLFCLU_SUCCESS) {
+                        break;
+                    }
                 }
 
                 token = XSTRTOK(NULL, "/", &slash);
@@ -903,9 +911,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        out = wolfSSL_BIO_new_file(outFileName, "wb");
+        out = wolfCLU_OpenOutFileBio(outFileName);
         if (out == NULL) {
-            wolfCLU_LogError("Unable to open out file %s", outFileName);
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -1148,6 +1155,120 @@ int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out)
 }
 
 
+/* Amount the record buffer grows by, and so the most one wolfSSL_BIO_gets()
+ * can return, per read. */
+#ifndef WOLFCLU_DB_READ_CHUNK_SZ
+#define WOLFCLU_DB_READ_CHUNK_SZ 256
+#endif
+
+/* Upper bound on one certificate database record, so a corrupt or hostile
+ * database cannot drive an unbounded allocation. */
+#ifndef WOLFCLU_MAX_DB_RECORD_SZ
+#define WOLFCLU_MAX_DB_RECORD_SZ 16384
+#endif
+
+/* Read one newline-terminated record from the certificate database. A DN is
+ * only bounded by the number of RDNs it carries, so a record can be longer
+ * than any single read; accumulate until the newline rather than truncating,
+ * which would leave the continuation looking like a fresh (tab-less) record.
+ * Reads land directly in the growing record so no bounce buffer sits on the
+ * stack. On success *out holds the record and must be freed by the caller,
+ * or is NULL at end of input.
+ * return WOLFCLU_SUCCESS on success */
+static int wolfCLU_ReadDbRecord(WOLFSSL_BIO* bio, char** out)
+{
+    char* record = NULL;
+    int   recordSz = 0;
+    int   ret = WOLFCLU_SUCCESS;
+
+    if (bio == NULL || out == NULL) {
+        return BAD_FUNC_ARG;
+    }
+    *out = NULL;
+
+    for (;;) {
+        char* bigger;
+        int   readSz;
+
+        if (recordSz > WOLFCLU_MAX_DB_RECORD_SZ - WOLFCLU_DB_READ_CHUNK_SZ) {
+            wolfCLU_LogError("Certificate database record exceeds %d bytes",
+                    WOLFCLU_MAX_DB_RECORD_SZ);
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+        bigger = (char*)XREALLOC(record,
+                (size_t)recordSz + WOLFCLU_DB_READ_CHUNK_SZ, HEAP_HINT,
+                DYNAMIC_TYPE_TMP_BUFFER);
+        if (bigger == NULL) {
+            ret = MEMORY_E;
+            break;
+        }
+        record = bigger;
+
+        if (wolfSSL_BIO_gets(bio, record + recordSz,
+                    WOLFCLU_DB_READ_CHUNK_SZ) <= 0) {
+            break;
+        }
+        readSz = (int)XSTRLEN(record + recordSz);
+        if (readSz == 0) {
+            break;
+        }
+        recordSz += readSz;
+
+        if (record[recordSz - 1] == '\n') {
+            break;
+        }
+    }
+
+    if (ret != WOLFCLU_SUCCESS || recordSz == 0) {
+        /* *out stays NULL: either an error, or the end of the database. */
+        XFREE(record, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        return ret;
+    }
+
+    *out = record;
+    return WOLFCLU_SUCCESS;
+}
+
+
+/* #5749/#5751: a DN attribute holding a TAB, CR or LF splits the flat-file
+ * database record wolfCLU_CertSignLog() writes, and the split record no
+ * longer round-trips back to an equal WOLFSSL_X509_NAME. Rewriting those
+ * characters would only change the stored copy, leaving the unique_subject
+ * comparison -- which runs against the live name -- unable to ever match, so
+ * refuse the DN instead and keep both sides in the same form.
+ * return WOLFCLU_SUCCESS when the subject is safe to record */
+static int wolfCLU_CheckSubjectRecordable(WOLFSSL_X509_NAME* name)
+{
+    char* oneline;
+    int   i;
+    int   ret = WOLFCLU_SUCCESS;
+
+    if (name == NULL) {
+        wolfCLU_LogError("Unable to get subject name");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    oneline = wolfSSL_X509_NAME_oneline(name, NULL, 0);
+    if (oneline == NULL) {
+        wolfCLU_LogError("Unable to get subject name");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    for (i = 0; oneline[i] != '\0'; i++) {
+        if (oneline[i] == '\t' || oneline[i] == '\r' || oneline[i] == '\n') {
+            wolfCLU_LogError("Subject name contains a control character and "
+                    "cannot be recorded in the certificate database");
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+    }
+
+    XFREE(oneline, NULL, DYNAMIC_TYPE_OPENSSL);
+    return ret;
+}
+
+
 static int wolfCLU_CertSignLog(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 {
     int ret = WOLFCLU_SUCCESS;
@@ -1176,6 +1297,10 @@ static int wolfCLU_CertSignLog(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             wolfCLU_LogError("Unable to get subject name");
             ret = WOLFCLU_FATAL_ERROR;
         }
+
+        /* #5749/#5751: the DN is known to be free of the TAB/CR/LF field
+         * separators here -- wolfCLU_CheckSubjectRecordable() rejected the
+         * certificate before this point if it was not. */
 
         if (ret == WOLFCLU_SUCCESS &&
                 wolfSSL_BIO_write(csign->dataBase, subject,
@@ -1221,26 +1346,27 @@ static int _checkPolicy(WOLFSSL_X509_NAME* issuer, WOLFSSL_X509_NAME* subject,
             return WOLFCLU_FAILURE;
         }
 
-        current  = (char*)XMALLOC(currentSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-        expected = (char*)XMALLOC(expectedSz, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        current  = (char*)XMALLOC(currentSz + 1, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        expected = (char*)XMALLOC(expectedSz + 1, NULL,
+                DYNAMIC_TYPE_TMP_BUFFER);
         if (current == NULL || expected == NULL) {
             ret = WOLFCLU_FAILURE;
         }
 
         if (ret == WOLFCLU_SUCCESS &&
                 wolfSSL_X509_NAME_get_text_by_NID(subject, nid, current,
-                currentSz) <= 0) {
+                currentSz + 1) <= 0) {
             ret = WOLFCLU_FAILURE;
         }
 
         if (ret == WOLFCLU_SUCCESS &&
                 wolfSSL_X509_NAME_get_text_by_NID(issuer, nid, expected,
-                expectedSz) <= 0) {
+                expectedSz + 1) <= 0) {
             ret = WOLFCLU_FAILURE;
         }
 
         if (ret == WOLFCLU_SUCCESS &&
-                XSTRNCMP(expected, current, currentSz) != 0) {
+                XSTRNCMP(expected, current, currentSz + 1) != 0) {
             WOLFSSL_MSG("Policy mismatch with subject and issuer");
             ret = WOLFCLU_FAILURE;
         }
@@ -1273,6 +1399,15 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
     if (ret == WOLFCLU_SUCCESS && csign->ca == NULL) {
         wolfCLU_LogError("Bad argument no signing certificate");
         ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    /* Validate the subject before anything is written to the database or
+     * compared against it, so the recorded form and the live name are always
+     * the same form. */
+    if (ret == WOLFCLU_SUCCESS &&
+            (csign->dataBase != NULL || csign->unique == 1)) {
+        ret = wolfCLU_CheckSubjectRecordable(
+                wolfSSL_X509_get_subject_name(x509));
     }
 
     /* set cert date */
@@ -1375,45 +1510,87 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         wolfSSL_ASN1_INTEGER_free(s);
     }
 
+    /* A CSR's basicConstraints/CA:TRUE claim is untrusted content: issuance
+     * policy is the signer's call, not the requester's. Force CA:FALSE
+     * before extensions are applied, so the operator's own -extensions
+     * config can still assert CA:TRUE afterwards and win. -selfsign
+     * (csign->ca == x509) defaults to CA:TRUE instead, matching req -x509:
+     * there the operator supplies both the request and the signing key.
+     *
+     * Neutralizing rather than refusing keeps `ca` usable for batch signing
+     * and matches OpenSSL, which ignores CSR extensions by default
+     * (copy_extensions = none) rather than failing on them. */
+#if defined(WOLFSSL_CERT_EXT)
+    if (ret == WOLFCLU_SUCCESS) {
+        if (csign->ca != x509 && wolfSSL_X509_get_isCA(x509)) {
+            WOLFCLU_LOG(WOLFCLU_L0, "CSR requested basicConstraints CA:TRUE; "
+                    "issuing as CA:FALSE (use -extensions to override)");
+        }
+        ret = wolfCLU_SetBasicConstraintsCA(x509, csign->ca == x509);
+    }
+#else
+    /* No WOLFSSL_CERT_EXT API to neutralize a CSR's basicConstraints, so a
+     * CA:TRUE claim can only be refused here. */
+    if (ret == WOLFCLU_SUCCESS && csign->ca != x509 &&
+            wolfSSL_X509_get_isCA(x509)) {
+        wolfCLU_LogError("wolfSSL built without WOLFSSL_CERT_EXT cannot "
+                "neutralize a CSR's basicConstraints; refusing to sign a "
+                "CSR that asserts CA:TRUE");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+#endif /* WOLFSSL_CERT_EXT */
+
     /* set extensions */
     if (ret == WOLFCLU_SUCCESS && csign->ext != NULL) {
         ret = wolfCLU_setExtensions(x509, csign->config, csign->ext);
     }
 
-    /* sign the certificate */
-    if (ret == WOLFCLU_SUCCESS &&
-            (csign->keyType == RSAk || csign->keyType == ECDSAk)) {
-        if (wolfSSL_X509_check_private_key(csign->ca, csign->caKey.pkey) !=
-                WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Private key does not match with CA");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
 
-        if (ret == WOLFCLU_SUCCESS &&
-                wolfSSL_X509_sign(x509, csign->caKey.pkey, md) <= 0) {
-            wolfCLU_LogError("Error signing certificate");
+    /* sign the certificate */
+    if (ret == WOLFCLU_SUCCESS) {
+        if (csign->keyType == RSAk || csign->keyType == ECDSAk) {
+            if (wolfSSL_X509_check_private_key(csign->ca, csign->caKey.pkey) !=
+                    WOLFSSL_SUCCESS) {
+                wolfCLU_LogError("Private key does not match with CA");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    wolfSSL_X509_sign(x509, csign->caKey.pkey, md) <= 0) {
+                wolfCLU_LogError("Error signing certificate");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else {
+            /* ML-DSA/PQC pure-cert signing isn't implemented yet; fail
+             * instead of writing out an unsigned certificate. */
+            wolfCLU_LogError("Unsupported key type for CA signing");
             ret = WOLFCLU_FATAL_ERROR;
         }
-    } /* @TODO else case here could get the tbs buffer or just the der of the
-       * x509 struct and use a different method for signing and creating the
-       * certificate */
+    }
 
     /* check if unique subject name is required */
     if (ret == WOLFCLU_SUCCESS && csign->unique == 1) {
-        char line[MAX_TERM_WIDTH];
         WOLFSSL_X509_NAME* subject;
+        char* record = NULL;
+
         subject = wolfSSL_X509_get_subject_name(x509);
 
         /* for now using a dumb brute force approach */
         wolfSSL_BIO_reset(csign->dataBase);
-        while (wolfSSL_BIO_gets(csign->dataBase, line, MAX_TERM_WIDTH) > 0) {
+        for (;;) {
             int i = 0;
             char* word, *end;
             char* deli = (char*)"\t";
             char* subj = NULL;
             WOLFSSL_X509_NAME* current = NULL;
 
-            for (word = strtok_r(line, deli, &end); word != NULL;
+            ret = wolfCLU_ReadDbRecord(csign->dataBase, &record);
+            if (ret != WOLFCLU_SUCCESS || record == NULL) {
+                break; /* error, or end of database */
+            }
+
+            for (word = strtok_r(record, deli, &end); word != NULL;
                     word = strtok_r(NULL, deli, &end)) {
                     if (i == 1) {
                         subj = word;
@@ -1441,7 +1618,11 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
                 break;
             }
             wolfSSL_X509_NAME_free(current);
+
+            XFREE(record, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            record = NULL;
         }
+        XFREE(record, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     /* check policy constraints */
@@ -1517,10 +1698,8 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
     /* create WOLFSSL_BIO for output */
     if (ret == WOLFCLU_SUCCESS) {
-        out = wolfSSL_BIO_new_file(csign->outDir, "wb");
+        out = wolfCLU_OpenOutFileBio(csign->outDir);
         if (out == NULL) {
-            wolfCLU_LogError("Could not open output file %s",
-                    csign->outDir);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -1756,7 +1935,17 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
 
         if (wolfSSL_NCONF_get_number(conf, CAsection, "default_days",
                     &defaultDays) == WOLFSSL_SUCCESS) {
-            wolfCLU_CertSignSetDate(ret, (int)defaultDays);
+            /* #5685: guard against long->int narrowing UB and RFC 5280
+             * year-overflow for absurdly large values. */
+            if (defaultDays > 0 &&
+                    defaultDays <= (long)WOLFCLU_MAX_CERT_DAYS) {
+                wolfCLU_CertSignSetDate(ret, (int)defaultDays);
+            }
+            else {
+                wolfCLU_LogError("default_days value %ld is out of valid range "
+                        "[1, %d]; using built-in default", defaultDays,
+                        WOLFCLU_MAX_CERT_DAYS);
+            }
         }
 
         defaultMD = wolfSSL_NCONF_get_string(conf, CAsection, "default_md");
@@ -1813,15 +2002,88 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         keyType = wolfCLU_GetTypeFromPKEY(caKey);
     }
 
+    /* Ownership after SetCA:
+     * - ca: taken when ret != NULL (stored in csign->ca)
+     * - caKey: taken only when ret != NULL and keyType is RSAk/ECDSAk
+     * - on ret == NULL, SetCA is a no-op; free both locals below
+     * - on unsupported keyType with ret != NULL, free caKey (ca stays) */
     wolfCLU_CertSignSetCA(ret, ca, caKey, keyType);
+
+    if (ret == NULL || (keyType != RSAk && keyType != ECDSAk)) {
+        wolfSSL_EVP_PKEY_free(caKey);
+    }
 
     /* in fail case free up memory */
     if (ret == NULL) {
         wolfSSL_NCONF_free(conf);
         wolfSSL_X509_free(ca);
-        wolfSSL_EVP_PKEY_free(caKey);
     }
     return ret;
 }
 
 #endif /* WOLFCLU_NO_FILESYSTEM */
+
+#if defined(WOLFSSL_CERT_GEN) && defined(WOLFSSL_CERT_EXT)
+int wolfCLU_CertSignNative(WOLFSSL_X509* x509, void* caKey, int caKeyType,
+        int sigType, int bufSz, WOLFSSL_X509* caCert, int outForm,
+        byte** outData, int* outDataSz, int policySanitized,
+        void* subjKey, int subjKeyType)
+{
+    int ret;
+    byte* certBuf = NULL;
+    byte* outBuf = NULL;
+    int certSz = 0;
+    int outBufSz = 0;
+
+    if (outData != NULL) {
+        *outData = NULL;
+    }
+    if (outDataSz != NULL) {
+        *outDataSz = 0;
+    }
+    if (x509 == NULL || caKey == NULL || outData == NULL || outDataSz == NULL ||
+        subjKey == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    ret = wolfCLU_MakeAndSignCertDer(x509, 0, sigType, bufSz, subjKey,
+            subjKeyType, caKey, caKeyType, caCert, policySanitized, -1,
+            &certBuf, &certSz);
+
+    if (ret == WOLFCLU_SUCCESS && outForm == PEM_FORM) {
+        ret = wolfCLU_DerToPemBuf(certBuf, certSz, CERT_TYPE, &outBuf,
+                &outBufSz);
+    }
+    if (ret == WOLFCLU_SUCCESS) {
+        if (outForm == PEM_FORM) {
+            *outData = outBuf;
+            *outDataSz = outBufSz;
+            outBuf = NULL;
+        }
+        else if (outForm == DER_FORM) {
+            if (bufSz > certSz) {
+                wolfCLU_ForceZero(certBuf + certSz,
+                        (unsigned int)(bufSz - certSz));
+            }
+            *outData = certBuf;
+            *outDataSz = certSz;
+            certBuf = NULL;
+        }
+        else {
+            wolfCLU_LogError("Invalid outForm specified");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (certBuf != NULL) {
+        wolfCLU_ForceZero(certBuf, (unsigned int)bufSz);
+        XFREE(certBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (outBuf != NULL) {
+        wolfCLU_ForceZero(outBuf, (unsigned int)outBufSz);
+        XFREE(outBuf,  HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+
+    return ret;
+}
+#endif /* WOLFSSL_CERT_GEN && WOLFSSL_CERT_EXT */

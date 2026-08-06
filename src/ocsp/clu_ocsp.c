@@ -865,12 +865,11 @@ static int ocspResponder(OcspResponderConfig* config)
         if (transportSendResponse(clientfd, transportType, respBuffer, (int)respSz) != 0)
             goto continue_loop;
 
-        if (ocspStatus == OCSP_SUCCESSFUL) {
-            /* Only count successfully processed requests toward the -nrequest
-             * limit. Failed reads/sends jump to continue_loop above, so a
-             * misbehaving client cannot exhaust the budget. */
-            requestsProcessed++;
-        }
+        /* Count every response sent, including malformedRequest and
+         * internalError ones, to match OpenSSL's accept_count. Connections
+         * that never produced a response jump to continue_loop above and so
+         * are not counted. */
+        requestsProcessed++;
 
         /* Check if we've hit the request limit */
         if (config->nrequest > 0 && requestsProcessed >= config->nrequest) {

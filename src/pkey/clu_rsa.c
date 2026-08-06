@@ -80,7 +80,7 @@ int wolfCLU_RSA(int argc, char** argv)
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
     WOLFSSL_RSA *rsa = NULL;
-    char *outPath = NULL;
+    const char *outPath = NULL;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -209,6 +209,14 @@ int wolfCLU_RSA(int argc, char** argv)
         }
     }
 
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        /* bio holds secret material exactly when pubOut is false */
+        bioOut = wolfCLU_OpenOutOrKeyFileBio(outPath, !pubOut);
+        if (bioOut == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
     /* print to stdout if no -out was used */
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
@@ -229,6 +237,8 @@ int wolfCLU_RSA(int argc, char** argv)
         unsigned char *pt; /* use pt with i2d to handle potential pointer
                               increment */
         int derSz = 0;
+        /* separate from derSz: a failed second i2d call overwrites derSz */
+        int allocSz = 0;
         int pemType;
         int heapType;
 
@@ -242,6 +252,7 @@ int wolfCLU_RSA(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS) {
+                allocSz = derSz;
                 der = (unsigned char*)XMALLOC(derSz, HEAP_HINT, heapType);
                 if (der == NULL) {
                     ret = WOLFCLU_FATAL_ERROR;
@@ -251,6 +262,9 @@ int wolfCLU_RSA(int argc, char** argv)
             if (ret == WOLFCLU_SUCCESS) {
                 pt    = der;
                 derSz = wolfSSL_i2d_RSAPublicKey(rsa, &pt);
+                if (derSz < 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
             }
         }
         else {
@@ -263,6 +277,7 @@ int wolfCLU_RSA(int argc, char** argv)
             }
 
             if (ret == WOLFCLU_SUCCESS) {
+                allocSz = derSz;
                 der = (unsigned char*)XMALLOC(derSz, HEAP_HINT, heapType);
                 if (der == NULL) {
                     ret = WOLFCLU_FATAL_ERROR;
@@ -272,18 +287,25 @@ int wolfCLU_RSA(int argc, char** argv)
             if (ret == WOLFCLU_SUCCESS) {
                 pt    = der;
                 derSz = wolfSSL_i2d_RSAPrivateKey(rsa, &pt);
+                if (derSz < 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
             }
         }
 
-        if (outForm == PEM_FORM) {
-            ret = wolfCLU_printDer(bioOut, der, derSz, pemType, heapType);
-        }
-        else {
-            wolfSSL_BIO_write(bioOut, der, derSz);
+        if (ret == WOLFCLU_SUCCESS) {
+            if (outForm == PEM_FORM) {
+                ret = wolfCLU_printDer(bioOut, der, derSz, pemType, heapType);
+            }
+            else if (wolfSSL_BIO_write(bioOut, der, derSz) != derSz) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
 
         if (der != NULL) {
-            wolfCLU_ForceZero(der, derSz);
+            if (allocSz > 0) {
+                wolfCLU_ForceZero(der, allocSz);
+            }
             XFREE(der, HEAP_HINT, heapType);
         }
     }

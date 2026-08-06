@@ -246,8 +246,7 @@ int wolfCLU_sign_verify_setup(int argc, char** argv)
     int    helpCheck   = 0;
     int    inForm      = DER_FORM; /* the key input format */
 
-    /* The algorithm name is a positional mode selector (rsa, ecc, ...).
-     * checkForArg doesn't look for "-" here, as it would have been
+    /* checkForArg doesn't look for "-" here, as it would have been
      * removed in clu_main.c if present. */
     if (wolfCLU_checkForArg("rsa", 3, argc, argv) > 0) {
         algCheck = RSA_SIG_VER;
