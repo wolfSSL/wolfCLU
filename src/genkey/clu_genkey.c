@@ -1,6 +1,6 @@
 /* clu_genkey.c
  *
- * Copyright (C) 2006-2025 wolfSSL Inc.
+ * Copyright (C) 2006-2026 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -770,7 +770,6 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
 }
 
 
-
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                        keySz, long exp)
@@ -1274,10 +1273,11 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 #endif /* HAVE_DILITHIUM && !WOLFCLU_NO_FILESYSTEM */
 }
 
-int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
-                            int keySz, int level, int withAlg)
+int wolfCLU_genKey_ML_DSA(WC_RNG* rng, const char* fName, int directive,
+                            int fmt, int keySz, int level, int withAlg,
+                            MlDsaKey** outKey)
 {
-#if defined(HAVE_DILITHIUM) && !defined(WOLFCLU_NO_FILESYSTEM)
+#if defined(WOLFCLU_HAVE_MLDSA) && !defined(WOLFCLU_NO_FILESYSTEM)
     int    ret = WOLFCLU_SUCCESS;
 
     XFILE  file       = NULL;
@@ -1294,30 +1294,32 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
     int    pemBufSz    = 0;
     int    outBufSz    = 0;
 
-#ifdef WOLFSSL_SMALL_STACK
     MlDsaKey* key;
     key = (MlDsaKey*)XMALLOC(sizeof(MlDsaKey), HEAP_HINT,
-            DYNAMIC_TYPE_DILITHIUM);
+            DYNAMIC_TYPE_TMP_BUFFER);
     if (key == NULL) {
         return MEMORY_E;
     }
-#else
-    MlDsaKey key[1];
-#endif
 
-    if (rng == NULL || fName == NULL) {
-#ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
-#endif
+    if (rng == NULL || (fName == NULL && outKey == NULL)) {
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return BAD_FUNC_ARG;
+    }
+
+    /* fOutNameBuf below appends up to fExtSz-1 bytes of extension; keep the
+     * combined name within MAX_FILENAME_SZ. */
+    if (fName != NULL &&
+            (int)XSTRLEN(fName) >= MAX_FILENAME_SZ - (int)sizeof(fExtPriv)) {
+        wolfCLU_LogError("ERROR: output filename too long (max %d)",
+                         MAX_FILENAME_SZ - (int)sizeof(fExtPriv) - 1);
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        return USER_INPUT_ERROR;
     }
 
     /* init the ML-DSA key */
     if (wc_MlDsaKey_Init(key, NULL, 0) != 0) {
         wolfCLU_LogError("Failed to initialize ML-DSA Key");
-#ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
-#endif
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return WOLFCLU_FAILURE;
     }
 
@@ -1325,9 +1327,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
     if (wc_MlDsaKey_SetParams(key, (byte)level) != 0) {
         wolfCLU_LogError("Failed to set ML-DSA Key parameters");
         wc_MlDsaKey_Free(key);
-#ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
-#endif
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return WOLFCLU_FAILURE;
     }
 
@@ -1335,14 +1335,12 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
     if (wc_MlDsaKey_MakeKey(key, rng) != 0) {
         wolfCLU_LogError("Failed to make ML-DSA Key");
         wc_MlDsaKey_Free(key);
-#ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
-#endif
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         return WOLFCLU_FAILURE;
     }
 
     /* set up the file name output buffer */
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && fName != NULL) {
         fNameSz     = (int)XSTRLEN(fName);
         fOutNameBuf = (char*)XMALLOC(fNameSz + fExtSz + 1, HEAP_HINT,
                         DYNAMIC_TYPE_TMP_BUFFER);
@@ -1351,18 +1349,14 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
+
+
+    if (ret == WOLFCLU_SUCCESS && fName != NULL) {
         XMEMSET(fOutNameBuf, 0, fNameSz + fExtSz);
         XMEMCPY(fOutNameBuf, fName, fNameSz);
-
-        derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
-                    DYNAMIC_TYPE_TMP_BUFFER);
-        if (derBuf == NULL) {
-            ret = MEMORY_E;
-        }
     }
 
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && fName != NULL) {
         switch (directive) {
             case PRIV_AND_PUB_FILES:
                 /* Fall through to PRIV_ONLY_FILE */
@@ -1370,6 +1364,13 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
             case PRIV_ONLY_FILE:
                 /* add on the final part of the file name ".priv" */
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPriv, fExtSz);
+                
+                derBuf = (byte*)XMALLOC(keySz, HEAP_HINT,
+                        DYNAMIC_TYPE_TMP_BUFFER);
+                if (derBuf == NULL) {
+                    ret = MEMORY_E;
+                    break;
+                }
                 WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
 
                 /* Private key to der */
@@ -1430,7 +1431,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 FALL_THROUGH;
             case PUB_ONLY_FILE:
-                /* add on the final part of the file name ".priv" */
+                /* add on the final part of the file name ".pub" */
                 XMEMCPY(fOutNameBuf + fNameSz, fExtPub, fExtSz);
                 WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
@@ -1442,6 +1443,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                                 DYNAMIC_TYPE_TMP_BUFFER);
                 if (derBuf == NULL) {
                     ret = MEMORY_E;
+                    break;
                 }
 
                 if (ret == WOLFCLU_SUCCESS) {
@@ -1511,10 +1513,12 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
         XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
-    wc_MlDsaKey_Free(key);
-#ifdef WOLFSSL_SMALL_STACK
-    XFREE(key, HEAP_HINT, DYNAMIC_TYPE_DILITHIUM);
-#endif
+    if (outKey != NULL && ret == WOLFCLU_SUCCESS) {
+        *outKey = key;
+    } else {
+        wc_MlDsaKey_Free(key);
+        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
 
     return ret;
 #else
@@ -1525,9 +1529,10 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
     (void)keySz;
     (void)level;
     (void)withAlg;
+    (void)outKey;
 
     return NOT_COMPILED_IN;
-#endif /* HAVE_DILITHIUM && !WOLFCLU_NO_FILESYSTEM */
+#endif /* WOLFCLU_HAVE_MLDSA && !WOLFCLU_NO_FILESYSTEM */
 }
 
 /* The call back function of the writing xmss key */
@@ -1827,7 +1832,7 @@ int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
 
         /* write to file */
         if (ret == 0) {
-            if ((int)XFWRITE(pubOutBuf, 1, pubOutBufSz, file) <= 0) {
+            if ((int)XFWRITE(pubOutBuf, 1, pubOutBufSz, file) != pubOutBufSz) {
                 ret = OUTPUT_FILE_ERROR;
             }
         }

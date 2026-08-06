@@ -1,6 +1,6 @@
 /* clu_cert_setup.c
  *
- * Copyright (C) 2006-2025 wolfSSL Inc.
+ * Copyright (C) 2006-2026 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -27,6 +27,7 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
+#include <wolfclu/x509/clu_mldsa.h>
 
 #define PEM_BEGIN_CERT "-----BEGIN CERTIFICATE-----"
 #define BEGIN_CERT_REQ "-----BEGIN CERTIFICATE REQUEST-----"
@@ -148,10 +149,29 @@ int wolfCLU_LoadKey(const char* file, CLU_KEY_CTX* ctx)
     }
 
     if (ctx->evp == NULL) {
-        /* Algorithms EVP cannot represent hook in ahead of this by filling
-         * ctx->key themselves; nothing here accepted the file. */
+#if defined(WOLFCLU_HAVE_MLDSA) && !defined(WOLFCLU_NO_FILESYSTEM)
+        /* ML-DSA has no EVP_PKEY representation, so it loads into the raw
+         * slot and supplies its own free. */
+        MlDsaKey* mldsa = (MlDsaKey*)XMALLOC(sizeof(MlDsaKey), HEAP_HINT,
+                DYNAMIC_TYPE_TMP_BUFFER);
+        if (mldsa == NULL) {
+            return MEMORY_E;
+        }
+        XMEMSET(mldsa, 0, sizeof(*mldsa));
+        if (wolfCLU_LoadMLDSAKey(file, mldsa, &ctx->level, 0)
+                != WOLFCLU_SUCCESS) {
+            wolfCLU_FreeMLDSAKeyHeap(&mldsa);
+            wolfCLU_LogError("Failed to load key from %s", file);
+            return USER_INPUT_ERROR;
+        }
+        ctx->key     = mldsa;
+        ctx->keyType = wolfCLU_MLDSALevelToKeyOid(ctx->level);
+        ctx->keyFree = wolfCLU_MLDSAKeyCtxFree;
+        return WOLFCLU_SUCCESS;
+#else
         wolfCLU_LogError("Failed to load key from %s", file);
         return USER_INPUT_ERROR;
+#endif
     }
     return WOLFCLU_SUCCESS;
 }
@@ -204,6 +224,7 @@ int wolfCLU_certSetup(int argc, char **argv)
     char *extFile = NULL; /* pointer to the config File name */
     char *ext =
         NULL; /* pointer to the extensions section's name in config File */
+    char *signkey = NULL;    /* pointer to the signkey path */
     int inForm = PEM_FORM;  /* the input format */
     int outForm = PEM_FORM; /* the output format */
 
@@ -216,6 +237,12 @@ int wolfCLU_certSetup(int argc, char **argv)
     byte printFinger = 0;
     byte printPurpose = 0;
     byte printSubjHash = 0;
+    byte isMLDSA = 0;
+#if defined(WOLFCLU_HAVE_MLDSA) && defined(WOLFSSL_CERT_GEN)
+    MlDsaKey* mldsaMemKey = NULL;
+    byte*     mldsaCertOut   = NULL;
+    int       mldsaCertOutSz = 0;
+#endif
 
     WOLFSSL_BIO *in = NULL;
     WOLFSSL_BIO *keyIn = NULL;
@@ -255,6 +282,7 @@ int wolfCLU_certSetup(int argc, char **argv)
                 break;
 
             case WOLFCLU_SIGNKEY:
+                signkey = optarg;
                 keyIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (keyIn == NULL) {
                     wolfCLU_LogError("Unable to open private key file");
@@ -503,13 +531,40 @@ int wolfCLU_certSetup(int argc, char **argv)
 
     /* try to open self signeky file if set */
     if (ret == WOLFCLU_SUCCESS && keyIn != NULL) {
-        privkey = wolfSSL_PEM_read_bio_PrivateKey(keyIn, NULL, NULL, NULL);
-        if (privkey == NULL) {
-            wolfCLU_LogError("Error reading key from file");
-            ret = USER_INPUT_ERROR;
+#if defined(WOLFCLU_HAVE_MLDSA) && defined(WOLFSSL_CERT_GEN)
+        MlDsaKey* probeKey = (MlDsaKey*)XMALLOC(sizeof(MlDsaKey), HEAP_HINT,
+                DYNAMIC_TYPE_TMP_BUFFER);
+        if (probeKey == NULL) {
+            wolfCLU_LogError("Memory allocation failed for ML-DSA probe key");
+            ret = MEMORY_E;
         }
-        wolfSSL_BIO_free(keyIn);
-        keyIn = NULL;
+        else {
+            byte probeLevel = 0;
+            XMEMSET(probeKey, 0, sizeof(*probeKey));
+            if (wolfCLU_LoadMLDSAKey(signkey, probeKey, &probeLevel, 1) ==
+                    WOLFCLU_SUCCESS) {
+                /* We have an ML-DSA key! */
+                mldsaMemKey = probeKey;
+                isMLDSA = 1;
+                wolfSSL_BIO_free(keyIn);
+                keyIn = NULL;
+            }
+            else {
+                wolfCLU_FreeMLDSAKeyHeap(&probeKey);
+            }
+        }
+#else
+        (void)signkey;
+#endif
+        if (ret == WOLFCLU_SUCCESS && keyIn != NULL) {
+            privkey = wolfSSL_PEM_read_bio_PrivateKey(keyIn, NULL, NULL, NULL);
+            if (privkey == NULL) {
+                wolfCLU_LogError("Error reading key from file");
+                ret = USER_INPUT_ERROR;
+            }
+            wolfSSL_BIO_free(keyIn);
+            keyIn = NULL;
+        }
     }
 
     if (ret == WOLFCLU_SUCCESS && extFile != NULL) {
@@ -547,18 +602,54 @@ int wolfCLU_certSetup(int argc, char **argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && reqFlag) {
-        if (wolfSSL_X509_check_private_key(x509, privkey) != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Private key does not match with certificate");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-        if (ret == WOLFCLU_SUCCESS && md != NULL) {
-            if (wolfSSL_X509_sign(x509, privkey, md) <= 0) {
-                wolfCLU_LogError("Error signing certificate");
+        if (!isMLDSA) {
+            if (wolfSSL_X509_check_private_key(x509, privkey) !=
+                    WOLFSSL_SUCCESS) {
+                wolfCLU_LogError("Private key does not match with certificate");
                 ret = WOLFCLU_FATAL_ERROR;
             }
+            if (ret == WOLFCLU_SUCCESS && md != NULL) {
+                if (wolfSSL_X509_sign(x509, privkey, md) <= 0) {
+                    wolfCLU_LogError("Error signing certificate");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+            wolfSSL_EVP_PKEY_free(privkey);
+            privkey = NULL;
         }
-        wolfSSL_EVP_PKEY_free(privkey);
-        privkey = NULL;
+        else {
+#if defined(WOLFCLU_HAVE_MLDSA) && defined(WOLFSSL_CERT_GEN)
+            /* mldsaMemKey is already loaded by the probe above; just
+             * get its level and sign. outData/outDataSz are mandatory
+             * non-NULL for wolfCLU_MLDSACertSign. */
+            {
+                byte mldsaLevel = 0;
+#ifndef NO_CHECK_PRIVATE_KEY
+                if (wolfCLU_MLDSACheckPrivateKeyCert(x509, mldsaMemKey) !=
+                        WOLFCLU_SUCCESS) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+#endif /* !NO_CHECK_PRIVATE_KEY */
+
+
+
+                if (ret == WOLFCLU_SUCCESS &&
+                        wc_MlDsaKey_GetParams(mldsaMemKey, &mldsaLevel) != 0) {
+                    wolfCLU_LogError("Failed to get ML-DSA key level or validate CSR");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = wolfCLU_MLDSACertSign(x509, mldsaMemKey, mldsaLevel,
+                            NULL /* caCert (self-signed) */, outForm,
+                            &mldsaCertOut, &mldsaCertOutSz, 1);
+                    if (ret != WOLFCLU_SUCCESS) {
+                        wolfCLU_LogError("ML-DSA self-sign failed: %d", ret);
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                }
+            }
+#endif
+        }
     }
 
     /* try to open output file if set */
@@ -789,6 +880,28 @@ int wolfCLU_certSetup(int argc, char **argv)
 
     /* write out human readable text if set to */
     if (ret == WOLFCLU_SUCCESS && textFlag) {
+#if defined(WOLFCLU_HAVE_MLDSA)
+        /* wolfSSL_X509_print cannot render ML-DSA public key bytes; skip
+         * the library call entirely instead of inferring the reason for a
+         * print failure after the fact. */
+        if (wolfCLU_IsMLDSAKeyType(wolfSSL_X509_get_pubkey_type(x509))) {
+            static const char msg[] =
+                "        ML-DSA public key (full print not yet "
+                "supported)\n";
+            if (wolfSSL_BIO_write(out, msg, (int)XSTRLEN(msg)) <= 0) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            if (ret == WOLFCLU_SUCCESS && wolfSSL_X509_get_isCA(x509)) {
+                static const char bc[] =
+                    "        X509v3 extensions:\n"
+                    "            X509v3 Basic Constraints:\n"
+                    "                CA:TRUE\n";
+                if (wolfSSL_BIO_write(out, bc, (int)XSTRLEN(bc)) <= 0)
+                    ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else
+#endif /* WOLFCLU_HAVE_MLDSA */
         if (wolfSSL_X509_print(out, x509) != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("unable to print certificate out");
             ret = WOLFCLU_FATAL_ERROR;
@@ -852,6 +965,19 @@ int wolfCLU_certSetup(int argc, char **argv)
 
     /* write out certificate */
     if (ret == WOLFCLU_SUCCESS && !nooutFlag) {
+#if defined(WOLFCLU_HAVE_MLDSA) && defined(WOLFSSL_CERT_GEN)
+        /* ML-DSA self-signed cert: wolfCLU_MLDSACertSign already produced
+         * the final PEM/DER bytes; write them directly and skip the normal
+         * x509-re-serialization path. */
+        if (mldsaCertOut != NULL) {
+            if (wolfSSL_BIO_write(out, mldsaCertOut, mldsaCertOutSz) <= 0) {
+                wolfCLU_LogError("Error writing ML-DSA certificate");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else
+#endif /* WOLFCLU_HAVE_MLDSA && WOLFSSL_CERT_GEN */
+        {
         byte *derBuf = inBuf;
         byte *pt; /* use pt with i2d to handle potential pointer increment */
         int derBufSz = inBufSz;
@@ -903,6 +1029,7 @@ int wolfCLU_certSetup(int argc, char **argv)
                 }
             }
         }
+        } /* end normal cert output block */
     }
 
     if (inBufRaw != NULL) {
@@ -911,6 +1038,14 @@ int wolfCLU_certSetup(int argc, char **argv)
     if (tmpOutBuf != NULL) {
         XFREE(tmpOutBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
+#if defined(WOLFCLU_HAVE_MLDSA) && defined(WOLFSSL_CERT_GEN)
+    if (mldsaCertOut != NULL) {
+        XFREE(mldsaCertOut, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    }
+    if (mldsaMemKey != NULL) {
+        wolfCLU_FreeMLDSAKeyHeap(&mldsaMemKey);
+    }
+#endif
     if (keyIn != NULL)
         wolfSSL_BIO_free(keyIn);
     if (privkey != NULL)
@@ -1097,8 +1232,9 @@ int wolfCLU_UnwrapX509Extensions(const byte** extensions, int* extensionsSz)
 
 /* Parse x509's raw DER into dCert to access Extensions.
  * Caller must wc_FreeDecodedCert(dCert). dCert points into x509's buffer.
- * Must use CERT_TYPE (x509 is a placeholder cert, not a CSR) because
- * downstream SAN parsing (wc_SetAltNamesBuffer) hardcodes CERT_TYPE. */
+ * x509 may be a placeholder cert (CERT_TYPE-shaped DER) or a real CSR
+ * loaded via X509_REQ APIs (CertificationRequest-shaped DER); try both,
+ * matching wolfSSL_X509_get_ext_count()'s own isCSR-based branch. */
 static int wolfCLU_GetX509RawExtensions(WOLFSSL_X509* x509,
         DecodedCert* dCert)
 {
@@ -1114,6 +1250,11 @@ static int wolfCLU_GetX509RawExtensions(WOLFSSL_X509* x509,
 
     wc_InitDecodedCert(dCert, der, (word32)derSz, NULL);
     ret = wc_ParseCert(dCert, CERT_TYPE, NO_VERIFY, NULL);
+    if (ret != 0) {
+        wc_FreeDecodedCert(dCert);
+        wc_InitDecodedCert(dCert, der, (word32)derSz, NULL);
+        ret = wc_ParseCert(dCert, CERTREQ_TYPE, NO_VERIFY, NULL);
+    }
     if (ret != 0) {
         wolfCLU_LogError("Could not parse CSR's DER to read extensions");
         wc_FreeDecodedCert(dCert);
@@ -1139,6 +1280,13 @@ static int wolfCLU_FindX509Ext(DecodedCert* dCert, const byte* oid,
     word32 idx = 0;
 
     *found = 0;
+
+    /* Callers pass NULL when the input carried no parseable DER to take
+     * extensions from (e.g. a self-signed cert built from scratch); that is
+     * simply "no extension present", not an error. */
+    if (dCert == NULL) {
+        return WOLFCLU_SUCCESS;
+    }
 
     while (idx < (word32)dCert->extensionsSz) {
         WOLFCLU_X509_EXT cur;
@@ -1473,8 +1621,30 @@ int wolfCLU_CopyX509SanToCert(WOLFSSL_X509* x509, Cert* cert)
 
     der = wolfSSL_X509_get_der(x509, &derSz);
     if (der == NULL || derSz <= 0) {
-        wolfCLU_LogError("Could not get CSR's raw DER");
-        return WOLFCLU_FATAL_ERROR;
+        /* A freshly-built x509 with no backing CSR/cert DER (e.g. a
+         * self-signed cert generated from scratch) has no SAN to carry. */
+        return WOLFCLU_SUCCESS;
+    }
+
+    /* wc_SetAltNamesBuffer() hardcodes CERT_TYPE internally, so it can't
+     * handle x509 being a real CSR (CertificationRequest-shaped DER, e.g.
+     * loaded via wolfSSL_X509_REQ_d2i()/wolfSSL_PEM_read_bio_X509_REQ()).
+     * Probe first so that case degrades to a skipped SAN copy instead of
+     * failing the whole signing operation. */
+    {
+        DecodedCert probe;
+        int isCert;
+
+        wc_InitDecodedCert(&probe, der, (word32)derSz, NULL);
+        isCert = (wc_ParseCert(&probe, CERT_TYPE, NO_VERIFY, NULL) == 0);
+        wc_FreeDecodedCert(&probe);
+
+        if (!isCert) {
+            wolfCLU_Log(WOLFCLU_L0, "Warning: cannot copy subjectAltName "
+                    "from a CSR on this wolfSSL build (missing "
+                    "wc_SetAltNamesFromList); skipping SAN");
+            return WOLFCLU_SUCCESS;
+        }
     }
 
     if (wc_SetAltNamesBuffer(cert, der, derSz) != 0) {
@@ -1988,15 +2158,18 @@ static int wolfCLU_X509FillCert_ex(WOLFSSL_X509* x509, Cert* cert,
 
 #ifdef WOLFSSL_CERT_EXT
     /* Parse the CSR's DER once and reuse it for every wolfCLU_FindX509Ext()
-     * lookup below, instead of each lookup re-parsing the same DER. */
+     * lookup below, instead of each lookup re-parsing the same DER. A
+     * freshly-built x509 with no backing CSR/cert DER (e.g. a self-signed
+     * cert generated from scratch) has nothing to carry extensions from;
+     * that is not a fatal error, just nothing to look up below. */
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfCLU_GetX509RawExtensions(x509, &dCert);
-        dCertValid = (ret == WOLFCLU_SUCCESS);
+        dCertValid = (wolfCLU_GetX509RawExtensions(x509, &dCert) ==
+                WOLFCLU_SUCCESS);
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfCLU_SetCertKeyUsage(cert, &dCert, (word16)ku,
-                subjWcKeyType, isCA, isCSR);
+        ret = wolfCLU_SetCertKeyUsage(cert, dCertValid ? &dCert : NULL,
+                (word16)ku, subjWcKeyType, isCA, isCSR);
     }
 #else
     (void)isCA;
@@ -2034,8 +2207,11 @@ static int wolfCLU_X509FillCert_ex(WOLFSSL_X509* x509, Cert* cert,
         byte serial[EXTERNAL_SERIAL_SIZE];
         int serialSz = EXTERNAL_SERIAL_SIZE;
 
+        /* A freshly-built x509 with no CSR/config behind it has no serial
+         * yet (serialSz == 0); leave cert->serialSz at 0 so wc_MakeCert_ex
+         * generates a random one, rather than treating that as an error. */
         if (wolfSSL_X509_get_serial_number(x509, serial, &serialSz) !=
-                WOLFSSL_SUCCESS || serialSz <= 0) {
+                WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Error reading serial number");
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -2043,7 +2219,7 @@ static int wolfCLU_X509FillCert_ex(WOLFSSL_X509* x509, Cert* cert,
             wolfCLU_LogError("Serial number too large");
             ret = WOLFCLU_FATAL_ERROR;
         }
-        else {
+        else if (serialSz > 0) {
             XMEMCPY(cert->serial, serial, (size_t)serialSz);
             cert->serialSz = serialSz;
         }
@@ -2077,21 +2253,22 @@ static int wolfCLU_X509FillCert_ex(WOLFSSL_X509* x509, Cert* cert,
 
 #ifdef WOLFSSL_CERT_EXT
     if (ret == WOLFCLU_SUCCESS) {
-        ret = wolfCLU_SetCertKeyIds(cert, &dCert, subjWcKey, subjWcKeyType,
+        ret = wolfCLU_SetCertKeyIds(cert, dCertValid ? &dCert : NULL,
+                subjWcKey, subjWcKeyType,
                 caWcKey, caWcKeyType, isCSR);
     }
 
     /* Carry any remaining CSR extensions (or warn that they were dropped),
      * reusing the dCert parsed above instead of paying for a second
      * wc_ParseCert() over the identical CSR DER. */
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && dCertValid) {
         ret = wolfCLU_CopyX509ExtsToCertFromDCert(&dCert, cert, extsDropped);
     }
 
 #if defined(WOLFSSL_ALT_NAMES) && defined(HAVE_WC_SET_ALT_NAMES_FROM_LIST)
     /* Also reuse dCert for SAN copying, avoiding wc_SetAltNamesBuffer()'s
      * own independent CERT_TYPE-only re-parse of the same CSR DER. */
-    if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS && dCertValid) {
         ret = wolfCLU_CopyX509SanToCertFromDCert(&dCert, cert);
     }
 #endif
@@ -2134,6 +2311,7 @@ int wolfCLU_X509FillCert(WOLFSSL_X509* x509, Cert* cert, int sigType,
 }
 #endif /* WOLFSSL_CERT_GEN */
 
+/* Frees key material held by ctx. Returns WOLFCLU_SUCCESS or BAD_FUNC_ARG. */
 #if defined(WOLFSSL_CERT_GEN) && defined(WOLFSSL_CERT_EXT)
 int wolfCLU_MakeAndSignCertDer(WOLFSSL_X509* x509, int isCSR, int sigType,
         int bufSz, void* subjKey, int subjKeyType, void* caKey, int caKeyType,

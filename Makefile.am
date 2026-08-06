@@ -73,6 +73,7 @@ man_MANS+= manpages/wolfssl-sign_verify.1
 man_MANS+= manpages/wolfssl-ecc.1
 man_MANS+= manpages/wolfssl-ed25519.1
 man_MANS+= manpages/wolfssl-dilithium.1
+man_MANS+= manpages/wolfssl-ml-dsa.1
 man_MANS+= manpages/wolfssl-xmss.1
 man_MANS+= manpages/wolfssl-xmssmt.1
 man_MANS+= manpages/wolfssl-rand.1

@@ -138,6 +138,17 @@ AC_CHECK_FUNC([wc_EncodeObjectId],
 AC_CHECK_FUNC([wc_SetAltNamesFromList],
     [AM_CFLAGS="$AM_CFLAGS -DHAVE_WC_SET_ALT_NAMES_FROM_LIST"],
     [])
+AC_CHECK_FUNC([wc_MlDsaKey_Init],
+    [AM_CFLAGS="$AM_CFLAGS -DWOLFCLU_HAVE_MLDSA -DWOLFCLU_MLDSA_CHECKED"
+     AC_CHECK_FUNC([wc_CheckCertSigPubKey],
+        [AM_CFLAGS="$AM_CFLAGS -DWOLFCLU_MLDSA_VERIFY_SELFSIGNED"],
+        [AC_MSG_WARN([ML-DSA support is enabled, but wolfSSL was not built ]
+                     [with OPENSSL_EXTRA or WOLFSSL_SMALL_CERT_VERIFY. ]
+                     [`wolfssl verify` will not be able to verify ]
+                     [self-signed ML-DSA certificates on this build. ]
+                     [Rebuild wolfSSL with --enable-opensslextra (or ]
+                     [WOLFSSL_SMALL_CERT_VERIFY) to enable this.])])],
+    [AM_CFLAGS="$AM_CFLAGS -DWOLFCLU_MLDSA_CHECKED"])
 
 
 ###############################################

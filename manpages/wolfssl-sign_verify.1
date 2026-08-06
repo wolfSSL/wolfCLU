@@ -19,7 +19,9 @@ command.
 .br
 -ed25519   Ed25519 signing and verification (requires HAVE_ED25519).
 .br
--dilithium Dilithium (ML-DSA) signing and verification (requires HAVE_DILITHIUM).
+-ml-dsa    ML-DSA (Dilithium) signing and verification (requires HAVE_DILITHIUM).
+.br
+           -dilithium is accepted as an alias for -ml-dsa.
 .br
 -xmss      XMSS signing and verification (requires WOLFSSL_HAVE_XMSS).
 .br
@@ -73,6 +75,16 @@ wolfssl -rsa -verify -inkey pub.pem -inform pem -sigfile message.sig -out verify
 Verify with an ECC public key:
 .br
 wolfssl -ecc -verify -inkey pub.pem -inform pem -sigfile message.sig -in message.txt -pubin
+.br
+.LP
+Sign a file with an ML-DSA private key:
+.br
+wolfssl -ml-dsa -sign -inkey mykey.priv -inform der -in message.bin -out message.sig
+.br
+.LP
+Verify with an ML-DSA public key:
+.br
+wolfssl -ml-dsa -verify -inkey mykey.pub -inform der -sigfile message.sig -in message.bin -pubin
 .SH NOTES
 Available only when wolfSSL is built with filesystem support. The set of
 usable key types depends on the wolfSSL configure options.

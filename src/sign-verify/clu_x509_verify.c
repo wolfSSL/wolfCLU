@@ -26,6 +26,9 @@
 #include <wolfclu/sign-verify/clu_verify.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfssl/wolfcrypt/types.h>
+#ifdef WOLFCLU_HAVE_MLDSA
+#include <wolfclu/x509/clu_mldsa.h>
+#endif /* WOLFCLU_HAVE_MLDSA */
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -75,6 +78,60 @@ static int cert_is_self_signed_root(WOLFSSL_X509* cert, int* hardErr)
             wolfSSL_X509_NAME_cmp(subj, issu) != 0) {
         return 0;
     }
+
+#ifdef WOLFCLU_HAVE_MLDSA
+    {
+        int keyType = wolfSSL_X509_get_pubkey_type(cert);
+        if (wolfCLU_IsMLDSAKeyType(keyType)) {
+#if defined(WOLFCLU_MLDSA_VERIFY_SELFSIGNED)
+            /*wc_CheckCertSigPubKey() is only declared in wolfSSL's asn. */
+            const byte* certDer   = NULL;
+            byte*       pubDer    = NULL;
+            int         certDerSz = 0;
+            int         pubDerSz  = 0;
+            int         isRoot    = 0;
+
+            certDer = wolfSSL_X509_get_der(cert, &certDerSz);
+            if (certDer == NULL || certDerSz <= 0) {
+                *hardErr = WOLFCLU_FATAL_ERROR;
+                return 0;
+            }
+            if (wolfSSL_X509_get_pubkey_buffer(cert, NULL, &pubDerSz)
+                    != WOLFSSL_SUCCESS) {
+                *hardErr = WOLFCLU_FATAL_ERROR;
+                return 0;
+            }
+            if (pubDerSz <= 0 || pubDerSz > WOLFCLU_MLDSA_MAX_SPKI_DER_SZ) {
+                *hardErr = WOLFCLU_FATAL_ERROR;
+                return 0;
+            }
+            pubDer = (byte*)XMALLOC((size_t)pubDerSz, HEAP_HINT,
+                    DYNAMIC_TYPE_PUBLIC_KEY);
+            if (pubDer == NULL) {
+                *hardErr = MEMORY_E;
+                return 0;
+            }
+            if (wolfSSL_X509_get_pubkey_buffer(cert, pubDer, &pubDerSz)
+                    != WOLFSSL_SUCCESS) {
+                XFREE(pubDer, HEAP_HINT, DYNAMIC_TYPE_PUBLIC_KEY);
+                *hardErr = WOLFCLU_FATAL_ERROR;
+                return 0;
+            }
+            isRoot = (wc_CheckCertSigPubKey(certDer, (word32)certDerSz,
+                    HEAP_HINT, pubDer, (word32)pubDerSz, keyType) == 0);
+            XFREE(pubDer, HEAP_HINT, DYNAMIC_TYPE_PUBLIC_KEY);
+            return isRoot;
+#else
+            /* Rebuild wolfSSL with the needed configure options below. */
+            wolfCLU_LogError("Cannot verify ML-DSA self-signed certificates "
+                    "on this build; rebuild wolfSSL with OPENSSL_EXTRA or "
+                    "WOLFSSL_SMALL_CERT_VERIFY");
+            *hardErr = WOLFCLU_FATAL_ERROR;
+            return 0;
+#endif /* WOLFCLU_MLDSA_VERIFY_SELFSIGNED */
+        }
+    }
+#endif /* WOLFCLU_HAVE_MLDSA */
 
     {
         WOLFSSL_EVP_PKEY* pubKey = wolfSSL_X509_get_pubkey(cert);
@@ -339,11 +396,12 @@ int wolfCLU_x509Verify(int argc, char** argv)
         }
     }
 
-    /* Require -CAfile to contain a self-signed root CA unless -partial_chain. */
+    /* Require -CAfile to contain a self-signed root CA unless -partial_chain or -legacy_ca. */
     if (ret == WOLFCLU_SUCCESS && caCert != NULL) {
-        if (!partialChain && wolfCLU_PathsRefEqual(caCert, verifyCert)) {
+        if (!partialChain && !legacyCa &&
+                wolfCLU_PathsRefEqual(caCert, verifyCert)) {
             wolfCLU_LogError("Cannot verify a certificate against itself "
-                    "as a CA without -partial_chain");
+                    "as a CA without -partial_chain or -legacy_ca");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

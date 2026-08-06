@@ -1,6 +1,6 @@
 /* clu_sign.h
  *
- * Copyright (C) 2006-2025 wolfSSL Inc.
+ * Copyright (C) 2006-2026 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -19,9 +19,16 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+#ifndef WOLFCLU_SIGN_H
+#define WOLFCLU_SIGN_H
+
 #ifndef WOLFSSL_USER_SETTINGS
 #include <wolfssl/options.h>
 #endif
+/* Pulls in the WOLFCLU_HAVE_MLDSA detection block and the
+ * DILITHIUM_MAX_BOTH_KEY_PEM_SIZE fallback; kept in one place there to
+ * avoid a second copy going stale here. */
+#include <wolfclu/clu_header_main.h>
 #ifdef HAVE_ED25519
     #include <wolfssl/wolfcrypt/ed25519.h>
 #endif
@@ -34,11 +41,9 @@
 #endif
 #ifdef HAVE_DILITHIUM
     #include <wolfssl/wolfcrypt/dilithium.h>
-    /* Fallback for older wolfSSL builds predating this constant; 10267 is
-     * the largest possible key PEM size
-     * (DILITHIUM_LEVEL5_BOTH_KEY_PEM_SIZE). */
-    #ifndef DILITHIUM_MAX_BOTH_KEY_PEM_SIZE
-        #define DILITHIUM_MAX_BOTH_KEY_PEM_SIZE 10267
+    #ifdef WOLFCLU_HAVE_MLDSA
+        /* Accesses pubKeySet directly. Fails if wolfSSL renames it. */
+        #define WOLFCLU_MLDSA_PUB_KEY_IS_SET(k) ((k)->pubKeySet)
     #endif
 #endif
 #ifdef WOLFSSL_HAVE_XMSS
@@ -98,6 +103,7 @@ int wolfCLU_sign_data_dilithium(byte* data, char* out, word32 dataSz,
 int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey);
 int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey);
 
+/**  convert a PEM key buffer to DER in place. */
 int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn);
 
 /* Same as wolfCLU_KeyPemToDer, but treats ASN_NO_PEM_HEADER as "already DER"
@@ -105,3 +111,5 @@ int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn);
  * *pkeySz when a conversion resized the buffer. */
 int wolfCLU_KeyPemToDerFallback_ex(unsigned char** pkeyBuf, int* pkeySz,
         int pubIn);
+
+#endif /* WOLFCLU_SIGN_H */

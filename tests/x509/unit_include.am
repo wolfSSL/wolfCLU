@@ -14,5 +14,7 @@ tests_x509_cert_setup_unit_test_SOURCES = \
                     src/x509/clu_cert_setup.c \
                     src/x509/clu_parse.c \
                     src/x509/clu_config.c \
+                    src/x509/clu_mldsa.c \
                     src/x509/clu_x509_sign.c \
+                    src/sign-verify/clu_sign.c \
                     src/tools/clu_funcs.c

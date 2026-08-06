@@ -98,6 +98,13 @@ Unless both -req and -signkey are used, -extfile and -extensions are
 silently ignored on output: the (re-encoded) certificate is written from
 the original input DER, not from any in-memory changes made while parsing
 extensions.
+.LP
+When -text is used on a certificate containing an ML-DSA SubjectPublicKey,
+the standard field-by-field dump (subject, issuer, validity, serial number,
+key bytes, and most extensions) is replaced with a short placeholder line
+noting that full ML-DSA decoding is not yet supported, plus a
+basicConstraints CA:TRUE line when the certificate is a CA, due to library
+limitations.
 .SH EXAMPLES
 View certificate details in human-readable format:
 .RS

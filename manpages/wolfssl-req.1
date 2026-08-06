@@ -26,9 +26,9 @@ key is written to stdout.
 .LP
 -newkey type:bits     generate the private key to use with the request.
 .br
-                      RSA: rsa:2048. Dilithium (with -x509 and certgen):
+                      RSA: rsa:2048. ML-DSA: ml-dsa:N (or dilithium:N),
 .br
-                      dilithium:2, dilithium:3, dilithium:5, or ml-dsa:N.
+                      where N is 2, 3, or 5 (requires HAVE_DILITHIUM).
 .br
                       For ECC keys, generate with ecparam first.
 .br
@@ -98,11 +98,24 @@ View a CSR in human-readable format:
 .RS
 wolfssl req -in mycsr.pem -text -noout
 .RE
+.LP
+Generate an ML-DSA-65 CSR with a new key:
+.RS
+wolfssl req -new -newkey ml-dsa:3 -keyout ml-dsa -out my.csr.pem -subj "/CN=example.com"
+.RE
+.LP
+Create a self-signed ML-DSA-44 CA certificate:
+.RS
+wolfssl req -x509 -newkey ml-dsa:2 -keyout ca-ml-dsa -out ca-ml-dsa.pem -days 3650 -subj "/CN=ML-DSA Root CA"
+.RE
 .SH SEE ALSO
 .BR wolfssl-genkey(1) ", " wolfssl-ca(1) ", " wolfssl-x509(1)
 .SH NOTES
 Available only when wolfSSL is built with certificate request support
 (WOLFSSL_CERT_REQ) and filesystem support.
+.LP
+For ML-DSA keys, -config and -extensions are ignored (only the subject DN is
+carried), and -text and -verify are not supported.
 .SH BUGS
 No known bugs at this time.
 .SH AUTHOR

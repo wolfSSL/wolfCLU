@@ -85,10 +85,6 @@ int wolfCLU_UnwrapX509Extensions(const byte** extensions,
         int* extensionsSz);
 #endif /* WOLFSSL_CERT_EXT */
 
-int wolfCLU_X509FillCert(WOLFSSL_X509* x509, Cert* cert, int sigType,
-        void* subjWcKey, int subjWcKeyType,
-        void* caWcKey, int caWcKeyType, WOLFSSL_X509* caCert,
-        int policySanitized, int* extsDropped);
 #define WOLFCLU_CERT_DAYS_DEFAULT 365
 
 #ifdef WOLFSSL_CERT_EXT
@@ -104,4 +100,8 @@ int wolfCLU_MakeAndSignCertDer(WOLFSSL_X509* x509, int isCSR, int sigType,
         byte** outDer, int* outDerSz);
 #endif /* WOLFSSL_CERT_EXT */
 
+int wolfCLU_X509FillCert(WOLFSSL_X509* x509, Cert* cert, int sigType,
+        void* subjWcKey, int subjWcKeyType,
+        void* caWcKey, int caWcKeyType, WOLFSSL_X509* caCert,
+        int policySanitized, int* extsDropped);
 #endif /* WOLFSSL_CERT_GEN */

@@ -84,6 +84,11 @@ Generate a Dilithium key pair:
 wolfssl genkey dilithium -level 3 -out mykey -outform der -output KEYPAIR
 .br
 .LP
+Generate an ML-DSA-65 key pair (ML-DSA OIDs, not interchangeable with dilithium keys):
+.br
+wolfssl genkey ml-dsa -level 3 -out mykey -outform der -output KEYPAIR
+.br
+.LP
 Generate an XMSS key pair:
 .br
 wolfssl genkey xmss -height 10 -out mykey -outform raw -output KEYPAIR

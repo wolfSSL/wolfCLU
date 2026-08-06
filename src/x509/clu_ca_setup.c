@@ -1,6 +1,6 @@
 /* clu_ca_setup.c
  *
- * Copyright (C) 2006-2025 wolfSSL Inc.
+ * Copyright (C) 2006-2026 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -26,12 +26,41 @@
 #include <wolfclu/x509/clu_request.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_x509_sign.h>
+#include <wolfclu/x509/clu_mldsa.h>
 #include <wolfclu/certgen/clu_certgen.h>
 #include <wolfssl/openssl/evp.h>
 #include <wolfssl/ssl.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
+#ifdef WOLFCLU_HAVE_MLDSA
+#include <wolfssl/wolfcrypt/dilithium.h>
+#include <wolfclu/sign-verify/clu_sign.h>
+#endif /* WOLFCLU_HAVE_MLDSA */
 
 #ifndef WOLFCLU_NO_FILESYSTEM
+
+/*Transfer the ML-DSA or EVP_PKEY CA key into signer. */
+static int wolfCLU_CASetupCertSignSetCA(WOLFCLU_CERT_SIGN* signer,
+        WOLFSSL_X509* issuer, CLU_KEY_CTX* keyCtx)
+{
+#if defined(WOLFCLU_HAVE_MLDSA)
+    if (keyCtx->key != NULL) {
+        int ret = wolfCLU_CertSignSetCA(signer, issuer, (MlDsaKey*)keyCtx->key,
+                wolfCLU_MLDSALevelToKeyOid(keyCtx->level));
+        if (ret == WOLFCLU_SUCCESS) {
+            keyCtx->key = NULL;
+        }
+        return ret;
+    }
+#endif
+
+    if (keyCtx->evp != NULL) {
+        return wolfCLU_CertSignSetCA(signer, issuer, keyCtx->evp,
+                wolfCLU_GetTypeFromPKEY(keyCtx->evp));
+    }
+
+    /* -cert without -keyfile: update issuer only */
+    return wolfCLU_CertSignSetCA(signer, issuer, NULL, 0);
+}
 
 static const struct option ca_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
@@ -69,35 +98,62 @@ static void wolfCLU_CAHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to read configuration from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days for certificate to be valid");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-selfsign sign with key associated with cert");
-#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend sign with alternate key");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-altkey file to read alternate private key from");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-altpub file to read alternate public key from");
+#if defined(WOLFCLU_HAVE_MLDSA) && defined(WOLFSSL_CERT_GEN) && \
+    !defined(WOLFCLU_NO_FILESYSTEM)
+    WOLFCLU_LOG(WOLFCLU_L0, "  ML-DSA CA signing (parameter set 2, 3, or 5 is "
+            "read");
+    WOLFCLU_LOG(WOLFCLU_L0, "  from the key file; there is no -level option on "
+            "ca):");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-keyfile ML-DSA private key (<name>.priv) with");
+    WOLFCLU_LOG(WOLFCLU_L0,
+            "\t        companion <name>.pub (or <stem>Pub.pem);");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        or set [CA_default] private_key in "
+            "-config.");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        Signs RSA/ECDSA CSRs; ML-DSA subject "
+            "keys");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        are supported when present on the CSR.");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        Verify issued certs with:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t        wolfssl verify -CAfile <ca-cert> "
+            "<issued-cert>");
+#endif /* WOLFCLU_HAVE_MLDSA && WOLFSSL_CERT_GEN && !WOLFCLU_NO_FILESYSTEM */
+#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(WOLFCLU_HAVE_MLDSA)
+    WOLFCLU_LOG(WOLFCLU_L0, "  Chimera (dual-algorithm) options for adding a "
+            "post-quantum");
+    WOLFCLU_LOG(WOLFCLU_L0, "  ML-DSA/dilithium alternate signature to a "
+            "conventional cert:");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altextend add an alternate (ML-DSA) signature "
+            "to the cert");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altkey file to read the alternate (ML-DSA) "
+            "private key from");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-altpub file to read the alternate (ML-DSA) "
+            "public key from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-subjkey file to read subject key from");
-#endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
+#endif /* WOLFSSL_DUAL_ALG_CERTS && WOLFCLU_HAVE_MLDSA */
 }
-#endif
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_CASetup(int argc, char** argv)
 {
 #ifndef WOLFCLU_NO_FILESYSTEM
     WOLFCLU_CERT_SIGN* signer = NULL;
-    WOLFSSL_BIO *keyIn     = NULL;
     WOLFSSL_BIO *subjKey   = NULL;
     WOLFSSL_BIO *altKey    = NULL;
     WOLFSSL_BIO *altKeyPub = NULL;
     WOLFSSL_BIO *reqIn     = NULL;
     WOLFSSL_X509 *x509     = NULL;
     WOLFSSL_X509 *ca       = NULL;
-    WOLFSSL_EVP_PKEY* pkey = NULL;
+    CLU_KEY_CTX keyCtx;
+    int pkeyOwned = 0;   /* set once keyCtx ownership transfers to signer */
+    int issuerOwned = 0; /* set once ca/x509 ownership transfers to signer */
     enum wc_HashType hashType = WC_HASH_TYPE_NONE;
+
+    char* keyPath = NULL;
 
     int   ret = WOLFCLU_SUCCESS;
     char* out = NULL;
     char* config = NULL;
     char* ext = NULL;
-
     int inForm  = PEM_FORM;
     int outForm = PEM_FORM;
     int option;
@@ -105,10 +161,10 @@ int wolfCLU_CASetup(int argc, char** argv)
     int days = 0;
     int selfSigned = 0;
     int altSign = 0;
-    int x509Owned = 0;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
+    XMEMSET(&keyCtx, 0, sizeof(keyCtx));
     while (ret == WOLFCLU_SUCCESS &&
             (option = wolfCLU_GetOpt(argc, argv, "", ca_options,
                     &longIndex)) != END_OF_ARGS) {
@@ -128,14 +184,9 @@ int wolfCLU_CASetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_KEY:
-                keyIn = wolfSSL_BIO_new_file(optarg, "rb");
-                if (keyIn == NULL) {
-                    wolfCLU_LogError("Unable to open private key file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                keyPath = optarg;
                 break;
-#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
+#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(WOLFCLU_HAVE_MLDSA)
             case WOLFCLU_SUBJKEY:
                 subjKey = wolfSSL_BIO_new_file(optarg, "rb");
                 if (subjKey == NULL) {
@@ -162,7 +213,7 @@ int wolfCLU_CASetup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
-#endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
+#endif /* WOLFSSL_DUAL_ALG_CERTS && WOLFCLU_HAVE_MLDSA */
 
             case WOLFCLU_ALTEXTEND:
                 altSign = 1;
@@ -196,10 +247,20 @@ int wolfCLU_CASetup(int argc, char** argv)
 
             case WOLFCLU_INFORM:
                 inForm = wolfCLU_checkInform(optarg);
+                if (inForm < 0) {
+                    /*wolfCLU_checkInform signals invalid input with                      USER_INPUT_ERROR (negative), never 0. */
+                    wolfCLU_LogError("Invalid input format: %s", optarg);
+                    ret = USER_INPUT_ERROR;
+                }
                 break;
 
             case WOLFCLU_OUTFORM:
                 outForm = wolfCLU_checkOutform(optarg);
+                if (outForm < 0) {
+                    /*wolfCLU_checkOutform signals an invalid format with                      USER_INPUT_ERROR (negative), never 0. */
+                    wolfCLU_LogError("Invalid output format: %s", optarg);
+                    ret = USER_INPUT_ERROR;
+                }
                 break;
 
             case WOLFCLU_CONFIG:
@@ -249,6 +310,11 @@ int wolfCLU_CASetup(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
+    if (ret == WOLFCLU_SUCCESS && selfSigned && altSign) {
+        wolfCLU_LogError("-selfsign and -altextend are mutually exclusive");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
     if (ret == WOLFCLU_SUCCESS && config != NULL) {
         signer = wolfCLU_readSignConfig(config, (char*)"ca");
     }
@@ -265,16 +331,19 @@ int wolfCLU_CASetup(int argc, char** argv)
         wolfCLU_CertSignSetHash(signer, hashType);
     }
 
-    if (ret == WOLFCLU_SUCCESS && keyIn != NULL && altSign == 0) {
-        pkey = wolfSSL_PEM_read_bio_PrivateKey(keyIn, NULL, NULL, NULL);
-        if (pkey == NULL) {
-            wolfCLU_LogError("Error reading key from file");
+    if (ret == WOLFCLU_SUCCESS && keyPath != NULL && altSign == 0) {
+        ret = wolfCLU_LoadKey(keyPath, &keyCtx);
+        if (ret != WOLFCLU_SUCCESS) {
             ret = USER_INPUT_ERROR;
         }
     }
 
     if (ret == WOLFCLU_SUCCESS && out != NULL) {
         ret = wolfCLU_CertSignAppendOut(signer, out);
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        ret = wolfCLU_CertSignSetOutForm(signer, outForm);
     }
 
     if (ret == WOLFCLU_SUCCESS && days > 0) {
@@ -297,14 +366,55 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && (pkey != NULL || ca != NULL ||
-            altKey != NULL || altKeyPub != NULL)) {
-        if (altSign) {
+#if defined(WOLFCLU_HAVE_MLDSA)
+    if (ret == WOLFCLU_SUCCESS && keyCtx.key != NULL) {
+        if (wolfCLU_MLDSALevelToKeyOid(keyCtx.level) == 0) {
+            wolfCLU_LogError("Unsupported ML-DSA level %d "
+                    "(supported: 2, 3, 5)", keyCtx.level);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+#endif /* WOLFCLU_HAVE_MLDSA */
+
+    if (ret == WOLFCLU_SUCCESS && (keyCtx.evp != NULL || ca != NULL ||
+            altKey != NULL || altKeyPub != NULL
+#if defined(WOLFCLU_HAVE_MLDSA)
+            || keyCtx.key != NULL
+#endif /* WOLFCLU_HAVE_MLDSA */
+            )) {
+        if (selfSigned) {
+            if (keyCtx.evp == NULL &&
+#if defined(WOLFCLU_HAVE_MLDSA)
+                keyCtx.key == NULL &&
+#endif
+                    !wolfCLU_CertSignHasKey(signer)) {
+                wolfCLU_LogError("No signing key provided");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                ret = wolfCLU_CASetupCertSignSetCA(signer, x509, &keyCtx);
+            }
+        }
+        else if (altSign) {
             char* subjName = wolfSSL_X509_NAME_oneline(
                 wolfSSL_X509_get_subject_name(x509), 0, 0);
             if (subjName != NULL) {
-                ret = wolfCLU_GenChimeraCertSign(keyIn, altKey, altKeyPub, subjKey,
-                    ca, subjName, out, outForm);
+                WOLFSSL_BIO* chimeraKey = NULL;
+                if (keyPath != NULL) {
+                    chimeraKey = wolfSSL_BIO_new_file(keyPath, "rb");
+                }
+                if (keyPath != NULL && chimeraKey == NULL) {
+                    wolfCLU_LogError("Unable to open private key file %s",
+                            keyPath);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    ret = wolfCLU_GenChimeraCertSign(chimeraKey, altKey,
+                        altKeyPub, subjKey, ca, subjName, out, outForm);
+                }
+                if (chimeraKey != NULL) {
+                    wolfSSL_BIO_free(chimeraKey);
+                }
                 XFREE(subjName, 0, DYNAMIC_TYPE_OPENSSL);
             }
             else {
@@ -312,18 +422,35 @@ int wolfCLU_CASetup(int argc, char** argv)
             }
         }
         else {
-            int pkeyType = wolfCLU_GetTypeFromPKEY(pkey);
-            wolfCLU_CertSignSetCA(signer, selfSigned ? x509 : ca, pkey,
-                    pkeyType);
-            if (selfSigned) {
-                /* ownership of x509 was transferred to signer */
-                x509Owned = 1;
+            if (keyCtx.evp == NULL &&
+#if defined(WOLFCLU_HAVE_MLDSA)
+                keyCtx.key == NULL &&
+#endif
+                    !wolfCLU_CertSignHasKey(signer)) {
+                wolfCLU_LogError("No signing key provided");
+                ret = WOLFCLU_FATAL_ERROR;
             }
-            if (pkeyType == RSAk || pkeyType == ECDSAk) {
-                /* ownership of pkey was transferred to signer */
-                pkey = NULL;
+            else {
+                ret = wolfCLU_CASetupCertSignSetCA(signer, ca, &keyCtx);
             }
         }
+
+        /* On success, signer now owns ca and (if set) pkey. */
+        if (ret == WOLFCLU_SUCCESS && !altSign) {
+            issuerOwned = 1;
+            if (keyCtx.evp != NULL) {
+                pkeyOwned = 1;
+            }
+        }
+    }
+
+    /* No CLI key/cert flags were given above (the guard on the block just
+     * above only fires when at least one of pkey/ca/altKey/altKeyPub/
+     * mldsaKey is set), so re-check here whether -config supplied a usable
+     * signing key. */
+    if (ret == WOLFCLU_SUCCESS && !altSign && !wolfCLU_CertSignHasKey(signer)) {
+        wolfCLU_LogError("No signing key provided");
+        ret = WOLFCLU_FATAL_ERROR;
     }
 
     /* default to version 3 which supports extensions */
@@ -344,7 +471,6 @@ int wolfCLU_CASetup(int argc, char** argv)
 
 cleanup:
     wolfSSL_BIO_free(reqIn);
-    wolfSSL_BIO_free(keyIn);
     if (altKey != NULL) {
         wolfSSL_BIO_free(altKey);
     }
@@ -354,14 +480,25 @@ cleanup:
     if (subjKey != NULL) {
         wolfSSL_BIO_free(subjKey);
     }
-    if (!x509Owned) {
+    if (selfSigned) {
+        /* x509 was the issuer handed to CertSignSetCA; the signer owns it
+         * only when that call succeeded, otherwise free it here. */
+        if (!issuerOwned) {
+            wolfSSL_X509_free(x509);
+        }
+    }
+    else {
+        /* x509 is the CSR here, always ours to free */
         wolfSSL_X509_free(x509);
     }
-    if ((selfSigned || altSign) && ca != NULL) {
+
+    /*Free ca unless ownership transferred to the signer. */
+    if (ca != NULL && (selfSigned || !issuerOwned)) {
         wolfSSL_X509_free(ca);
     }
-    if (pkey != NULL) {
-        wolfSSL_EVP_PKEY_free(pkey);
+    /* free keyCtx only when it was not handed off to the signer */
+    if (!pkeyOwned) {
+        wolfCLU_FreeKeyCtx(&keyCtx);
     }
 
     /* check for success on signer free since random data is output */
@@ -374,5 +511,5 @@ cleanup:
     (void)argv;
     WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
     return WOLFCLU_FATAL_ERROR;
-#endif
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 }

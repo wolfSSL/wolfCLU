@@ -20,7 +20,15 @@ the configuration file (see -config).
 -out file             output file for the signed certificate.
 .br
 .LP
--keyfile file         private key used to sign the certificate.
+-keyfile file         private key used to sign the certificate (RSA, ECDSA, or
+.br
+                      ML-DSA). For ML-DSA, the companion public key must
+.br
+                      co-exist and is loaded automatically (e.g. <name>.pub
+.br
+                      for <name>.priv, or <stem>Pub.pem for <stem>.pem).
+.br
+                      The key may also be set via [CA_default] private_key.
 .br
 .LP
 -cert file            CA certificate to issue from.
@@ -32,11 +40,9 @@ the configuration file (see -config).
 -inform PEM|DER       input format of the CSR.
 .br
 .LP
--outform PEM|DER      output format of the certificate. The normal signing
+-outform PEM|DER      output format of the issued certificate. Defaults to
 .br
-                      path always writes PEM; -outform der is currently
-.br
-                      ignored.
+                      PEM.
 .br
 .LP
 -md digest            signing digest to use, e.g. sha256.
@@ -76,6 +82,11 @@ wolfssl ca -selfsign -in mycsr.pem -keyfile mykey.pem -out mycert.pem -days 365 
 Sign a CSR as a CA with your CA certificate and key:
 .RS
 wolfssl ca -in csr.pem -out cert.pem -keyfile ca-key.pem -cert ca-cert.pem -days 365 -md sha256
+.RE
+.LP
+Sign a CSR with an ML-DSA CA key:
+.RS
+wolfssl ca -in csr.pem -out cert.pem -keyfile ca-key.priv -cert ca-cert.pem -days 365
 .RE
 .LP
 View the certificate details after signing:

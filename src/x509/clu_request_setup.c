@@ -1,6 +1,6 @@
 /* clu_request_setup.c
  *
- * Copyright (C) 2006-2025 wolfSSL Inc.
+ * Copyright (C) 2006-2026 wolfSSL Inc.
  *
  * This file is part of wolfSSL.
  *
@@ -31,6 +31,21 @@
 #include <wolfssl/ssl.h>
 #include <wolfssl/wolfcrypt/error-crypt.h>
 #include <wolfssl/wolfcrypt/types.h>
+
+#ifdef WOLFCLU_HAVE_MLDSA
+    #include <wolfssl/wolfcrypt/dilithium.h>
+    #include <wolfclu/sign-verify/clu_sign.h>
+    #include <wolfclu/genkey/clu_genkey.h>
+    #include <wolfclu/x509/clu_mldsa.h>
+#endif /* WOLFCLU_HAVE_MLDSA */
+
+/* The pure ML-DSA certificate path uses the raw wolfcrypt cert builder
+ * (wc_InitCert/wc_MakeCert_ex/wc_SignCert_ex and Cert.subject), all of which
+ * require WOLFSSL_CERT_GEN.
+ */
+#if defined(WOLFCLU_HAVE_MLDSA) && defined(WOLFSSL_CERT_GEN)
+    #define WOLFCLU_MLDSA_CERTGEN
+#endif /* WOLFCLU_HAVE_MLDSA && WOLFSSL_CERT_GEN */
 
 #if defined(WOLFSSL_CERT_REQ) && !defined(WOLFCLU_NO_FILESYSTEM)
 static void wolfCLU_certgenHelp(void) {
@@ -551,7 +566,7 @@ static int wolfSSL_X509_REQ_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
     return WOLFSSL_SUCCESS;
 }
 #endif /* NO_WOLFSSL_REQ_PRINT */
-#endif
+#endif /* WOLFSSL_CERT_REQ && !WOLFCLU_NO_FILESYSTEM */
 
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_requestSetup(int argc, char** argv)
@@ -570,10 +585,10 @@ int wolfCLU_requestSetup(int argc, char** argv)
     return NOT_COMPILED_IN;
 #else
     WOLFSSL_BIO *bioOut = NULL;
-    WOLFSSL_BIO *keyIn  = NULL;
     WOLFSSL_BIO *reqIn  = NULL;
     WOLFSSL_X509 *x509  = NULL;
     const WOLFSSL_EVP_MD *md  = NULL;
+    CLU_KEY_CTX keyCtx;
     WOLFSSL_EVP_PKEY *pkey = NULL;
 
     int     ret = WOLFCLU_SUCCESS;
@@ -605,11 +620,16 @@ int wolfCLU_requestSetup(int argc, char** argv)
     byte reSign    = 0; /* flag for if resigning req is needed */
     byte noOut     = 0;
     byte useDes    = 1;
+#ifdef WOLFCLU_MLDSA_CERTGEN
+    int  isMLDSA    = 0;
+    MlDsaKey* mldsaMemKey = NULL;
+#endif /* WOLFCLU_MLDSA_CERTGEN */
 #ifdef NO_WOLFSSL_REQ_PRINT
     byte isCSR     = 1;
-#endif
+#endif /* NO_WOLFSSL_REQ_PRINT */
     /* Multiple -addext is not yet supported. Detect it up front and fail
      * instead of silently dropping the extension and exiting success. */
+    XMEMSET(&keyCtx, 0, sizeof(keyCtx));
     {
         int i, addExtCount = 0;
         for (i = 1; i < argc; i++) {
@@ -688,12 +708,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             case WOLFCLU_KEY:
                 in = optarg;
-                keyIn = wolfSSL_BIO_new_file(optarg, "rb");
-                if (keyIn == NULL) {
-                    wolfCLU_LogError("Unable to open public key file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
                 break;
 
             case WOLFCLU_OUTFILE:
@@ -792,7 +806,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
                     XFREE(keyType, NULL, DYNAMIC_TYPE_TMP_BUFFER);
                 }
                 wolfSSL_BIO_free(reqIn);
-                wolfSSL_BIO_free(keyIn);
                 wolfSSL_BIO_free(bioOut);
                 wolfSSL_X509_free(x509);
                 wolfSSL_EVP_PKEY_free(pkey);
@@ -874,16 +887,21 @@ int wolfCLU_requestSetup(int argc, char** argv)
         reSign = 1; /* re-sign after date change */
     }
 
-    if (ret == WOLFCLU_SUCCESS && keyIn != NULL) {
-        pkey = wolfSSL_PEM_read_bio_PrivateKey(keyIn, NULL, NULL, NULL);
-        if (pkey == NULL) {
-            wolfCLU_LogError("Error reading key from file");
-            ret = USER_INPUT_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS &&
-                wolfSSL_X509_set_pubkey(x509, pkey) != WOLFSSL_SUCCESS) {
-            ret = WOLFCLU_FATAL_ERROR;
+    if (ret == WOLFCLU_SUCCESS && in != NULL) {
+        ret = wolfCLU_LoadKey(in, &keyCtx);
+        if (ret == WOLFCLU_SUCCESS) {
+            pkey = keyCtx.evp;
+            if (pkey != NULL) {
+                if (wolfSSL_X509_set_pubkey(x509, pkey) != WOLFSSL_SUCCESS) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+            }
+#ifdef WOLFCLU_MLDSA_CERTGEN
+            else if (keyCtx.key != NULL) {
+                isMLDSA = 1;
+                mldsaMemKey = (MlDsaKey*)keyCtx.key;
+            }
+#endif
         }
     }
 
@@ -892,24 +910,142 @@ int wolfCLU_requestSetup(int argc, char** argv)
             pkey == NULL) {
         WOLFSSL_EVP_PKEY_CTX* ctx = NULL;
 
-        if (XSTRNCMP("ec", keyType, 2) == 0) {
+#ifdef WOLFCLU_MLDSA_CERTGEN
+        /*Reject -newkey if -key gave an ML-DSA key. */
+        if (isMLDSA) {
+            wolfCLU_LogError("Cannot combine -key (ML-DSA) with -newkey; "
+                    "provide only one key source");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+
+        if (ret == WOLFCLU_SUCCESS && XSTRNCMP("ec", keyType, 2) == 0) {
             wolfCLU_LogError("No supporting ecc gen with -newkey yet, "
                     "use ecparam command instead");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
-        if (XSTRNCMP("rsa", keyType, 3) == 0) {
+#ifdef WOLFCLU_MLDSA_CERTGEN
+        /*!isMLDSA: Guard against -newkey clobbering a provided ML-DSA -key          (since ML-DSA keys leave pkey NULL). */
+        if (ret == WOLFCLU_SUCCESS && !isMLDSA &&
+                (XSTRNCMP("ml-dsa", keyType, 6) == 0 ||
+                 XSTRNCMP("dilithium", keyType, 9) == 0)) {
+            int      mlLevel = 0;
+            int      mlKeySz = 0;
+            int      mlWithAlg = 0;
+            int      levelArg = (int)XATOI(keyInfo);
+            WC_RNG   newkeyRng;
+
+            /* Reject before generating/writing any key material. */
+            if (reqIn != NULL) {
+                wolfCLU_LogError(
+                        "Re-signing an existing ML-DSA CSR/cert is not "
+                        "supported");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS &&
+                    (levelArg < 0 || levelArg > 255 ||
+                     wolfCLU_MLDSALevelToKeyGenParams((byte)levelArg,
+                             &mlLevel, &mlKeySz, &mlWithAlg) !=
+                             WOLFCLU_SUCCESS)) {
+                ret = USER_INPUT_ERROR;
+            }
+
+            if (ret == WOLFCLU_SUCCESS) {
+                const char* kName = keyOut; /* NULL when no -keyout */
+                int         rngInited = 0;
+
+                /* Init RNG first for keygen. */
+                XMEMSET(&newkeyRng, 0, sizeof(newkeyRng));
+                if (wc_InitRng(&newkeyRng) != 0) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                } else {
+                    rngInited = 1;
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    ret = wolfCLU_genKey_ML_DSA(&newkeyRng, kName,
+                              PRIV_AND_PUB_FILES, PEM_FORM, mlKeySz,
+                              mlLevel, mlWithAlg, &mldsaMemKey);
+                }
+
+                if (rngInited) {
+                    wc_FreeRng(&newkeyRng);
+                }
+
+                if (ret == WOLFCLU_SUCCESS) {
+                    isMLDSA = 1;
+
+                    if (keyOut != NULL) {
+                        wolfCLU_Log(WOLFCLU_L0, "ML-DSA key pair written to %s.priv "
+                                "and %s.pub", kName, kName);
+                        if (passout) {
+                            wolfCLU_Log(WOLFCLU_L0, "Warning: ML-DSA private "
+                                    "key written unencrypted (-passout not "
+                                    "applied)");
+                        }
+                    }
+                    else {
+                        /*No -keyout: match the RSA/EC -newkey convention                          (below, ~line 1298) of printing the generated                          private key instead of silently discarding it. */
+                        byte* derBuf = (byte*)XMALLOC(mlKeySz, HEAP_HINT,
+                                DYNAMIC_TYPE_TMP_BUFFER);
+                        if (derBuf == NULL) {
+                            ret = MEMORY_E;
+                        }
+                        else {
+                            int derSz = wc_MlDsaKey_PrivateKeyToDer(
+                                    mldsaMemKey, derBuf, (word32)mlKeySz);
+                            if (derSz < 0) {
+                                ret = derSz;
+                            }
+                            else {
+                                byte* pemBuf = NULL;
+                                int pemSz = wolfCLU_KeyDerToPem(derBuf, derSz,
+                                        &pemBuf, PKCS8_PRIVATEKEY_TYPE,
+                                        DYNAMIC_TYPE_TMP_BUFFER);
+                                if (pemSz <= 0 || pemBuf == NULL) {
+                                    ret = WOLFCLU_FAILURE;
+                                }
+                                else {
+                                    wolfCLU_Log(WOLFCLU_L0, "Warning: ML-DSA "
+                                            "private key written unencrypted "
+                                            "to stdout (no -keyout given)");
+                                    XFWRITE(pemBuf, 1, (size_t)pemSz, stdout);
+                                    wc_ForceZero(pemBuf, pemSz);
+                                    XFREE(pemBuf, HEAP_HINT,
+                                            DYNAMIC_TYPE_TMP_BUFFER);
+                                }
+                            }
+                            wc_ForceZero(derBuf, mlKeySz);
+                            XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+                        }
+                    }
+                }
+            }
+        }
+        else
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+        if (ret == WOLFCLU_SUCCESS && XSTRNCMP("rsa", keyType, 3) == 0) {
             ctx = wolfSSL_EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
             ret = wolfSSL_EVP_PKEY_CTX_set_rsa_keygen_bits(ctx,
                     (int)XATOI(keyInfo));
         }
 
-        if (ret == WOLFCLU_SUCCESS && ctx == NULL) {
+        if (ret == WOLFCLU_SUCCESS && ctx == NULL
+#ifdef WOLFCLU_MLDSA_CERTGEN
+                && !isMLDSA
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+                ) {
             wolfCLU_LogError("Unknown/unsupported algo name");
             ret = WOLFCLU_FATAL_ERROR;
         }
 
-        if (ret == WOLFCLU_SUCCESS) {
+        if (ret == WOLFCLU_SUCCESS
+#ifdef WOLFCLU_MLDSA_CERTGEN
+                && !isMLDSA
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+                ) {
             if (wolfSSL_EVP_PKEY_keygen(ctx, &pkey) != WOLFSSL_SUCCESS) {
                 wolfCLU_LogError("Error with keygen");
                 ret = WOLFCLU_FATAL_ERROR;
@@ -917,13 +1053,29 @@ int wolfCLU_requestSetup(int argc, char** argv)
         }
         wolfSSL_EVP_PKEY_CTX_free(ctx);
 
-        if (ret == WOLFCLU_SUCCESS &&
+        if (ret == WOLFCLU_SUCCESS
+#ifdef WOLFCLU_MLDSA_CERTGEN
+                && !isMLDSA
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+                &&
                 wolfSSL_X509_set_pubkey(x509, pkey) != WOLFSSL_SUCCESS) {
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && reqIn == NULL && pkey == NULL) {
+#ifdef WOLFCLU_MLDSA_CERTGEN
+    if (ret == WOLFCLU_SUCCESS && isMLDSA && reqIn != NULL) {
+        wolfCLU_LogError(
+                "Re-signing an existing ML-DSA CSR/cert is not supported");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+
+    if (ret == WOLFCLU_SUCCESS && reqIn == NULL && pkey == NULL
+#ifdef WOLFCLU_MLDSA_CERTGEN
+            && !isMLDSA
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+            ) {
         wolfCLU_LogError("Please specify a -key <key> option when "
                "generating a certificate.");
         wolfCLU_certgenHelp();
@@ -1010,7 +1162,11 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
     /* check that we have the key if re-signing */
     if (ret == WOLFCLU_SUCCESS &&
-            (reqIn == NULL || reSign) && pkey == NULL) {
+            (reqIn == NULL || reSign) && pkey == NULL
+#ifdef WOLFCLU_MLDSA_CERTGEN
+            && !isMLDSA
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+            ) {
         wolfCLU_LogError("No key loaded to sign with");
         ret = WOLFCLU_FATAL_ERROR;
     }
@@ -1029,17 +1185,76 @@ int wolfCLU_requestSetup(int argc, char** argv)
         if (bioOut != NULL) {
             if (wolfSSL_BIO_set_fp(bioOut, stdout, BIO_NOCLOSE)
                     != WOLFSSL_SUCCESS) {
+                wolfSSL_BIO_free(bioOut);
+                bioOut = NULL;
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
     }
 
+#ifdef WOLFCLU_MLDSA_CERTGEN
+    /*ML-DSA certs/CSRs are built via raw wolfcrypt (EVP lacks support). */
+    if (ret == WOLFCLU_SUCCESS && isMLDSA &&
+            (config != NULL || ext != NULL || addExt != NULL)) {
+        wolfCLU_Log(WOLFCLU_L0, "Warning: ML-DSA ignores "
+                "-config/-extensions/-addext; only the subject DN%s is "
+                "emitted",
+                genX509 ? " and basicConstraints (CA:TRUE/FALSE)" : "");
+    }
+
+    /* ML-DSA path does not honor -text/-verify (EVP print unsupported). */
+    if (ret == WOLFCLU_SUCCESS && isMLDSA && (doTextOut || doVerify)) {
+        wolfCLU_Log(WOLFCLU_L0, "Warning: -text/-verify are not supported on "
+                "the ML-DSA path and will be ignored");
+    }
+
+    /* ML-DSA cert/CSR path: build and sign via raw wolfcrypt */
+    if (ret == WOLFCLU_SUCCESS && isMLDSA && (in != NULL || mldsaMemKey != NULL)) {
+        if (genX509) {
+            ret = wolfCLU_MakeMLDSASelfSignedCert(in, mldsaMemKey, x509, days, outForm,
+                    bioOut, noOut);
+        }
+        else {
+            ret = wolfCLU_MakeMLDSACSR(in, mldsaMemKey, x509, outForm, bioOut, noOut);
+        }
+
+        wolfSSL_BIO_free(bioOut);
+        bioOut = NULL;
+
+        /* don't leave a truncated 0-byte cert file behind on failure */
+        if (ret != WOLFCLU_SUCCESS && out != NULL) {
+            if (remove(out) != 0) {
+                wolfCLU_Log(WOLFCLU_L0, "Warning: could not remove incomplete "
+                                 "output file %s", out);
+            }
+        }
+
+        (void)pkey;
+        (void)md;
+        (void)algCheck;
+        (void)oid;
+        if (keyType != NULL)
+            XFREE(keyType, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        keyType = NULL;
+        wolfSSL_BIO_free(reqIn);
+
+        wolfSSL_X509_free(x509);
+        wolfCLU_FreeMLDSAKeyHeap(&mldsaMemKey);
+
+        return ret;
+    }
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+
     /* sign the req/cert */
-    if (ret == WOLFCLU_SUCCESS && (reqIn == NULL || reSign)) {
+    if (ret == WOLFCLU_SUCCESS && (reqIn == NULL || reSign)
+#ifdef WOLFCLU_MLDSA_CERTGEN
+            && !isMLDSA
+#endif /* WOLFCLU_MLDSA_CERTGEN */
+            ) {
         if (genX509) {
 #ifdef NO_WOLFSSL_REQ_PRINT
             isCSR = 0;
-#endif
+#endif /* NO_WOLFSSL_REQ_PRINT */
             /* default to version 3 which supports extensions */
             if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) !=
                     WOLFSSL_SUCCESS) {
@@ -1093,7 +1308,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         wolfSSL_X509_REQ_print(bioOut, x509, isCSR);
 #else
         wolfSSL_X509_REQ_print(bioOut, x509);
-#endif
+#endif /* NO_WOLFSSL_REQ_PRINT */
     }
 
     if (ret == WOLFCLU_SUCCESS && !noOut) {
@@ -1181,15 +1396,18 @@ cleanup:
     (void)oid;
 
     if (keyType != NULL) {
-        XFREE(keyType, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        XFREE(keyType, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
     wolfSSL_BIO_free(reqIn);
-    wolfSSL_BIO_free(keyIn);
+
     wolfSSL_BIO_free(bioOut);
     wolfSSL_X509_free(x509);
     wolfSSL_EVP_PKEY_free(pkey);
+#ifdef WOLFCLU_MLDSA_CERTGEN
+    wolfCLU_FreeMLDSAKeyHeap(&mldsaMemKey);
+#endif /* WOLFCLU_MLDSA_CERTGEN */
     return ret;
-#endif
+#endif /* !WOLFSSL_CERT_REQ */
 }
 

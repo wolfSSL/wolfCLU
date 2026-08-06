@@ -160,7 +160,7 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
     int fSz;
     byte *data = NULL;
 
-    if (wolfCLU_ReadFileToBuffer(in, WOLFCLU_MAX_FILE_SIZE, &data, &fSz) !=
+    if (wolfCLU_ReadFileToBuffer(in, INT_MAX, &data, &fSz) !=
             WOLFCLU_SUCCESS) {
         return WOLFCLU_FATAL_ERROR;
     }
