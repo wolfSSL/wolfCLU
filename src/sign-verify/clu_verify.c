@@ -32,56 +32,73 @@
  * allocated. */
 #define WOLFCLU_MAX_FILE_SIZE 0xFFFFFFF
 
+/* Reads the message/digest file used by every wolfCLU_verify_signature()
+ * case except RSA (which verifies the signature directly). On success
+ * stores the buffer in *hash and its length in *hSzOut and returns
+ * WOLFCLU_SUCCESS; on failure returns the error wolfCLU_ReadMessageFileToBuffer()
+ * reported, already logged, for the caller to propagate as-is. */
+static int wolfCLU_ReadVerifyHash(char* hashFile, byte** hash, long* hSzOut)
+{
+    int hSzInt = 0;
+    int hRet = wolfCLU_ReadMessageFileToBuffer(hashFile, WOLFCLU_MAX_FILE_SIZE,
+            hash, &hSzInt);
+    if (hRet == WOLFCLU_SUCCESS) {
+        *hSzOut = hSzInt;
+    }
+    return hRet;
+}
+
+#ifdef WOLFSSL_HAVE_XMSS
+/* Reads an XMSS/XMSS-MT public key file, shared by
+ * wolfCLU_verify_signature_xmss() and wolfCLU_verify_signature_xmssmt():
+ * both need the same "read it in, then confirm it is at least large enough
+ * to hold the OID" check before they can look at the parameter set. On
+ * success stores the buffer in *keyBuf and its length in *keyFileSzOut and
+ * returns WOLFCLU_SUCCESS; on failure returns the error, already logged. */
+static int wolfCLU_ReadXmssPubKey(char* pubKey, byte** keyBuf,
+        long* keyFileSzOut)
+{
+    int keyFileSzInt = 0;
+    int ret = wolfCLU_ReadFileToBuffer(pubKey, WOLFCLU_MAX_FILE_SIZE, keyBuf,
+            &keyFileSzInt);
+
+    if (ret == WOLFCLU_SUCCESS) {
+        if (keyFileSzInt < (int)XMSS_OID_LEN) {
+            ret = WOLFCLU_FATAL_ERROR;
+            wolfCLU_LogError("File: %s is too small to hold a valid "
+                    "XMSS public key.", pubKey);
+        }
+        else {
+            *keyFileSzOut = keyFileSzInt;
+        }
+    }
+    return ret;
+}
+#endif /* WOLFSSL_HAVE_XMSS */
+
 int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
                              char* keyPath, int keyType, int pubIn,
                              int inForm)
 {
     long hSz = 0;
     long fSz;
+    int dataSz = 0;
     int ret = WOLFCLU_FATAL_ERROR;
 
     byte* hash = NULL;
     byte* data = NULL;
-    XFILE h;
-    XFILE f;
+
 
     if (sig == NULL) {
         return BAD_FUNC_ARG;
     }
 
-    f = XFOPEN(sig, "rb");
-    if (f == NULL) {
-        wolfCLU_LogError("unable to open file %s", sig);
-        return BAD_FUNC_ARG;
+    ret = wolfCLU_ReadFileToBuffer(sig, WOLFCLU_MAX_FILE_SIZE, &data, &dataSz);
+    if (ret != WOLFCLU_SUCCESS) {
+        return ret;
     }
-
-    XFSEEK(f, 0, SEEK_END);
-    fSz = XFTELL(f);
-
-    if (fSz < 0) {
-        wolfCLU_LogError("Invalid Sig File %s.", sig);
-        XFCLOSE(f);
-        return BAD_FUNC_ARG;
-    }
-
-    if (fSz > WOLFCLU_MAX_FILE_SIZE) {
-        wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                "bytes.", sig, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-        XFCLOSE(f);
-        return WOLFCLU_FATAL_ERROR;
-    }
-
-    data = (byte*)XMALLOC(fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (data == NULL) {
-        XFCLOSE(f);
-        return MEMORY_E;
-    }
-    if (XFSEEK(f, 0, SEEK_SET) != 0 || (long)XFREAD(data, 1, fSz, f) != fSz) {
-        XFCLOSE(f);
-        XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    XFCLOSE(f);
+    fSz = (long)dataSz;
+    ret = WOLFCLU_FATAL_ERROR;
 
     switch(keyType) {
         case RSA_SIG_VER:
@@ -90,93 +107,20 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
             break;
 
         case ECC_SIG_VER:
-            h = XFOPEN(hashFile,"rb");
-            if (h == NULL) {
-                wolfCLU_LogError("unable to open file %s", hashFile);
-                ret = BAD_FUNC_ARG;
+            ret = wolfCLU_ReadVerifyHash(hashFile, &hash, &hSz);
+            if (ret != WOLFCLU_SUCCESS) {
                 break;
             }
-
-            XFSEEK(h, 0, SEEK_END);
-            hSz = XFTELL(h);
-
-            if (hSz < 0) {
-                wolfCLU_LogError("Unable to Get Size of Hash File %s.",
-                        hashFile);
-                ret = BAD_FUNC_ARG;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (hSz > WOLFCLU_MAX_FILE_SIZE) {
-                wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                        "bytes.", hashFile, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-                ret = WOLFCLU_FATAL_ERROR;
-                XFCLOSE(h);
-                break;
-            }
-
-            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (hash == NULL) {
-                ret = MEMORY_E;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
-                XFCLOSE(h);
-                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return WOLFCLU_FATAL_ERROR;
-            }
-            XFCLOSE(h);
             ret = wolfCLU_verify_signature_ecc(data, (int)fSz, hash, (int)hSz,
                     keyPath, pubIn, inForm);
             break;
 
         case ED25519_SIG_VER:
         #ifdef HAVE_ED25519
-            h = XFOPEN(hashFile, "rb");
-            if (h == NULL) {
-                wolfCLU_LogError("unable to open file %s", hashFile);
-                ret = BAD_FUNC_ARG;
+            ret = wolfCLU_ReadVerifyHash(hashFile, &hash, &hSz);
+            if (ret != WOLFCLU_SUCCESS) {
                 break;
             }
-
-            XFSEEK(h, 0, SEEK_END);
-            hSz = XFTELL(h);
-
-
-            if (hSz < 0) {
-                wolfCLU_LogError("Unable to Get Size of Hash File %s.",
-                        hashFile);
-                ret = BAD_FUNC_ARG;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (hSz > WOLFCLU_MAX_FILE_SIZE) {
-                wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                        "bytes.", hashFile, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-                ret = WOLFCLU_FATAL_ERROR;
-                XFCLOSE(h);
-                break;
-            }
-
-            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (hash == NULL) {
-                ret = MEMORY_E;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
-                XFCLOSE(h);
-                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return WOLFCLU_FATAL_ERROR;
-            }
-            XFCLOSE(h);
             ret = wolfCLU_verify_signature_ed25519(data, (int)fSz, hash,
                     (int)hSz, keyPath, pubIn, inForm);
         #endif
@@ -184,50 +128,10 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
 
 #ifdef HAVE_DILITHIUM
         case DILITHIUM_SIG_VER:
-            /* hashFIle means msgFile */
-            h = XFOPEN(hashFile, "rb");
-            if (h == NULL) {
-                wolfCLU_LogError("unable to open file %s", hashFile);
-                ret = BAD_FUNC_ARG;
+            ret = wolfCLU_ReadVerifyHash(hashFile, &hash, &hSz);
+            if (ret != WOLFCLU_SUCCESS) {
                 break;
             }
-
-            /* hSz means msgLen */
-            XFSEEK(h, 0, SEEK_END);
-            hSz = XFTELL(h);
-
-            if (hSz < 0) {
-                wolfCLU_LogError("Unable to Get Size of Hash File %s.",
-                        hashFile);
-                ret = BAD_FUNC_ARG;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (hSz > WOLFCLU_MAX_FILE_SIZE) {
-                wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                        "bytes.", hashFile, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-                ret = WOLFCLU_FATAL_ERROR;
-                XFCLOSE(h);
-                break;
-            }
-
-            /* hash means msg */
-            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (hash == NULL) {
-                ret = MEMORY_E;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
-                XFCLOSE(h);
-                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return WOLFCLU_FATAL_ERROR;
-            }
-            XFCLOSE(h);
-
             ret = wolfCLU_verify_signature_dilithium(data, (int)fSz, hash,
                     (int)hSz, keyPath, inForm);
             break;
@@ -235,100 +139,19 @@ int wolfCLU_verify_signature(char* sig, char* hashFile, char* out,
 
 #ifdef WOLFSSL_HAVE_XMSS
         case XMSS_SIG_VER:
-            /* hashFIle means msgFile */
-            h = XFOPEN(hashFile, "rb");
-            if (h == NULL) {
-                wolfCLU_LogError("unable to open file %s", hashFile);
-                ret = BAD_FUNC_ARG;
+            ret = wolfCLU_ReadVerifyHash(hashFile, &hash, &hSz);
+            if (ret != WOLFCLU_SUCCESS) {
                 break;
             }
-
-            /* hSz means msgLen */
-            XFSEEK(h, 0, SEEK_END);
-            hSz = XFTELL(h);
-
-
-            if (hSz < 0) {
-                wolfCLU_LogError("Unable to Get Size of Hash File %s.",
-                        hashFile);
-                ret = BAD_FUNC_ARG;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (hSz > WOLFCLU_MAX_FILE_SIZE) {
-                wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                        "bytes.", hashFile, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-                ret = WOLFCLU_FATAL_ERROR;
-                XFCLOSE(h);
-                break;
-            }
-
-            /* hash means msg */
-            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (hash == NULL) {
-                ret = MEMORY_E;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
-                XFCLOSE(h);
-                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return WOLFCLU_FATAL_ERROR;
-            }
-            XFCLOSE(h);
-
             ret = wolfCLU_verify_signature_xmss(data, (int)fSz, hash, (int)hSz,
                     keyPath);
             break;
 
         case XMSSMT_SIG_VER:
-            /* hashFIle means msgFile */
-            h = XFOPEN(hashFile, "rb");
-            if (h == NULL) {
-                wolfCLU_LogError("unable to open file %s", hashFile);
-                ret = BAD_FUNC_ARG;
+            ret = wolfCLU_ReadVerifyHash(hashFile, &hash, &hSz);
+            if (ret != WOLFCLU_SUCCESS) {
                 break;
             }
-
-            /* hSz means msgLen */
-            XFSEEK(h, 0, SEEK_END);
-            hSz = XFTELL(h);
-
-            if (hSz < 0) {
-                wolfCLU_LogError("Unable to Get Size of Hash File %s.",
-                        hashFile);
-                ret = BAD_FUNC_ARG;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (hSz > WOLFCLU_MAX_FILE_SIZE) {
-                wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                        "bytes.", hashFile, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-                ret = WOLFCLU_FATAL_ERROR;
-                XFCLOSE(h);
-                break;
-            }
-
-            /* hash means msg */
-            hash = (byte*)XMALLOC(hSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-            if (hash == NULL) {
-                ret = MEMORY_E;
-                XFCLOSE(h);
-                break;
-            }
-
-            if (XFSEEK(h, 0, SEEK_SET) != 0 || (int)XFREAD(hash, 1, hSz, h) != hSz) {
-                XFCLOSE(h);
-                XFREE(hash, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                return WOLFCLU_FATAL_ERROR;
-            }
-            XFCLOSE(h);
-
             ret = wolfCLU_verify_signature_xmssmt(data, (int)fSz, hash,
                     (int)hSz, keyPath);
             break;
@@ -353,9 +176,9 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
 
 #ifndef NO_RSA
     int ret;
+    int keyFileSzInt = 0;
     long keyFileSz = 0;
     word32 index = 0;
-    XFILE keyPathFile = NULL;
     RsaKey key;
     byte* keyBuf = NULL;
     byte* outBuf = NULL;
@@ -367,37 +190,15 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         wolfCLU_LogError("Failed to initialize RsaKey.\nRet: %d", ret);
     }
 
-    /* open, read, and store RSA key  */
+    /* open, read, and store RSA key */
     if (ret == 0) {
-        keyPathFile = XFOPEN(keyPath, "rb");
-        if (keyPathFile == NULL) {
-            wolfCLU_LogError("unable to open file %s", keyPath);
-            ret = BAD_FUNC_ARG;
+        ret = wolfCLU_ReadFileToBuffer(keyPath, WOLFCLU_MAX_FILE_SIZE,
+                &keyBuf, &keyFileSzInt);
+        if (ret == WOLFCLU_SUCCESS) {
+            keyFileSz = keyFileSzInt;
+            ret = 0;
         }
-    }
-    if (ret == 0) {
-        XFSEEK(keyPathFile, 0, SEEK_END);
-        keyFileSz = XFTELL(keyPathFile);
-        if (keyFileSz < 0) {
-            wolfCLU_LogError("Unable to Get Size of Key File %s.", keyPath);
-            ret = BAD_FUNC_ARG;
-        }
-        else if (keyFileSz > WOLFCLU_MAX_FILE_SIZE) {
-            wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                    "bytes.", keyPath, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        keyBuf = (byte*)XMALLOC(keyFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (keyBuf == NULL) {
-            ret = MEMORY_E;
-        }
-    }
-    if (ret == 0) {
-        XMEMSET(keyBuf, 0, keyFileSz+1);
-        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+        else {
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -468,9 +269,8 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
         /* write the output to the specified file */
         if (ret > 0) {
             int writeSz = ret;
-            XFILE s = XFOPEN(out, "wb");
+            XFILE s = wolfCLU_OpenOutFile(out);
             if (s == NULL) {
-                wolfCLU_LogError("Unable to open file %s", out);
                 ret = BAD_FUNC_ARG;
             }
             else {
@@ -483,14 +283,16 @@ int wolfCLU_verify_signature_rsa(byte* sig, char* out, int sigSz, char* keyPath,
     }
 
     /* Cleanup allocated resources */
-    if (keyPathFile != NULL) {
-        XFCLOSE(keyPathFile);
-    }
-
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (keyBuf != NULL) {
+        /* With pubIn == 0 this holds a private key. Wipe using the size
+         * of the CURRENT allocation: wolfCLU_KeyPemToDer() swaps keyBuf
+         * for a smaller DER buffer and the tracking variable differs
+         * between these functions.
+         */
+        wolfCLU_ForceZero(keyBuf, (unsigned int)keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
@@ -509,11 +311,11 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
 
 #ifdef HAVE_ECC
     int ret;
+    int keyFileSzInt = 0;
     long keyFileSz = 0;
     int stat = 0;
     word32 index = 0;
 
-    XFILE keyPathFile = NULL;
     ecc_key key;
     byte* keyBuf = NULL;
     byte* outBuf = NULL;
@@ -527,37 +329,14 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
         wolfCLU_LogError("Failed to initialize ecc key.\nRet: %d", ret);
     }
 
-    /* open, read, and store Ecc key  */
     if (ret == 0) {
-        keyPathFile = XFOPEN(keyPath, "rb");
-        if (keyPathFile == NULL) {
-            wolfCLU_LogError("unable to open file %s", keyPath);
-            ret = BAD_FUNC_ARG;
+        ret = wolfCLU_ReadFileToBuffer(keyPath, WOLFCLU_MAX_FILE_SIZE,
+                &keyBuf, &keyFileSzInt);
+        if (ret == WOLFCLU_SUCCESS) {
+            keyFileSz = keyFileSzInt;
+            ret = 0;
         }
-    }
-    if (ret == 0) {
-        XFSEEK(keyPathFile, 0, SEEK_END);
-        keyFileSz = XFTELL(keyPathFile);
-        if (keyFileSz < 0) {
-            wolfCLU_LogError("Unable to Get Size of Key File %s.", keyPath);
-            ret = BAD_FUNC_ARG;
-        }
-        else if (keyFileSz > WOLFCLU_MAX_FILE_SIZE) {
-            wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                    "bytes.", keyPath, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        keyBuf = (byte*)XMALLOC(keyFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (keyBuf == NULL) {
-            ret = MEMORY_E;
-        }
-    }
-    if (ret == 0) {
-        XMEMSET(keyBuf, 0, keyFileSz+1);
-        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+        else {
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -661,14 +440,16 @@ int wolfCLU_verify_signature_ecc(byte* sig, int sigSz, byte* hash, int hashSz,
     }
 
     /* cleanup allocated resources */
-    if (keyPathFile != NULL) {
-        XFCLOSE(keyPathFile);
-    }
-
     if (outBuf != NULL) {
         XFREE(outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (keyBuf != NULL) {
+        /* With pubIn == 0 this holds a private key. Wipe using the size
+         * of the CURRENT allocation: wolfCLU_KeyPemToDer() swaps keyBuf
+         * for a smaller DER buffer and the tracking variable differs
+         * between these functions.
+         */
+        wolfCLU_ForceZero(keyBuf, (unsigned int)keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
@@ -688,9 +469,9 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     int ret;
     int stat = 0;
     word32 index = 0;
+    int keyFileSzInt = 0;
     long keyFileSz = 0;
 
-    XFILE keyPathFile = NULL;
     ed25519_key key;
     byte* keyBuf = NULL;
 
@@ -702,37 +483,14 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
         wolfCLU_LogError("Failed to initialize ED25519 key.\nRet: %d", ret);
     }
 
-    /* open, read, and store ED25519 key */
     if (ret == 0) {
-        keyPathFile = XFOPEN(keyPath, "rb");
-        if (keyPathFile == NULL) {
-            wolfCLU_LogError("unable to open file %s", keyPath);
-            ret = BAD_FUNC_ARG;
+        ret = wolfCLU_ReadFileToBuffer(keyPath, WOLFCLU_MAX_FILE_SIZE,
+                &keyBuf, &keyFileSzInt);
+        if (ret == WOLFCLU_SUCCESS) {
+            keyFileSz = keyFileSzInt;
+            ret = 0;
         }
-    }
-    if (ret == 0) {
-        XFSEEK(keyPathFile, 0, SEEK_END);
-        keyFileSz = XFTELL(keyPathFile);
-        if (keyFileSz < 0) {
-            wolfCLU_LogError("Unable to Get Size of Key File %s.", keyPath);
-            ret = BAD_FUNC_ARG;
-        }
-        else if (keyFileSz > WOLFCLU_MAX_FILE_SIZE) {
-            wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                    "bytes.", keyPath, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
-    if (ret == 0) {
-        keyBuf = (byte*)XMALLOC(keyFileSz+1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (keyBuf == NULL) {
-            ret = MEMORY_E;
-        }
-    }
-    if (ret == 0) {
-        XMEMSET(keyBuf, 0, keyFileSz+1);
-        if (XFSEEK(keyPathFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(keyBuf, 1, keyFileSz, keyPathFile) != keyFileSz) {
+        else {
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
@@ -817,11 +575,13 @@ int wolfCLU_verify_signature_ed25519(byte* sig, int sigSz,
     }
 
     /* cleanup allocated resources */
-    if (keyPathFile != NULL) {
-        XFCLOSE(keyPathFile);
-    }
-
     if (keyBuf != NULL) {
+        /* With pubIn == 0 this holds a private key. Wipe using the size
+         * of the CURRENT allocation: wolfCLU_KeyPemToDer() swaps keyBuf
+         * for a smaller DER buffer and the tracking variable differs
+         * between these functions.
+         */
+        wolfCLU_ForceZero(keyBuf, (unsigned int)keyFileSz);
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 
@@ -840,7 +600,6 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
 #ifdef HAVE_DILITHIUM
     int ret = 0;
 
-    XFILE keyFile = NULL;
     byte* keyBuf = NULL;
     long keyFileSz = 0;
     word32 keyBufSz = 0;
@@ -872,62 +631,21 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
     }
 
     /* open and read public key */
-    keyFile = XFOPEN(keyPath, "rb");
-    if (keyFile == NULL) {
-        wolfCLU_LogError("Failed to open public key FILE.");
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return BAD_FUNC_ARG;
-    }
-
-    XFSEEK(keyFile, 0, SEEK_END);
-    keyFileSz = XFTELL(keyFile);
-    if (keyFileSz <= 0) {
-        wolfCLU_LogError("Failed to get valid size of public key FILE.");
-        XFCLOSE(keyFile);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return BAD_FUNC_ARG;
-    }
-    if (keyFileSz > DILITHIUM_MAX_BOTH_KEY_PEM_SIZE) {
-        wolfCLU_LogError("Incorrect public key file size: %ld", keyFileSz);
-        XFCLOSE(keyFile);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return WOLFCLU_FATAL_ERROR;
-    }
-
-    keyBuf = (byte*)XMALLOC(keyFileSz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (keyBuf == NULL) {
-        wolfCLU_LogError("Failed to malloc key buffer.");
-        XFCLOSE(keyFile);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return MEMORY_E;
-    }
-    XMEMSET(keyBuf, 0, keyFileSz + 1);
-
-    if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
-        (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
-        wolfCLU_LogError("Failed to read public key.\nRET: %d", ret);
-        XFCLOSE(keyFile);
-        XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        wc_dilithium_free(key);
-    #ifdef WOLFSSL_SMALL_STACK
-        XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    #endif
-        return WOLFCLU_FATAL_ERROR;
+    {
+        int keyFileSzInt = 0;
+        int keyRet = wolfCLU_ReadFileToBuffer(keyPath,
+                DILITHIUM_MAX_BOTH_KEY_PEM_SIZE, &keyBuf, &keyFileSzInt);
+        if (keyRet != WOLFCLU_SUCCESS) {
+            /* wolfCLU_ReadFileToBuffer() already reported the reason. */
+            wc_dilithium_free(key);
+        #ifdef WOLFSSL_SMALL_STACK
+            XFREE(key, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        #endif
+            return keyRet;
+        }
+        keyFileSz = keyFileSzInt;
     }
     keyBufSz = (word32)keyFileSz;
-    XFCLOSE(keyFile);
 
     /* convert PEM to DER if necessary */
     if (inForm == PEM_FORM) {
@@ -940,6 +658,10 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
             }
             else {
                 wolfCLU_LogError("Failed to convert PEM to DER.\nRET: %d", ret);
+                /* The conversion failed, so keyBuf still holds the original
+                 * file contents and keyBufSz is still its allocation size.
+                 * Wipe it here too, matching the success path below. */
+                wolfCLU_ForceZero(keyBuf, keyBufSz);
                 XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 wc_dilithium_free(key);
             #ifdef WOLFSSL_SMALL_STACK
@@ -955,6 +677,11 @@ int wolfCLU_verify_signature_dilithium(byte* sig, int sigSz, byte* msg,
 
     /* retrieving public key and storing in the dilithium key */
     ret = wc_Dilithium_PublicKeyDecode(keyBuf, &index, key, keyBufSz);
+    /* keyBuf holds whatever file -inkey named, which may be a private key.
+     * keyBufSz (not keyFileSz) is the size of the CURRENT allocation:
+     * wolfCLU_KeyPemToDer() swaps keyBuf for a smaller DER buffer and this
+     * function tracks that size in keyBufSz. */
+    wolfCLU_ForceZero(keyBuf, keyBufSz);
     XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (ret != 0) {
         wolfCLU_LogError("Failed to decode public key.\nRET: %d", ret);
@@ -1009,7 +736,6 @@ int wolfCLU_verify_signature_xmss(byte* sig, int sigSz,
 {
 #ifdef WOLFSSL_HAVE_XMSS
     int ret        = 0;
-    XFILE keyFile  = NULL;               /* public key file              */
     byte* keyBuf   = NULL;               /* public key buffer            */
     long keyFileSz  = 0;                  /* public key buffer size       */
     word32 oid     = 0x0;                /* OID of the XMSS parameter    */
@@ -1035,48 +761,9 @@ int wolfCLU_verify_signature_xmss(byte* sig, int sigSz,
 
     /* open and read public key */
     if (ret == 0) {
-        keyFile = XFOPEN(pubKey, "rb");
-        if (keyFile == NULL) {
-            ret = OUTPUT_FILE_ERROR;
-            wolfCLU_LogError("Failed to open Public key FILE.");
-        }
-    }
-
-    if (ret == 0) {
-        XFSEEK(keyFile, 0, SEEK_END);
-        keyFileSz = XFTELL(keyFile);
-        if (keyFileSz < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-            wolfCLU_LogError("Failed to get size of public key FILE.");
-        }
-        else if (keyFileSz > WOLFCLU_MAX_FILE_SIZE) {
-            ret = WOLFCLU_FATAL_ERROR;
-            wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                    "bytes.", pubKey, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-        }
-    }
-
-    if (ret == 0) {
-        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (keyBuf == NULL) {
-            ret = MEMORY_E;
-            wolfCLU_LogError("Failed to malloc key buffer.\nRET: %d", ret);
-        }
-        else {
-            XMEMSET(keyBuf, 0, keyFileSz);
-        }
-    }
-
-    if (ret == 0) {
-        if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
-            ret = WOLFCLU_FATAL_ERROR;
-            wolfCLU_LogError("Failed to read public key."
-                             "\nRET: %d", ret);
-        }
-        else {
-            XFCLOSE(keyFile);
-            keyFile = NULL;
+        ret = wolfCLU_ReadXmssPubKey(pubKey, &keyBuf, &keyFileSz);
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = 0;
         }
     }
 
@@ -1144,9 +831,6 @@ int wolfCLU_verify_signature_xmss(byte* sig, int sigSz,
     }
 
     /* cleanup allocated resources */
-    if (keyFile != NULL) {
-        XFCLOSE(keyFile);
-    }
     if (keyBuf != NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
@@ -1176,7 +860,6 @@ int wolfCLU_verify_signature_xmssmt(byte* sig, int sigSz,
 {
 #ifdef WOLFSSL_HAVE_XMSS
     int ret        = 0;
-    XFILE keyFile  = NULL;                     /* public key file              */
     byte* keyBuf   = NULL;                     /* public key buffer            */
     long keyFileSz  = 0;                        /* public key buffer size       */
     word32 oid     = 0x0;                      /* OID of the XMSS parameter    */
@@ -1202,47 +885,9 @@ int wolfCLU_verify_signature_xmssmt(byte* sig, int sigSz,
 
     /* open and read public key */
     if (ret == 0) {
-        keyFile = XFOPEN(pubKey, "rb");
-        if (keyFile == NULL) {
-            ret = OUTPUT_FILE_ERROR;
-            wolfCLU_LogError("Failed to open Public key FILE.");
-        }
-    }
-
-    if (ret == 0) {
-        XFSEEK(keyFile, 0, SEEK_END);
-        keyFileSz = XFTELL(keyFile);
-        if (keyFileSz < 0) {
-            ret = WOLFCLU_FATAL_ERROR;
-            wolfCLU_LogError("Failed to get size of public key FILE.");
-        }
-        else if (keyFileSz > WOLFCLU_MAX_FILE_SIZE) {
-            ret = WOLFCLU_FATAL_ERROR;
-            wolfCLU_LogError("File: %s exceeds max size of 0x%X "
-                    "bytes.", pubKey, (unsigned)WOLFCLU_MAX_FILE_SIZE);
-        }
-    }
-
-    if (ret == 0) {
-        keyBuf = (byte*)XMALLOC(keyFileSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (keyBuf == NULL) {
-            ret = MEMORY_E;
-            wolfCLU_LogError("Failed to malloc key buffer.\nRET: %d", ret);
-        }
-        else {
-            XMEMSET(keyBuf, 0, keyFileSz);
-        }
-    }
-
-    if (ret == 0) {
-        if (XFSEEK(keyFile, 0, SEEK_SET) != 0 ||
-            (int)XFREAD(keyBuf, 1, keyFileSz, keyFile) != keyFileSz) {
-            ret = WOLFCLU_FATAL_ERROR;
-            wolfCLU_LogError("Failed to read public key.\nRET: %d", ret);
-        }
-        else {
-            XFCLOSE(keyFile);
-            keyFile = NULL;
+        ret = wolfCLU_ReadXmssPubKey(pubKey, &keyBuf, &keyFileSz);
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = 0;
         }
     }
 
@@ -1325,9 +970,6 @@ int wolfCLU_verify_signature_xmssmt(byte* sig, int sigSz,
     }
 
     /* cleanup allocated resources */
-    if (keyFile != NULL) {
-        XFCLOSE(keyFile);
-    }
     if (keyBuf != NULL) {
         XFREE(keyBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }

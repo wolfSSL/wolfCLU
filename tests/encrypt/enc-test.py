@@ -11,7 +11,9 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, WOLFSSL_BIN, run_wolfssl, test_main
+from wolfclu_test import (
+    no_filesystem, CERTS_DIR, WOLFSSL_BIN, run_wolfssl, test_main
+)
 
 # The interactive password prompt only reads from stdin when stdin is a real
 # terminal (wolfCLU_GetStdinPassword -> tcgetattr fails on a pipe), so driving
@@ -30,6 +32,7 @@ def run_enc(*args, password=""):
                           stdin=subprocess.DEVNULL, timeout=60)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncDecryptTest(unittest.TestCase):
 
     @classmethod
@@ -37,11 +40,7 @@ class EncDecryptTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+
 
     def _cleanup(self, *files):
         for f in files:
@@ -129,6 +128,52 @@ class EncDecryptTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(orig, dec, shallow=False),
                         "decrypted file does not match original")
 
+    def test_in_out_same_file_refused(self):
+        """-in and -out on one file would truncate the input mid-read."""
+        src = "enc_inplace.txt"
+        self._cleanup(src)
+
+        with open(src, "w") as f:
+            f.write("plaintext that must survive\n")
+
+        r = run_enc("enc", "-aes-128-cbc", "-in", src, "-out", src,
+                     password="test")
+        self.assertNotEqual(r.returncode, 0, "in-place enc should fail")
+        with open(src) as f:
+            self.assertEqual(f.read(), "plaintext that must survive\n",
+                             "input file was modified")
+
+        r = run_enc("enc", "-d", "-aes-128-cbc", "-in", src, "-out", src,
+                     password="test")
+        self.assertNotEqual(r.returncode, 0, "in-place dec should fail")
+        with open(src) as f:
+            self.assertEqual(f.read(), "plaintext that must survive\n",
+                             "input file was modified")
+
+    def test_in_out_same_file_refused_camellia(self):
+        """-in and -out on one file would truncate the input mid-read (non-EVP path)."""
+        if not _camellia_available():
+            self.skipTest("camellia support not compiled in")
+        src = "enc_inplace_camellia.txt"
+        self._cleanup(src)
+
+        with open(src, "w") as f:
+            f.write("plaintext that must survive\n")
+
+        r = run_enc("enc", "-camellia-128-cbc", "-in", src, "-out", src,
+                     password="test")
+        self.assertNotEqual(r.returncode, 0, "in-place enc should fail")
+        with open(src) as f:
+            self.assertEqual(f.read(), "plaintext that must survive\n",
+                             "input file was modified")
+
+        r = run_enc("enc", "-d", "-camellia-128-cbc", "-in", src, "-out", src,
+                     password="test")
+        self.assertNotEqual(r.returncode, 0, "in-place dec should fail")
+        with open(src) as f:
+            self.assertEqual(f.read(), "plaintext that must survive\n",
+                             "input file was modified")
+
     def test_small_file(self):
         small = "enc_small.txt"
         enc = "enc_small.txt.enc"
@@ -180,6 +225,7 @@ class EncDecryptTest(unittest.TestCase):
                          "{}".format(r.stderr))
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncInteropTest(unittest.TestCase):
     """Test interoperability with OpenSSL (skipped if openssl not available)."""
 
@@ -336,6 +382,7 @@ class EncInteropTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(orig, dec, shallow=False))
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncPassSourceTest(unittest.TestCase):
     """Regression tests for issue 6133.
 
@@ -351,11 +398,7 @@ class EncPassSourceTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+
 
     def _cleanup(self, *files):
         for f in files:
@@ -420,6 +463,7 @@ class EncPassSourceTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(orig, dec, shallow=False))
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncLegacyNamesTest(unittest.TestCase):
 
     @classmethod
@@ -479,6 +523,7 @@ def _camellia_available():
             os.remove(probe)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncStdinInputTest(unittest.TestCase):
     """Regression tests for stack buffer overflow fix (scanf -> fgets).
 
@@ -492,11 +537,7 @@ class EncStdinInputTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+
 
         cls.has_camellia = _camellia_available()
 
@@ -640,6 +681,7 @@ class EncStdinInputTest(unittest.TestCase):
                         "Camellia roundtrip mismatch after too-long reprompt")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncKeyInputTest(unittest.TestCase):
     """Tests for the -key (hex on CLI) and -inkey (key from file) flags."""
 
@@ -653,11 +695,7 @@ class EncKeyInputTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+
 
     def _cleanup(self, *files):
         for f in files:
@@ -914,6 +952,7 @@ class EncKeyInputTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_PTY, "pty not available (non-POSIX)")
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EncStdinPasswordTest(unittest.TestCase):
     """Interactive stdin-password path of `encrypt` (F-5970).
 

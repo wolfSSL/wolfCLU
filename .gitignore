@@ -29,6 +29,9 @@ wolfssl
 test-suite.log
 tests/*/*.log
 tests/*/*.trs
+# check_PROGRAMS binaries left in the tree by an in-tree "make check"
+tests/tools/tools_unit_test
+tests/tools/tools_unit_test.exe
 ecckey
 src/config.h
 src/config.h.in

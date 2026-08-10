@@ -9,12 +9,15 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import (CERTS_DIR, is_fips, run_wolfssl, test_main,
-                          truncate_sparse)
+from wolfclu_test import (
+    no_filesystem, CERTS_DIR, is_fips, run_wolfssl, test_main,
+    truncate_sparse
+)
 
 DGST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstVerifyTest(unittest.TestCase):
 
     @classmethod
@@ -22,11 +25,7 @@ class DgstVerifyTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+
 
     def test_verify_sha256_rsa(self):
         r = run_wolfssl("dgst", "-sha256", "-verify",
@@ -141,7 +140,7 @@ class DgstVerifyTest(unittest.TestCase):
         r = run_wolfssl("dgst", "-sha256", "-verify",
                         os.path.join(CERTS_DIR, "server-keyPub.pem"),
                         "-signature", os.path.join(DGST_DIR, "sha256-rsa.sig"))
-        self.assertGreaterEqual(r.returncode, 0, r.stderr)
+        self.assertNotEqual(r.returncode, 0, r.stderr)
 
     def test_complete_args_not_misflagged(self):
         """A well-formed dgst command must not trip the malformed-argument
@@ -154,6 +153,7 @@ class DgstVerifyTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstLargeFileTest(unittest.TestCase):
 
     LARGE_FILE = "large-test.txt"
@@ -163,11 +163,7 @@ class DgstLargeFileTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+
 
         # Create large file: 5000 copies of server-key.der
         der_path = os.path.join(CERTS_DIR, "server-key.der")
@@ -245,6 +241,7 @@ class DgstLargeFileTest(unittest.TestCase):
                         "Decryption of large file failed")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class LargeFileDgstTest(unittest.TestCase):
     """A signature over a >4 GiB file must NOT verify a tampered copy.
 
@@ -346,6 +343,7 @@ class LargeFileDgstTest(unittest.TestCase):
                     self.assertNotEqual(r.returncode, 0)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstSignVerifyRoundtripTest(unittest.TestCase):
 
     @classmethod
@@ -389,6 +387,7 @@ class DgstSignVerifyRoundtripTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstHmacTest(unittest.TestCase):
     """HMAC test vectors for `dgst -mac HMAC`.
 
@@ -437,12 +436,6 @@ class DgstHmacTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
-
         cls._tmpdir = tempfile.mkdtemp(prefix="wolfclu-hmac-")
         cls.data_file = os.path.join(cls._tmpdir, "data.bin")
         with open(cls.data_file, "wb") as f:

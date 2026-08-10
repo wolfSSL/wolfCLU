@@ -72,20 +72,53 @@ WOLFSSL_BIN = _find_wolfssl_bin()
 CERTS_DIR = _find_certs_dir()
 
 
-def run_wolfssl(*args, stdin_data=None, timeout=60):
+def run_wolfssl(*args, stdin_data=None, timeout=60, stdout=None):
     """Run the wolfssl binary with the given arguments.
 
     Returns a CompletedProcess instance.
     A default timeout of 60 seconds prevents indefinite hangs in CI.
     Network-facing tests (s_client, ocsp) manage their own timeouts.
+    Pass stdout (an open file) to redirect the child's stdout instead of
+    capturing it; the returned .stdout is None in that case.
     """
     cmd = [WOLFSSL_BIN] + list(args)
-    kwargs = dict(capture_output=True, text=True, timeout=timeout)
+    kwargs = dict(text=True, timeout=timeout)
+    if stdout is not None:
+        kwargs["stdout"] = stdout
+        kwargs["stderr"] = subprocess.PIPE
+    else:
+        kwargs["capture_output"] = True
     if stdin_data is not None:
         kwargs["input"] = stdin_data
     else:
         kwargs["stdin"] = subprocess.DEVNULL
     return subprocess.run(cmd, **kwargs)
+
+
+_NO_FILESYSTEM = None
+
+
+def no_filesystem():
+    """True when the build under test was configured --disable-filesystem,
+    in which case every file-backed subcommand refuses to run.
+
+    Use as a class decorator:
+        @unittest.skipIf(no_filesystem(), "filesystem support disabled")
+    """
+    global _NO_FILESYSTEM
+    if _NO_FILESYSTEM is None:
+        _NO_FILESYSTEM = False
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                _NO_FILESYSTEM = "disable-filesystem" in f.read()
+    return _NO_FILESYSTEM
+
+
+def skip_if_no_filesystem():
+    """no_filesystem() as a SkipTest. Call from setUpClass."""
+    if no_filesystem():
+        raise unittest.SkipTest("filesystem support disabled")
 
 
 def is_fips():

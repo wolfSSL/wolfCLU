@@ -316,9 +316,8 @@ int wolfCLU_Rand(int argc, char** argv)
     /* Open output ("wb") only after the count validates, so a bad/missing
      * count never truncates an existing file. */
     if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
-        bioOut = wolfSSL_BIO_new_file(outFile, "wb");
+        bioOut = wolfCLU_OpenOutFileBio(outFile);
         if (bioOut == NULL) {
-            wolfCLU_LogError("Unable to open output file %s", outFile);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

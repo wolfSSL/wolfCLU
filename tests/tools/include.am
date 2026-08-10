@@ -1,0 +1,17 @@
+# vim:ft=automake
+# included from top level Makefile.am
+# All paths should be given relative to root directory
+
+check_PROGRAMS += tests/tools/tools_unit_test
+
+# No _LDADD is needed: configure.ac's AC_CHECK_LIB([wolfssl], ...) puts
+# -lwolfssl in the global $(LIBS), which automake appends to every program
+# link, and bin_PROGRAMS wolfssl links the same implicit way.
+#
+# No per-target _CFLAGS/_CPPFLAGS either: setting any of them forces
+# per-target object names, which compiles clu_funcs.c and clu_log.c a second
+# time instead of reusing the objects the wolfssl binary already builds.
+tests_tools_tools_unit_test_SOURCES = \
+                    tests/tools/tools_unit_test.c \
+                    src/clu_log.c \
+                    src/tools/clu_funcs.c

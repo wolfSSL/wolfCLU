@@ -77,6 +77,11 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
         return BAD_FUNC_ARG;
     }
 
+    /* Opening the output truncates it, destroying the input mid-read. */
+    if (wolfCLU_RejectSamePath(fileIn, fileOut) != WOLFCLU_SUCCESS) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
     /* Start up the random number generator */
     if (wc_InitRng(&rng) != 0) {
         wolfCLU_LogError("Random Number Generator failed to start.");
@@ -236,7 +241,21 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     /* open the outFile in write mode */
     if (ret == WOLFCLU_SUCCESS) {
         if (fileOut != NULL) {
-            out = wolfSSL_BIO_new_file(fileOut, "wb");
+            /* Guard against identical in/out paths before truncating output. */
+            XFILE inBioFile = NULL;
+            FILE* outFile;
+
+            if (fileIn != NULL && in != NULL) {
+                (void)wolfSSL_BIO_get_fp(in, &inBioFile);
+            }
+            outFile = wolfCLU_OpenOutFileDistinctFrom(fileOut, inBioFile);
+            if (outFile != NULL) {
+                out = wolfSSL_BIO_new_fp(outFile, BIO_CLOSE);
+                if (out == NULL) {
+                    XFCLOSE(outFile);
+                    wolfCLU_LogError("unable to open output file %s", fileOut);
+                }
+            }
         }
         else {
             /* write to stdout if no file provided  */
@@ -246,10 +265,7 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
             }
         }
         if (out == NULL) {
-            if (fileOut != NULL) {
-                wolfCLU_LogError("unable to open output file %s", fileOut);
-            }
-            else {
+            if (fileOut == NULL) {
                 wolfCLU_LogError("unable to open stdout for output");
             }
             ret = WOLFCLU_FATAL_ERROR;
@@ -390,7 +406,13 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        wolfSSL_BIO_write(out, output, outputSz);
+        /* Checked like the in-loop write above: this is the padded final
+         * block, so losing it silently truncates the output. */
+        if (wolfSSL_BIO_write(out, output, outputSz) < 0) {
+            wolfCLU_LogError("Failed to write output file %s",
+                    fileOut != NULL ? fileOut : "stdout");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
     /* write out stored up output in base64 encrypt case */
@@ -411,8 +433,30 @@ int wolfCLU_evp_crypto(const WOLFSSL_EVP_CIPHER* cphr, char* mode, byte* pwdKey,
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                wolfSSL_BIO_write(base64Bio, mem->data, (int)mem->length);
+                /* The write can fail outright (ENOSPC/EIO) for a large
+                 * payload, before anything is left buffered for the flush
+                 * below to catch, so its result has to be checked here. */
+                if (wolfSSL_BIO_write(base64Bio, mem->data,
+                            (int)mem->length) != (int)mem->length) {
+                    wolfCLU_LogError("Failed to write output file %s",
+                            fileOut != NULL ? fileOut : "stdout");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
                 wolfSSL_BIO_free(base64Bio);
+            }
+        }
+    }
+
+    /* Flush output stream to catch write errors before closing. */
+    {
+        WOLFSSL_BIO* fileBio = (enc && isBase64) ? tmp : out;
+
+        if (fileBio != NULL &&
+                wolfSSL_BIO_flush(fileBio) != WOLFSSL_SUCCESS) {
+            wolfCLU_LogError("Failed to write output file %s",
+                    fileOut != NULL ? fileOut : "stdout");
+            if (ret == WOLFCLU_SUCCESS) {
+                ret = WOLFCLU_FATAL_ERROR;
             }
         }
     }

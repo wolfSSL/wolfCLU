@@ -23,6 +23,11 @@
  * https://github.com/wolfSSL/wolfssl-examples/tree/master/tls
  */
 
+/* wolfclu/server.h only declares server_test() with a filesystem, and the
+ * example itself is built around loading certs and keys from files. Compile
+ * the whole thing out otherwise, exactly as src/client/client.c does. */
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 #ifdef HAVE_CONFIG_H
     #include <config.h>
 #endif
@@ -3927,3 +3932,5 @@ exit:
     char* myoptarg = NULL;
 
 #endif /* NO_MAIN_DRIVER */
+
+#endif /* !WOLFCLU_NO_FILESYSTEM */

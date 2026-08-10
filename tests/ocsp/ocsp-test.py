@@ -15,7 +15,9 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main, find_free_port
+from wolfclu_test import (
+    no_filesystem, WOLFSSL_BIN, CERTS_DIR, test_main, find_free_port
+)
 
 HAS_OPENSSL = shutil.which("openssl") is not None
 
@@ -107,6 +109,7 @@ def _run_client(binary, port, extra_args=None):
     return r.returncode, r.stdout + r.stderr
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class _OCSPInteropBase(unittest.TestCase):
     """Base class for a single client/responder combination.
 
@@ -310,6 +313,7 @@ class _OCSPInteropBase(unittest.TestCase):
 # Concrete test classes for each client/responder combination.
 # Each gets a dynamically assigned port in setUpClass to avoid conflicts.
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestWolfsslClientWolfsslResponder(_OCSPInteropBase):
     CLIENT_BIN = WOLFSSL_BIN
     RESPONDER_BIN = WOLFSSL_BIN
@@ -326,6 +330,7 @@ class TestWolfsslClientWolfsslResponder(_OCSPInteropBase):
 
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestWolfsslClientOpensslResponder(_OCSPInteropBase):
     CLIENT_BIN = WOLFSSL_BIN
     RESPONDER_BIN = "openssl"
@@ -341,6 +346,7 @@ class TestWolfsslClientOpensslResponder(_OCSPInteropBase):
 
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestOpensslClientWolfsslResponder(_OCSPInteropBase):
     CLIENT_BIN = "openssl"
     RESPONDER_BIN = WOLFSSL_BIN
@@ -355,6 +361,7 @@ class TestOpensslClientWolfsslResponder(_OCSPInteropBase):
         self.assertIn("good", out.lower(), out)
 
 @unittest.skipUnless(HAS_OPENSSL, "openssl not available")
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestOpensslClientOpensslResponder(_OCSPInteropBase):
     CLIENT_BIN = "openssl"
     RESPONDER_BIN = "openssl"
@@ -368,6 +375,7 @@ class TestOpensslClientOpensslResponder(_OCSPInteropBase):
         self.assertEqual(rc, 0, out)
         self.assertIn("good", out.lower(), out)
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestPortValidation(unittest.TestCase):
     """Boundary tests for the -port range check in wolfCLU_OcspSetup.
 
@@ -451,6 +459,7 @@ class TestPortValidation(unittest.TestCase):
                          "expected missing-argument diagnostic for -port")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestNrequestValidation(unittest.TestCase):
     """Boundary tests for the -nrequest range check in wolfCLU_OcspSetup.
 

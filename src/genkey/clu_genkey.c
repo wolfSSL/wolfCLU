@@ -26,13 +26,26 @@
 
 #if defined(WOLFSSL_KEY_GEN) && !defined(NO_ASN)
 
+/* Each key-generation routine below writes its result out through the wolfCLU
+ * secure file helpers, which are only declared and compiled when a stdio
+ * filesystem is available, so each is additionally conditioned on
+ * !WOLFCLU_NO_FILESYSTEM and falls back to its NOT_COMPILED_IN branch --
+ * except wolfCLU_genKey_ED25519() and the XMSS read/write callbacks, whose
+ * entire definitions (including the NOT_COMPILED_IN stub) are already
+ * conditioned on their key type being enabled, so they gain no separate
+ * !WOLFCLU_NO_FILESYSTEM stub of their own; their only callers are already
+ * inside a !WOLFCLU_NO_FILESYSTEM guard.
+ * The BIO-based helpers (wolfCLU_GenKeyECC, wolfCLU_EcparamPrintOID,
+ * wolfCLU_KeyDerToPem) open no files and stay available: ecparam still
+ * generates keys to stdout without a filesystem. */
 #include <wolfclu/clu_header_main.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/genkey/clu_genkey.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
 
-#ifdef HAVE_ED25519
+/* Writes the key to a file, so it needs the secure file helpers. */
+#if defined(HAVE_ED25519) && !defined(WOLFCLU_NO_FILESYSTEM)
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 {
@@ -51,8 +64,8 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     XFILE file = NULL;                   /* file stream */
     byte* derBuf = NULL;                 /* buffer for DER format */
     byte* pemBuf = NULL;                 /* buffer for PEM format */
-    int derSz;                           /* size of DER buffer */
-    int pemSz;                           /* size of PEM buffer */
+    int derSz = 0;                       /* size of DER buffer */
+    int pemSz = 0;                       /* size of PEM buffer */
 
     /* initialize ed25519 key */
     ret = wc_ed25519_init(&edKeyOut);
@@ -121,7 +134,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
             /* open the file for writing the private key */
             if (ret == 0) {
-                file = XFOPEN(finalOutFNm, "wb");
+                file = wolfCLU_OpenKeyFile(finalOutFNm);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -201,12 +214,23 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
                 break;
             } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1 */
 
-            XFCLOSE(file);
+            if (wolfCLU_CloseOutFile(file, finalOutFNm) != WOLFCLU_SUCCESS) {
+                ret = OUTPUT_FILE_ERROR;
+            }
             file = NULL;
+            if (derBuf != NULL) {
+                wolfCLU_ForceZero(derBuf, derSz);
+            }
             XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             derBuf = NULL;
+            if (pemBuf != NULL) {
+                wolfCLU_ForceZero(pemBuf, pemSz);
+            }
             XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             pemBuf = NULL;
+            if (ret != 0) {
+                break;
+            }
 
             FALL_THROUGH;
         case PUB_ONLY_FILE:
@@ -216,7 +240,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
             /* open the file for writing the public key */
             if (ret == 0) {
-                file = XFOPEN(finalOutFNm, "wb");
+                file = wolfCLU_OpenOutFile(finalOutFNm);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -301,27 +325,40 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
     }
 
     /* cleanup allocated resources */
+    if (file != NULL) {
+        if (wolfCLU_CloseOutFile(file, finalOutFNm) != WOLFCLU_SUCCESS &&
+                ret == 0) {
+            ret = OUTPUT_FILE_ERROR;
+        }
+        file = NULL;
+    }
     if (finalOutFNm != NULL) {
         XFREE(finalOutFNm, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         finalOutFNm = NULL;
     }
     if (derBuf != NULL) {
+        wolfCLU_ForceZero(derBuf, derSz);
         XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (pemBuf != NULL) {
+        wolfCLU_ForceZero(pemBuf, pemSz);
         XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
-    if (file != NULL) {
-        XFCLOSE(file);
-        file = NULL;
-    }
+    /* privKeyBuf holds the raw private key when format == RAW_FORM; wipe it
+     * here regardless of format so a caller-supplied but unused buffer is
+     * never left holding key material past this call. */
+    wolfCLU_ForceZero(privKeyBuf, sizeof(privKeyBuf));
 
     /* expected ret == WOLFCLU_SUCCESS */
     return (ret >= 0) ? WOLFCLU_SUCCESS : ret;
 }
-#endif /* HAVE_ED25519 */
+#endif /* HAVE_ED25519 && !WOLFCLU_NO_FILESYSTEM */
 
 #ifdef HAVE_ECC
+
+/* Only wolfCLU_GenAndOutput_ECC() uses these two, so they follow it in being
+ * compiled out without a filesystem. */
+#ifndef WOLFCLU_NO_FILESYSTEM
 /* returns WOLFCLU_SUCCESS on successfully writing out public DER key */
 static int wolfCLU_ECC_write_pub_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
 {
@@ -403,6 +440,7 @@ static int wolfCLU_ECC_write_priv_der(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key)
 
     return ret;
 }
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 
 void wolfCLU_EcparamPrintOID(WOLFSSL_BIO* out, WOLFSSL_EC_KEY* key,
         int fmt)
@@ -613,7 +651,7 @@ WOLFSSL_EC_KEY* wolfCLU_GenKeyECC(char* name)
 int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
         int fmt, char* name)
 {
-#ifdef HAVE_ECC
+#if defined(HAVE_ECC) && !defined(WOLFCLU_NO_FILESYSTEM)
     int   fNameSz;
     int   fExtSz      = 6;
     char  fExtPriv[6] = ".priv";
@@ -663,11 +701,9 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
                     WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
 
-                    bioPri = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
+                    bioPri = wolfCLU_OpenKeyFileBio(fOutNameBuf);
                     if (bioPri == NULL) {
-                        wolfCLU_LogError("unable to read outfile %s",
-                                fOutNameBuf);
-                        ret = MEMORY_E;
+                        ret = OUTPUT_FILE_ERROR;
                     }
                 }
 
@@ -697,11 +733,9 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
                     WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
-                    bioPub = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
+                    bioPub = wolfCLU_OpenOutFileBio(fOutNameBuf);
                     if (bioPub == NULL) {
-                        wolfCLU_LogError("unable to read outfile %s",
-                                fOutNameBuf);
-                        ret = MEMORY_E;
+                        ret = OUTPUT_FILE_ERROR;
                     }
                 }
 
@@ -743,8 +777,10 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
     (void)directive;
     (void)fmt;
 
+    (void)name;
+
     return NOT_COMPILED_IN;
-#endif /* HAVE_ECC */
+#endif /* HAVE_ECC && !WOLFCLU_NO_FILESYSTEM */
 }
 
 
@@ -789,7 +825,7 @@ int wolfCLU_KeyDerToPem(const byte* der, int derSz, byte** out, int pemType,
 int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                        keySz, long exp)
 {
-#ifndef NO_RSA
+#if !defined(NO_RSA) && !defined(WOLFCLU_NO_FILESYSTEM)
     RsaKey key;                        /* the RSA key structure */
     XFILE file = NULL;                 /* file stream */
     int   ret = WOLFCLU_SUCCESS;       /* return value */
@@ -849,7 +885,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
             /* open the file for writing the private key */
             if (ret == WOLFCLU_SUCCESS) {
-                file = XFOPEN(fOutNameBuf, "wb");
+                file = wolfCLU_OpenKeyFile(fOutNameBuf);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -919,7 +955,9 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                 break;
             } /* else fall through to PUB_ONLY_FILE if flagOutputPub == 1 */
 
-            XFCLOSE(file);
+            if (wolfCLU_CloseOutFile(file, fOutNameBuf) != WOLFCLU_SUCCESS) {
+                ret = OUTPUT_FILE_ERROR;
+            }
             file = NULL;
             if (derBuf != NULL) {
                 if (derBufSz > 0) {
@@ -935,6 +973,9 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
                 XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
                 pemBuf = NULL;
             }
+            if (ret != WOLFCLU_SUCCESS) {
+                break;
+            }
 
             FALL_THROUGH;
         case PUB_ONLY_FILE:
@@ -944,7 +985,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
             /* open the file for writing the public key */
             if (ret == WOLFCLU_SUCCESS) {
-                file = XFOPEN(fOutNameBuf, "wb");
+                file = wolfCLU_OpenOutFile(fOutNameBuf);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -1019,6 +1060,13 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
     }
 
     /* cleanup allocated resources */
+    if (file != NULL) {
+        if (wolfCLU_CloseOutFile(file, fOutNameBuf) != WOLFCLU_SUCCESS &&
+                ret == WOLFCLU_SUCCESS) {
+            ret = OUTPUT_FILE_ERROR;
+        }
+        file = NULL;
+    }
     if (fOutNameBuf != NULL) {
         XFREE(fOutNameBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         fOutNameBuf = NULL;
@@ -1036,10 +1084,6 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
         }
         XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         pemBuf = NULL;
-    }
-     if (file != NULL) {
-        XFCLOSE(file);
-        file = NULL;
     }
 
     wc_FreeRsaKey(&key);
@@ -1061,7 +1105,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                             int keySz, int level, int withAlg)
 {
-#ifdef HAVE_DILITHIUM
+#if defined(HAVE_DILITHIUM) && !defined(WOLFCLU_NO_FILESYSTEM)
     int    ret = WOLFCLU_SUCCESS;
 
     XFILE  file = NULL;
@@ -1180,10 +1224,8 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Private key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        wolfCLU_LogError("unable to open file %s",
-                                        fOutNameBuf);
+                    file = wolfCLU_OpenKeyFile(fOutNameBuf);
+                    if (file == NULL) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
@@ -1198,7 +1240,9 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                     break;
                 }
 
-                XFCLOSE(file);
+                if (wolfCLU_CloseOutFile(file, fOutNameBuf) != WOLFCLU_SUCCESS) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
                 file = NULL;
                 wolfCLU_ForceZero(derBuf, keySz);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -1207,6 +1251,9 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
                     wolfCLU_ForceZero(pemBuf, pemBufSz);
                     XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
                     pemBuf = NULL;
+                }
+                if (ret != WOLFCLU_SUCCESS) {
+                    break;
                 }
 
                 FALL_THROUGH;
@@ -1247,10 +1294,8 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Public key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        wolfCLU_LogError("unable to open file %s",
-                                        fOutNameBuf);
+                    file = wolfCLU_OpenOutFile(fOutNameBuf);
+                    if (file == NULL) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
@@ -1268,8 +1313,13 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
         }
     }
 
-    if (file != NULL)
-        XFCLOSE(file);
+    if (file != NULL) {
+        if (wolfCLU_CloseOutFile(file, fOutNameBuf) != WOLFCLU_SUCCESS &&
+                ret == WOLFCLU_SUCCESS) {
+            ret = OUTPUT_FILE_ERROR;
+        }
+        file = NULL;
+    }
 
     if (derBuf != NULL) {
         wolfCLU_ForceZero(derBuf, keySz);
@@ -1301,13 +1351,13 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
     (void)withAlg;
 
     return NOT_COMPILED_IN;
-#endif /* HAVE_DILITHIUM */
+#endif /* HAVE_DILITHIUM && !WOLFCLU_NO_FILESYSTEM */
 }
 
 int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                             int keySz, int level, int withAlg)
 {
-#ifdef HAVE_DILITHIUM
+#if defined(HAVE_DILITHIUM) && !defined(WOLFCLU_NO_FILESYSTEM)
     int    ret = WOLFCLU_SUCCESS;
 
     XFILE  file       = NULL;
@@ -1428,10 +1478,8 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Private key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        wolfCLU_LogError("unable to open file %s",
-                                        fOutNameBuf);
+                    file = wolfCLU_OpenKeyFile(fOutNameBuf);
+                    if (file == NULL) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
@@ -1446,7 +1494,9 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                     break;
                 }
 
-                XFCLOSE(file);
+                if (wolfCLU_CloseOutFile(file, fOutNameBuf) != WOLFCLU_SUCCESS) {
+                    ret = OUTPUT_FILE_ERROR;
+                }
                 file = NULL;
                 wolfCLU_ForceZero(derBuf, keySz);
                 XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
@@ -1455,6 +1505,9 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
                     wolfCLU_ForceZero(pemBuf, pemBufSz);
                     XFREE(pemBuf, HEAP_HINT, DYNAMIC_TYPE_PRIVATE_KEY);
                     pemBuf = NULL;
+                }
+                if (ret != WOLFCLU_SUCCESS) {
+                    break;
                 }
 
                 FALL_THROUGH;
@@ -1500,10 +1553,8 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Public key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
-                    if (file == XBADFILE) {
-                        wolfCLU_LogError("unable to open file %s",
-                                        fOutNameBuf);
+                    file = wolfCLU_OpenOutFile(fOutNameBuf);
+                    if (file == NULL) {
                         ret = OUTPUT_FILE_ERROR;
                     }
                 }
@@ -1522,7 +1573,11 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
     }
 
     if (file != NULL) {
-        XFCLOSE(file);
+        if (wolfCLU_CloseOutFile(file, fOutNameBuf) != WOLFCLU_SUCCESS &&
+                ret == WOLFCLU_SUCCESS) {
+            ret = OUTPUT_FILE_ERROR;
+        }
+        file = NULL;
     }
 
     if (derBuf != NULL) {
@@ -1555,11 +1610,13 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
     (void)withAlg;
 
     return NOT_COMPILED_IN;
-#endif /* HAVE_DILITHIUM */
+#endif /* HAVE_DILITHIUM && !WOLFCLU_NO_FILESYSTEM */
 }
 
 /* The call back function of the writing xmss key */
-#ifdef WOLFSSL_HAVE_XMSS
+/* The read/write callbacks below go through the secure file helpers;
+ * clu_sign.c only registers them when a filesystem is available. */
+#if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFCLU_NO_FILESYSTEM)
 enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
                                        word32 privSz, void * context)
 {
@@ -1578,15 +1635,12 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
 
     filename = context;
 
-    /* Open file for read and write. */
-    file = fopen(filename, "rb+");
+    /* This is the XMSS private key, including the signing state that is
+     * rewritten after every signature, so it gets the same owner-only,
+     * no-symlink treatment as every other private key wolfCLU writes. */
+    file = wolfCLU_OpenSecureFileForUpdate(filename);
     if (!file) {
-        /* Create the file if it didn't exist. */
-        file = fopen(filename, "wb+");
-        if (!file) {
-            fprintf(stderr, "error: fopen(%s, \"w+\") failed.\n", filename);
-            return WC_XMSS_RC_WRITE_FAIL;
-        }
+        return WC_XMSS_RC_WRITE_FAIL;
     }
 
     n_write = fwrite(priv, 1, privSz, file);
@@ -1606,9 +1660,12 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
 
     /* Verify private key data has actually been written to persistent
      * storage correctly. */
-    file = fopen(filename, "rb+");
+    /* ownerOnly is clear: this only reads back what was just written, and
+     * the mode was already forced during the write above. Passing 1 here
+     * would make a read path fchmod the file. */
+    file = wolfCLU_OpenExistingSecureFile(filename, "rb", 0);
     if (!file) {
-        fprintf(stderr, "error: fopen(%s, \"r+\") failed.\n", filename);
+        fprintf(stderr, "error: could not reopen %s to verify.\n", filename);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
@@ -1626,12 +1683,15 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
     if (n_read != n_write) {
         fprintf(stderr, "error: read %zu, expected %zu: %d\n", n_read, n_write,
                 ferror(file));
+        wolfCLU_ForceZero(buff, (unsigned int)privSz);
         free(buff);
         fclose(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
     n_cmp = XMEMCMP(buff, priv, n_write);
+    /* buff holds a copy of the private key read back from disk. */
+    wolfCLU_ForceZero(buff, (unsigned int)privSz);
     free(buff);
     buff = NULL;
 
@@ -1664,9 +1724,12 @@ enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte * priv,
 
     filename = context;
 
-    file = fopen(filename, "rb");
+    /* Read-only path, so it follows symlinks like any other read; the
+     * no-symlink rule is applied where this key is written, in the write
+     * callback above. */
+    file = XFOPEN(filename, "rb");
     if (!file) {
-        fprintf(stderr, "error: fopen(%s, \"rb\") failed\n", filename);
+        fprintf(stderr, "error: could not open %s for reading\n", filename);
         return WC_XMSS_RC_READ_FAIL;
     }
 
@@ -1683,12 +1746,12 @@ enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte * priv,
 
     return WC_XMSS_RC_READ_TO_MEMORY;
 }
-#endif  /* WOLFSSL_HAVE_XMSS */
+#endif  /* WOLFSSL_HAVE_XMSS && !WOLFCLU_NO_FILESYSTEM */
 
 int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
                         int directive, const char* paramStr)
 {
-#ifdef WOLFSSL_HAVE_XMSS
+#if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFCLU_NO_FILESYSTEM)
     int ret            = 0;
     int fNameSz        = 0;           /* file name without append         */
     int fExtSz         = 6;           /* size of ".priv\0" and ".pub\0\0" */
@@ -1794,10 +1857,9 @@ int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
         WOLFCLU_LOG(WOLFCLU_L0, "Public key file = %s", fOutNameBuf);
 
         /* open the file for writing the public key */
-        file = XFOPEN(fOutNameBuf, "wb");
+        file = wolfCLU_OpenOutFile(fOutNameBuf);
         if (file == NULL) {
             ret = OUTPUT_FILE_ERROR;
-            wolfCLU_LogError("unable to open file %s\nRET: %d", fOutNameBuf, ret);
         }
 
         /* get the public key length */
@@ -1839,7 +1901,11 @@ int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
         }
 
         if (file != NULL) {
-            XFCLOSE(file);
+            if (wolfCLU_CloseOutFile(file, fOutNameBuf) != WOLFCLU_SUCCESS &&
+                    ret == 0) {
+                ret = OUTPUT_FILE_ERROR;
+            }
+            file = NULL;
         }
     }
 
@@ -1864,7 +1930,7 @@ int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
     (void)paramStr;
 
     return NOT_COMPILED_IN;
-#endif /* HAVE_XMSS */
+#endif /* WOLFSSL_HAVE_XMSS && !WOLFCLU_NO_FILESYSTEM */
 }
 
 #endif /* WOLFSSL_KEY_GEN && !NO_ASN*/

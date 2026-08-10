@@ -8,7 +8,8 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import (CERTS_DIR, run_wolfssl, test_main, truncate_sparse)
+from wolfclu_test import (CERTS_DIR, run_wolfssl, skip_if_no_filesystem,
+                          test_main, truncate_sparse)
 
 HASH_DIR = os.path.dirname(os.path.abspath(__file__))
 CERT_FILE = os.path.join(CERTS_DIR, "ca-cert.pem")
@@ -28,11 +29,7 @@ class HashCommandTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+        skip_if_no_filesystem()
 
     def test_sha(self):
         r = run_wolfssl("-hash", "-sha", "-in", CERT_FILE)
@@ -82,11 +79,7 @@ class HashShortcutTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+        skip_if_no_filesystem()
 
     def test_md5(self):
         r = run_wolfssl("md5", CERT_FILE)
@@ -174,6 +167,54 @@ class LargeFileHashTest(unittest.TestCase):
                 self.assertEqual(r1.returncode, 0, r1.stderr)
                 self.assertEqual(r2.returncode, 0, r2.stderr)
                 self.assertNotEqual(r1.stdout.strip(), r2.stdout.strip())
+
+
+class HashOutTargetTest(unittest.TestCase):
+    """-out must accept every target fopen() accepts.
+
+    Non-secret output is not hardened against symlinks, so writing to
+    /dev/stdout or through a symlink has to keep working.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        if not os.path.isdir(CERTS_DIR):
+            raise unittest.SkipTest("certs directory not found")
+        skip_if_no_filesystem()
+        cls._tmpdir = tempfile.mkdtemp(prefix="wolfclu-hash-out-")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(getattr(cls, "_tmpdir", ""), ignore_errors=True)
+
+    def test_out_dev_stdout(self):
+        if not os.path.exists("/dev/stdout"):
+            self.skipTest("/dev/stdout not available")
+        target = os.path.join(self._tmpdir, "stdout-redirect.bin")
+        with open(target, "wb") as f:
+            r = run_wolfssl("-hash", "-sha256", "-in", CERT_FILE,
+                            "-out", "/dev/stdout", stdout=f)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(os.path.getsize(target), 32)
+
+    def test_out_through_symlink(self):
+        if not hasattr(os, "symlink"):
+            self.skipTest("symlinks not supported")
+        target = os.path.join(self._tmpdir, "real.bin")
+        link = os.path.join(self._tmpdir, "link.bin")
+        open(target, "wb").close()
+        try:
+            os.symlink(target, link)
+        except (OSError, NotImplementedError) as e:
+            self.skipTest("could not create symlink: {}".format(e))
+
+        r = run_wolfssl("-hash", "-sha256", "-in", CERT_FILE, "-out", link)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(os.path.islink(link),
+                        "-out replaced the symlink instead of writing "
+                        "through it")
+        self.assertEqual(os.path.getsize(target), 32,
+                         "-out did not write through the symlink")
 
 
 class HashArgErrorTest(unittest.TestCase):

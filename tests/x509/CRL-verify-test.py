@@ -6,7 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import no_filesystem, CERTS_DIR, run_wolfssl, test_main
 
 
 def _has_crl():
@@ -33,6 +33,7 @@ def _cleanup(*files):
             os.remove(f)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCRLVerify(unittest.TestCase):
     """CRL verification tests."""
 
@@ -150,6 +151,7 @@ class TestCRLVerify(unittest.TestCase):
                           combined))
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCRLText(unittest.TestCase):
     """CRL -text output tests."""
 

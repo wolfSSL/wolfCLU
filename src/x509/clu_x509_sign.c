@@ -903,9 +903,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        out = wolfSSL_BIO_new_file(outFileName, "wb");
+        out = wolfCLU_OpenOutFileBio(outFileName);
         if (out == NULL) {
-            wolfCLU_LogError("Unable to open out file %s", outFileName);
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
@@ -1604,6 +1603,26 @@ static void _setPolicy(word32* ret, char* str, word32 matchMask,
 }
 
 
+/* Open a CA state file (serial counter, database/index) for read-modify-write
+ * access. These persist across every signing operation, so they get the same
+ * no-follow, owner-only protection as key material rather than the plain
+ * fopen()-equivalent behavior used for one-shot -out writes. */
+static WOLFSSL_BIO* wolfCLU_OpenCaStateFileBio(const char* path,
+        const char* mode)
+{
+    FILE* f = wolfCLU_CreateSecureFile(path, mode, 1);
+    WOLFSSL_BIO* bio;
+
+    if (f == NULL) {
+        return NULL;
+    }
+    bio = wolfSSL_BIO_new_fp(f, BIO_CLOSE);
+    if (bio == NULL) {
+        XFCLOSE(f);
+    }
+    return bio;
+}
+
 static int wolfCLU_ParsePolicy(WOLFCLU_CERT_SIGN* csigner, char* sect)
 {
     WOLFSSL_CONF* conf;
@@ -1689,7 +1708,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     if (ret != NULL) {
         tmp = wolfSSL_NCONF_get_string(conf, CAsection, "database");
         if (tmp != NULL) {
-            ret->dataBase = wolfSSL_BIO_new_file(tmp, "ab+");
+            ret->dataBase = wolfCLU_OpenCaStateFileBio(tmp, "ab+");
             if (ret->dataBase == NULL) {
                 wolfCLU_LogError("Unable to open data base file %s",
                         tmp);
@@ -1726,7 +1745,7 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
         if (serial != NULL) {
             WOLFSSL_BIO* s;
 
-            s = wolfSSL_BIO_new_file(serial, "rb+");
+            s = wolfCLU_OpenCaStateFileBio(serial, "rb+");
             if (s == NULL) {
                 wolfCLU_LogError("Unable to open serial file %s",
                         serial);

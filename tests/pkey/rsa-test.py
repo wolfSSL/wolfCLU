@@ -180,5 +180,29 @@ class RsaTest(unittest.TestCase):
         self.assertEqual(r.stdout.strip(), RSA_PUBKEY_PEM)
 
 
+    def test_out_without_filename_fails(self):
+        """A trailing -out binds a NULL optarg; without the guard the key is
+        silently written to stdout with a success exit code."""
+        r = run_wolfssl("rsa", "-in",
+                        os.path.join(CERTS_DIR, "server-key.pem"), "-out")
+        self.assertNotEqual(r.returncode, 0,
+                            "-out without filename must fail")
+
+    def test_in_out_same_file_refused(self):
+        """-in and -out naming the same file must be refused."""
+        same = "rsa_inplace.pem"
+        self._cleanup(same)
+        with open(os.path.join(CERTS_DIR, "server-key.pem"), "rb") as src:
+            original = src.read()
+        with open(same, "wb") as f:
+            f.write(original)
+
+        r = run_wolfssl("rsa", "-in", same, "-out", same)
+        self.assertNotEqual(r.returncode, 0,
+                            "in-place update must fail")
+        with open(same, "rb") as f:
+            self.assertEqual(f.read(), original, "-in was modified")
+
+
 if __name__ == "__main__":
     test_main()

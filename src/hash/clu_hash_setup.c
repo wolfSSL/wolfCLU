@@ -109,6 +109,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
     WOLFSSL_BIO *bioOut = NULL;
     char* inFile = NULL;
     char* outFile = NULL;
+    int   outSeen = 0;
 
 
     opterr = 0; /* do not display unrecognized options */
@@ -125,6 +126,7 @@ int wolfCLU_hashSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
+                outSeen = 1;
                 outFile = optarg;
                 break;
 
@@ -293,11 +295,43 @@ int wolfCLU_hashSetup(int argc, char** argv)
         }
     }
 
+    /* -out as the last argv token binds a NULL optarg; without this the
+     * digest silently goes to stdout with a success exit code. */
+    if (ret == WOLFCLU_SUCCESS && outSeen && outFile == NULL) {
+        wolfCLU_LogError("-out requires a file name");
+        ret = USER_INPUT_ERROR;
+    }
+
     if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
-        bioOut = wolfSSL_BIO_new_file(outFile, "wb");
-        if (bioOut == NULL) {
-            wolfCLU_LogError("unable to open output file %s", outFile);
+        /* Opening -out truncates it, and the input is streamed afterwards,
+         * so naming one file for both would hash whatever survives the
+         * truncation and overwrite the user's data with the digest. */
+        if (wolfCLU_RejectSamePath(inFile, outFile) != WOLFCLU_SUCCESS) {
             ret = USER_INPUT_ERROR;
+        }
+        else {
+            /* A digest is not secret, so this keeps fopen() semantics:
+             * symlinks and /dev/stdout stay valid -out targets. bioIn is
+             * already open, so the fd-level check also closes the window
+             * between the comparison above and this open. */
+            XFILE inBioFile = NULL;
+            FILE* outFp;
+
+            if (bioIn != NULL) {
+                (void)wolfSSL_BIO_get_fp(bioIn, &inBioFile);
+            }
+            outFp = wolfCLU_OpenOutFileDistinctFrom(outFile, inBioFile);
+            if (outFp == NULL) {
+                ret = USER_INPUT_ERROR;
+            }
+            else {
+                bioOut = wolfSSL_BIO_new_fp(outFp, BIO_CLOSE);
+                if (bioOut == NULL) {
+                    XFCLOSE(outFp);
+                    wolfCLU_LogError("unable to open output file %s", outFile);
+                    ret = USER_INPUT_ERROR;
+                }
+            }
         }
     }
 

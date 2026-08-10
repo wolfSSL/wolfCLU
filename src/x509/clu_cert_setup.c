@@ -480,9 +480,8 @@ int wolfCLU_certSetup(int argc, char **argv)
 
     /* try to open output file if set */
     if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
-        out = wolfSSL_BIO_new_file(outFile, "wb");
+        out = wolfCLU_OpenOutFileBio(outFile);
         if (out == NULL) {
-            wolfCLU_LogError("unable to open/create output file");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

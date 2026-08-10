@@ -7,7 +7,9 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import (
+    no_filesystem, WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+)
 
 # Use absolute forward-slash paths so wolfSSL recognizes them as absolute.
 # Temporary artefacts go under the build directory (CWD under automake),
@@ -211,6 +213,7 @@ def _has_altextend():
     return "altextend" in combined
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCAHelp(unittest.TestCase):
     """ca -h and -help should succeed."""
 
@@ -224,6 +227,7 @@ class TestCAHelp(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCASelfSign(unittest.TestCase):
     """ca -selfsign tests."""
 
@@ -308,6 +312,7 @@ class TestCASelfSign(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCACreateAndVerify(unittest.TestCase):
     """ca certificate creation and verification."""
 
@@ -349,6 +354,7 @@ class TestCACreateAndVerify(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCAOverrideConfig(unittest.TestCase):
     """Override config options with command-line flags."""
 
@@ -392,7 +398,7 @@ class TestCAOverrideConfig(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
-
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCAKeyMismatch(unittest.TestCase):
     """ca with mismatched key should fail."""
 
@@ -427,6 +433,7 @@ class TestCAKeyMismatch(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCAUniqueSubjectAndSerial(unittest.TestCase):
     """unique_subject enforcement and serial number handling."""
 
@@ -547,6 +554,7 @@ class TestCAUniqueSubjectAndSerial(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCAPolicy(unittest.TestCase):
     """Policy section enforcement."""
 
@@ -646,6 +654,7 @@ class TestCAPolicy(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCAChimera(unittest.TestCase):
     """Chimera certificate (altextend) tests."""
 
@@ -729,6 +738,7 @@ class TestCAChimera(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestCAOutdirPath(unittest.TestCase):
     """Test path concatenation for -out with new_certs_dir."""
 

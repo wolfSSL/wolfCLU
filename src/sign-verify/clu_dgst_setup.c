@@ -269,7 +269,7 @@ static int wolfCLU_dgstHmac(WOLFSSL_BIO* dataBio, char* hmacKey,
         WOLFSSL_BIO* outBio = NULL;
 
         if (outFile != NULL) {
-            outBio = wolfSSL_BIO_new_file(outFile, "wb");
+            outBio = wolfCLU_OpenOutFileBio(outFile);
         }
         else {
             outBio = wolfSSL_BIO_new_fp(stdout, WOLFSSL_BIO_NOCLOSE);
@@ -511,10 +511,8 @@ static int wolfCLU_dgstSignVerify(WOLFSSL_BIO* dataBio, WOLFSSL_BIO* pubKeyBio,
 
         /* write out the signature */
         if (ret == WOLFCLU_SUCCESS) {
-            sigBio = wolfSSL_BIO_new_file(outFile, "wb");
+            sigBio = wolfCLU_OpenOutFileBio(outFile);
             if (sigBio == NULL) {
-                wolfCLU_LogError("Unable to create signature file %s",
-                        outFile);
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
@@ -663,8 +661,7 @@ int wolfCLU_dgst_setup(int argc, char** argv)
             case WOLFCLU_VERIFY:
                 pubKeyBio = wolfSSL_BIO_new_file(optarg, "rb");
                 if (pubKeyBio == NULL) {
-                    wolfCLU_LogError("Unable to open key file %s",
-                            optarg);
+                    wolfCLU_LogError("Unable to open key file %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;

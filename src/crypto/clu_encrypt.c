@@ -60,6 +60,11 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     char*   userInputBuffer = NULL; /* buffer when input is not a file */
 
 
+    /* wolfCLU_OpenPairedOutFile() below rejects -in == -out before its
+     * truncating open, which is what protects the scratch copy the branch
+     * below writes to -in when it does not already exist -- see
+     * clu_decrypt.c, which relies on the same single check. */
+
     if (access (in, F_OK) == -1) {
         WOLFCLU_LOG(WOLFCLU_L0, "file did not exist, encrypting string following \"-i\""
                 "instead.");
@@ -74,10 +79,14 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         /* writes the entered text to the input buffer */
         XMEMCPY(userInputBuffer, in, inputLength);
 
-        /* open the file to write */
-        tempInFile = XFOPEN(in, "wb");
+        /* open the file to write; use the owner-only, no-follow-symlink
+         * secure open rather than wolfCLU_OpenOutFile(), since this scratch
+         * copy holds the plaintext the user is about to encrypt. Without
+         * this, a dangling symlink at -in would make wolfCLU_OpenOutFile()
+         * follow it and write the plaintext to the symlink's target
+         * instead of refusing. */
+        tempInFile = wolfCLU_OpenKeyFile(in);
         if (tempInFile == NULL) {
-            wolfCLU_LogError("unable to open file %s", in);
             XFREE(userInputBuffer, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
             return BAD_FUNC_ARG;
         }
@@ -129,6 +138,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
         if (ret != 0) {
             XFCLOSE(inFile);
+            wc_FreeRng(&rng);
             return ret;
         }
 
@@ -137,6 +147,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         if (ret != WOLFCLU_SUCCESS) {
             wolfCLU_LogError("failed to set pwdKey.");
             XFCLOSE(inFile);
+            wc_FreeRng(&rng);
             return ret;
         }
         /* move the generated pwdKey to "key" for encrypting */
@@ -145,27 +156,32 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         }
     }
 
-    /* open the outFile in write mode */
-    outFile = XFOPEN(out, "wb");
+    /* open the outFile in write mode; re-checks -in/-out and proves outFile
+     * is not inFile before truncating, so a path swapped in after the
+     * check above cannot destroy the plaintext mid-read. */
+    outFile = wolfCLU_OpenPairedOutFile(in, out, inFile);
     if (outFile == NULL) {
-        wolfCLU_LogError("unable to open output file %s", out);
         XFCLOSE(inFile);
+        wc_FreeRng(&rng);
         return WOLFCLU_FATAL_ERROR;
     }
     XFWRITE(salt, 1, SALT_SIZE, outFile);
     XFWRITE(iv, 1, block, outFile);
-    XFCLOSE(outFile);
 
     /* MALLOC 1kB buffers */
     input = (byte*) XMALLOC(MAX_LEN, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (input == NULL) {
         XFCLOSE(inFile);
+        XFCLOSE(outFile);
+        wc_FreeRng(&rng);
         return MEMORY_E;
     }
     output = (byte*) XMALLOC(MAX_LEN, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     if (output == NULL) {
         XFCLOSE(inFile);
+        XFCLOSE(outFile);
         wolfCLU_freeBins(input, NULL, NULL, NULL, NULL);
+        wc_FreeRng(&rng);
         return MEMORY_E;
     }
 
@@ -196,7 +212,13 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
                      if (hexRet != WOLFCLU_SUCCESS) {
                         wolfCLU_LogError("failed during conversion of input,"
                             " ret = %d", hexRet);
+                        /* wolfCLU_hexToBin() already freed and NULLed its
+                         * own allocation, so this is really here to free
+                         * 'output' on the way out. */
+                        wolfCLU_freeBins(input, output, NULL, NULL, NULL);
                         XFCLOSE(inFile);
+                        XFCLOSE(outFile);
+                        wc_FreeRng(&rng);
                         return hexRet;
                     }
                 }/* end hex or ascii */
@@ -211,6 +233,8 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             else { /* otherwise we got a file read error */
                 wolfCLU_freeBins(input, output, NULL, NULL, NULL);
                 XFCLOSE(inFile);
+                XFCLOSE(outFile);
+                wc_FreeRng(&rng);
                 return FREAD_ERROR;
             }/* End feof check */
         }/* End fread check */
@@ -221,8 +245,10 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             ret = wc_CamelliaSetKey(&camellia, key, size / 8, iv);
             if (ret != 0) {
                 XFCLOSE(inFile);
+                XFCLOSE(outFile);
                 wolfCLU_LogError("CamelliaSetKey failed.");
                 wolfCLU_freeBins(input, output, NULL, NULL, NULL);
+                wc_FreeRng(&rng);
                 return ret;
             }
             if (XSTRNCMP(mode, "cbc", 3) == 0) {
@@ -230,8 +256,10 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             }
             else {
                 XFCLOSE(inFile);
+                XFCLOSE(outFile);
                 wolfCLU_LogError("Incompatible mode while using Camellia.");
                 wolfCLU_freeBins(input, output, NULL, NULL, NULL);
+                wc_FreeRng(&rng);
                 return FATAL_ERROR;
             }
         }
@@ -253,15 +281,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             WOLFCLU_LOG(WOLFCLU_L0, " ]\n");
         } /* end visual confirmation */
 
-        /* Open the outFile in append mode */
-        outFile = XFOPEN(out, "ab");
-        if (outFile == NULL) {
-            XFCLOSE(inFile);
-            wolfCLU_LogError("failed to open file.");
-            wolfCLU_freeBins(input, output, NULL, NULL, NULL);
-            return FWRITE_ERROR;
-        }
-
+        /* write this chunk to the already-open outFile */
         ret = (int)XFWRITE(output, 1, tempMax, outFile);
 
         if (ferror(outFile)) {
@@ -269,6 +289,7 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             XFCLOSE(inFile);
             wolfCLU_LogError("failed to write to file.");
             wolfCLU_freeBins(input, output, NULL, NULL, NULL);
+            wc_FreeRng(&rng);
             return FWRITE_ERROR;
         }
         if (ret > MAX_LEN) {
@@ -276,17 +297,27 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             XFCLOSE(inFile);
             wolfCLU_LogError("Wrote too much to file.");
             wolfCLU_freeBins(input, output, NULL, NULL, NULL);
+            wc_FreeRng(&rng);
             return FWRITE_ERROR;
         }
-        /* close the outFile */
-        XFCLOSE(outFile);
 
         length -= tempMax;
         if (length < 0)
             WOLFCLU_LOG(WOLFCLU_L0, "length went past zero.");
     }
 
-    /* closes the opened files and frees the memory */
+    /* closes the opened files and frees the memory. ret currently holds the
+     * byte count from the last XFWRITE() above, not a status code, so the
+     * close result is captured separately rather than folded into it. */
+    {
+        int closeRet = wolfCLU_CloseOutFile(outFile, out);
+        if (closeRet != WOLFCLU_SUCCESS) {
+            ret = closeRet;
+        }
+        else {
+            ret = WOLFCLU_SUCCESS;
+        }
+    }
     XFCLOSE(inFile);
     XMEMSET(key, 0, size);
     XMEMSET(iv, 0 , block);
@@ -297,6 +328,6 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
 
     (void)mode;
     (void)alg;
-    return WOLFCLU_SUCCESS;
+    return (ret == WOLFCLU_SUCCESS) ? WOLFCLU_SUCCESS : WOLFCLU_FATAL_ERROR;
 }
 #endif

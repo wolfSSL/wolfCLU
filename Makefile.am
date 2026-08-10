@@ -89,6 +89,7 @@ endif
 
 include src/include.am
 include wolfclu/include.am
+include tests/tools/include.am
 if HAVE_PYTHON
 include tests/dh/include.am
 include tests/dsa/include.am
@@ -117,10 +118,11 @@ TESTS += $(check_PROGRAMS)
 check_SCRIPTS+= $(dist_noinst_SCRIPTS)
 TESTS += $(check_SCRIPTS)
 
-# Automake's test driver writes .log/.trs files next to each test script.
-# When tests live in the source tree (no VPATH), those files land in tests/,
-# where EXTRA_DIST+=tests would otherwise sweep them into the tarball and
-# break `make distcheck` via stale VPATH lookups.
+# Automake's test driver writes .log/.trs files next to each test script, and
+# an in-tree build leaves the compiled check_PROGRAMS binaries and their .o
+# files there too. When tests live in the source tree (no VPATH), all of that
+# lands in tests/, where EXTRA_DIST+=tests would otherwise sweep it into the
+# tarball and break `make distcheck` via stale VPATH lookups.
 # Generate the compressed manpages into the tarball from their .1 sources,
 # so the .gz copies are never hand-maintained in git. These ship in the release
 # tarball for downstream packaging; they are intentionally not installed
@@ -130,6 +132,12 @@ TESTS += $(check_SCRIPTS)
 dist-hook:
 	find $(distdir)/tests -name '*.log' -delete
 	find $(distdir)/tests -name '*.trs' -delete
+	find $(distdir)/tests -name '*.o' -delete
+	find $(distdir)/tests -name '.dirstamp' -delete
+	find $(distdir)/tests \( -name '.deps' -o -name '.libs' \) -type d -prune -exec rm -rf {} +
+	for p in $(check_PROGRAMS); do \
+	  rm -f "$(distdir)/$$p"; \
+	done
 # Always strip stale .1.gz from the tarball (local manpages-gz output or a
 # prior dist may have left them in manpages/). Regenerate only when enabled.
 	chmod u+w $(distdir)/manpages 2>/dev/null || true

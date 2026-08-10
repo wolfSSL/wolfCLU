@@ -66,10 +66,11 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
         wolfCLU_LogError("Input file does not exist.");
         return DECRYPT_ERROR;
     }
-    /* opens output file */
 
-    if ((outFile = XFOPEN(out, "wb")) == NULL) {
-        wolfCLU_LogError("Error creating output file.");
+    /* opens output file; guarded against -in and -out naming the same
+     * file, since opening it truncates it and would destroy the
+     * ciphertext mid-read. */
+    if ((outFile = wolfCLU_OpenPairedOutFile(in, out, inFile)) == NULL) {
         XFCLOSE(inFile);
         return DECRYPT_ERROR;
     }
@@ -236,7 +237,11 @@ int wolfCLU_decrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
     /* Use the wolfssl wc_FreeRng to free rng */
     wc_FreeRng(&rng);
     XFCLOSE(inFile);
-    XFCLOSE(outFile);
+    if (wolfCLU_CloseOutFile(outFile, out) != WOLFCLU_SUCCESS && ret == 0) {
+        /* Only when nothing else already failed, so a more specific earlier
+         * error is not overwritten. */
+        ret = DECRYPT_ERROR;
+    }
 
     (void)mode;
     (void)alg;

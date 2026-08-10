@@ -24,6 +24,8 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
+/* Only referenced by the full build of wolfCLU_Base64Setup() below. */
+#if !defined(WOLFCLU_NO_FILESYSTEM) && !defined(NO_CODING)
 static const struct option base64_options[] = {
     {"-in",           required_argument, 0, WOLFCLU_INFILE    },
     {"-out",          required_argument, 0, WOLFCLU_OUTFILE   },
@@ -44,6 +46,7 @@ static void wolfCLU_Base64Help(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-d             Decode data");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-help          Display this message");
 }
+#endif
 
 /* base64 setup function */
 int wolfCLU_Base64Setup(int argc, char** argv)
@@ -82,10 +85,8 @@ int wolfCLU_Base64Setup(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
+                    bioOut = wolfCLU_OpenOutFileBio(optarg);
                 if (bioOut == NULL) {
-                    wolfCLU_LogError("unable to open output file %s",
-                            optarg);
                     if (bioIn != NULL) {
                         wolfSSL_BIO_free(bioIn);
                     }

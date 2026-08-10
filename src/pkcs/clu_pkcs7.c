@@ -64,6 +64,9 @@ int wolfCLU_PKCS7(int argc, char** argv)
     PKCS7 pkcs7;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
+    char *inPath  = NULL;
+    char *outPath = NULL;
+    int   outSeen = 0;
     DerBuffer* derObj = NULL;
     byte* buf = NULL;
     byte* derContent = NULL;
@@ -88,6 +91,7 @@ int wolfCLU_PKCS7(int argc, char** argv)
                 break;
 
             case WOLFCLU_INFILE:
+                inPath = optarg;
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
                     wolfCLU_LogError("Unable to open pkcs7 file %s",
@@ -97,12 +101,11 @@ int wolfCLU_PKCS7(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                /* Opening now would truncate -in before it's read below if
+                 * the two name the same file; deferred until -in is known
+                 * to be a different path. */
+                outSeen = 1;
+                outPath = optarg;
                 break;
 
             case WOLFCLU_INFORM:
@@ -128,6 +131,14 @@ int wolfCLU_PKCS7(int argc, char** argv)
                 /* do nothing. */
                 (void)ret;
         }
+    }
+
+    /* -out as the last argv token binds a NULL optarg; without this the
+     * deferred open below is skipped and the output silently goes to
+     * stdout with a success exit code. */
+    if (ret == WOLFCLU_SUCCESS && outSeen && outPath == NULL) {
+        wolfCLU_LogError("-out requires a file name");
+        ret = USER_INPUT_ERROR;
     }
 
     /* currently only supporting PKCS7 parsing, input is expected */
@@ -187,6 +198,23 @@ int wolfCLU_PKCS7(int argc, char** argv)
         }
     }
 
+
+    /* Open -out now that -in has been fully read: doing this any earlier
+     * risks truncating -in before it's read, if the two name the same
+     * file. */
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        if (wolfCLU_RejectSamePath(inPath, outPath) != WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            /* This tool only ever prints certificates, never key material,
+             * so default (non-owner-only) permissions apply. */
+            bioOut = wolfCLU_OpenOutFileBio(outPath);
+            if (bioOut == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+    }
 
     /* setup output bio to stdout if not already set */
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {

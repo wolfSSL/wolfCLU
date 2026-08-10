@@ -80,6 +80,9 @@ int wolfCLU_RSA(int argc, char** argv)
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
     WOLFSSL_RSA *rsa = NULL;
+    char *inPath  = NULL;
+    char *outPath = NULL;
+    int outSeen = 0;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -92,21 +95,20 @@ int wolfCLU_RSA(int argc, char** argv)
                 break;
 
             case WOLFCLU_INFILE:
+                inPath = optarg;
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    wolfCLU_LogError("unable to open key file %s",
-                            optarg);
+                    wolfCLU_LogError("unable to open key file %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("unable to open out file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                /* Deferred: whether this is a private key (owner-only) or a
+                 * public key/modulus (default perms) depends on -pubout,
+                 * which may appear later on the command line. */
+                outSeen = 1;
+                outPath = optarg;
                 break;
 
             case WOLFCLU_INFORM:
@@ -155,6 +157,14 @@ int wolfCLU_RSA(int argc, char** argv)
         }
     }
 
+    /* -out as the last argv token binds a NULL optarg; without this the
+     * deferred open below is skipped and the output silently goes to
+     * stdout with a success exit code. */
+    if (ret == WOLFCLU_SUCCESS && outSeen && outPath == NULL) {
+        wolfCLU_LogError("-out requires a file name");
+        ret = USER_INPUT_ERROR;
+    }
+
     /* read in the RSA key */
     if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
         if (inForm == PEM_FORM) {
@@ -198,6 +208,21 @@ int wolfCLU_RSA(int argc, char** argv)
         if (rsa == NULL) {
             wolfCLU_LogError("error reading key from file");
             ret = USER_INPUT_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        /* Use owner-only permissions for private key output. */
+        if (wolfCLU_RejectSamePath(inPath, outPath) != WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            bioOut = wolfCLU_OpenOutOrKeyFileBio(outPath,
+                    (pubOut || noOut) ? WOLFCLU_OUT_PUBLIC :
+                            WOLFCLU_OUT_SECRET);
+            if (bioOut == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 

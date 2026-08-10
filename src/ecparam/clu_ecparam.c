@@ -201,6 +201,16 @@ int wolfCLU_ecparam(int argc, char** argv)
             key = wolfSSL_EVP_PKEY_get1_EC_KEY(pkey);
         }
         wolfSSL_EVP_PKEY_free(pkey);
+
+        /* -in is fully consumed above, so close it here rather than at
+         * function exit: -in and -out may name the same path (e.g.
+         * "ecparam -genkey -in key.pem -out key.pem" is only safe because
+         * -in has already been read and closed before -out truncates it),
+         * and freeing it now turns any future change that tries to read
+         * -in lazily, after this point, into an immediate use-after-free
+         * instead of a silent truncate-before-read data loss. */
+        wolfSSL_BIO_free(in);
+        in = NULL;
     }
 
     if (ret == WOLFCLU_SUCCESS && genKey) {
@@ -221,7 +231,10 @@ int wolfCLU_ecparam(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open input file");
         ret = WOLFCLU_FATAL_ERROR;
 #else
-        bioOut = wolfSSL_BIO_new_file(out, "wb");
+        /* -genkey sends an EC private key here, so it gets the same
+         * owner-only treatment as dhparam/dsaparam -genkey. */
+        bioOut = wolfCLU_OpenOutOrKeyFileBio(out,
+                    genKey ? WOLFCLU_OUT_SECRET : WOLFCLU_OUT_PUBLIC);
         if (bioOut == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -282,6 +295,11 @@ int wolfCLU_ecparam(int argc, char** argv)
             }
 
             if (der != NULL) {
+                /* der holds the EC private key, so scrub it before
+                 * releasing it back to the allocator. */
+                if (derSz > 0) {
+                    wolfCLU_ForceZero(der, (unsigned int)derSz);
+                }
                 /* der was created by wolfSSL library so we assume
                  * that XMALLOC was used and call XFREE here */
                 XFREE(der, NULL, DYNAMIC_TYPE_TMP_BUFFER);

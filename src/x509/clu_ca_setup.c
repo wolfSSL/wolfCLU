@@ -78,6 +78,21 @@ static void wolfCLU_CAHelp(void)
 }
 #endif
 
+#ifndef WOLFCLU_NO_FILESYSTEM
+/* Open a key file for reading and wrap it in a BIO, so the four key
+ * options below share one open and one error message. Returns NULL and
+ * logs on failure. */
+static WOLFSSL_BIO* wolfCLU_CAOpenKeyBio(const char* path, const char* what)
+{
+    WOLFSSL_BIO* bio = wolfSSL_BIO_new_file(path, "rb");
+
+    if (bio == NULL) {
+        wolfCLU_LogError("Unable to open %s file %s", what, path);
+    }
+    return bio;
+}
+#endif /* !WOLFCLU_NO_FILESYSTEM */
+
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_CASetup(int argc, char** argv)
 {
@@ -126,37 +141,30 @@ int wolfCLU_CASetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_KEY:
-                keyIn = wolfSSL_BIO_new_file(optarg, "rb");
+                keyIn = wolfCLU_CAOpenKeyBio(optarg, "private key");
                 if (keyIn == NULL) {
-                    wolfCLU_LogError("Unable to open private key file %s",
-                            optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 #if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
             case WOLFCLU_SUBJKEY:
-                subjKey = wolfSSL_BIO_new_file(optarg, "rb");
+                subjKey = wolfCLU_CAOpenKeyBio(optarg, "subject key");
                 if (subjKey == NULL) {
-                    wolfCLU_LogError("Unable to open subject key file %s",
-                            optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
             case WOLFCLU_ALTKEY:
-                altKey = wolfSSL_BIO_new_file(optarg, "rb");
+                altKey = wolfCLU_CAOpenKeyBio(optarg, "alternate key");
                 if (altKey == NULL) {
-                    wolfCLU_LogError("Unable to open alternate key file %s",
-                            optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
             case WOLFCLU_ALTPUB:
-                altKeyPub = wolfSSL_BIO_new_file(optarg, "rb");
+                altKeyPub = wolfCLU_CAOpenKeyBio(optarg,
+                        "alternate public key");
                 if (altKeyPub == NULL) {
-                    wolfCLU_LogError("Unable to open \
-                                    alternate public key file %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;

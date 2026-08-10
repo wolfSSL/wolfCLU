@@ -6,7 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import no_filesystem, CERTS_DIR, run_wolfssl, test_main
 
 
 def _has_crl():
@@ -19,6 +19,7 @@ def _has_crl():
     return "recompile wolfSSL with CRL" not in combined
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509Verify(unittest.TestCase):
     """Certificate verification tests."""
 
@@ -125,6 +126,7 @@ class TestX509Verify(unittest.TestCase):
         # require a normal exit code regardless of verify success/failure.
         self.assertGreaterEqual(r.returncode, 0, r.stderr)
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509VerifyCRL(unittest.TestCase):
     """CRL-related verification tests."""
 
@@ -161,6 +163,7 @@ class TestX509VerifyCRL(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509VerifyChain(unittest.TestCase):
     """Certificate chain verification tests."""
 

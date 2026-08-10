@@ -9,7 +9,10 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
+from wolfclu_test import (
+    no_filesystem, WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, 
+    test_main
+)
 
 
 def _tmp(name):
@@ -115,6 +118,7 @@ def _flip_last_der_byte(src, dst):
         f.write(data)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqNew(unittest.TestCase):
     """Test req -new with various options."""
 
@@ -134,6 +138,7 @@ class TestReqNew(unittest.TestCase):
     def _clean(self, *files):
         for f in files:
             self.addCleanup(lambda p=f: _cleanup(p))
+
 
     def test_req_new_with_subj(self):
         """req -new -subj creates cert with correct subject."""
@@ -479,6 +484,7 @@ class TestReqNew(unittest.TestCase):
                            "test_req_addext_badtype.crt")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqPemDerRoundTrip(unittest.TestCase):
     """Test PEM <-> DER round-trip for CSR."""
 
@@ -522,6 +528,7 @@ class TestReqPemDerRoundTrip(unittest.TestCase):
                              "PEM -> DER -> PEM round-trip mismatch")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqVerify(unittest.TestCase):
     """Test req -verify, including that a tampered CSR fails (F-5363)."""
 
@@ -581,6 +588,7 @@ class TestReqVerify(unittest.TestCase):
         self.assertNotIn("BEGIN CERTIFICATE REQUEST", r.stdout)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509ReqSign(unittest.TestCase):
     """Test x509 -req -signkey signing."""
 
@@ -638,6 +646,7 @@ class TestX509ReqSign(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509ReqHashAlgorithms(unittest.TestCase):
     """Test hash algorithm options for x509 -req."""
 
@@ -708,6 +717,7 @@ class TestX509ReqHashAlgorithms(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509ReqExtensions(unittest.TestCase):
     """Test extensions from config file for x509 -req."""
 
@@ -752,6 +762,7 @@ class TestX509ReqExtensions(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqConfigSubject(unittest.TestCase):
     """Test subject from config file."""
 
@@ -784,6 +795,7 @@ class TestReqConfigSubject(unittest.TestCase):
                          "Got: {!r}".format(subject_line))
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqDefaultBasicConstraints(unittest.TestCase):
     """Test default basic constraints extension."""
 
@@ -807,6 +819,7 @@ class TestReqDefaultBasicConstraints(unittest.TestCase):
         self.assertIn("CA:TRUE", r2.stdout)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqFIPS(unittest.TestCase):
     """FIPS-conditional tests."""
 
@@ -869,6 +882,7 @@ class TestReqFIPS(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqHashAndKeyAlgos(unittest.TestCase):
     """Test hash and key algorithm options for req."""
 
@@ -918,6 +932,7 @@ class TestReqHashAndKeyAlgos(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqAltNamesFullSkip(unittest.TestCase):
     """Test full alt_names extension with skipped indices."""
 
@@ -954,6 +969,7 @@ class TestReqAltNamesFullSkip(unittest.TestCase):
 
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqPromptValidation(unittest.TestCase):
     """Test prompt-based config validation."""
 
@@ -994,6 +1010,7 @@ class TestReqPromptValidation(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqCSRAttributes(unittest.TestCase):
     """Test CSR attribute printing."""
 
@@ -1023,6 +1040,7 @@ class TestReqCSRAttributes(unittest.TestCase):
                             "CSR with unsupported attributes should fail")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqCSRVersion(unittest.TestCase):
     """Test CSR version number."""
 
@@ -1117,6 +1135,7 @@ challengePassword = testpass123
 """
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqKeyUsageAbbrev(unittest.TestCase):
     """Regression: abbreviated keyUsage names must not be accepted."""
 
@@ -1143,6 +1162,7 @@ class TestReqKeyUsageAbbrev(unittest.TestCase):
                 "Abbreviated keyUsage 'd' should not match digitalSignature")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestReqChallengePassword(unittest.TestCase):
     """req config with challengePassword attribute must succeed."""
 

@@ -424,6 +424,9 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     WOLFSSL_EVP_PKEY *pkey = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
+    char *inPath  = NULL;
+    char *outPath = NULL;
+    int outSeen = 0;
 
     optind = 0; /* start at indent 0 */
     while ((option = wolfCLU_GetOpt(argc, argv, "", pkey_options,
@@ -444,21 +447,20 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_INFILE:
+                inPath = optarg;
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    wolfCLU_LogError("Unable to open public key file %s",
-                            optarg);
+                    wolfCLU_LogError("Unable to open public key file %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                /* Deferred: whether this is a private key (owner-only) or a
+                 * public key (default perms) depends on -pubout, which may
+                 * appear later on the command line. */
+                outSeen = 1;
+                outPath = optarg;
                 break;
 
             case WOLFCLU_INFORM:
@@ -486,6 +488,14 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     }
 
 
+    /* -out as the last argv token binds a NULL optarg; without this the
+     * deferred open below is skipped and the output silently goes to
+     * stdout with a success exit code. */
+    if (ret == WOLFCLU_SUCCESS && outSeen && outPath == NULL) {
+        wolfCLU_LogError("-out requires a file name");
+        ret = USER_INPUT_ERROR;
+    }
+
     if (ret == WOLFCLU_SUCCESS && bioIn != NULL) {
         if (inForm == PEM_FORM) {
             if (pubIn) {
@@ -506,6 +516,22 @@ int wolfCLU_pKeySetup(int argc, char** argv)
         if (pkey == NULL) {
             wolfCLU_LogError("Error reading key from file");
             ret = USER_INPUT_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        /* -pubout is fully parsed by now, so the secret-ness of -out is
+         * known. -in has been fully read, so this open cannot destroy it;
+         * still refuse an in-place overwrite. */
+        if (wolfCLU_RejectSamePath(inPath, outPath) != WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            bioOut = wolfCLU_OpenOutOrKeyFileBio(outPath,
+                    pubOut ? WOLFCLU_OUT_PUBLIC : WOLFCLU_OUT_SECRET);
+            if (bioOut == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 

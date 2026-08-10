@@ -2,11 +2,13 @@
 """Key generation, signing, and verification tests for wolfCLU."""
 
 import os
+import subprocess
 import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, run_wolfssl,
+                          skip_if_no_filesystem, test_main)
 
 # Files that tests may create; cleaned up by tearDownClass
 _TEMP_FILES = []
@@ -14,16 +16,36 @@ _TEMP_FILES = []
 
 def _cleanup_files(files):
     for f in files:
-        if os.path.exists(f):
+        # lexists, not exists: a symlink whose target is already gone would
+        # otherwise be left behind and break the next run with EEXIST.
+        if os.path.lexists(f):
             os.remove(f)
 
 
 def _has_algorithm(algo):
-    """Check if an algorithm is available in the current build."""
+    """Check if an algorithm is available in the current build.
+
+    Only the compiled-in key list is consulted. Substring-matching the whole
+    help text would always report rsa as present, because the usage EXAMPLE
+    in wolfCLU_genKeyHelp() names it unconditionally.
+    """
     r = run_wolfssl("-genkey", "-h")
-    combined = r.stdout + r.stderr
-    # Look for the algorithm name in the help output
-    return algo in combined
+    keys = set()
+    in_list = False
+    for line in (r.stdout + r.stderr).splitlines():
+        line = line.strip()
+        if line.startswith("Available keys with current configure settings"):
+            in_list = True
+            continue
+        if not in_list:
+            continue
+        # The list runs to the banner of asterisks that follows it.
+        if line.startswith("*"):
+            break
+        if not line or line.startswith("KEYS:"):
+            continue
+        keys.add(line)
+    return algo in keys
 
 
 class _GenkeySignVerifyBase(unittest.TestCase):
@@ -33,11 +55,7 @@ class _GenkeySignVerifyBase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+        skip_if_no_filesystem()
 
         with open(cls.SIGN_FILE, "w") as f:
             f.write("Sign this test data\n")
@@ -53,15 +71,9 @@ class _GenkeySignVerifyBase(unittest.TestCase):
 
     def _gen_sign_badverify(self, algo, keybase, sig_file, fmt,
                             extra_genkey_args=None, use_output_flag=False):
-        """Generate a key, sign SIGN_FILE, then verify the (valid) signature
-        against a *different* message and assert the command fails with a
-        non-zero (non-crash) exit.
-
-        Verifying a genuine signature against tampered input produces a
-        well-formed signature that simply does not match: the verify API
-        returns successfully with stat/res != 1.  The buggy code logged
-        "Invalid Signature." but still exited 0; the fix must turn that into
-        a failure exit (F-5362)."""
+        """Sign, then verify against a different message: must fail with a
+        non-zero (non-crash) exit, not just log "Invalid Signature." while
+        still exiting 0."""
         priv, pub = self._genkey(algo, keybase, fmt, extra_genkey_args,
                                  use_output_flag=use_output_flag)
         self._sign(algo, priv, fmt, sig_file)
@@ -166,8 +178,45 @@ class Ed25519Test(_GenkeySignVerifyBase):
         self._gen_sign_verify("ed25519", "edkey", "ed-signed.sig", "raw")
 
     def test_ed25519_bad_verify(self):
-        """An Ed25519 signature that does not match must fail (F-5362)."""
+        """An Ed25519 signature that does not match must fail."""
         self._gen_sign_badverify("ed25519", "edkey-bad", "ed-bad.sig", "der")
+
+    def test_ed25519_reads_key_through_symlink(self):
+        """Key reads follow symlinks. Refusing them would reject the layouts
+        keys normally live in (certbot's live/ symlinks, /etc/ssl/private
+        farms, /dev/stdin) while buying nothing, since anyone who can plant a
+        symlink at the key's path can replace the key file itself. The
+        no-symlink rule is enforced on the write paths instead."""
+        if not hasattr(os, "symlink"):
+            self.skipTest("symlinks not supported")
+        priv, pub = self._genkey("ed25519", "edkey-symlink", "der",
+                                 use_output_flag=True)
+        sig_file = "ed-symlink.sig"
+        self._sign("ed25519", priv, "der", sig_file)
+
+        priv_link = "edkey-symlink.priv.link"
+        pub_link = "edkey-symlink.pub.link"
+        signed = "ed-symlink-signed.sig"
+        self._track(priv_link, pub_link, signed)
+        try:
+            os.symlink(os.path.abspath(priv), priv_link)
+            os.symlink(os.path.abspath(pub), pub_link)
+        except (OSError, NotImplementedError) as e:
+            self.skipTest(f"could not create symlink: {e}")
+
+        r = run_wolfssl("-ed25519", "-sign", "-inkey", priv_link,
+                        "-inform", "der", "-in", self.SIGN_FILE,
+                        "-out", signed)
+        self.assertEqual(r.returncode, 0,
+                         f"sign through a symlinked private key failed: "
+                         f"{r.stderr}")
+
+        r = run_wolfssl("-ed25519", "-verify", "-inkey", pub_link,
+                        "-inform", "der", "-sigfile", sig_file,
+                        "-in", self.SIGN_FILE, "-pubin")
+        self.assertEqual(r.returncode, 0,
+                         f"verify through a symlinked public key failed: "
+                         f"{r.stderr}")
 
     def test_ed25519_signature_size(self):
         """ED25519 signatures must be exactly 64 bytes."""
@@ -207,7 +256,7 @@ class EccTest(_GenkeySignVerifyBase):
         self._gen_sign_verify("ecc", "ecckey", "ecc-signed.sig", "pem")
 
     def test_ecc_bad_verify(self):
-        """An ECC signature that does not match must fail (F-5362)."""
+        """An ECC signature that does not match must fail."""
         self._gen_sign_badverify("ecc", "ecckey-bad", "ecc-bad.sig", "der")
 
     def test_ecc_der_key_size_and_roundtrip(self):
@@ -250,9 +299,13 @@ class EccTest(_GenkeySignVerifyBase):
         self.assertNotEqual(r.returncode, 0,
                             "ECC signing with empty key should have failed")
 
-    def test_ecc_sign_empty_input_fails(self):
-        """Signing a 0-byte input file must fail gracefully (regression for
-        the XFSEEK/XFTELL size guards in wolfCLU_sign_data)."""
+    def test_ecc_sign_empty_input_succeeds(self):
+        """Signing a 0-byte input file must succeed: wolfCLU_sign_data()
+        reads the message through wolfCLU_ReadMessageFileToBuffer(), which
+        (like wolfCLU_ReadVerifyHash() on the verify side) accepts a
+        zero-length file rather than treating it as a size error, so sign
+        and verify agree on an empty message being legitimate input (e.g.
+        the Ed25519 RFC 8032 empty-message test vector)."""
         priv, _ = self._genkey("ecc", "ecc-empty-in", "der",
                                use_output_flag=True)
         empty_in = "empty-input.txt"
@@ -262,11 +315,12 @@ class EccTest(_GenkeySignVerifyBase):
 
         r = run_wolfssl("-ecc", "-sign", "-inkey", priv, "-inform", "der",
                         "-in", empty_in, "-out", empty_sig)
-        self.assertNotEqual(r.returncode, 0,
-                            "ECC signing of empty input should have failed")
-        self.assertGreaterEqual(r.returncode, 0,
-                                "ECC sign of empty input crashed with signal "
-                                "{}".format(r.returncode))
+        self.assertEqual(r.returncode, 0,
+                         "ECC signing of empty input should have succeeded: "
+                         "{}".format(r.stderr))
+        self.assertTrue(os.path.exists(empty_sig) and
+                        os.path.getsize(empty_sig) > 0,
+                        "ECC sign of empty input produced no signature")
 
     def test_ecc_sign_missing_inkey_value(self):
         """-inkey with no value must fail gracefully (no segfault)."""
@@ -327,6 +381,235 @@ class RsaTest(_GenkeySignVerifyBase):
                             "RSA signing with empty key should have failed")
 
 
+def _icacls_entries(path):
+    """Return the list of ACE description strings icacls reports for path,
+    one string per trustee (e.g. "DOMAIN\\user:(F)")."""
+    try:
+        r = subprocess.run(["icacls", path], capture_output=True, text=True,
+                           timeout=10)
+    except (OSError, subprocess.SubprocessError) as e:
+        # icacls missing or unusable is an environment limitation, not a
+        # failure of the code under test.
+        raise unittest.SkipTest("could not run icacls: {}".format(e))
+    if r.returncode != 0:
+        raise unittest.SkipTest(
+            "icacls {} failed: {}".format(path, r.stderr))
+
+    entries = []
+    for line in r.stdout.splitlines():
+        line = line.rstrip()
+        if not line:
+            break
+        if line.lower().startswith("successfully processed"):
+            break
+        if line.startswith(path):
+            line = line[len(path):].strip()
+        else:
+            line = line.strip()
+        if line:
+            entries.append(line)
+    return entries
+
+
+class KeyFilePermissionsTest(unittest.TestCase):
+    """wolfCLU_OpenKeyFile must write private keys with owner-only
+    permissions (POSIX 0600 / Windows single-owner ACE) and replace, not
+    append to, a pre-existing file. Windows is checked via icacls since
+    NTFS ACLs, not os.stat() mode bits, are what's enforced there."""
+
+    @classmethod
+    def setUpClass(cls):
+        skip_if_no_filesystem()
+
+    @classmethod
+    def tearDownClass(cls):
+        _cleanup_files(_TEMP_FILES)
+        _TEMP_FILES.clear()
+
+    def _assert_owner_only(self, priv, label):
+        if os.name == "nt":
+            entries = _icacls_entries(priv)
+            self.assertEqual(len(entries), 1,
+                             "{}: expected exactly one owner-only ACL "
+                             "entry, got: {}".format(label, entries))
+            entry = entries[0]
+            self.assertIn("(F)", entry,
+                         "{}: owner ACE missing full control: {}"
+                         .format(label, entry))
+            for forbidden in ("Everyone", "Authenticated Users",
+                              "BUILTIN\\Users", "NT AUTHORITY"):
+                self.assertNotIn(forbidden, entry,
+                                 "{}: unexpected broad-access principal "
+                                 "{!r} in ACL: {}"
+                                 .format(label, forbidden, entry))
+        else:
+            mode = os.stat(priv).st_mode & 0o777
+            self.assertEqual(mode, 0o600,
+                             "{}: private key file mode is {:o}, expected "
+                             "600".format(label, mode))
+
+    def _priv_mode(self, keybase, algo, extra_args=(), outform="der"):
+        """Generate a keypair with algo and return the .priv path.
+
+        Skips when algo is not compiled in. outform defaults to der; XMSS
+        only supports raw.
+        """
+        if not _has_algorithm(algo):
+            self.skipTest("{} support not compiled in".format(algo))
+        priv = keybase + ".priv"
+        pub = keybase + ".pub"
+        _TEMP_FILES.extend([priv, pub])
+        args = ["-genkey", algo] + list(extra_args) + [
+            "-out", keybase, "-outform", outform, "-output", "KEYPAIR"]
+        r = run_wolfssl(*args)
+        if "NOT_COMPILED_IN" in r.stderr or "not enabled" in r.stderr:
+            self.skipTest("not compiled in")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return priv
+
+    def test_rsa_priv_key_mode_is_owner_only(self):
+        priv = self._priv_mode("rsakey-perm-test", "rsa",
+                               ["-size", "2048"])
+        self._assert_owner_only(priv, "RSA")
+
+    def test_ecc_priv_key_mode_is_owner_only(self):
+        priv = self._priv_mode("ecckey-perm-test", "ecc")
+        self._assert_owner_only(priv, "ECC")
+
+    def test_ed25519_priv_key_mode_is_owner_only(self):
+        priv = self._priv_mode("edkey-perm-test", "ed25519")
+        self._assert_owner_only(priv, "Ed25519")
+
+    def test_dh_priv_key_mode_is_owner_only(self):
+        params_file = "dh-perm-test.params"
+        keyfile = "dh-perm-test.key"
+        _TEMP_FILES.extend([params_file, keyfile])
+
+        # Probe and generate in one shot: 1024-bit DH parameter generation is
+        # a primality search, so a throwaway second run is the slowest and
+        # most timeout-prone thing this module could do.
+        r = run_wolfssl("dhparam", "1024", "-out", params_file)
+        if "DH support not compiled into wolfSSL" in r.stdout + r.stderr:
+            self.skipTest("DH support not compiled in")
+        if "NOT_COMPILED_IN" in r.stderr or "not enabled" in r.stderr:
+            self.skipTest("not compiled in")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("dhparam", "-in", params_file, "-genkey",
+                        "-out", keyfile)
+        if "NOT_COMPILED_IN" in r.stderr or "not enabled" in r.stderr:
+            self.skipTest("not compiled in")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self._assert_owner_only(keyfile, "DH")
+
+    def test_dsa_priv_key_mode_is_owner_only(self):
+        params_file = "dsa-perm-test.params"
+        keyfile = "dsa-perm-test.key"
+        _TEMP_FILES.extend([params_file, keyfile])
+
+        # Same as DH above: one generation, not two.
+        r = run_wolfssl("dsaparam", "-out", params_file, "1024")
+        if "DSA support not compiled into wolfSSL" in r.stdout + r.stderr:
+            self.skipTest("DSA support not compiled in")
+        if "NOT_COMPILED_IN" in r.stderr or "not enabled" in r.stderr:
+            self.skipTest("not compiled in")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("dsaparam", "-in", params_file, "-genkey",
+                        "-out", keyfile)
+        if "NOT_COMPILED_IN" in r.stderr or "not enabled" in r.stderr:
+            self.skipTest("not compiled in")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self._assert_owner_only(keyfile, "DSA")
+
+    def test_dilithium_priv_key_mode_is_owner_only(self):
+        priv = self._priv_mode("dilithium-perm-test", "dilithium",
+                               ["-level", "2"])
+        self._assert_owner_only(priv, "Dilithium")
+
+    def test_mldsa_priv_key_mode_is_owner_only(self):
+        priv = self._priv_mode("mldsa-perm-test", "ml-dsa", ["-level", "2"])
+        self._assert_owner_only(priv, "ML-DSA")
+
+    def test_xmss_priv_key_mode_is_owner_only(self):
+        """XMSS writes its private key from a wolfSSL callback rather than
+        through the genkey path, so it needs its own coverage. The option is
+        -height, and raw is the only format XMSS supports."""
+        priv = self._priv_mode("xmss-perm-test", "xmss", ["-height", "10"],
+                               outform="raw")
+        self._assert_owner_only(priv, "XMSS")
+
+
+    @unittest.skipIf(os.name == "nt",
+                     "symlink attack path is POSIX-specific")
+    def test_symlink_at_priv_path_is_not_followed(self):
+        """A pre-existing symlink at the -out path must not be followed:
+        key material must never land at the symlink's target, and the
+        target's contents must be untouched."""
+        if not _has_algorithm("rsa"):
+            self.skipTest("rsa support not compiled in")
+        keybase = "rsakey-symlink-test"
+        priv = keybase + ".priv"
+        pub = keybase + ".pub"
+        target = "rsakey-symlink-target.txt"
+        _TEMP_FILES.extend([priv, pub, target])
+
+        with open(target, "wb") as f:
+            f.write(b"attacker-owned file; must not be overwritten")
+        os.symlink(target, priv)
+
+        r = run_wolfssl("-genkey", "rsa", "-size", "2048", "-out", keybase,
+                        "-outform", "der", "-output", "KEYPAIR")
+
+        with open(target, "rb") as f:
+            target_content = f.read()
+        self.assertEqual(target_content,
+                         b"attacker-owned file; must not be overwritten",
+                         "symlink target was written through; key "
+                         "material leaked to an attacker-controlled path")
+
+        # The refusal itself is the contract, not just the absence of
+        # collateral damage: a regression that quietly wrote the key
+        # somewhere else and reported success would leave the target
+        # untouched too.
+        self.assertNotEqual(r.returncode, 0,
+                            "-genkey reported success for a symlinked -out "
+                            "path that it is supposed to refuse")
+        self.assertIn("symlink", (r.stdout + r.stderr).lower(),
+                      "refusal did not explain that the path is a symlink")
+        self.assertTrue(os.path.islink(priv),
+                        "-genkey removed or replaced the symlink instead of "
+                        "refusing it")
+
+    def test_preexisting_priv_file_is_replaced(self):
+        """A stale file at the target path must be replaced, not appended
+        to or left with mixed content, and must end up owner-only."""
+        if not _has_algorithm("rsa"):
+            self.skipTest("rsa support not compiled in")
+        keybase = "rsakey-replace-test"
+        priv = keybase + ".priv"
+        pub = keybase + ".pub"
+        _TEMP_FILES.extend([priv, pub])
+
+        with open(priv, "wb") as f:
+            f.write(b"stale placeholder content")
+        if os.name != "nt":
+            os.chmod(priv, 0o644)
+
+        r = run_wolfssl("-genkey", "rsa", "-size", "2048", "-out", keybase,
+                        "-outform", "der", "-output", "KEYPAIR")
+        if "NOT_COMPILED_IN" in r.stderr or "not enabled" in r.stderr:
+            self.skipTest("not compiled in")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        with open(priv, "rb") as f:
+            content = f.read()
+        self.assertNotIn(b"stale placeholder content", content,
+                         "stale content survived key generation")
+
+        self._assert_owner_only(priv, "replaced RSA")
+
+
 @unittest.skipUnless(_has_algorithm("dilithium"),
                      "dilithium not available")
 class DilithiumTest(_GenkeySignVerifyBase):
@@ -348,7 +631,7 @@ class DilithiumTest(_GenkeySignVerifyBase):
                     skip_priv_verify=True, use_output_flag=True)
 
     def test_dilithium_bad_verify(self):
-        """A Dilithium signature that does not match must fail (F-5362)."""
+        """A Dilithium signature that does not match must fail."""
         for level in [2, 3, 5]:
             with self.subTest(level=level):
                 self._gen_sign_badverify(
@@ -364,6 +647,8 @@ class DilithiumTest(_GenkeySignVerifyBase):
         r = run_wolfssl("-genkey", "dilithium", "-level", "2",
                         "-out", "mldsakey_pub", "-outform", "der",
                         "-output", "pub")
+        if "NOT_COMPILED_IN" in r.stderr or "not enabled" in r.stderr:
+            self.skipTest("not compiled in")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue(os.path.exists(pub), ".pub file missing")
         self.assertFalse(os.path.exists(priv), ".priv unexpectedly created")
@@ -376,6 +661,8 @@ class DilithiumTest(_GenkeySignVerifyBase):
         r = run_wolfssl("-genkey", "dilithium", "-level", "2",
                         "-out", "mldsakey_priv", "-outform", "der",
                         "-output", "priv")
+        if "NOT_COMPILED_IN" in r.stderr or "not enabled" in r.stderr:
+            self.skipTest("not compiled in")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue(os.path.exists(priv), ".priv file missing")
         self.assertFalse(os.path.exists(pub), ".pub unexpectedly created")
@@ -541,11 +828,7 @@ class SignVerifySetupArgsTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+        skip_if_no_filesystem()
         with open(cls.SIGN_FILE, "w") as f:
             f.write("Sign this test data\n")
 

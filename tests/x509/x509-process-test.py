@@ -8,7 +8,9 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import (
+    no_filesystem, WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+)
 
 TESTS_X509_DIR = os.path.dirname(os.path.abspath(__file__))
 HAS_OPENSSL = shutil.which("openssl") is not None
@@ -84,6 +86,7 @@ def _cleanup(*files):
             os.remove(f)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509ProcessValid(unittest.TestCase):
     """run1: valid PEM/DER format conversions and combined file handling."""
 
@@ -235,6 +238,7 @@ class TestX509ProcessValid(unittest.TestCase):
                          "combined PEM output differs from original")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509ProcessInvalidInput(unittest.TestCase):
     """run2: invalid argument combinations should fail."""
 
@@ -292,6 +296,7 @@ class TestX509ProcessInvalidInput(unittest.TestCase):
         self._fail("-outform", "-noout")
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509ProcessValidFiles(unittest.TestCase):
     """run3: valid input file operations and field extraction."""
 
@@ -448,6 +453,7 @@ class TestX509ProcessValidFiles(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509ProcessInvalidFiles(unittest.TestCase):
     """run4: invalid input files should fail."""
 
@@ -504,6 +510,7 @@ class TestX509ProcessInvalidFiles(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestMalformedArguments(unittest.TestCase):
     """ Regression: for malformed arguments """
 
@@ -518,6 +525,7 @@ class TestMalformedArguments(unittest.TestCase):
         self.assertGreater(len(r.stderr), 0)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class TestX509ModulusNoout(unittest.TestCase):
     """Regression: x509 -modulus -noout must not crash."""
 

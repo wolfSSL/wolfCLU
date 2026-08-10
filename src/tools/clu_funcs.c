@@ -34,6 +34,27 @@
 #include <wolfssl/wolfcrypt/hash.h>
 #include <wolfssl/wolfcrypt/memory.h>
 
+/* Platform headers for the file helpers further down. Kept here rather than
+ * beside those helpers so INT_MAX/PATH_MAX are in scope for the whole file.
+ * The filesystem-specific ones are guarded to match the helpers themselves:
+ * a --disable-filesystem build targets platforms where they do not exist. */
+#ifndef WOLFCLU_NO_FILESYSTEM
+#ifdef _WIN32
+#include <windows.h>
+#include <sddl.h>
+#include <aclapi.h>
+#include <io.h>
+#else
+#include <sys/stat.h>
+#include <unistd.h>
+#include <libgen.h>
+#endif
+#include <fcntl.h>
+#endif /* !WOLFCLU_NO_FILESYSTEM */
+#include <errno.h>
+#include <limits.h>
+#include <stdlib.h>
+
 #define SALT_SIZE       8
 #define DES3_BLOCK_SIZE 24
 
@@ -550,6 +571,13 @@ int wolfCLU_getAlgo(int argc, char** argv, int* alg, char** mode, int* size)
     int option;
     char name[80];
 
+    /* #3985: guard argv[2] access. argc==2 means argv[2] is the POSIX NULL
+     * sentinel; XSTRLEN(NULL) would crash before the overflow check below. */
+    if (argc < 3 || argv[2] == NULL) {
+        wolfCLU_LogError("ERROR: missing algorithm argument");
+        return USER_INPUT_ERROR;
+    }
+
     wolfCLU_oldAlgo(argc, argv);
     XMEMSET(name, 0, sizeof(name));
     if (XSTRLEN(argv[2]) >= sizeof(name)) {
@@ -693,7 +721,7 @@ void wolfCLU_stats(double start, int blockSize, int64_t blocks)
     WOLFCLU_LOG(WOLFCLU_L0, "took %6.3f seconds, blocks = %llu", time_total,
             (unsigned long long)blocks);
 
-    bytes = ((blocks * blockSize) / MEGABYTE) / time_total;
+    bytes = ((double)(blocks * blockSize) / MEGABYTE) / time_total;
     WOLFCLU_LOG(WOLFCLU_L0, "Average %s/s = %8.1f", unit, bytes);
     if (blockSize != MEGABYTE) {
         WOLFCLU_LOG(WOLFCLU_L0, "Block size of this algorithm is: %d.\n", blockSize);
@@ -1096,10 +1124,49 @@ void wolfCLU_convertToLower(char* s, int sSz)
 {
     int i;
     for (i = 0; i < sSz; i++) {
-        s[i] = tolower(s[i]);
+        s[i] = (char)tolower((unsigned char)s[i]);
     }
 }
 
+
+/* DER definite-length encoder. Returns encoded length byte count.
+ *
+ * Duplicates wolfssl/wolfcrypt/asn.h's internal SetLength() rather than
+ * calling it: that symbol is declared WOLFSSL_ASN_API, which only resolves
+ * to an exported WOLFSSL_API (as opposed to hidden WOLFSSL_LOCAL) when
+ * wolfSSL is built with WOLFSSL_TEST_CERT, OPENSSL_EXTRA,
+ * OPENSSL_EXTRA_X509_SMALL, or WOLFSSL_PUBLIC_ASN. wolfCLU has no control
+ * over how the wolfSSL it links against was configured, so taking a hard
+ * dependency on SetLength() would fail to link against a minimal build
+ * that defines none of those - this local copy keeps DER length encoding
+ * available regardless. */
+word32 wolfCLU_DerSetLength(word32 length, byte* output)
+{
+    word32 i;
+    word32 sz = 1;
+
+    if (length < ASN_LONG_LENGTH) {
+        if (output != NULL)
+            output[0] = (byte)length;
+    }
+    else {
+        word32 len = length;
+
+        while (len != 0) {
+            sz++;
+            len >>= 8;
+        }
+        if (output != NULL) {
+            output[0] = (byte)(ASN_LONG_LENGTH | (sz - 1));
+            for (i = 1; i < sz; i++) {
+                output[sz - i] = (byte)(length & 0xFF);
+                length >>= 8;
+            }
+        }
+    }
+
+    return sz;
+}
 
 void wolfCLU_ForceZero(void* mem, unsigned int len)
 {
@@ -1111,6 +1178,1373 @@ void wolfCLU_ForceZero(void* mem, unsigned int len)
     while (len--) *z++ = 0;
 #endif
 }
+
+/* Everything from here to the matching #endif needs a stdio filesystem. These
+ * helpers work in terms of FILE* and POSIX/Win32 file descriptors rather than
+ * wolfSSL's XFILE/XFOPEN porting macros, because the permission and symlink
+ * guarantees they exist to provide have no equivalent in that abstraction. */
+#ifndef WOLFCLU_NO_FILESYSTEM
+
+static int wolfCLU_ReadFileToBufferEx(const char* path, long maxSz,
+        byte** outBuf, int* outSz, int allowEmpty)
+{
+    int   sz;
+    long  fsz;
+    byte* buf = NULL;
+    XFILE f;
+
+    if (path == NULL || outBuf == NULL || outSz == NULL || maxSz <= 0) {
+        return BAD_FUNC_ARG;
+    }
+    *outBuf = NULL;
+    *outSz  = 0;
+
+    /* Reads follow symlinks like any other tool. Refusing them here would
+     * reject the layouts keys normally live in (certbot's live/ symlinks,
+     * /etc/ssl/private farms, /dev/stdin, process substitution) while
+     * buying nothing: anyone able to plant a symlink at the key's path can
+     * equally replace the key file itself. The no-symlink rule is enforced
+     * where it does defend something -- the write paths. */
+    f = XFOPEN(path, "rb");
+    if (f == XBADFILE) {
+        /* A file that will not open is a runtime failure, not a caller
+         * mistake; BAD_FUNC_ARG is reserved for the argument check above. */
+        wolfCLU_LogError("unable to open file %s", path);
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    if (XFSEEK(f, 0, XSEEK_END) != 0) {
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    fsz = XFTELL(f);
+    if (XFSEEK(f, 0, XSEEK_SET) != 0) {
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (fsz < 0 || (fsz == 0 && !allowEmpty)) {
+        wolfCLU_LogError("%s: file is empty or unreadable", path);
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (fsz > maxSz || fsz > (long)INT_MAX) {
+        wolfCLU_LogError("%s: size %ld exceeds %ld-byte file limit",
+                path, fsz, maxSz);
+        XFCLOSE(f);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    sz = (int)fsz;
+
+    /* +1/NUL-terminate: matches other PEM-buffer readers in this codebase. */
+    buf = (byte*)XMALLOC((size_t)sz + 1, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    if (buf == NULL) {
+        XFCLOSE(f);
+        return MEMORY_E;
+    }
+
+    /* short/long read here catches a file that changed size after XFTELL. */
+    if (XFREAD(buf, 1, (size_t)sz, f) != (size_t)sz) {
+        XFCLOSE(f);
+        wolfCLU_ForceZero(buf, sz);
+        XFREE(buf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    buf[sz] = '\0';
+    XFCLOSE(f);
+
+    *outBuf = buf;
+    *outSz  = sz;
+    return WOLFCLU_SUCCESS;
+}
+
+int wolfCLU_ReadFileToBuffer(const char* path, long maxSz, byte** outBuf,
+        int* outSz)
+{
+    return wolfCLU_ReadFileToBufferEx(path, maxSz, outBuf, outSz, 0);
+}
+
+/* Same as wolfCLU_ReadFileToBuffer(), but accepts a zero-length file: the
+ * message/digest being verified is legitimately empty for some algorithms
+ * (e.g. Ed25519 RFC 8032 test vector 1), unlike a key or signature file,
+ * which never is. */
+int wolfCLU_ReadMessageFileToBuffer(const char* path, long maxSz,
+        byte** outBuf, int* outSz)
+{
+    return wolfCLU_ReadFileToBufferEx(path, maxSz, outBuf, outSz, 1);
+}
+
+/* Open path for writing. When ownerOnly is set the target is kept as an
+ * owner-only regular file and symlinks/reparse points are refused; otherwise
+ * this matches fopen(path, mode). */
+#ifdef _WIN32
+#ifndef ELOOP
+    #define ELOOP 41
+#endif
+#ifndef EMLINK
+    #define EMLINK 31
+#endif
+#pragma comment(lib, "advapi32.lib")
+
+/* Owner-only DACL: no inheritance, full access for the object owner alone. */
+#define WOLFCLU_OWNER_ONLY_SDDL "D:P(A;;FA;;;OW)"
+
+/* Translate a stdio mode string into the CreateFileA()/CRT arguments fopen()
+ * would use for it, so both platforms honour mode identically. wantTrunc is
+ * reported separately rather than folded into the disposition: key files are
+ * truncated only after the ownership checks below have passed, so that a
+ * refused target is left untouched. Returns 0 on success, -1 for a mode
+ * string fopen() would not accept. */
+static int wolfCLU_ModeToWin32(const char* mode, DWORD* accessOut,
+        DWORD* dispOut, int* crtFlagsOut, int* wantTruncOut)
+{
+    int update;
+
+    if (mode == NULL || mode[0] == '\0') {
+        return -1;
+    }
+    /* 'b' and friends may appear in any order; only '+' changes direction. */
+    update = (XSTRSTR(mode, "+") != NULL);
+    *accessOut = update ? (GENERIC_READ | GENERIC_WRITE) : 0;
+    *wantTruncOut = 0;
+
+    switch (mode[0]) {
+        case 'r':
+            if (!update) *accessOut = GENERIC_READ;
+            *dispOut     = OPEN_EXISTING;
+            *crtFlagsOut = update ? _O_RDWR : _O_RDONLY;
+            break;
+        case 'w':
+            if (!update) *accessOut = GENERIC_WRITE;
+            *dispOut     = OPEN_ALWAYS;
+            *crtFlagsOut = (update ? _O_RDWR : _O_WRONLY) | _O_CREAT |
+                    _O_TRUNC;
+            *wantTruncOut = 1;
+            break;
+        case 'a':
+            if (!update) *accessOut = GENERIC_WRITE;
+            *dispOut     = OPEN_ALWAYS;
+            *crtFlagsOut = (update ? _O_RDWR : _O_WRONLY) | _O_CREAT |
+                    _O_APPEND;
+            break;
+        default:
+            return -1;
+    }
+    return 0;
+}
+
+/* Read the SID out of the process token for cls (TokenUser or TokenOwner).
+ * Caller LocalFree()s *bufOut, which owns the storage *sidOut points into.
+ * return 0 on success, -1 otherwise */
+static int wolfCLU_GetTokenSid(HANDLE hToken, TOKEN_INFORMATION_CLASS cls,
+        void** bufOut, PSID* sidOut)
+{
+    DWORD len = 0;
+    void* buf;
+
+    *bufOut = NULL;
+    *sidOut = NULL;
+
+    /* Sizing call; always fails. */
+    (void)GetTokenInformation(hToken, cls, NULL, 0, &len);
+    if (len == 0) {
+        return -1;
+    }
+    buf = LocalAlloc(LPTR, len);
+    if (buf == NULL) {
+        return -1;
+    }
+    if (!GetTokenInformation(hToken, cls, buf, len, &len)) {
+        LocalFree(buf);
+        return -1;
+    }
+    *bufOut = buf;
+    *sidOut = (cls == TokenUser) ? ((TOKEN_USER*)buf)->User.Sid
+                                 : ((TOKEN_OWNER*)buf)->Owner;
+    return 0;
+}
+
+/* Counterpart of the POSIX st_uid check. The owner-only DACL grants full
+ * access to the object *owner*, so applying it to a foreign-owned file would
+ * hand that user the key instead of locking them out.
+ * return 0 when we own it, -1 otherwise */
+static int wolfCLU_HandleOwnedBySelf(HANDLE hFile)
+{
+    PSECURITY_DESCRIPTOR pSD = NULL;
+    PSID   pOwner = NULL;
+    HANDLE hToken = NULL;
+    void*  buf;
+    PSID   sid;
+    int    ret = -1;
+
+    if (GetSecurityInfo(hFile, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
+            &pOwner, NULL, NULL, NULL, &pSD) != ERROR_SUCCESS) {
+        return -1;
+    }
+    if (pOwner == NULL || !IsValidSid(pOwner)) {
+        LocalFree(pSD);
+        return -1;
+    }
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+        LocalFree(pSD);
+        return -1;
+    }
+    if (wolfCLU_GetTokenSid(hToken, TokenUser, &buf, &sid) == 0) {
+        if (EqualSid(pOwner, sid)) {
+            ret = 0;
+        }
+        LocalFree(buf);
+    }
+    /* TokenOwner too: an elevated process creates files owned by the
+     * Administrators group, and those are still ours. */
+    if (ret != 0 &&
+            wolfCLU_GetTokenSid(hToken, TokenOwner, &buf, &sid) == 0) {
+        if (EqualSid(pOwner, sid)) {
+            ret = 0;
+        }
+        LocalFree(buf);
+    }
+    CloseHandle(hToken);
+    LocalFree(pSD);
+    return ret;
+}
+
+/* Validate a freshly opened key file handle and lock it down: refuse a
+ * reparse point, a multiply linked file or one we do not own, apply the
+ * owner-only DACL CreateFileA() only sets on files it creates, then truncate
+ * if asked. A file
+ * this call created is removed again when the checks refuse it. hFile is
+ * closed on failure. created says whether CreateFileA() made the file.
+ * return 0 on success, -1 with errno set otherwise */
+static int wolfCLU_FinishKeyHandle(HANDLE hFile, const char* path,
+        PSECURITY_DESCRIPTOR pSD, int created, int wantTrunc)
+{
+    BY_HANDLE_FILE_INFORMATION bhfi;
+
+    if (!GetFileInformationByHandle(hFile, &bhfi)) {
+        CloseHandle(hFile);
+        errno = EACCES;
+        return -1;
+    }
+    if ((bhfi.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+        /* Reparse point here means path was swapped for a symlink/junction
+         * between GetFileAttributesA() and CreateFileA(). */
+        CloseHandle(hFile);
+        if (created) {
+            (void)_unlink(path);
+        }
+        errno = ELOOP;
+        return -1;
+    }
+    if (bhfi.nNumberOfLinks > 1) {
+        /* A second hard link would keep the old contents readable, and the
+         * DACL below would be shared with whoever owns that link. */
+        CloseHandle(hFile);
+        if (created) {
+            (void)_unlink(path);
+        }
+        errno = EMLINK;
+        return -1;
+    }
+    if (wolfCLU_HandleOwnedBySelf(hFile) != 0) {
+        /* Matches the POSIX st_uid refusal; a pre-existing path may belong
+         * to someone else. */
+        CloseHandle(hFile);
+        if (created) {
+            (void)_unlink(path);
+        }
+        errno = EPERM;
+        return -1;
+    }
+
+    /* The SECURITY_ATTRIBUTES passed to CreateFileA() only apply their DACL
+     * to a file it actually created; a pre-existing file keeps its old,
+     * possibly permissive, ACL. */
+    if (!created &&
+            !SetKernelObjectSecurity(hFile, DACL_SECURITY_INFORMATION, pSD)) {
+        CloseHandle(hFile);
+        errno = EPERM;
+        return -1;
+    }
+
+    if (wantTrunc) {
+        if (SetFilePointer(hFile, 0, NULL, FILE_BEGIN) ==
+                    INVALID_SET_FILE_POINTER ||
+                !SetEndOfFile(hFile)) {
+            CloseHandle(hFile);
+            if (created) {
+                (void)_unlink(path);
+            }
+            errno = EACCES;
+            return -1;
+        }
+    }
+    return 0;
+}
+
+FILE* wolfCLU_CreateSecureFile(const char* path, const char* mode,
+        int ownerOnly)
+{
+    SECURITY_ATTRIBUTES sa;
+    SECURITY_ATTRIBUTES* pSA = NULL;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+    HANDLE hFile;
+    DWORD existing;
+    DWORD access;
+    DWORD disp;
+    int fd;
+    int crtFlags;
+    int wantTrunc;
+    int created = 0;
+    FILE* f = NULL;
+
+    if (path == NULL || wolfCLU_ModeToWin32(mode, &access, &disp, &crtFlags,
+            &wantTrunc) != 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if (!ownerOnly) {
+        /* Nothing secret is being written, so behave exactly like
+         * fopen(path, mode): reuse whatever the path already names rather
+         * than requiring a brand new file. CON, NUL and redirected handles
+         * are all legitimate -out targets. */
+        return fopen(path, mode);
+    }
+
+    /* Key material: refuse rather than clobber a reparse point, and never
+     * destroy what the path already names. An existing regular file is
+     * truncated in place after the checks below, so a refused or failed open
+     * leaves the previous key intact. */
+    existing = GetFileAttributesA(path);
+    if (existing != INVALID_FILE_ATTRIBUTES) {
+        if ((existing & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+            errno = ELOOP;
+            return NULL;
+        }
+        if ((existing & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+            errno = EEXIST;
+            return NULL;
+        }
+    }
+
+    if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(
+            WOLFCLU_OWNER_ONLY_SDDL, SDDL_REVISION_1, &pSD, NULL)) {
+        errno = EACCES;
+        return NULL;
+    }
+    sa.nLength = sizeof(SECURITY_ATTRIBUTES);
+    sa.bInheritHandle = FALSE;
+    sa.lpSecurityDescriptor = pSD;
+    pSA = &sa;
+
+    /* READ_CONTROL/WRITE_DAC for the owner and DACL work below. */
+    SetLastError(0);
+    hFile = CreateFileA(path, access | READ_CONTROL | WRITE_DAC, 0, pSA, disp,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        /* Callers pick their error message off errno, so give them one that
+         * reflects this failure rather than whatever a previous CRT call
+         * happened to leave behind. */
+        DWORD err = GetLastError();
+        errno = (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+                ? ENOENT : EACCES;
+    }
+    else if (disp == OPEN_EXISTING) {
+        /* OPEN_EXISTING never creates a file - CreateFileA() only succeeds
+         * here because the file already existed, so GetLastError() carries
+         * no ERROR_ALREADY_EXISTS signal to read (it may be stale from an
+         * unrelated earlier call). Trust the disposition, not the error. */
+        created = 0;
+    }
+    else {
+        /* The pre-open GetFileAttributesA() snapshot is racy: another
+         * process can create the file between that check and this call.
+         * CreateFileA() itself is authoritative here - for CREATE_ALWAYS/
+         * OPEN_ALWAYS it sets last-error to ERROR_ALREADY_EXISTS on success
+         * iff the file already existed, even though existed/disp above may
+         * disagree. */
+        created = (GetLastError() != ERROR_ALREADY_EXISTS);
+    }
+
+    if (hFile != INVALID_HANDLE_VALUE &&
+            wolfCLU_FinishKeyHandle(hFile, path, pSD, created, wantTrunc)
+                    != 0) {
+        hFile = INVALID_HANDLE_VALUE;
+    }
+
+    if (hFile != INVALID_HANDLE_VALUE) {
+        fd = _open_osfhandle((intptr_t)hFile, crtFlags);
+        if (fd != -1) {
+            f = _fdopen(fd, mode);
+        }
+        if (f == NULL) {
+            if (fd != -1) _close(fd);
+            else CloseHandle(hFile);
+            if (created) {
+                (void)_unlink(path);
+            }
+            errno = EACCES;
+        }
+    }
+    if (pSD != NULL) {
+        LocalFree(pSD);
+    }
+    return f;
+}
+
+/* No-follow open for in-place updates. */
+FILE* wolfCLU_OpenExistingSecureFile(const char* path, const char* mode,
+        int ownerOnly)
+{
+    HANDLE hFile;
+    int fd = -1;
+    FILE* f = NULL;
+    DWORD access;
+    DWORD disp;
+    int crtFlags;
+    int wantTrunc;
+    DWORD attrs;
+    DWORD err;
+
+    if (path == NULL || wolfCLU_ModeToWin32(mode, &access, &disp, &crtFlags,
+            &wantTrunc) != 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    attrs = GetFileAttributesA(path);
+    if (attrs == INVALID_FILE_ATTRIBUTES) {
+        err = GetLastError();
+        errno = (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+                ? ENOENT : EIO;
+        return NULL;
+    }
+    if (attrs & FILE_ATTRIBUTE_REPARSE_POINT) {
+        errno = ELOOP;
+        return NULL;
+    }
+
+    hFile = CreateFileA(path,
+            access | (ownerOnly ? (READ_CONTROL | WRITE_DAC) : 0), 0, NULL,
+            OPEN_EXISTING,
+            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        err = GetLastError();
+        errno = (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+                ? ENOENT : EIO;
+        return NULL;
+    }
+
+    /* Re-check after open: path may have been replaced with a reparse
+     * point between GetFileAttributesA and CreateFileA. */
+    {
+        BY_HANDLE_FILE_INFORMATION bhfi;
+        if (!GetFileInformationByHandle(hFile, &bhfi) ||
+                (bhfi.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT)) {
+            CloseHandle(hFile);
+            errno = ELOOP;
+            return NULL;
+        }
+        /* As at creation: a second hard link sees every update and shares
+         * the DACL set below. */
+        if (ownerOnly && bhfi.nNumberOfLinks > 1) {
+            CloseHandle(hFile);
+            errno = EMLINK;
+            return NULL;
+        }
+    }
+
+    if (ownerOnly) {
+        PSECURITY_DESCRIPTOR pSD = NULL;
+        BOOL ok;
+
+        if (wolfCLU_HandleOwnedBySelf(hFile) != 0) {
+            CloseHandle(hFile);
+            errno = EPERM;
+            return NULL;
+        }
+        if (!ConvertStringSecurityDescriptorToSecurityDescriptorA(
+                WOLFCLU_OWNER_ONLY_SDDL, SDDL_REVISION_1, &pSD, NULL)) {
+            CloseHandle(hFile);
+            errno = EPERM;
+            return NULL;
+        }
+        ok = SetKernelObjectSecurity(hFile, DACL_SECURITY_INFORMATION, pSD);
+        LocalFree(pSD);
+        /* Otherwise key material lands behind the file's old ACL. */
+        if (!ok) {
+            CloseHandle(hFile);
+            errno = EPERM;
+            return NULL;
+        }
+    }
+
+    /* Truncation is deferred to here rather than folded into the disposition
+     * so the ACL above is applied before the old contents are dropped. */
+    if (wantTrunc) {
+        if (SetFilePointer(hFile, 0, NULL, FILE_BEGIN) ==
+                    INVALID_SET_FILE_POINTER ||
+                !SetEndOfFile(hFile)) {
+            CloseHandle(hFile);
+            errno = EACCES;
+            return NULL;
+        }
+    }
+
+    fd = _open_osfhandle((intptr_t)hFile, crtFlags);
+    if (fd == -1) {
+        CloseHandle(hFile);
+        return NULL;
+    }
+    f = _fdopen(fd, mode);
+    if (f == NULL) {
+        _close(fd);
+    }
+    return f;
+}
+#else
+#ifndef O_NOFOLLOW
+    #define O_NOFOLLOW 0
+#endif
+/* Creation modes, before umask. Key material is owner-only; everything else
+ * gets the same default fopen() would have used. */
+#define WOLFCLU_KEY_FILE_MODE (S_IRUSR | S_IWUSR)
+#define WOLFCLU_OUT_FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | \
+                               S_IROTH | S_IWOTH)
+
+/* Translate a stdio mode string into the open(2) flags fopen() would use for
+ * it, so both platforms honour mode identically. Returns 0 on success, -1 for
+ * a mode string fopen() would not accept. */
+static int wolfCLU_ModeToOpenFlags(const char* mode, int* flagsOut)
+{
+    int update;
+
+    if (mode == NULL || mode[0] == '\0') {
+        return -1;
+    }
+    /* 'b' and friends may appear in any order; only '+' changes direction. */
+    update = (XSTRSTR(mode, "+") != NULL);
+
+    switch (mode[0]) {
+        case 'r':
+            *flagsOut = update ? O_RDWR : O_RDONLY;
+            break;
+        case 'w':
+            *flagsOut = (update ? O_RDWR : O_WRONLY) | O_CREAT | O_TRUNC;
+            break;
+        case 'a':
+            *flagsOut = (update ? O_RDWR : O_WRONLY) | O_CREAT | O_APPEND;
+            break;
+        default:
+            return -1;
+    }
+    return 0;
+}
+
+/* Remove a file this call created, but only while path still names the file
+ * fd holds: in an attacker-writable directory the path may already have been
+ * replaced by something we must not delete. Call before closing fd. */
+static void wolfCLU_UnlinkOwnFd(int fd, const char* path)
+{
+    struct stat fst, lst;
+
+    if (fstat(fd, &fst) == 0 && lstat(path, &lst) == 0 &&
+            fst.st_dev == lst.st_dev && fst.st_ino == lst.st_ino) {
+        (void)unlink(path);
+    }
+}
+
+/* Validate and lock down a freshly opened key file descriptor: confirm it is
+ * still the regular file lstat() saw, owned by us and not multiply linked,
+ * then truncate and tighten it. A file this call created is removed again
+ * when the checks refuse it, so a rejected path is left as it was found.
+ * fd is closed on failure. Takes the pre-open lstat result and whether the
+ * path already existed.
+ * return 0 on success, -1 with errno set otherwise */
+/* Shared tail of wolfCLU_CreateSecureFile()'s and
+ * wolfCLU_OpenExistingSecureFile()'s owner-only opens: confirm fd is still
+ * the regular file pre (from the pre-open lstat()) saw, then apply the
+ * owner-only protections (owner check, single-link check, mode tightened to
+ * WOLFCLU_KEY_FILE_MODE) when ownerOnly is set, and truncate last if asked.
+ * A file this call created (existed == 0) is removed again on any refusal,
+ * so a rejected path is left as it was found. fd is closed on failure.
+ * return 0 on success, -1 with errno set otherwise */
+static int wolfCLU_FinishKeyFd(int fd, const char* path,
+        const struct stat* pre, int existed, int wantTrunc, int ownerOnly)
+{
+    struct stat st;
+
+    /* O_NOFOLLOW rejects a symlink swapped in after the lstat, but the path
+     * could still have been replaced by a regular file owned by someone
+     * else; check what was actually opened. */
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        if (!existed) {
+            wolfCLU_UnlinkOwnFd(fd, path);
+        }
+        close(fd);
+        errno = EEXIST;
+        return -1;
+    }
+    if (existed && (st.st_dev != pre->st_dev || st.st_ino != pre->st_ino)) {
+        close(fd);
+        errno = ELOOP;
+        return -1;
+    }
+    if (ownerOnly && st.st_uid != geteuid()) {
+        if (!existed) {
+            wolfCLU_UnlinkOwnFd(fd, path);
+        }
+        close(fd);
+        errno = EPERM;
+        return -1;
+    }
+    if (ownerOnly && st.st_nlink > 1) {
+        if (!existed) {
+            wolfCLU_UnlinkOwnFd(fd, path);
+        }
+        close(fd);
+        errno = EMLINK;
+        return -1;
+    }
+    /* Tighten the mode before truncating, so a pre-existing key still holds
+     * its contents on every path this call goes on to refuse, and is never
+     * left group/world readable while it holds the new key. */
+    if (ownerOnly &&
+            (st.st_mode & (mode_t)~S_IFMT) != (mode_t)WOLFCLU_KEY_FILE_MODE &&
+            fchmod(fd, WOLFCLU_KEY_FILE_MODE) != 0) {
+        /* Cleanup below makes its own syscalls; the caller reads errno. */
+        int err = errno;
+        if (!existed) {
+            wolfCLU_UnlinkOwnFd(fd, path);
+        }
+        close(fd);
+        errno = err;
+        return -1;
+    }
+    if (wantTrunc && ftruncate(fd, 0) != 0) {
+        int err = errno;
+        if (!existed) {
+            wolfCLU_UnlinkOwnFd(fd, path);
+        }
+        close(fd);
+        errno = err;
+        return -1;
+    }
+    return 0;
+}
+
+FILE* wolfCLU_CreateSecureFile(const char* path, const char* mode,
+        int ownerOnly)
+{
+    int         fd;
+    int         flags;
+    int         wantTrunc;
+    int         existed = 0;
+    FILE*       f;
+    struct stat pre;
+
+    if (path == NULL || wolfCLU_ModeToOpenFlags(mode, &flags) != 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if (!ownerOnly) {
+        /* Nothing secret is being written, so behave exactly like
+         * fopen(path, mode): follow symlinks, and create, truncate or append
+         * exactly as the mode string asks. Special files (/dev/stdout,
+         * /dev/null, FIFOs) and symlinks to regular files are all legitimate
+         * -out targets. */
+        fd = open(path, flags, WOLFCLU_OUT_FILE_MODE);
+        if (fd < 0) {
+            return NULL;
+        }
+        f = fdopen(fd, mode);
+        if (f == NULL) {
+            close(fd);
+        }
+        return f;
+    }
+
+    /* Key material: never write through a symlink, and never silently
+     * destroy whatever the path already names. Anything that is not a regular
+     * file is refused with a distinguishable errno so the caller can say why.
+     *
+     * Truncation is done by an explicit ftruncate() after the checks below
+     * rather than by O_TRUNC, so a refused target keeps its contents and a
+     * failed open leaves the previous key untouched. The mode is then forced
+     * down to owner-only, since O_CREAT only applies WOLFCLU_KEY_FILE_MODE to
+     * a file it actually creates and a pre-existing file would otherwise keep
+     * its old, possibly permissive, mode. */
+    wantTrunc = (flags & O_TRUNC) != 0;
+    flags &= ~O_TRUNC;
+
+    if (lstat(path, &pre) == 0) {
+        if (S_ISLNK(pre.st_mode)) {
+            errno = ELOOP;
+            return NULL;
+        }
+        if (!S_ISREG(pre.st_mode)) {
+            errno = EEXIST;
+            return NULL;
+        }
+        existed = 1;
+    }
+    else if (errno != ENOENT) {
+        return NULL;
+    }
+
+    fd = open(path, flags | O_NOFOLLOW |
+            (((flags & O_CREAT) != 0 && !existed) ? O_EXCL : 0),
+            WOLFCLU_KEY_FILE_MODE);
+    if (fd < 0) {
+        return NULL;
+    }
+
+    if (wolfCLU_FinishKeyFd(fd, path, &pre, existed, wantTrunc, 1) != 0) {
+        return NULL;
+    }
+
+    f = fdopen(fd, mode);
+    if (f == NULL) {
+        int err = errno;
+        if (!existed) {
+            /* remove the stray empty file we created */
+            wolfCLU_UnlinkOwnFd(fd, path);
+        }
+        close(fd);
+        errno = err;
+    }
+    return f;
+}
+
+/* No-follow open for in-place updates. */
+FILE* wolfCLU_OpenExistingSecureFile(const char* path, const char* mode,
+        int ownerOnly)
+{
+    int fd;
+    int flags;
+    int wantTrunc;
+    FILE* f;
+    struct stat pre;
+
+    if (path == NULL || wolfCLU_ModeToOpenFlags(mode, &flags) != 0) {
+        errno = EINVAL;
+        return NULL;
+    }
+    /* This helper only ever updates a file that is already there, so O_CREAT
+     * is dropped and a missing path is reported as ENOENT by the lstat. */
+    wantTrunc = (flags & O_TRUNC) != 0;
+    flags &= ~(O_CREAT | O_TRUNC);
+
+    if (lstat(path, &pre) != 0) {
+        return NULL; /* errno from lstat, including ENOENT */
+    }
+    /* Keep the two refusals distinguishable: a symlink is the attack this
+     * helper exists to stop, while a directory or FIFO is just the wrong
+     * kind of target. */
+    if (S_ISLNK(pre.st_mode)) {
+        errno = ELOOP;
+        return NULL;
+    }
+    if (!S_ISREG(pre.st_mode)) {
+        errno = EEXIST;
+        return NULL;
+    }
+    fd = open(path, flags | O_NOFOLLOW);
+    if (fd < 0) {
+        return NULL;
+    }
+    /* Shares wolfCLU_CreateSecureFile()'s post-open checks and owner-only
+     * lockdown, so both entry points enforce the exact same permission
+     * policy on a key file - e.g. a pre-existing 0700 file is tightened to
+     * 0600 here too. The file always pre-existed at this point (existed=1),
+     * so a refusal here never unlinks it. */
+    if (wolfCLU_FinishKeyFd(fd, path, &pre, 1, wantTrunc, ownerOnly) != 0) {
+        return NULL;
+    }
+    f = fdopen(fd, mode);
+    if (f == NULL) {
+        int err = errno;
+        close(fd);
+        errno = err;
+    }
+    return f;
+}
+#endif /* _WIN32 */
+
+void wolfCLU_LogKeyOpenFailure(const char* path, int err)
+{
+    /* Distinguish every deliberate refusal from a plain open failure so the
+     * user is not left guessing why a writable path was rejected. Shared by
+     * every key-file open, including wolfCLU_OpenExistingSecureFile()
+     * callers, which get no logging from the open itself. */
+    if (path == NULL) {
+        /* An option given as the last argv token binds a NULL optarg; never
+         * hand that to %s. */
+        wolfCLU_LogError("No key file name given");
+    }
+    else if (err == ELOOP) {
+        wolfCLU_LogError("Refusing to write key material through the "
+                "symlink %s", path);
+    }
+    else if (err == EEXIST) {
+        wolfCLU_LogError("Refusing to write key material to %s: not a "
+                "regular file", path);
+    }
+    else if (err == EPERM) {
+        wolfCLU_LogError("Refusing to write key material to %s: owned by "
+                "another user", path);
+    }
+    else if (err == EMLINK) {
+        wolfCLU_LogError("Refusing to write key material to %s: file has "
+                "more than one hard link", path);
+    }
+    else {
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+}
+
+FILE* wolfCLU_OpenKeyFile(const char* path)
+{
+    FILE* f;
+
+    errno = 0;
+    f = wolfCLU_CreateSecureFile(path, "wb", 1);
+
+    if (f == NULL) {
+        wolfCLU_LogKeyOpenFailure(path, errno);
+    }
+    return f;
+}
+
+FILE* wolfCLU_OpenSecureFileForUpdate(const char* path)
+{
+    FILE* f;
+    int   openErr;
+
+    errno = 0;
+    f = wolfCLU_OpenExistingSecureFile(path, "rb+", 1);
+    if (f != NULL) {
+        return f;
+    }
+
+    /* Only a missing file earns a second attempt: creating it is the one
+     * case handled differently here, since callers expect the returned
+     * handle to stay readable and writable in place, not just wb's
+     * write-only truncate. "wb+" creates it (empty, so O_TRUNC is a no-op)
+     * while still opening it O_RDWR, unlike wolfCLU_OpenKeyFile()'s "wb".
+     * Every other errno is a deliberate refusal, and the open above logs
+     * nothing, so report it here or the caller fails with no diagnostic at
+     * all. */
+    openErr = errno;
+    if (openErr == ENOENT) {
+        errno = 0;
+        f = wolfCLU_CreateSecureFile(path, "wb+", 1);
+        if (f == NULL) {
+            wolfCLU_LogKeyOpenFailure(path, errno);
+        }
+        return f;
+    }
+    wolfCLU_LogKeyOpenFailure(path, openErr);
+    return NULL;
+}
+
+int wolfCLU_CloseOutFile(FILE* file, const char* path)
+{
+    /* The last chunk written can still be sitting in stdio's buffer, so a
+     * flush failure (e.g. ENOSPC/EIO) is only reported here, at close, even
+     * though the writes that filled the buffer already reported success. */
+    if (file == NULL) {
+        return WOLFCLU_SUCCESS;
+    }
+    if (XFCLOSE(file) != 0) {
+        wolfCLU_LogError("Failed to write output file %s", path);
+        return OUTPUT_FILE_ERROR;
+    }
+    return WOLFCLU_SUCCESS;
+}
+
+FILE* wolfCLU_OpenOutFile(const char* path)
+{
+    FILE* f = wolfCLU_CreateSecureFile(path, "wb", 0);
+
+    if (f == NULL) {
+        /* An option given as the last argv token binds a NULL optarg; never
+         * hand that to %s. */
+        if (path == NULL) {
+            wolfCLU_LogError("No output file name given");
+        }
+        else {
+            wolfCLU_LogError("Unable to open output file %s", path);
+        }
+    }
+    return f;
+}
+
+FILE* wolfCLU_OpenOutFileDistinctFrom(const char* path, FILE* inFile)
+{
+    FILE* f;
+#ifndef _WIN32
+    int   fd;
+    int   flags;
+    struct stat outSt;
+    struct stat inSt;
+
+    if (inFile == NULL) {
+        /* Nothing to alias; the ordinary open already has the right
+         * semantics (including special files such as /dev/stdout). */
+        return wolfCLU_OpenOutFile(path);
+    }
+    if (path == NULL || wolfCLU_ModeToOpenFlags("wb", &flags) != 0) {
+        errno = EINVAL;
+        wolfCLU_LogError("No output file name given");
+        return NULL;
+    }
+
+    /* Truncation is deferred past the identity check below, so if -out is
+     * swapped to alias -in after wolfCLU_PathsRefEqual() ran, the input is
+     * still intact when the alias is caught. O_TRUNC here instead would
+     * destroy it before anything could be compared. */
+    fd = open(path, flags & ~O_TRUNC, WOLFCLU_OUT_FILE_MODE);
+    if (fd < 0) {
+        wolfCLU_LogError("Unable to open output file %s", path);
+        return NULL;
+    }
+
+    if (fstat(fd, &outSt) != 0 || fstat(fileno(inFile), &inSt) != 0) {
+        close(fd);
+        wolfCLU_LogError("Unable to open output file %s", path);
+        return NULL;
+    }
+    if (outSt.st_dev == inSt.st_dev && outSt.st_ino == inSt.st_ino) {
+        close(fd);
+        wolfCLU_LogError("-in and -out name the same file %s", path);
+        return NULL;
+    }
+
+    /* Only a regular file needs (or tolerates) truncation; a FIFO or
+     * character device is a legitimate -out and must be left alone. */
+    if (S_ISREG(outSt.st_mode) && ftruncate(fd, 0) != 0) {
+        close(fd);
+        wolfCLU_LogError("Unable to open output file %s", path);
+        return NULL;
+    }
+
+    f = fdopen(fd, "wb");
+    if (f == NULL) {
+        close(fd);
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+    return f;
+#else
+    HANDLE hFile;
+    HANDLE hIn;
+    DWORD  access;
+    DWORD  disp;
+    int    crtFlags;
+    int    wantTrunc;
+    int    fd;
+    BY_HANDLE_FILE_INFORMATION outInfo;
+    BY_HANDLE_FILE_INFORMATION inInfo;
+
+    if (inFile == NULL) {
+        /* Nothing to alias; the ordinary open already has the right
+         * semantics (including special files such as CON/NUL). */
+        return wolfCLU_OpenOutFile(path);
+    }
+    if (path == NULL || wolfCLU_ModeToWin32("wb", &access, &disp, &crtFlags,
+            &wantTrunc) != 0) {
+        errno = EINVAL;
+        wolfCLU_LogError("No output file name given");
+        return NULL;
+    }
+
+    /* OPEN_ALWAYS does not truncate on its own (unlike CREATE_ALWAYS), so
+     * truncation stays deferred past the identity check below, the same
+     * way the POSIX branch defers it past O_TRUNC: if -out is swapped to
+     * alias -in after wolfCLU_PathsRefEqual() ran, the input is still
+     * intact when the alias is caught here. */
+    hFile = CreateFileA(path, access, 0, NULL, disp, FILE_ATTRIBUTE_NORMAL,
+            NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        wolfCLU_LogError("Unable to open output file %s", path);
+        return NULL;
+    }
+
+    hIn = (HANDLE)_get_osfhandle(_fileno(inFile));
+    if (hIn == INVALID_HANDLE_VALUE ||
+            !GetFileInformationByHandle(hFile, &outInfo) ||
+            !GetFileInformationByHandle(hIn, &inInfo)) {
+        CloseHandle(hFile);
+        wolfCLU_LogError("Unable to open output file %s", path);
+        return NULL;
+    }
+    if (outInfo.dwVolumeSerialNumber == inInfo.dwVolumeSerialNumber &&
+            outInfo.nFileIndexHigh == inInfo.nFileIndexHigh &&
+            outInfo.nFileIndexLow == inInfo.nFileIndexLow) {
+        CloseHandle(hFile);
+        wolfCLU_LogError("-in and -out name the same file %s", path);
+        return NULL;
+    }
+
+    /* Only a regular file needs (or tolerates) truncation; a character
+     * device (CON, NUL) is a legitimate -out and must be left alone. */
+    if ((outInfo.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
+            (SetFilePointer(hFile, 0, NULL, FILE_BEGIN) ==
+                    INVALID_SET_FILE_POINTER ||
+             !SetEndOfFile(hFile))) {
+        CloseHandle(hFile);
+        wolfCLU_LogError("Unable to open output file %s", path);
+        return NULL;
+    }
+
+    fd = _open_osfhandle((intptr_t)hFile, crtFlags);
+    if (fd != -1) {
+        f = _fdopen(fd, "wb");
+    }
+    else {
+        f = NULL;
+    }
+    if (f == NULL) {
+        if (fd != -1) {
+            _close(fd);
+        }
+        else {
+            CloseHandle(hFile);
+        }
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+    return f;
+#endif /* !_WIN32 */
+}
+
+#ifdef _WIN32
+    #define WOLFCLU_PATH_BUF_SZ MAX_PATH
+    /* Two canonicalized paths to compare. */
+    #define WOLFCLU_PATH_WORK_SZ (WOLFCLU_PATH_BUF_SZ * 2)
+#else
+    /* PATH_MAX is optional in POSIX and absent on e.g. GNU/Hurd, where paths
+     * have no fixed upper bound; fall back to a generous fixed size. The
+     * fallback is kept in wolfCLU's own namespace rather than defining
+     * PATH_MAX, which belongs to the implementation. */
+    #ifdef PATH_MAX
+        #define WOLFCLU_PATH_BUF_SZ PATH_MAX
+    #else
+        #define WOLFCLU_PATH_BUF_SZ 4096
+    #endif
+    /* Two canonicalized paths plus the three scratch buffers
+     * wolfCLU_ResolveParentPath() needs. */
+    #define WOLFCLU_PATH_WORK_SZ (WOLFCLU_PATH_BUF_SZ * 5)
+
+/* Rewrite path as "<resolved parent dir>/<basename>" into out, borrowing
+ * three WOLFCLU_PATH_BUF_SZ buffers from scratch. realpath() requires its
+ * target to exist, but -out/-keyout name files that are typically created
+ * later in the same call, so only the parent (which does exist) is resolved.
+ * notExist, if non-NULL, is set to 1 when the failure was specifically
+ * "the parent directory doesn't exist" (as opposed to e.g. an oversized
+ * path) -- the two are distinguishable to the caller and mean different
+ * things: a path whose parent doesn't exist yet cannot already alias
+ * another file, while other failures are genuinely inconclusive.
+ * return 1 on success, 0 if the path cannot be canonicalized */
+static int wolfCLU_ResolveParentPath(const char* path, char* out,
+        word32 outSz, char* scratch, int* notExist)
+{
+    char* dirBuf      = scratch;
+    char* baseBuf     = scratch + WOLFCLU_PATH_BUF_SZ;
+    char* resolvedDir = scratch + (WOLFCLU_PATH_BUF_SZ * 2);
+
+    if (notExist != NULL) {
+        *notExist = 0;
+    }
+    if (XSTRLEN(path) >= WOLFCLU_PATH_BUF_SZ) {
+        return 0;
+    }
+    /* dirname()/basename() may modify their argument, so each gets a copy. */
+    XSTRNCPY(dirBuf, path, WOLFCLU_PATH_BUF_SZ - 1);
+    dirBuf[WOLFCLU_PATH_BUF_SZ - 1] = '\0';
+    XSTRNCPY(baseBuf, path, WOLFCLU_PATH_BUF_SZ - 1);
+    baseBuf[WOLFCLU_PATH_BUF_SZ - 1] = '\0';
+
+    /* realpath()'s resolved-path output can be as long as PATH_MAX reports,
+     * but on platforms that skip the #ifdef PATH_MAX branch above there is
+     * no such bound: the filesystem may hand back a path longer than the
+     * fixed WOLFCLU_PATH_BUF_SZ fallback, which would overflow resolvedDir.
+     * Guard explicitly rather than trusting realpath() to respect the
+     * buffer size it was never told about. */
+    {
+        /* realpath()'s glibc/BSD "return a malloc()'d buffer" extension
+         * (POSIX.1-2008) is used here rather than a caller-supplied buffer
+         * precisely so the buffer is sized to the result: that's what makes
+         * the length check below meaningful instead of just moving the
+         * overflow into realpath() itself. This allocation comes from the
+         * platform's malloc(), not wolfSSL's allocator, so it is freed with
+         * free(), not XFREE(). */
+        char* tmp;
+        errno = 0;
+        tmp = realpath(dirname(dirBuf), NULL);
+        if (tmp == NULL) {
+            if (notExist != NULL) {
+                *notExist = (errno == ENOENT);
+            }
+            return 0;
+        }
+        if (XSTRLEN(tmp) >= WOLFCLU_PATH_BUF_SZ) {
+            free(tmp);
+            return 0;
+        }
+        XSTRNCPY(resolvedDir, tmp, WOLFCLU_PATH_BUF_SZ - 1);
+        resolvedDir[WOLFCLU_PATH_BUF_SZ - 1] = '\0';
+        free(tmp);
+    }
+    if (XSNPRINTF(out, outSz, "%s/%s", resolvedDir, basename(baseBuf))
+            >= (int)outSz) {
+        return 0;
+    }
+    return 1;
+}
+
+/* Compare two existing paths by their unique file identity (device + inode)
+ * rather than by string form. This is the only reliable way to detect that
+ * -in and -out name the same underlying file when a symlink or hard link is
+ * involved: two different, non-canonicalizable-to-each-other path strings
+ * can still refer to the same inode. Sets *haveResult to 1 only when both
+ * paths could be stat()'d, since a not-yet-created -out cannot be compared
+ * this way and the caller needs to know to fall back to path comparison. */
+static int wolfCLU_FileIdEqual(const char* pathA, const char* pathB,
+        int* haveResult)
+{
+    struct stat stA;
+    struct stat stB;
+
+    *haveResult = 0;
+    if (stat(pathA, &stA) != 0 || stat(pathB, &stB) != 0) {
+        return 0;
+    }
+    /* Only a regular file can be destroyed by the truncating open this
+     * guard protects. Two paths to one character device or FIFO share a
+     * dev/ino pair but alias nothing that can be lost -- an interactive
+     * '-in /dev/stdin -out /dev/stdout' resolves both to the same tty, and
+     * must keep working. wolfCLU_OpenOutFileDistinctFrom() already scopes
+     * its truncation to S_ISREG for the same reason. */
+    if (!S_ISREG(stA.st_mode) || !S_ISREG(stB.st_mode)) {
+        *haveResult = 1;
+        return 0;
+    }
+    *haveResult = 1;
+    return (stA.st_dev == stB.st_dev && stA.st_ino == stB.st_ino);
+}
+#endif /* _WIN32 */
+
+#ifdef _WIN32
+/* Windows equivalent of wolfCLU_FileIdEqual(): compares the volume serial
+ * number and file index, which (unlike the path string) are unaffected by
+ * symlinks, hard links, or junctions. Only usable when both files already
+ * exist. */
+static int wolfCLU_FileIdEqual(const char* pathA, const char* pathB,
+        int* haveResult)
+{
+    HANDLE hA;
+    HANDLE hB;
+    BY_HANDLE_FILE_INFORMATION infoA;
+    BY_HANDLE_FILE_INFORMATION infoB;
+    int ret = 0;
+
+    *haveResult = 0;
+
+    hA = CreateFileA(pathA, 0, FILE_SHARE_READ | FILE_SHARE_WRITE |
+            FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (hA == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+    hB = CreateFileA(pathB, 0, FILE_SHARE_READ | FILE_SHARE_WRITE |
+            FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    if (hB == INVALID_HANDLE_VALUE) {
+        CloseHandle(hA);
+        return 0;
+    }
+
+    if (GetFileInformationByHandle(hA, &infoA) &&
+            GetFileInformationByHandle(hB, &infoB)) {
+        *haveResult = 1;
+        ret = (infoA.dwVolumeSerialNumber == infoB.dwVolumeSerialNumber &&
+                infoA.nFileIndexHigh == infoB.nFileIndexHigh &&
+                infoA.nFileIndexLow == infoB.nFileIndexLow);
+    }
+
+    CloseHandle(hA);
+    CloseHandle(hB);
+    return ret;
+}
+#endif /* _WIN32 */
+
+/* return WOLFCLU_PATHS_SAME when both paths provably name the same file,
+ * WOLFCLU_PATHS_DISTINCT when they are provably distinct, and
+ * WOLFCLU_PATHS_UNDETERMINED when the comparison was inconclusive
+ * (allocation failure, unresolvable path, etc.). This guards an
+ * overwrite-in-place check, so an undetermined result still fails closed -
+ * the caller must treat it as a possible match - but stays distinguishable
+ * from a definite match so the caller can report the real cause. */
+int wolfCLU_PathsRefEqual(const char* pathA, const char* pathB)
+{
+    char* work;
+    char* fullA;
+    char* fullB;
+    int   ret;
+    int   haveIdResult;
+
+    if (pathA == NULL || pathB == NULL) {
+        return WOLFCLU_PATHS_DISTINCT;
+    }
+    if (XSTRCMP(pathA, pathB) == 0) {
+        return WOLFCLU_PATHS_SAME;
+    }
+
+    /* Prefer comparing by file identity (inode/dev on POSIX, volume serial
+     * + file index on Windows): unlike any string comparison, it correctly
+     * catches symlink and hard-link aliases pointing at the same file. This
+     * only works when both paths already exist, e.g. it can't help when
+     * -out will be created fresh by this run. */
+    ret = wolfCLU_FileIdEqual(pathA, pathB, &haveIdResult);
+    if (haveIdResult) {
+        return ret ? WOLFCLU_PATHS_SAME : WOLFCLU_PATHS_DISTINCT;
+    }
+
+    /* PATH_MAX buffers are far past the stack budget for one function, so
+     * the whole working set comes from a single allocation. */
+    work = (char*)XMALLOC(WOLFCLU_PATH_WORK_SZ, HEAP_HINT,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (work == NULL) {
+        /* Can't canonicalize without scratch space; fail closed, but let
+         * the caller know this wasn't a definite match. */
+        return WOLFCLU_PATHS_UNDETERMINED;
+    }
+    fullA = work;
+    fullB = work + WOLFCLU_PATH_BUF_SZ;
+
+    /* Canonicalize to catch path aliases. */
+#ifdef _WIN32
+    {
+        DWORD retA = GetFullPathNameA(pathA, WOLFCLU_PATH_BUF_SZ, fullA, NULL);
+        DWORD retB = GetFullPathNameA(pathB, WOLFCLU_PATH_BUF_SZ, fullB, NULL);
+        if (retA == 0 || retA >= WOLFCLU_PATH_BUF_SZ ||
+                retB == 0 || retB >= WOLFCLU_PATH_BUF_SZ) {
+            /* Couldn't resolve one side; fail closed rather than assume
+             * the paths are distinct, but flag it as undetermined rather
+             * than a definite match. */
+            ret = WOLFCLU_PATHS_UNDETERMINED;
+        }
+        else {
+            ret = (_stricmp(fullA, fullB) == 0) ? WOLFCLU_PATHS_SAME :
+                    WOLFCLU_PATHS_DISTINCT;
+        }
+    }
+#else
+    {
+        char* scratch = work + (WOLFCLU_PATH_BUF_SZ * 2);
+        int notExistA = 0;
+        int notExistB = 0;
+        int okA = wolfCLU_ResolveParentPath(pathA, fullA, WOLFCLU_PATH_BUF_SZ,
+                scratch, &notExistA);
+        int okB = wolfCLU_ResolveParentPath(pathB, fullB, WOLFCLU_PATH_BUF_SZ,
+                scratch, &notExistB);
+
+        if (okA && okB) {
+            ret = (XSTRCMP(fullA, fullB) == 0) ? WOLFCLU_PATHS_SAME :
+                    WOLFCLU_PATHS_DISTINCT;
+        }
+        else if ((okA || notExistA) && (okB || notExistB)) {
+            /* Every unresolved side failed only because its parent
+             * directory doesn't exist yet (typical of a fresh -out): such
+             * a path can't already exist, so it can't alias the other,
+             * already string-distinct path. The eventual open of that
+             * path will fail with the real, more useful diagnostic. */
+            ret = WOLFCLU_PATHS_DISTINCT;
+        }
+        else {
+            /* At least one side failed for a different reason (oversized
+             * path, allocation failure); fail closed rather than assume
+             * the paths are distinct. */
+            ret = WOLFCLU_PATHS_UNDETERMINED;
+        }
+    }
+#endif
+
+    XFREE(work, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    return ret;
+}
+
+int wolfCLU_RejectSamePath(const char* pathA, const char* pathB)
+{
+    int pathCmp = wolfCLU_PathsRefEqual(pathA, pathB);
+
+    if (pathCmp == WOLFCLU_PATHS_SAME) {
+        wolfCLU_LogError("-in and -out name the same file %s", pathB);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (pathCmp == WOLFCLU_PATHS_UNDETERMINED) {
+        wolfCLU_LogError("Unable to determine if -in and -out name "
+                "different files");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    return WOLFCLU_SUCCESS;
+}
+
+FILE* wolfCLU_OpenPairedOutFile(const char* in, const char* out,
+        FILE* inFile)
+{
+    /* wolfCLU_RejectSamePath() gives a friendly refusal, by path string
+     * alone, before any work is done on the input. wolfCLU_OpenOutFile
+     * DistinctFrom() repeats the check at the fd level right before -out
+     * truncates, closing the TOCTOU window between that early check and
+     * this open (e.g. -out replaced with a symlink to -in in between) -
+     * it is the one both callers must not skip. Keeping both, rather than
+     * relying on the fd-level check alone, is a deliberate trade of one
+     * extra stat() per paired -in/-out invocation for a clearer error
+     * message ("-in and -out name the same file" up front instead of only
+     * after -in has already been opened). */
+    if (wolfCLU_RejectSamePath(in, out) != WOLFCLU_SUCCESS) {
+        return NULL;
+    }
+    return wolfCLU_OpenOutFileDistinctFrom(out, inFile);
+}
+
+static WOLFSSL_BIO* wolfCLU_WrapSecureFileBio(FILE* f, const char* path)
+{
+    WOLFSSL_BIO* bioOut = (f != NULL) ?
+            wolfSSL_BIO_new_fp(f, BIO_CLOSE) : NULL;
+
+    if (bioOut == NULL && f != NULL) {
+        /* wolfCLU_OpenKeyFile()/wolfCLU_OpenOutFile() already logged when
+         * f itself was NULL; only log here for the BIO-wrap failure. The
+         * path is deliberately left alone: it may name a pre-existing file
+         * or special file the user asked to write to, and removing it would
+         * destroy more than the empty file we would have created. */
+        XFCLOSE(f);
+        wolfCLU_LogError("Unable to open output file %s", path);
+    }
+    return bioOut;
+}
+
+WOLFSSL_BIO* wolfCLU_OpenKeyFileBio(const char* path)
+{
+    return wolfCLU_WrapSecureFileBio(wolfCLU_OpenKeyFile(path), path);
+}
+
+WOLFSSL_BIO* wolfCLU_OpenOutFileBio(const char* path)
+{
+    return wolfCLU_WrapSecureFileBio(wolfCLU_OpenOutFile(path), path);
+}
+
+WOLFSSL_BIO* wolfCLU_OpenOutOrKeyFileBio(const char* path,
+        WOLFCLU_OUT_KIND kind)
+{
+    return (kind == WOLFCLU_OUT_SECRET) ? wolfCLU_OpenKeyFileBio(path) :
+            wolfCLU_OpenOutFileBio(path);
+}
+
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 
 #ifndef WOLFCLU_NO_TERM_SUPPORT
 
@@ -1313,18 +2747,64 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
 }
 
 
+/* Stream bioIn in chunks to update(). */
+static int wolfCLU_bioReadUpdate(WOLFSSL_BIO* bioIn,
+        int (*update)(void* updateCtx, const byte* data, word32 sz),
+        void* updateCtx)
+{
+    byte chunk[MAX_IO_CHUNK_SZ];
+    int bytesRead;
+    int ret = WOLFCLU_SUCCESS;
+
+    while (ret == WOLFCLU_SUCCESS) {
+        bytesRead = wolfSSL_BIO_read(bioIn, chunk, sizeof(chunk));
+        if (bytesRead < 0) {
+            wolfCLU_LogError("Error reading data");
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+        else if (bytesRead == 0) {
+            break;
+        }
+        if (update(updateCtx, chunk, (word32)bytesRead) != 0) {
+            wolfCLU_LogError("Hash update failed");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    wolfCLU_ForceZero(chunk, sizeof(chunk));
+    return ret;
+}
+
+struct wolfCLU_hashUpdateCtx {
+    wc_HashAlg* hashAlg;
+    enum wc_HashType hashType;
+};
+
+static int wolfCLU_hashUpdateCb(void* updateCtx, const byte* data, word32 sz)
+{
+    struct wolfCLU_hashUpdateCtx* ctx =
+            (struct wolfCLU_hashUpdateCtx*)updateCtx;
+    return wc_HashUpdate(ctx->hashAlg, ctx->hashType, data, sz);
+}
+
+static int wolfCLU_hmacUpdateCb(void* updateCtx, const byte* data, word32 sz)
+{
+    return (wolfSSL_HMAC_Update((WOLFSSL_HMAC_CTX*)updateCtx, data, sz)
+            == WOLFSSL_SUCCESS) ? 0 : WOLFCLU_FATAL_ERROR;
+}
+
 /* Stream-hash data read from bioIn using hashType and write the digest to
  * outDigest. On entry *outDigestSz is the capacity of outDigest; on success
  * it is updated to the actual digest length. */
 int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
         byte* outDigest, word32* outDigestSz)
 {
-    byte chunk[MAX_IO_CHUNK_SZ];
     wc_HashAlg hashAlg;
+    struct wolfCLU_hashUpdateCtx updateCtx;
     int hashInit = 0;
-    int bytesRead;
     int dsz;
-    int ret = WOLFCLU_SUCCESS;
+    int ret;
 
     if (bioIn == NULL || outDigest == NULL || outDigestSz == NULL) {
         return BAD_FUNC_ARG;
@@ -1342,21 +2822,9 @@ int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
     }
     hashInit = 1;
 
-    while (ret == WOLFCLU_SUCCESS) {
-        bytesRead = wolfSSL_BIO_read(bioIn, chunk, sizeof(chunk));
-        if (bytesRead < 0) {
-            wolfCLU_LogError("Error reading data");
-            ret = WOLFCLU_FATAL_ERROR;
-            break;
-        }
-        else if (bytesRead == 0) {
-            break;
-        }
-        if (wc_HashUpdate(&hashAlg, hashType, chunk, (word32)bytesRead) != 0) {
-            wolfCLU_LogError("Hash update failed");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-    }
+    updateCtx.hashAlg = &hashAlg;
+    updateCtx.hashType = hashType;
+    ret = wolfCLU_bioReadUpdate(bioIn, wolfCLU_hashUpdateCb, &updateCtx);
 
     if (ret == WOLFCLU_SUCCESS) {
         if (wc_HashFinal(&hashAlg, hashType, outDigest) != 0) {
@@ -1379,7 +2847,7 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
         enum wc_HashType alg, WOLFSSL_BIO* in, byte* out, word32* outSz)
 {
     int ret = WOLFCLU_SUCCESS;
-    byte chunk[MAX_IO_CHUNK_SZ];
+    byte digest[WC_MAX_DIGEST_SIZE];
     word32 hmacLen = 0;
     const WOLFSSL_EVP_MD* md = NULL;
 
@@ -1392,7 +2860,12 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
      * Cast to int so unrelated hash types don't trip -Wswitch-enum. */
     switch ((int)alg) {
         case WC_HASH_TYPE_MD5:
+        #ifndef NO_MD5
             md = wolfSSL_EVP_md5();
+        #else
+            wolfCLU_LogError("MD5 not compiled in");
+            ret = WOLFCLU_FATAL_ERROR;
+        #endif
             break;
         case WC_HASH_TYPE_SHA:
             md = wolfSSL_EVP_sha1();
@@ -1422,28 +2895,11 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        int bytesRead = 0;
-        while (ret == WOLFCLU_SUCCESS) {
-            bytesRead = wolfSSL_BIO_read(in, chunk, sizeof(chunk));
-            if (bytesRead < 0) {
-                wolfCLU_LogError("Error reading data");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-            else if (bytesRead == 0) {
-                break;
-            }
-            if (wolfSSL_HMAC_Update(ctx, chunk, (word32)bytesRead)
-                    != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Hash update failed");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-        wolfCLU_ForceZero(chunk, sizeof(chunk));
+        ret = wolfCLU_bioReadUpdate(in, wolfCLU_hmacUpdateCb, ctx);
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfSSL_HMAC_Final(ctx, chunk, &hmacLen) != WOLFSSL_SUCCESS) {
+        if (wolfSSL_HMAC_Final(ctx, digest, &hmacLen) != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Unable to get hmac hash of data.");
             ret = WOLFCLU_FATAL_ERROR;
         }
@@ -1451,7 +2907,7 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
 
     if (ret == WOLFCLU_SUCCESS) {
         if (hmacLen <= *outSz) {
-            XMEMCPY(out, chunk, hmacLen);
+            XMEMCPY(out, digest, hmacLen);
             *outSz = hmacLen;
         }
         else {
@@ -1460,6 +2916,6 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 len,
         }
     }
 
-    wolfCLU_ForceZero(chunk, sizeof(chunk));
+    wolfCLU_ForceZero(digest, sizeof(digest));
     return ret;
 }

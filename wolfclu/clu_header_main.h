@@ -117,9 +117,9 @@ extern "C" {
 #define MEGABYTE (1024*1024)
 #define KILOBYTE 1024
 #ifdef FREERTOS
-	#define BYTE_UNIT KILOBYTE
+    #define BYTE_UNIT KILOBYTE
 #else
-	#define BYTE_UNIT MEGABYTE
+    #define BYTE_UNIT MEGABYTE
 #endif
 #define MAX_TERM_WIDTH 80
 #define MAX_THREADS 64
@@ -443,8 +443,8 @@ int wolfCLU_streamHashBio(WOLFSSL_BIO* bioIn, enum wc_HashType hashType,
  * @param alg        hash type to use (converted to EVP type)
  * @param in         input BIO to read data from in MAX_IO_CHUNK_SZ chunks
  * @param out        buffer to output digest to
- * @param outSz      On entry, capacity of out; on success, updated to number of
-  *                  bytes written to out.
+ * @param outSz      On entry, capacity of out; on success, updated to number
+ *                   of bytes written to out.
  */
 int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 keyLen,
         enum wc_HashType alg, WOLFSSL_BIO* in, byte* out, word32* outSz);
@@ -615,6 +615,206 @@ int wolfCLU_PKCS12(int argc, char** argv);
 void wolfCLU_ForceZero(void* mem, unsigned int len);
 
 /**
+ * @brief DER definite-length encoder. Returns the encoded length in bytes.
+ *        With output NULL nothing is written and only that size is returned,
+ *        which is how callers size a buffer before encoding into it.
+ */
+word32 wolfCLU_DerSetLength(word32 length, byte* output);
+
+/*
+ * These helpers deliberately work in terms of FILE* and POSIX/Win32 file
+ * descriptors rather than wolfSSL's XFILE/XFOPEN porting macros: the
+ * permission and symlink guarantees they exist to provide have no equivalent
+ * in that abstraction. They are consequently declared and compiled only when
+ * a stdio filesystem is available, i.e. not when WOLFCLU_NO_FILESYSTEM is
+ * set. The results are assignable to XFILE only where XFILE is FILE*.
+ */
+#ifndef WOLFCLU_NO_FILESYSTEM
+
+/**
+ * @brief Read the whole of path into a newly allocated buffer.
+ *
+ * Returns WOLFCLU_SUCCESS, BAD_FUNC_ARG for a NULL argument or maxSz <= 0,
+ * MEMORY_E if the buffer cannot be allocated, or WOLFCLU_FATAL_ERROR when
+ * path cannot be opened, sized or read, or is empty or larger than maxSz.
+ *
+ * On success *outSz is the file size and *outBuf is an allocation of
+ * *outSz + 1 bytes whose trailing byte is a NUL, so the contents can be
+ * handed straight to a parser that expects a C string. The caller owns
+ * that allocation and frees it with
+ * XFREE(*outBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER).
+ * Neither output is written on failure.
+ */
+int wolfCLU_ReadFileToBuffer(const char* path, long maxSz, byte** outBuf,
+        int* outSz);
+
+/**
+ * @brief Same as wolfCLU_ReadFileToBuffer(), but a zero-length file is
+ * success rather than WOLFCLU_FATAL_ERROR. Use this for a message/digest
+ * being verified or signed, which some algorithms accept empty; never use
+ * it for a key or signature file, which a 0-byte file can never validly be.
+ */
+int wolfCLU_ReadMessageFileToBuffer(const char* path, long maxSz,
+        byte** outBuf, int* outSz);
+
+/**
+ * @brief Open path for writing.
+ *
+ * mode is a stdio mode string and is honoured identically on every platform:
+ * "wb" truncates, "ab" appends, "rb+" updates in place without truncating.
+ *
+ * With ownerOnly set, path is kept as a 0600 regular file owned by the
+ * caller, and a symlink, non-regular file, foreign-owned file or multiply
+ * linked file is refused (errno ELOOP, EEXIST, EPERM or EMLINK) rather than
+ * written to. A refused or failed open never destroys what path already
+ * names. With ownerOnly clear this behaves like fopen(path, mode), so
+ * symlinks and special files are valid targets.
+ */
+FILE* wolfCLU_CreateSecureFile(const char* path, const char* mode,
+        int ownerOnly);
+
+/**
+ * @brief Open an existing path for in-place update, refusing to follow a
+ *        symlink. Reports ENOENT when path does not exist, ELOOP for a
+ *        symlink and EEXIST for any other non-regular target. With ownerOnly
+ *        set the file must be owned by the caller and singly linked (EPERM,
+ *        EMLINK), and its group/other access is dropped before any write.
+ */
+FILE* wolfCLU_OpenExistingSecureFile(const char* path, const char* mode,
+        int ownerOnly);
+
+/**
+ * @brief Report why a key-file open was refused, given the errno it set.
+ *        wolfCLU_OpenExistingSecureFile() logs nothing itself, so callers
+ *        that use it directly must call this to avoid failing silently.
+ */
+void wolfCLU_LogKeyOpenFailure(const char* path, int err);
+
+/**
+ * @brief Open path for writing key material, with owner-only permissions.
+ *        Refuses (and logs) rather than writing through a symlink.
+ */
+FILE* wolfCLU_OpenKeyFile(const char* path);
+
+/**
+ * @brief Open an owner-only key file for in-place, repeated update:
+ *        preserves the existing file's contents and identity if path
+ *        already exists (via wolfCLU_OpenExistingSecureFile(path, "rb+", 1)),
+ *        or creates it securely on first use if it doesn't
+ *        (via wolfCLU_OpenKeyFile()). For a caller that rewrites the same
+ *        key file repeatedly (e.g. a signing state updated after every
+ *        operation) and must neither truncate an existing file nor fail
+ *        just because this is the first write. Logs its own failure on
+ *        every path.
+ */
+FILE* wolfCLU_OpenSecureFileForUpdate(const char* path);
+
+/**
+ * @brief Open path for writing non-secret output, with default permissions.
+ */
+FILE* wolfCLU_OpenOutFile(const char* path);
+
+/**
+ * @brief Close an output file opened for writing, reporting a flush
+ *        failure (e.g. ENOSPC/EIO) that would otherwise surface only as a
+ *        silently truncated file. No-op (returns WOLFCLU_SUCCESS) if file
+ *        is NULL, so callers can call this unconditionally on cleanup.
+ */
+int wolfCLU_CloseOutFile(FILE* file, const char* path);
+
+/* Whether an output file will hold key material. The hardening in
+ * wolfCLU_CreateSecureFile() only applies to WOLFCLU_OUT_SECRET, so this is
+ * the single point where that protection is switched on or off. It is an
+ * enum rather than an int because the deciding expression differs per tool
+ * (-genkey, !-pubout, -nokeys) and its polarity is not self-evident at the
+ * call site. */
+typedef enum {
+    WOLFCLU_OUT_PUBLIC = 0,  /* default permissions, symlinks followed */
+    WOLFCLU_OUT_SECRET = 1   /* owner-only, symlinks and aliases refused */
+} WOLFCLU_OUT_KIND;
+
+/**
+ * @brief Same as wolfCLU_OpenOutFile(), but proves the opened file is not
+ *        inFile before truncating it, closing the window between a
+ *        wolfCLU_PathsRefEqual() check and the open. inFile must already be
+ *        open; pass NULL to fall back to wolfCLU_OpenOutFile(). Refuses and
+ *        logs if the two turn out to be the same file, leaving it intact.
+ *        On Windows no fd-level check is performed.
+ */
+FILE* wolfCLU_OpenOutFileDistinctFrom(const char* path, FILE* inFile);
+
+/* wolfCLU_PathsRefEqual() return values. WOLFCLU_PATHS_DISTINCT is the only
+ * value meaning the paths are provably different; both non-zero values
+ * refuse an overwrite-in-place, but WOLFCLU_PATHS_UNDETERMINED lets the
+ * caller report the real reason (e.g. an unresolvable -out directory)
+ * instead of claiming -in and -out name the same file. */
+#define WOLFCLU_PATHS_DISTINCT     0
+#define WOLFCLU_PATHS_SAME         1
+#define WOLFCLU_PATHS_UNDETERMINED 2
+
+/**
+ * @brief Check if two path strings name (or might name) the same file.
+ *        Returns WOLFCLU_PATHS_DISTINCT only when they are provably
+ *        distinct, WOLFCLU_PATHS_SAME when they provably name the same
+ *        file, and WOLFCLU_PATHS_UNDETERMINED when the comparison was
+ *        inconclusive (for example a path whose parent directory cannot be
+ *        canonicalized) - fails closed (still refuses an overwrite) without
+ *        claiming a definite match.
+ *
+ *        This is a point-in-time check: nothing stops -out from being
+ *        replaced (e.g. with a symlink to -in) between this call and the
+ *        later open. Closing that TOCTOU window would mean deferring
+ *        -out's truncation until after an fd-level identity check against
+ *        -in, which touches every caller of wolfCLU_OpenOutFile(), not
+ *        just the ones calling this function. Accepted: it requires a
+ *        second, co-resident actor with write access to the target
+ *        directory racing this command, outside this CLI's single-user
+ *        threat model.
+ */
+int wolfCLU_PathsRefEqual(const char* pathA, const char* pathB);
+
+/**
+ * @brief Common -in/-out same-file guard used before a truncating -out open:
+ *        wraps wolfCLU_PathsRefEqual() and logs+returns WOLFCLU_FATAL_ERROR
+ *        for both WOLFCLU_PATHS_SAME and WOLFCLU_PATHS_UNDETERMINED (fails
+ *        closed), or WOLFCLU_SUCCESS when the paths are provably distinct.
+ *        pathB (the -out path) is named in the SAME-file log message.
+ */
+int wolfCLU_RejectSamePath(const char* pathA, const char* pathB);
+
+/**
+ * @brief Open -out for a paired -in/-out operation, guarded against both
+ *        naming the same file: combines wolfCLU_RejectSamePath(in, out)
+ *        (friendly early message) and wolfCLU_OpenOutFileDistinctFrom(out,
+ *        inFile) (TOCTOU-safe fd-level check right before truncation) in
+ *        one call, so encrypt/decrypt-style callers that open -in and -out
+ *        back to back don't each repeat the pair. inFile must already be
+ *        open. Logs its own failure on every path; returns NULL on
+ *        refusal or open failure, leaving inFile open either way.
+ */
+FILE* wolfCLU_OpenPairedOutFile(const char* in, const char* out,
+        FILE* inFile);
+
+/**
+ * @brief Open path for writing with owner-only permissions and wrap in BIO.
+ */
+WOLFSSL_BIO* wolfCLU_OpenKeyFileBio(const char* path);
+
+/**
+ * @brief Open path for writing with default permissions and wrap in BIO.
+ */
+WOLFSSL_BIO* wolfCLU_OpenOutFileBio(const char* path);
+
+/**
+ * @brief Call wolfCLU_OpenKeyFileBio or wolfCLU_OpenOutFileBio based on
+ *        whether the output holds key material.
+ */
+WOLFSSL_BIO* wolfCLU_OpenOutOrKeyFileBio(const char* path,
+        WOLFCLU_OUT_KIND kind);
+
+#endif /* !WOLFCLU_NO_FILESYSTEM */
+
+/**
  * @brief example client
  */
 int wolfCLU_Client(int argc, char** argv);
@@ -666,7 +866,8 @@ int wolfCLU_OcspSetup(int argc, char** argv);
 const char* wolfCLU_GetDefaultHttpGet(void);
 
 /**
- * @brief Get the length of the default HTTP GET request (without null terminator)
+ * @brief Get the length of the default HTTP GET request (without null
+ *        terminator)
  * @return length of HTTP GET request
  */
 int wolfCLU_GetDefaultHttpGetLength(void);

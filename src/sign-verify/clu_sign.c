@@ -32,7 +32,11 @@
 #define WOLFCLU_MAX_KEY_PEM_DER_SZ 65536
 #endif /* WOLFCLU_MAX_KEY_PEM_DER_SZ */
 
-#ifndef WOLFCLU_NO_FILESYSTEM
+/* Matches WOLFCLU_MAX_FILE_SIZE in clu_verify.c: the message being signed
+ * has the same upper bound as the message being verified. */
+#ifndef WOLFCLU_MAX_FILE_SIZE
+#define WOLFCLU_MAX_FILE_SIZE 0xFFFFFFF
+#endif /* WOLFCLU_MAX_FILE_SIZE */
 
 int wolfCLU_KeyPemToDer(unsigned char** pkeyBuf, int pkeySz, int pubIn) {
     int ret = 0;
@@ -118,41 +122,14 @@ int wolfCLU_sign_data(char* in, char* out, char* privKey, int keyType,
 {
     int ret;
     int fSz;
-    long fTell;
-    XFILE f;
     byte *data = NULL;
 
-    f = XFOPEN(in, "rb");
-    if (f == NULL) {
-        wolfCLU_LogError("unable to open file %s", in);
-        return BAD_FUNC_ARG;
+    /* Read file to buffer; accepts 0-length files. Logs on failure. */
+    ret = wolfCLU_ReadMessageFileToBuffer(in, WOLFCLU_MAX_FILE_SIZE, &data,
+            &fSz);
+    if (ret != WOLFCLU_SUCCESS) {
+        return ret;
     }
-    if (XFSEEK(f, 0, SEEK_END) != 0) {
-        wolfCLU_LogError("Failed to seek to end of file.");
-        XFCLOSE(f);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    fTell = XFTELL(f);
-    if (fTell <= 0 || fTell > INT_MAX) {
-        wolfCLU_LogError("Incorrect input file size: %ld", fTell);
-        XFCLOSE(f);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    fSz = (int)fTell;
-
-    data = (byte*)XMALLOC((size_t)fSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-    if (data == NULL) {
-        XFCLOSE(f);
-        return MEMORY_E;
-    }
-
-    if (XFSEEK(f, 0, SEEK_SET) != 0 ||
-            XFREAD(data, 1, (size_t)fSz, f) != (size_t)fSz) {
-        XFREE(data, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        XFCLOSE(f);
-        return WOLFCLU_FATAL_ERROR;
-    }
-    XFCLOSE(f);
 
     switch(keyType) {
 
@@ -322,9 +299,8 @@ int wolfCLU_sign_data_rsa(byte* data, char* out, word32 dataSz, char* privKey,
         ret = wc_RsaSSL_Sign(data, dataSz, outBuf, (word32)outBufSz, &key, &rng);
         if (ret >= 0) {
             XFILE s;
-            s = XFOPEN(out, "wb");
+            s = wolfCLU_OpenOutFile(out);
             if (s == NULL) {
-                wolfCLU_LogError("Failed to open output file");
                 ret = BAD_FUNC_ARG;
             }
             else {
@@ -506,9 +482,8 @@ int wolfCLU_sign_data_ecc(byte* data, char* out, word32 fSz, char* privKey,
         }
         if (ret >= 0) {
             XFILE s;
-            s = XFOPEN(out, "wb");
+            s = wolfCLU_OpenOutFile(out);
             if (s == NULL) {
-                wolfCLU_LogError("Failed to open file");
                 ret = BAD_FUNC_ARG;
             }
             else {
@@ -678,9 +653,8 @@ int wolfCLU_sign_data_ed25519 (byte* data, char* out, word32 fSz, char* privKey,
         ret = wc_ed25519_sign_msg(data, fSz, outBuf, &outLen, &key);
         if (ret >= 0) {
             XFILE s;
-            s = XFOPEN(out, "wb");
+            s = wolfCLU_OpenOutFile(out);
             if (s == NULL) {
-                wolfCLU_LogError("Failed to open file");
                 ret = BAD_FUNC_ARG;
             }
             else {
@@ -856,10 +830,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
     if (ret == 0) {
         XFILE outFile;
-        outFile = XFOPEN(out, "wb");
+        outFile = wolfCLU_OpenOutFile(out);
 
         if (outFile == NULL) {
-            wolfCLU_LogError("Failed to open output file %s", out);
             ret = BAD_FUNC_ARG;
         } else {
             if ((int)XFWRITE(outBuf, 1, outBufSz, outFile) <= 0) {
@@ -1034,10 +1007,9 @@ int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey)
 
     /* output signature */
     if (ret == 0) {
-        outFile = XFOPEN(out, "wb");
+        outFile = wolfCLU_OpenOutFile(out);
         if (outFile == NULL) {
             ret = OUTPUT_FILE_ERROR;
-            wolfCLU_LogError("Failed to open file %s.\nRET: %d", out, ret);
         }
         else if (ret == 0) {
             /* write to file */
@@ -1228,10 +1200,9 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
 
     /* output signature */
     if (ret == 0) {
-        outFile = XFOPEN(out, "wb");
+        outFile = wolfCLU_OpenOutFile(out);
         if (outFile == NULL) {
             ret = OUTPUT_FILE_ERROR;
-            wolfCLU_LogError("Failed to open file %s.\nRET: %d", out, ret);
         }
         else if (ret == 0) {
             /* write to file */
@@ -1270,4 +1241,4 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
 #endif  /* WOLFSSL_HAVE_XMSS */
 }
 
-#endif /* !WOLFCLU_NO_FILESYSTEM */
+

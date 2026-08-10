@@ -199,10 +199,8 @@ int wolfCLU_CRLVerify(int argc, char** argv)
 
 
     if (ret == WOLFCLU_SUCCESS && output != 0 && out != NULL) {
-        bioOut = wolfSSL_BIO_new_file(out, "wb");
+        bioOut = wolfCLU_OpenOutFileBio(out);
         if (bioOut == NULL) {
-            wolfCLU_LogError("unable to open output file %s",
-                    optarg);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }

@@ -74,6 +74,9 @@ int wolfCLU_PKCS12(int argc, char** argv)
     WOLF_STACK_OF(WOLFSSL_X509) *extra = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
+    char *inPath  = NULL;
+    char *outPath = NULL;
+    int outSeen = 0;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -106,6 +109,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 break;
 
             case WOLFCLU_INFILE:
+                inPath = optarg;
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
                     wolfCLU_LogError("Unable to open pkcs12 file %s",
@@ -115,12 +119,11 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                /* Deferred: -out can carry an unencrypted or DES-encrypted
+                 * private key alongside the cert unless -nokeys is given,
+                 * which may appear later on the command line. */
+                outSeen = 1;
+                outPath = optarg;
                 break;
 
             case WOLFCLU_HELP:
@@ -138,6 +141,14 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 /* do nothing. */
                 (void)ret;
         }
+    }
+
+    /* -out as the last argv token binds a NULL optarg; without this the
+     * deferred open below is skipped and the output silently goes to
+     * stdout with a success exit code. */
+    if (ret == WOLFCLU_SUCCESS && outSeen && outPath == NULL) {
+        wolfCLU_LogError("-out requires a file name");
+        ret = USER_INPUT_ERROR;
     }
 
     /* with currently only supporting PKCS12 parsing, an input file is expected */
@@ -184,6 +195,21 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Error parsing pkcs12 file");
             ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        /* Use owner-only permissions if writing a private key. */
+        if (wolfCLU_RejectSamePath(inPath, outPath) != WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            bioOut = wolfCLU_OpenOutOrKeyFileBio(outPath,
+                    (printKeys && pkey != NULL) ? WOLFCLU_OUT_SECRET :
+                            WOLFCLU_OUT_PUBLIC);
+            if (bioOut == NULL) {
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 

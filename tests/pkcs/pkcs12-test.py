@@ -95,5 +95,32 @@ class Pkcs12Test(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+    def test_out_without_filename_fails(self):
+        """Trailing -out binds NULL, silently leaking bundle to stdout."""
+        r = run_wolfssl("pkcs12", "-nodes", "-passin", 'pass:wolfSSL test',
+                        "-passout", "pass:", "-in", P12_FILE, "-out")
+        self.assertNotEqual(r.returncode, 0,
+                            "-out without filename must fail")
+        self.assertNotIn("-----BEGIN", r.stdout,
+                         "bundle leaked to stdout")
+
+    def test_in_out_same_file_refused(self):
+        """-in and -out naming the same file must be refused."""
+        same = "pkcs12_inplace.p12"
+        self.addCleanup(
+            lambda: os.remove(same) if os.path.exists(same) else None)
+        with open(P12_FILE, "rb") as src:
+            original = src.read()
+        with open(same, "wb") as f:
+            f.write(original)
+
+        r = run_wolfssl("pkcs12", "-nodes", "-passin", 'pass:wolfSSL test',
+                        "-passout", "pass:", "-in", same, "-out", same)
+        self.assertNotEqual(r.returncode, 0,
+                            "in-place update must fail")
+        with open(same, "rb") as f:
+            self.assertEqual(f.read(), original, "-in was modified")
+
+
 if __name__ == "__main__":
     test_main()

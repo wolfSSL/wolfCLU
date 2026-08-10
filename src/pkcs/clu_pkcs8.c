@@ -84,6 +84,9 @@ int wolfCLU_PKCS8(int argc, char** argv)
     WOLFSSL_EVP_PKEY *pkey = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
+    char *inPath  = NULL;
+    char *outPath = NULL;
+    int   outSeen = 0;
     char password[MAX_PASSWORD_SIZE];
     int passwordSz = MAX_PASSWORD_SIZE;
     byte* pass = NULL;
@@ -100,21 +103,20 @@ int wolfCLU_PKCS8(int argc, char** argv)
                 break;
 
             case WOLFCLU_INFILE:
+                inPath = optarg;
                 bioIn = wolfSSL_BIO_new_file(optarg, "rb");
                 if (bioIn == NULL) {
-                    wolfCLU_LogError("Unable to open pkcs8 file %s",
-                            optarg);
+                    wolfCLU_LogError("Unable to open pkcs8 file %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
+                /* Opening now would truncate -in before it's read below if
+                 * the two name the same file; deferred until -in is known
+                 * to be a different path. */
+                outSeen = 1;
+                outPath = optarg;
                 break;
 
             case WOLFCLU_INFORM:
@@ -156,6 +158,23 @@ int wolfCLU_PKCS8(int argc, char** argv)
             default:
                 /* do nothing. */
                 (void)ret;
+        }
+    }
+
+    /* -out as the last argv token binds a NULL optarg; without this the
+     * deferred open below is skipped and the private key is silently
+     * written to stdout with a success exit code. */
+    if (ret == WOLFCLU_SUCCESS && outSeen && outPath == NULL) {
+        wolfCLU_LogError("-out requires a file name");
+        ret = USER_INPUT_ERROR;
+    }
+
+    /* Refuse an in-place overwrite before stdin is drained or a passphrase
+     * is prompted for: comparing the two paths has no side effects, so it
+     * can fail fast. Only the truncating open has to wait for -in. */
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        if (wolfCLU_RejectSamePath(inPath, outPath) != WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -234,6 +253,26 @@ int wolfCLU_PKCS8(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
+    /* Reject before -out is opened: this combination can never succeed, and
+     * opening -out would truncate and force-chmod an existing key on a path
+     * that is already doomed. */
+    if (ret == WOLFCLU_SUCCESS && toPkcs8 == 1 && noCrypt == 0) {
+        WOLFCLU_LOG(WOLFCLU_E0, "Encrypting PKCS8 keys not yet supported");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    /* -in has been fully read by now, so truncating -out can no longer
+     * destroy it. The in-place refusal itself was already decided above,
+     * before anything was read or prompted for.
+     * Always a private key (PKCS#1 or PKCS#8, encrypted or not), so lock it
+     * down owner-only. */
+    if (ret == WOLFCLU_SUCCESS && outPath != NULL) {
+        bioOut = wolfCLU_OpenKeyFileBio(outPath);
+        if (bioOut == NULL) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
     /* setup output bio to stdout if not already set */
     if (ret == WOLFCLU_SUCCESS && bioOut == NULL) {
         bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
@@ -246,11 +285,6 @@ int wolfCLU_PKCS8(int argc, char** argv)
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
-    }
-
-    if (ret == WOLFCLU_SUCCESS && toPkcs8 == 1 && noCrypt == 0) {
-        WOLFCLU_LOG(WOLFCLU_E0, "Encrypting PKCS8 keys not yet supported");
-        ret = WOLFCLU_FATAL_ERROR;
     }
 
     if (ret == WOLFCLU_SUCCESS && pkey != NULL) {

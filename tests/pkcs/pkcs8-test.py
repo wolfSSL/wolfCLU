@@ -116,6 +116,33 @@ class Pkcs8Test(unittest.TestCase):
                         "-inform", "DER", "-passin", "pass:yassl123")
         self.assertNotEqual(r.returncode, 0)
 
+    def test_out_without_filename_fails(self):
+        """A trailing -out binds a NULL optarg. Without the guard the key is
+        silently written to stdout with a success exit code."""
+        r = run_wolfssl("pkcs8", "-in",
+                        os.path.join(CERTS_DIR, "server-keyEnc.pem"),
+                        "-passin", "pass:yassl123", "-out")
+        self.assertNotEqual(r.returncode, 0,
+                            "-out without filename must fail")
+        self.assertNotIn("-----BEGIN", r.stdout,
+                         "private key leaked to stdout")
+
+    def test_in_out_same_file_refused(self):
+        """-in and -out naming the same file must be refused."""
+        same = "pkcs8_inplace.pem"
+        self._cleanup(same)
+        with open(os.path.join(CERTS_DIR, "server-key.pem"), "rb") as src:
+            original = src.read()
+        with open(same, "wb") as f:
+            f.write(original)
+
+        r = run_wolfssl("pkcs8", "-in", same, "-out", same, "-topk8",
+                        "-nocrypt")
+        self.assertNotEqual(r.returncode, 0,
+                            "in-place update must fail")
+        with open(same, "rb") as f:
+            self.assertEqual(f.read(), original, "-in was modified")
+
 
 if __name__ == "__main__":
     test_main()
