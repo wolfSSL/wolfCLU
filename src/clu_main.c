@@ -353,10 +353,7 @@ int main(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
     wolfSSL_Cleanup();
-
-    /* main function we want to return 0 on success so that the executable
-     * returns the expected 0 on success */
-    return (ret == WOLFCLU_SUCCESS)? 0 : ret;
+    return ret == WOLFCLU_FATAL_ERROR ? 1 : 0;
 }
 
 #ifdef FREERTOS

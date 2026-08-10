@@ -391,6 +391,28 @@ class TestCAOverrideConfig(unittest.TestCase):
                         os.path.join(CERTS_DIR, "ca-ecc-key.pem"))
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_days_bounds(self):
+        """-days is bounded the same way as `req -days` and `x509 -days`.
+
+        The bound is WOLFCLU_MAX_VALIDITY, the largest day count that still
+        fits an int once converted to seconds; ca used to accept up to INT_MAX
+        and only fail later, from inside the time formatter."""
+        for bad in ("0", "-1", "24856", "2147483647", "abc", "10.5"):
+            with self.subTest(days=bad):
+                r = run_wolfssl("ca", "-config", self.conf,
+                                "-in", self.csr,
+                                "-out", "test_ca_days_bad.pem",
+                                "-days", bad)
+                self.assertNotEqual(r.returncode, 0,
+                                    "-days {} must be rejected".format(bad))
+                self.assertIn("-days", r.stdout + r.stderr)
+
+        out_name = "test_ca_days_max.pem"
+        self._clean(_tmp(out_name))
+        r = run_wolfssl("ca", "-config", self.conf,
+                        "-in", self.csr, "-out", out_name,
+                        "-days", "24855")
+        self.assertEqual(r.returncode, 0, r.stderr)
 
 
 class TestCAKeyMismatch(unittest.TestCase):

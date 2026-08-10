@@ -26,6 +26,11 @@
 #define DER_FORM 2
 #define RAW_FORM 3
 
+/* Default validity, in days, for a cert */
+#define WOLFCLU_DEFAULT_VALIDITY 20
+/* Max number of days that when converted to seconds will not overflow an int */
+#define WOLFCLU_MAX_VALIDITY 24855
+
 /* handles incoming arguments for certificate generation */
 int wolfCLU_certSetup(int argc, char** argv);
 
