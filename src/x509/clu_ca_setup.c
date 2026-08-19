@@ -292,6 +292,7 @@ int wolfCLU_CASetup(int argc, char** argv)
         if (selfSigned) {
             wolfCLU_CertSignSetCA(signer, x509, pkey,
                     wolfCLU_GetTypeFromPKEY(pkey));
+            pkey = NULL; /* ownership transferred to signer */
         }
         else if (altSign) {
             char* subjName = wolfSSL_X509_NAME_oneline(
@@ -308,6 +309,8 @@ int wolfCLU_CASetup(int argc, char** argv)
         else {
             wolfCLU_CertSignSetCA(signer, ca, pkey,
                     wolfCLU_GetTypeFromPKEY(pkey));
+            ca = NULL;   /* ownership transferred to signer */
+            pkey = NULL; /* ownership transferred to signer */
         }
     }
 
@@ -341,8 +344,11 @@ int wolfCLU_CASetup(int argc, char** argv)
     if (!selfSigned) {
         wolfSSL_X509_free(x509);
     }
-    if ((selfSigned || altSign) && ca != NULL) {
+    if (ca != NULL) {
         wolfSSL_X509_free(ca);
+    }
+    if (pkey != NULL) {
+        wolfSSL_EVP_PKEY_free(pkey);
     }
 
     /* check for success on signer free since random data is output */
