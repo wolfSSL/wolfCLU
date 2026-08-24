@@ -916,7 +916,7 @@ static int selfSignCert(WOLFSSL_X509* x509, WOLFSSL_EVP_PKEY* pkey,
         }
         else {
             notBefore = wolfSSL_ASN1_TIME_adj(NULL, t, 0, 0);
-            notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, days, 0);
+            notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, (int)days, 0);
             if (notBefore == NULL || notAfter == NULL) {
                 wolfCLU_LogError("Error creating not before/after dates");
                 ret = WOLFCLU_FATAL_ERROR;
@@ -1154,7 +1154,7 @@ static int caSignCert(WOLFSSL_X509** x509, WOLFSSL_BIO* caBio,
         }
         else {
             notBefore = wolfSSL_ASN1_TIME_adj(NULL, t, 0, 0);
-            notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, days, 0);
+            notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, (int)days, 0);
             if (notBefore == NULL || notAfter == NULL) {
                 wolfCLU_LogError("Error creating not before/after dates");
                 ret = WOLFCLU_FATAL_ERROR;

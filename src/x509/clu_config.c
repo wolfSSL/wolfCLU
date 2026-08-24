@@ -197,13 +197,7 @@ static WOLFSSL_X509_EXTENSION *wolfCLU_parseBasicConstraint(char *in, int crit)
                 return NULL;
             }
 
-            /* NOTE: Not undoing the set above: wolfSSL_X509_add_ext() reads the
-             * pathlen *value* out of ->length, which otherwise holds the DER
-             * encoding length. This leaves the ASN1_INTEGER inconsistent, so
-             * it must not be dup'd, printed or re-encoded past this point --
-             * ->data holds only 20 bytes. @TODO drop once wolfSSL has a real
-             * path length accessor. */
-            obj->pathlen->length = pathLen;
+            obj->pathlen->length = (int)pathLen;
             sawValue = 1;
             continue;
         }
