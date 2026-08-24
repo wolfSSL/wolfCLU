@@ -27,9 +27,14 @@
 #define RAW_FORM 3
 
 /* Default validity, in days, for a cert */
-#define WOLFCLU_DEFAULT_VALIDITY 20
+#define WOLFCLU_DEFAULT_VALIDITY 30
 /* Max number of days that when converted to seconds will not overflow an int */
 #define WOLFCLU_MAX_VALIDITY 24855
+
+/* Width, in bytes, of a randomly generated certificate serial number. Fixed
+ * rather than tied to sizeof(long) so the entropy is the same on every
+ * target, including the ones where a long is 32 bits. */
+#define WOLFCLU_SERIAL_SIZE 8
 
 /* handles incoming arguments for certificate generation */
 int wolfCLU_certSetup(int argc, char** argv);

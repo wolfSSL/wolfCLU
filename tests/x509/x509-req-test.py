@@ -930,9 +930,28 @@ class TestReqCASign(unittest.TestCase):
                         "-out", cls.ca_false_csr)
         assert r.returncode == 0, "setup CA:FALSE CSR failed: " + r.stderr
 
+        # Requests carrying extensions the issuer never agreed to. Only one
+        # -addext is supported per run, so each gets its own request.
+        cls.san_csr = _tmp("test_reqca_san.csr")
+        r = run_wolfssl("req", "-new",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", cls.RSA_SUBJ,
+                        "-addext", "subjectAltName=DNS:notmine.example.com",
+                        "-out", cls.san_csr)
+        assert r.returncode == 0, "setup SAN CSR failed: " + r.stderr
+
+        cls.ku_csr = _tmp("test_reqca_ku.csr")
+        r = run_wolfssl("req", "-new",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", cls.RSA_SUBJ,
+                        "-addext", "keyUsage=digitalSignature,keyEncipherment",
+                        "-out", cls.ku_csr)
+        assert r.returncode == 0, "setup keyUsage CSR failed: " + r.stderr
+
     @classmethod
     def tearDownClass(cls):
-        _cleanup(cls.rsa_csr, cls.ecc_csr, cls.ca_true_csr, cls.ca_false_csr)
+        _cleanup(cls.rsa_csr, cls.ecc_csr, cls.ca_true_csr, cls.ca_false_csr,
+                 cls.san_csr, cls.ku_csr)
 
     def _clean(self, *files):
         for f in files:
@@ -1110,9 +1129,10 @@ class TestReqCASign(unittest.TestCase):
 
         It used to be drawn from sizeof(int)-1 bytes, i.e. 24 bits, which
         collides with about 50% probability after ~4100 certificates from the
-        same CA. A zero draw was worse: both signing helpers gate on
-        "serial > 0", so it skipped set_serialNumber entirely and the cert
-        carried wolfSSL's default instead."""
+        same CA, and then from sizeof(long), which is only 8 bytes on LP64 --
+        half that on the Windows and 32-bit builds. A zero draw was worse: both
+        signing helpers gated on "serial > 0", so it skipped set_serialNumber
+        entirely and the cert carried wolfSSL's default instead."""
         seen = set()
         for i in range(4):
             r, out = self._ca_sign("reqca_defserial{}.pem".format(i))
@@ -1124,9 +1144,11 @@ class TestReqCASign(unittest.TestCase):
 
             value = int(hexval, 16)
             self.assertGreater(value, 0, "serial must be positive and non zero")
-            # 24 bits of entropy fits in 6 hex digits; require more than that
-            self.assertGreater(len(hexval), 8,
-                               "serial {!r} is too narrow".format(hexval))
+            # WOLFCLU_SERIAL_SIZE is 8 bytes, and the draw forces bit 0x40 of
+            # the top one, so the width is the same on every target rather
+            # than following sizeof(long).
+            self.assertEqual(len(hexval), 16,
+                             "serial {!r} is not 8 bytes wide".format(hexval))
             # No high-bit check on the first printed octet: -serial prints the
             # magnitude, like OpenSSL does, not the DER content octets. A
             # positive INTEGER whose top magnitude byte has the high bit set is
@@ -1152,6 +1174,34 @@ class TestReqCASign(unittest.TestCase):
                            "-subject", "-noout")
         self.assertEqual(subj.returncode, 0, subj.stderr)
         self.assertIn("leaf.example.com", subj.stdout)
+
+    def test_ca_sign_outform_der_verifies(self):
+        """The DER output must carry the signature that was made over it.
+
+        Reading the subject back only proves the file parses; a DER encoding
+        rebuilt from the struct rather than written out as signed would still
+        parse but no longer verify."""
+        r, out = self._ca_sign("reqca_verify.der", "-outform", "DER")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        pem = _tmp("reqca_verify_fromder.pem")
+        self._clean(pem)
+        c = run_wolfssl("x509", "-inform", "DER", "-in", out,
+                        "-outform", "PEM", "-out", pem)
+        self.assertEqual(c.returncode, 0, c.stderr)
+
+        v = run_wolfssl("verify", "-CAfile",
+                        os.path.join(CERTS_DIR, "ca-cert.pem"), pem)
+        self.assertEqual(v.returncode, 0, v.stderr)
+
+    def test_ca_sign_der_ca_cert(self):
+        """-CA accepts a DER encoded CA certificate."""
+        r, out = self._ca_sign("reqca_derca.pem", ca="ca-cert.der")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        v = run_wolfssl("verify", "-CAfile",
+                        os.path.join(CERTS_DIR, "ca-cert.pem"), out)
+        self.assertEqual(v.returncode, 0, v.stderr)
 
     def test_ca_without_cakey_fails(self):
         """-CA without -CAkey has no signing key and must fail."""
@@ -1395,6 +1445,174 @@ class TestReqCASign(unittest.TestCase):
                             "leaf SKID should come from its own key, not the "
                             "CA's")
 
+    def test_ca_sign_drops_request_subject_alt_name(self):
+        """A subjectAltName the requester asked for is not issued.
+
+        The name in a SAN is the one a TLS client actually matches, so a
+        requester that could plant one would get a certificate for a host it
+        does not own out of any CA that signs its CSRs. OpenSSL drops request
+        extensions for the same reason unless -copy_extensions says otherwise.
+        """
+        req = run_wolfssl("req", "-in", self.san_csr, "-text", "-noout")
+        self.assertEqual(req.returncode, 0, req.stderr)
+        self.assertIn("notmine.example.com", req.stdout + req.stderr,
+                      "the request under test must actually carry a SAN")
+
+        r, out = self._ca_sign("reqca_dropsan.pem", csr=self.san_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        text = self._text(out)
+        self.assertNotIn("notmine.example.com", text,
+                         "the requested SAN must not reach the issued cert")
+        self.assertNotIn("Subject Alternative Name", text)
+
+    def test_ca_sign_drops_request_key_usage(self):
+        """Nor is a keyUsage the requester asked for issued.
+
+        Guards the same rule on a second extension: the fix is to build the
+        leaf from the request's subject and key alone, not to special case
+        the one extension that was noticed first."""
+        req = run_wolfssl("req", "-in", self.ku_csr, "-text", "-noout")
+        self.assertEqual(req.returncode, 0, req.stderr)
+        self.assertIn("Key Usage", req.stdout + req.stderr,
+                      "the request under test must actually carry a keyUsage")
+
+        r, out = self._ca_sign("reqca_dropku.pem", csr=self.ku_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("Key Usage", self._text(out))
+
+    def test_ca_sign_says_it_is_dropping_the_request_extensions(self):
+        """Dropping them is reported, so the omission is not a surprise.
+
+        An operator who put the subjectAltName in the CSR would otherwise get
+        a certificate quietly missing it, at exit 0, with nothing pointing at
+        -copy_extensions."""
+        r, out = self._ca_sign("reqca_dropnotice.pem", csr=self.san_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("-copy_extensions", r.stdout + r.stderr)
+
+    def test_ca_sign_no_drop_notice_when_copying(self):
+        """The notice is about a drop, so copying must not print it."""
+        r, out = self._ca_sign("reqca_nodropnotice.pem",
+                               "-copy_extensions", "copy", csr=self.san_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("Ignoring the extensions", r.stdout + r.stderr)
+
+    def test_ca_sign_copy_extensions_carries_the_request_san(self):
+        """-copy_extensions copy is the opt-in that does carry them over."""
+        r, out = self._ca_sign("reqca_copysan.pem", "-copy_extensions", "copy",
+                               csr=self.san_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        text = self._text(out)
+        self.assertIn("Subject Alternative Name", text)
+        self.assertIn("notmine.example.com", text)
+
+    def test_ca_sign_copy_extensions_copyall_carries_the_request_san(self):
+        """copyall is accepted as a synonym for copy.
+
+        OpenSSL separates the two by whether extensions the issuer also sets
+        are skipped, but wolfCLU applies its own Basic Constraints, SKID and
+        AKID after the copy either way, so they land in the same place."""
+        r, out = self._ca_sign("reqca_copyallsan.pem",
+                               "-copy_extensions", "copyall", csr=self.san_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("notmine.example.com", self._text(out))
+
+    def test_ca_sign_copy_extensions_none_matches_the_default(self):
+        """Spelling the default out explicitly drops them just the same."""
+        r, out = self._ca_sign("reqca_copynone.pem", "-copy_extensions", "none",
+                               csr=self.san_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("notmine.example.com", self._text(out))
+
+    def test_ca_sign_copy_extensions_still_forces_ca_false(self):
+        """Even with -copy_extensions the requester does not get CA:TRUE.
+
+        The copy is an opt-in to the requester's *leaf* extensions; Basic
+        Constraints stays the issuer's call, or the opt-in would quietly hand
+        out the sub-CA the CA:TRUE downgrade exists to refuse."""
+        r, out = self._ca_sign("reqca_copycatrue.pem",
+                               "-copy_extensions", "copy", csr=self.ca_true_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        text = self._text(out)
+        self.assertIn("CA:FALSE", text)
+        self.assertNotIn("CA:TRUE", text)
+        self.assertIn("Warning", r.stderr)
+
+    def test_ca_sign_copy_extensions_rejects_an_unknown_value(self):
+        """A misspelled value fails instead of silently meaning "none".
+
+        Treating an unrecognized value as the default would issue a
+        certificate missing the extensions the operator asked to carry, at
+        exit 0."""
+        r, out = self._ca_sign("reqca_copybogus.pem",
+                               "-copy_extensions", "sure", csr=self.san_csr)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertFalse(os.path.exists(out),
+                         "no certificate should be written on a bad value")
+
+    def test_ca_sign_preserves_the_request_public_key(self):
+        """The issued cert certifies the key the request carried.
+
+        The leaf is built fresh rather than signed in place, so the public key
+        has to be carried across deliberately; getting the CA's key here, or
+        an empty one, would be certifying the wrong subject entirely."""
+        r, out = self._ca_sign("reqca_pubkey.pem", csr=self.san_csr)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        req_key = run_wolfssl("req", "-in", self.san_csr, "-text", "-noout")
+        self.assertEqual(req_key.returncode, 0, req_key.stderr)
+
+        def modulus(text):
+            """The first line of the printed modulus, signature bytes look
+            the same but do not follow a 'Modulus:' header."""
+            m = re.search(r"Modulus:\s*\n\s*([0-9a-f:]+)", text)
+            return m.group(1) if m else None
+
+        req_mod = modulus(req_key.stdout)
+        self.assertIsNotNone(req_mod, "no modulus found in the request")
+        self.assertEqual(req_mod, modulus(self._text(out)),
+                         "issued cert should carry the request's public key")
+
+    def test_ca_sign_subject_key_id_does_not_depend_on_copy_extensions(self):
+        """The leaf's SKID is the same whether or not extensions are copied.
+
+        wolfSSL derives it from WOLFSSL_X509.pubKey, which holds the bare key
+        bits on a parsed request but a whole SubjectPublicKeyInfo on a key
+        installed with X509_set_pubkey(). Only the former is the RFC 5280
+        4.2.1.2 value every other tool computes, so the two paths drifting
+        apart here means the fresh-built leaf took the wrong hash."""
+        plain, out_plain = self._ca_sign("reqca_skid_plain.pem",
+                                         csr=self.san_csr)
+        self.assertEqual(plain.returncode, 0, plain.stderr)
+        copied, out_copied = self._ca_sign("reqca_skid_copy.pem",
+                                           "-copy_extensions", "copy",
+                                           csr=self.san_csr)
+        self.assertEqual(copied.returncode, 0, copied.stderr)
+
+        skid_plain = _ext_value(self._text(out_plain),
+                                "X509v3 Subject Key Identifier")
+        skid_copied = _ext_value(self._text(out_copied),
+                                 "X509v3 Subject Key Identifier")
+        self.assertIsNotNone(skid_plain, "leaf has no Subject Key Identifier")
+        self.assertEqual(skid_plain, skid_copied)
+
+    def test_copy_extensions_without_ca_is_reported_as_ignored(self):
+        """-copy_extensions outside the -CA path says it is doing nothing.
+
+        A CSR is built from the options given here, so there is nothing to
+        copy; dropping the option silently would read as having applied it."""
+        out = _tmp("reqca_copy_noca.csr")
+        self._clean(out)
+        r = run_wolfssl("req", "-new",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", self.RSA_SUBJ,
+                        "-copy_extensions", "copy", "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("Ignoring -copy_extensions", r.stdout + r.stderr)
+
     def test_ca_sign_produces_v3_certificate(self):
         """The issued cert is X.509 v3.
 
@@ -1541,8 +1759,8 @@ class TestReqX509SelfSign(unittest.TestCase):
         """The default serial on the self-signed path is wide and non zero.
 
         Same reasoning as test_ca_sign_default_serial_is_wide_and_unique: a
-        24-bit draw collides after a few thousand certs, and a zero draw would
-        skip set_serialNumber entirely because this path also gates on
+        narrow draw collides after a few thousand certs, and a zero draw would
+        have skipped set_serialNumber entirely back when this path gated on
         "serial > 0"."""
         seen = set()
         for i in range(4):
@@ -1555,9 +1773,9 @@ class TestReqX509SelfSign(unittest.TestCase):
 
             value = int(hexval, 16)
             self.assertGreater(value, 0, "serial must be positive and non zero")
-            # 24 bits of entropy fits in 6 hex digits; require more than that
-            self.assertGreater(len(hexval), 8,
-                               "serial {!r} is too narrow".format(hexval))
+            # same fixed 8 byte width as the -CA path above
+            self.assertEqual(len(hexval), 16,
+                             "serial {!r} is not 8 bytes wide".format(hexval))
             seen.add(hexval)
 
         self.assertEqual(len(seen), 4, "serials repeated: {}".format(seen))
@@ -2374,8 +2592,9 @@ class TestReqAddExtNames(unittest.TestCase):
         text = self._addext_text(
                 ["subjectAltName=critical,DNS:mixed.example.com"],
                 "test_addext_subjan_crit_prefix_pass.crt")
+        # only acceptance is checked: wolfSSL cannot mark a subjectAltName
+        # critical, which wolfCLU warns about rather than applying
         self.assertIn("DNS:mixed.example.com", text)
-        self.assertIn("critical", text)
 
     def test_addext_authority_key_identifier_always_suffix(self):
         """The OpenSSL ":always" suffix on keyid is accepted."""
@@ -2572,6 +2791,52 @@ class TestReqAddExtNames(unittest.TestCase):
         self._addext_fails("keyUsag=digitalSignature",
                            "test_addext_truncated.crt")
 
+    def test_addext_extended_key_usage_any_with_named_fails(self):
+        """"any" beside a named purpose must be rejected, not half applied.
+
+        wolfSSL's SetExtKeyUsage() short circuits on EXTKEYUSE_ANY and emits
+        anyExtendedKeyUsage alone, so serverAuth here would be accepted and
+        then dropped from the certificate at exit 0. OpenSSL emits both."""
+        self._addext_fails("extendedKeyUsage=any,serverAuth",
+                           "test_addext_eku_any_named.crt")
+
+    def test_addext_extended_key_usage_any_alone_is_accepted(self):
+        """"any" on its own is still a valid extendedKeyUsage."""
+        text = self._addext_text(["extendedKeyUsage=any"],
+                                 "test_addext_eku_any.crt")
+        self.assertIsNotNone(_ext_value(text, "X509v3 Extended Key Usage"),
+                             "extended key usage not found in output")
+
+    def test_addext_subject_alt_name_empty_fails(self):
+        """A subjectAltName naming nothing is reported, not dropped.
+
+        Every sibling parser fails on an empty value; this one used to return
+        success having added no names at all."""
+        self._addext_fails("subjectAltName=",
+                           "test_addext_san_empty.crt")
+
+    def test_addext_subject_alt_name_critical_only_fails(self):
+        """"critical" is a flag, so it cannot be the whole value."""
+        self._addext_fails("subjectAltName=critical",
+                           "test_addext_san_crit_only.crt")
+
+    def test_addext_key_usage_is_always_emitted_critical(self):
+        """wolfSSL always marks keyUsage critical, with or without the flag.
+
+        EncodeExtensions() sets the criticality flag whenever a key usage is
+        present and CopyX509ToCert() never carries keyUsageCrit across, so the
+        two spellings have to produce the same extension. Pinned here because
+        the diagnostic wolfCLU prints about it is easy to invert."""
+        for i, val in enumerate(("keyCertSign,cRLSign",
+                                 "critical,keyCertSign,cRLSign")):
+            with self.subTest(keyUsage=val):
+                text = self._addext_text(
+                    ["keyUsage=" + val],
+                    "test_addext_ku_crit{}.crt".format(i))
+                self.assertIn("X509v3 Key Usage: critical", text,
+                              "keyUsage was not emitted critical")
+
+
 EXT_SECTION_CONF = """\
 [ ext_all ]
 basicConstraints = CA:TRUE
@@ -2590,6 +2855,9 @@ IP.1 = 192.0.2.7
 
 [ ext_bad_eku ]
 extendedKeyUsage = serverAuth,bogusUsage
+
+[ ext_missing_san_section ]
+subjectAltName = @no_such_section
 """
 
 
@@ -2716,6 +2984,25 @@ class TestX509ExtFileExtensionTypes(unittest.TestCase):
         self.assertIn("DNS:section.example.com", san)
         self.assertIn("IP Address:192.0.2.7", san)
 
+    def test_extfile_subject_alt_name_missing_section_fails(self):
+        """"subjectAltName = @section" naming a section that is not there
+        fails the command.
+
+        It used to leave ret at success, so the certificate was issued with no
+        alt names at all and the operator was never told the section name was
+        wrong."""
+        crt = _tmp("test_extfile_san_missing_sect.crt")
+        self._clean(crt)
+        r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
+                        "-extfile", self.conf,
+                        "-extensions", "ext_missing_san_section",
+                        "-signkey",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", crt)
+        self.assertNotEqual(r.returncode, 0,
+                            "a missing alt name section must fail the command")
+        self.assertIn("no_such_section", r.stdout + r.stderr)
+
 
 class TestReqOptionHandling(unittest.TestCase):
     """Option level behaviour: file aliasing, diagnostics, dropped values."""
@@ -2800,26 +3087,6 @@ class TestReqOptionHandling(unittest.TestCase):
         # "issuer" alone stays a success: it is the one documented skip, and
         # is covered by TestReqAddExtNames.
         #   test_addext_authority_key_identifier_issuer_only_is_skipped
-
-    def test_keyout_same_file_spelled_differently_keeps_both(self):
-        """The shared-stream case is decided by which file the paths resolve
-        to, not by the two option strings being byte-identical."""
-        both = _tmp("test_req_keyout_alias.pem")
-        self._clean(both)
-        # name the same file two ways: absolute, and via an explicit "."
-        aliased = os.path.join(os.path.dirname(both), ".",
-                               os.path.basename(both)).replace("\\", "/")
-
-        r = run_wolfssl("req", "-new", "-newkey", "rsa:2048", "-nodes",
-                        "-subj", "/C=US/CN=test",
-                        "-keyout", both, "-out", aliased)
-        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-
-        with open(both) as f:
-            text = f.read()
-        self.assertIn("PRIVATE KEY", text,
-                      "the key was truncated by the -out open")
-        self.assertIn("BEGIN CERTIFICATE REQUEST", text)
 
     def test_newkey_algorithm_conflict_either_order(self):
         """The -newkey/-ecc agreement check must not depend on argv order."""

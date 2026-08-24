@@ -4,7 +4,7 @@
 .SH NAME
 wolfssl-x509, x509 \- X.509 certificate processing and conversion
 .SH SYNOPSIS
-wolfssl x509 [-inform PEM|DER] [-in file] [-outform PEM|DER] [-out file] [-req] [-signkey file] [-extfile file] [-extensions section] [-sha1|-sha224|-sha256|-sha384|-sha512] [-noout] [-text] [-subject] [-issuer] [-serial] [-dates] [-email] [-fingerprint] [-purpose] [-hash] [-modulus] [-pubkey]
+wolfssl x509 [-inform PEM|DER] [-in file] [-outform PEM|DER] [-out file] [-req] [-signkey file] [-days n] [-extfile file] [-extensions section] [-sha1|-sha224|-sha256|-sha384|-sha512] [-noout] [-text] [-subject] [-issuer] [-serial] [-dates] [-email] [-fingerprint] [-purpose] [-hash] [-modulus] [-pubkey]
 .SH DESCRIPTION
 Reads an X.509 certificate and converts it between PEM and DER formats
 and/or prints selected fields. By default the (re-encoded) certificate is
@@ -38,18 +38,21 @@ written to the output.
 -signkey file         private key used when signing a CSR with -req.
 .br
 .LP
--extfile file         configuration file for extensions. Only takes effect
+-days n               number of days the re-signed certificate is valid
 .br
-                      when both -req and -signkey are also given; otherwise
+                      for, in the range [1, 24855]. Requires -req; see
 .br
-                      silently ignored (see NOTES).
+                      NOTES.
 .br
 .LP
--extensions section   section of the config file to use. Only takes effect
+-extfile file         configuration file for extensions. Requires -req;
 .br
-                      when both -req and -signkey are also given; otherwise
+                      see NOTES.
 .br
-                      silently ignored (see NOTES).
+.LP
+-extensions section   section of the config file to use. Requires -req;
+.br
+                      see NOTES.
 .br
 .LP
 -sha1, -sha224, -sha256, -sha384, -sha512
@@ -94,10 +97,13 @@ written to the output.
 .LP
 -pubkey               print out the public key.
 .SH NOTES
-Unless both -req and -signkey are used, -extfile and -extensions are
-silently ignored on output: the (re-encoded) certificate is written from
-the original input DER, not from any in-memory changes made while parsing
-extensions.
+-days, -extfile and -extensions alter the certificate, and an altered
+certificate is only written out when -req has it re-signed: without a
+re-sign the output is written from the original input DER, not from any
+in-memory changes. Passing any of the three without -req is therefore an
+error ("Altering a Cert requires a resign and -req was not set") and the
+command exits non-zero, rather than silently dropping the change as
+earlier releases did.
 .SH EXAMPLES
 View certificate details in human-readable format:
 .RS

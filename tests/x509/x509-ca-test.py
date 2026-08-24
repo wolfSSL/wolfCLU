@@ -397,6 +397,7 @@ class TestCAOverrideConfig(unittest.TestCase):
         The bound is WOLFCLU_MAX_VALIDITY, the largest day count that still
         fits an int once converted to seconds; ca used to accept up to INT_MAX
         and only fail later, from inside the time formatter."""
+        self._clean(_tmp("test_ca_days_bad.pem"))
         for bad in ("0", "-1", "24856", "2147483647", "abc", "10.5"):
             with self.subTest(days=bad):
                 r = run_wolfssl("ca", "-config", self.conf,

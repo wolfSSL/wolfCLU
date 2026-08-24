@@ -41,40 +41,6 @@
 
 #if defined(WOLFSSL_CERT_REQ) && !defined(WOLFCLU_NO_FILESYSTEM)
 
-#ifndef _WIN32
-    #include <sys/stat.h> /* for the -keyout / -out same file check */
-#endif
-
-/* Do 'a' and 'b' name the same file? A plain string compare misses the same
- * file spelled two ways ("out.pem" and "./out.pem"), so where stat() is
- * available the device and inode decide it.
- * returns 1 when both name one file, 0 otherwise */
-static int wolfCLU_isSameFile(const char* a, const char* b)
-{
-    if (a == NULL || b == NULL) {
-        return 0;
-    }
-
-    if (XSTRCMP(a, b) == 0) {
-        return 1;
-    }
-
-#ifndef _WIN32
-    {
-        struct stat sa, sb;
-
-        /* only meaningful once both exist; the caller has already created the
-         * -keyout file by this point */
-        if (stat(a, &sa) == 0 && stat(b, &sb) == 0) {
-            return sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino;
-        }
-    }
-#endif
-
-    return 0;
-}
-
-
 static void wolfCLU_certgenHelp(void) {
     WOLFCLU_LOG(WOLFCLU_L0, "Arguments:");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-in input file to read from");
@@ -82,13 +48,17 @@ static void wolfCLU_certgenHelp(void) {
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inform der or pem format for '-in'");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-outform der or pem format for '-out'");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-config file to parse for certificate configuration");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for (default: 20 days)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-days number of days should be valid for "
+            "(default: %u days)", WOLFCLU_DEFAULT_VALIDITY);
     WOLFCLU_LOG(WOLFCLU_L0, "\t-x509 generate self signed certificate");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-CA    Parent ca of new cert");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-CAkey Ca key for signing new cert");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-set_serial Input a serial number for the cert to use if not set one will be generated at random");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-extensions overwrite the section to get extensions from");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-addext add an extension, ie \"subjectAltName=IP:192.168.1.2,DNS:example.com\"");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-copy_extensions none|copy|copyall, whether -CA");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t    carries the request's extensions into the "
+            "issued certificate (default none)");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-nodes no DES encryption on private key output");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-newkey generate the private key to use with "
             "req, as <type>:<bits> i.e. rsa:2048 (rsa 2048/3072/4096 only)");
@@ -118,7 +88,7 @@ static const struct option req_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"-key",       required_argument, 0, WOLFCLU_KEY       },
-    {"-CA",        required_argument, 0, WOLFCLU_CA       },
+    {"-CA",        required_argument, 0, WOLFCLU_CAFILE    },
     {"-CAkey",     required_argument, 0, WOLFCLU_CAKEY    },
     {"-newkey",    required_argument, 0, WOLFCLU_NEWKEY },
     {"-inkey",     required_argument, 0, WOLFCLU_INKEY     },
@@ -137,6 +107,7 @@ static const struct option req_options[] = {
     {"-noout",     no_argument,       0, WOLFCLU_NOOUT },
     {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
     {"-addext",    required_argument, 0, WOLFCLU_ADDEXT },
+    {"-copy_extensions", required_argument, 0, WOLFCLU_COPY_EXTENSIONS },
     {"-nodes",     no_argument,       0, WOLFCLU_NODES },
     {"-h",         no_argument,       0, WOLFCLU_HELP },
     {"-help",      no_argument,       0, WOLFCLU_HELP },
@@ -295,11 +266,16 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
             WOLFSSL_X509_EXTENSION* ext = wolfSSL_X509_get_ext(x509, i);
             if (ext != NULL) {
                 WOLFSSL_ASN1_OBJECT* obj;
-                char buf[MAX_WIDTH];
+                char buf[MAX_WIDTH] = {0};
                 char* altName;
                 int nid;
 
                 obj = wolfSSL_X509_EXTENSION_get_object(ext);
+                if (obj == NULL) {
+                    /* obj2txt leaves 'buf' untouched for a NULL object, and
+                     * the name is what every arm below prints */
+                    continue;
+                }
                 wolfSSL_OBJ_obj2txt(buf, MAX_WIDTH, obj, 0);
                 XSNPRINTF(scratch, MAX_WIDTH, "%*s", indent + 4, "");
                 XSTRLCAT(scratch, buf, MAX_WIDTH);
@@ -647,13 +623,17 @@ static int verifyX509(WOLFSSL_BIO* keyBio, WOLFSSL_X509* x509, int isCSR)
     if (pkey == NULL && keyBio != NULL) {
         /* the key may already have been read once to sign with, rewind so
          * this read starts at the beginning of the file again */
-        wolfSSL_BIO_reset(keyBio);
-
-        pkey = wolfSSL_PEM_read_bio_PrivateKey(keyBio, NULL, NULL, NULL);
-        if (pkey == NULL) {
-            wolfCLU_LogError("Unable to read the key to verify with from the "
-                    "file passed to -key");
+        if (wolfSSL_BIO_reset(keyBio) != WOLFSSL_SUCCESS) {
+            wolfCLU_LogError("Unable to rewind keyBio");
             ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            pkey = wolfSSL_PEM_read_bio_PrivateKey(keyBio, NULL, NULL, NULL);
+            if (pkey == NULL) {
+                wolfCLU_LogError("Unable to read the key to verify with "
+                        "from the file passed to -key");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
     else if (pkey == NULL) {
@@ -681,10 +661,6 @@ static int verifyX509(WOLFSSL_BIO* keyBio, WOLFSSL_X509* x509, int isCSR)
         }
     }
 
-    /* prepare BIO for future use */
-    if (keyBio != NULL) {
-        wolfSSL_BIO_reset(keyBio);
-    }
     wolfSSL_EVP_PKEY_free(pkey);
     return ret;
 }
@@ -748,7 +724,6 @@ static int writeOutPkey(WOLFSSL_BIO* keyOutBio, WOLFSSL_EVP_PKEY* pkey,
     return ret;
 }
 
- /* return WOLFCLU_SUCCESS on success */
 /* Write the signed request or certificate out to 'outBio'.
  *
  * Kept out of makeReq()/selfSignCert()/caSignCert() so the caller can emit
@@ -769,9 +744,24 @@ static int writeOutX509(WOLFSSL_BIO* outBio, WOLFSSL_X509* x509, int outForm,
                                     : wolfSSL_PEM_write_bio_X509_REQ(outBio,
                                             x509);
     }
+    else if (outForm == DER_FORM) {
+        /* NOTE: not wolfSSL_i2d_X509_bio(): that rebuilds the TBS from the
+         * struct fields and staples the stored signature onto it, which need
+         * not be the bytes that were signed. wolfSSL_i2d_X509() hands back the
+         * cached DER, which is what the PEM path writes too. */
+        byte* der = NULL;
+        int   derSz = wolfSSL_i2d_X509(x509, &der);
+
+        if (derSz <= 0 || der == NULL) {
+            wolfCLU_LogError("Error getting the encoded x509 cert");
+            return WOLFCLU_FATAL_ERROR;
+        }
+        ret = (wolfSSL_BIO_write(outBio, der, derSz) == derSz) ?
+                WOLFSSL_SUCCESS : WOLFSSL_FAILURE;
+        XFREE(der, NULL, DYNAMIC_TYPE_OPENSSL);
+    }
     else {
-        ret = (outForm == DER_FORM) ? wolfSSL_i2d_X509_bio(outBio, x509)
-                                    : wolfSSL_PEM_write_bio_X509(outBio, x509);
+        ret = wolfSSL_PEM_write_bio_X509(outBio, x509);
     }
 
     if (ret != WOLFSSL_SUCCESS) {
@@ -815,9 +805,79 @@ static int makeReq(WOLFSSL_X509* x509, WOLFSSL_EVP_PKEY* pkey,
     return ret;
 }
 
- /* return WOLFCLU_SUCCESS on success */
+/* Build the serial number a new certificate is issued with.
+ *
+ * 'set' is the value -set_serial carried, or negative when the option was not
+ * given, in which case one is drawn at random.
+ *
+ * The draw is a fixed WOLFCLU_SERIAL_SIZE bytes rather than sizeof(long): on
+ * LLP64 and ILP32 targets a long is 32 bits, which would silently halve the
+ * entropy and collide after ~65k certificates from one CA. That means going
+ * through a BIGNUM, since wolfSSL_ASN1_INTEGER_set() only takes a long.
+ *
+ * returns the new serial on success, NULL on failure */
+static WOLFSSL_ASN1_INTEGER* makeSerial(long set)
+{
+    WOLFSSL_ASN1_INTEGER* serial = NULL;
+
+    if (set >= 0) {
+        serial = wolfSSL_ASN1_INTEGER_new();
+        if (serial != NULL && wolfSSL_ASN1_INTEGER_set(serial, set)
+                != WOLFSSL_SUCCESS) {
+            wolfSSL_ASN1_INTEGER_free(serial);
+            serial = NULL;
+        }
+        if (serial == NULL) {
+            wolfCLU_LogError("Unable to create the serial number");
+        }
+    }
+    else {
+        WC_RNG rng;
+        byte randBytes[WOLFCLU_SERIAL_SIZE];
+
+        /* wolfCrypt returns 0 on success, not WOLFSSL_SUCCESS */
+        if (wc_InitRng(&rng) != 0) {
+            wolfCLU_LogError("Unable to initialize RNG for serial number");
+            return NULL;
+        }
+
+        if (wc_RNG_GenerateBlock(&rng, randBytes, (word32)sizeof(randBytes))
+                != 0) {
+            wolfCLU_LogError("Unable to generate serial number");
+        }
+        else {
+            WOLFSSL_BIGNUM* bn;
+
+            /* A serial has to be a positive integer (RFC 5280 4.1.2.2), so
+             * clear the sign bit. Setting the next one down keeps the drawn
+             * width constant, so every serial is WOLFCLU_SERIAL_SIZE bytes
+             * and can never come out zero. */
+            randBytes[0] &= 0x7F;
+            randBytes[0] |= 0x40;
+
+            bn = wolfSSL_BN_bin2bn(randBytes, (int)sizeof(randBytes), NULL);
+            if (bn != NULL) {
+                serial = wolfSSL_BN_to_ASN1_INTEGER(bn, NULL);
+                wolfSSL_BN_free(bn);
+            }
+            if (serial == NULL) {
+                wolfCLU_LogError("Unable to create the serial number");
+            }
+        }
+
+        wc_FreeRng(&rng);
+        wolfCLU_ForceZero(randBytes, (unsigned int)sizeof(randBytes));
+    }
+
+    return serial;
+}
+
+/* Turn 'x509' into a self-signed certificate: issuer name, validity window,
+ * serial number and the default extensions, signed with its own key.
+ *
+ * return WOLFCLU_SUCCESS on success */
 static int selfSignCert(WOLFSSL_X509* x509, WOLFSSL_EVP_PKEY* pkey,
-        const WOLFSSL_EVP_MD* md, long days, long serial)
+        const WOLFSSL_EVP_MD* md, long days, WOLFSSL_ASN1_INTEGER* serial)
 {
     int ret = WOLFCLU_SUCCESS;
 
@@ -872,24 +932,13 @@ static int selfSignCert(WOLFSSL_X509* x509, WOLFSSL_EVP_PKEY* pkey,
     }
 
     /* Set the serial number. */
-    if (ret == WOLFCLU_SUCCESS && serial > 0) {
-        WOLFSSL_ASN1_INTEGER* asn1SerialNum = wolfSSL_ASN1_INTEGER_new();
-        if (asn1SerialNum != NULL) {
-            /* wolfSSL statuses stay out of 'ret', which carries the WOLFCLU
-             * status; the two only happen to agree on success */
-            if (wolfSSL_ASN1_INTEGER_set(asn1SerialNum, serial)
-                        != WOLFSSL_SUCCESS ||
-                    wolfSSL_X509_set_serialNumber(x509, asn1SerialNum)
-                        != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Unable to set serial number");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-        else {
+    if (ret == WOLFCLU_SUCCESS && serial != NULL) {
+        /* the wolfSSL status stays out of 'ret', which carries the WOLFCLU
+         * status; the two only happen to agree on success */
+        if (wolfSSL_X509_set_serialNumber(x509, serial) != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Unable to set serial number");
             ret = WOLFCLU_FATAL_ERROR;
         }
-        wolfSSL_ASN1_INTEGER_free(asn1SerialNum);
     }
 
 #if defined(WOLFSSL_CERT_EXT) && !defined(NO_SHA)
@@ -919,7 +968,7 @@ static int selfSignCert(WOLFSSL_X509* x509, WOLFSSL_EVP_PKEY* pkey,
 
 #else
     if (ret == WOLFCLU_SUCCESS) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Skipping basicConstaints "
+        WOLFCLU_LOG(WOLFCLU_L0, "Skipping basicConstraints, "
                 "WOLFSSL_CERT_EXT or SHA-1 disabled");
     }
 #endif
@@ -940,47 +989,81 @@ static int selfSignCert(WOLFSSL_X509* x509, WOLFSSL_EVP_PKEY* pkey,
     return ret;
 }
 
- /* return WOLFCLU_SUCCESS on success */
-static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
+/* Issue a certificate for the request '*x509' under the CA in 'caBio'.
+ *
+ * On success '*x509' is replaced by the issued certificate and the request is
+ * freed, so the caller must not hold another reference to it.
+ *
+ * A request states what the requester WANTS; only the issuer decides what the
+ * certificate SAYS. So by default the leaf is built from scratch and takes
+ * just the subject name and the public key out of the request -- every
+ * extension on it is the CA's own. Otherwise a requester could mint itself a
+ * sub-CA, a keyCertSign key or a certificate for a name it does not own just
+ * by putting it in the CSR. 'copyExt' set carries the request's extensions
+ * over instead, the opt-in OpenSSL spells -copy_extensions.
+ *
+ * return WOLFCLU_SUCCESS on success */
+static int caSignCert(WOLFSSL_X509** x509, WOLFSSL_BIO* caBio,
         WOLFSSL_BIO* caKeyBio, const WOLFSSL_EVP_MD* md, long days,
-        long serial, int doVerify)
+        WOLFSSL_ASN1_INTEGER* serial, int doVerify, int copyExt)
 {
     int ret = WOLFCLU_SUCCESS;
     WOLFSSL_EVP_PKEY* caKey = NULL;
     WOLFSSL_X509* caCert = NULL;
+    WOLFSSL_X509* req = NULL;
+    WOLFSSL_X509* leaf = NULL;
 
     /* Load the CA material */
-    if (caBio == NULL || caKeyBio == NULL)
+    if (x509 == NULL || *x509 == NULL || caBio == NULL || caKeyBio == NULL)
         return WOLFCLU_FATAL_ERROR;
 
-     caCert = wolfSSL_PEM_read_bio_X509(caBio, NULL, NULL, NULL);
-     if (caCert == NULL) {
-        wolfCLU_LogError("Unable to read ca cert passed to -CA");
-        ret = WOLFCLU_FATAL_ERROR;
-     }
+    req = *x509;
 
-     if (ret == WOLFCLU_SUCCESS) {
-        caKey  = wolfSSL_PEM_read_bio_PrivateKey(caKeyBio, NULL, NULL, NULL);
+    caCert = wolfSSL_PEM_read_bio_X509(caBio, NULL, NULL, NULL);
+    if (caCert == NULL) {
+        /* the PEM attempt above read the BIO to EOF, and the DER read sizes
+         * the input from the current offset, so rewind before retrying. A
+         * failed rewind is reported on its own: the DER read would otherwise
+         * start at the wrong offset and blame the file's contents. */
+        if (wolfSSL_BIO_reset(caBio) != WOLFSSL_SUCCESS) {
+            wolfCLU_LogError("Unable to rewind the file passed to -CA");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            caCert = wolfSSL_d2i_X509_bio(caBio, NULL);
+            if (caCert == NULL) {
+                wolfCLU_LogError("Unable to read ca cert passed to -CA "
+                        "tried to parse as PEM and DER");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        caKey = wolfSSL_PEM_read_bio_PrivateKey(caKeyBio, NULL, NULL, NULL);
         if (caKey == NULL) {
-           wolfCLU_LogError("Unable to read ca key passed to -CAkey");
-           ret = WOLFCLU_FATAL_ERROR;
+            wolfCLU_LogError("Unable to read ca key passed to -CAkey");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
     /* Confirm the CA cert can issue. wolfSSL_X509_check_ca() answers 1 for
      * CA:TRUE but also 4 for a leaf that merely carries a critical
      * extendedKeyUsage, so only the CA bit may be accepted here. */
-     if (ret == WOLFCLU_SUCCESS) {
+    if (ret == WOLFCLU_SUCCESS) {
         if (wolfSSL_X509_check_ca(caCert) != 1) {
             wolfCLU_LogError("The certificate passed to -CA is not a CA "
                     "(basicConstraints CA:TRUE) and cannot issue");
             ret = WOLFCLU_FATAL_ERROR;
         }
-     }
+    }
 
     /* A published keyUsage has to include keyCertSign (RFC 5280 4.2.1.3).
      * wolfSSL_X509_get_key_usage() returns all bits set when the extension is
-     * absent, so an unrestricted CA needs no special case. */
+     * absent, so an unrestricted CA needs no special case. Guarded on the
+     * wolfSSL version the same way the extension printer above is: the getter
+     * does not exist in older releases. */
+#if LIBWOLFSSL_VERSION_HEX > 0x05001000
     if (ret == WOLFCLU_SUCCESS) {
         if ((wolfSSL_X509_get_key_usage(caCert) & KEYUSE_KEY_CERT_SIGN) == 0) {
             wolfCLU_LogError("The certificate passed to -CA has a keyUsage "
@@ -988,6 +1071,7 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
+#endif
 
     /* -CAkey has to be the key -CA was issued under, otherwise the
      * certificate would carry the CA's issuer name over a signature that
@@ -1001,26 +1085,49 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
         }
     }
 
-    /* Verify the incoming request before certifying it */
-     if (ret == WOLFCLU_SUCCESS) {
-        WOLFSSL_EVP_PKEY* reqPub = wolfSSL_X509_get_pubkey(x509);
+    /* Verify the incoming request before certifying it, and build the leaf
+     * that will be signed.
+     *
+     * Without -copy_extensions the leaf is a fresh certificate carrying only
+     * the two things the request gets to decide -- its subject name and its
+     * public key. Everything else the request object holds (subjectAltName,
+     * keyUsage, extendedKeyUsage, certificate policies, nsCertType, custom
+     * extensions) is left behind, because wolfSSL_X509_sign() re-encodes all
+     * of it straight out of the object it is handed. With -copy_extensions
+     * the request itself is signed, so those extensions do carry over. */
+    if (ret == WOLFCLU_SUCCESS) {
+        WOLFSSL_EVP_PKEY* reqPub = wolfSSL_X509_get_pubkey(req);
         if (reqPub == NULL) {
             wolfCLU_LogError("Req did not have a public key to verify it with");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            if (wolfSSL_X509_REQ_verify(x509, reqPub) < 1) {
+            if (wolfSSL_X509_REQ_verify(req, reqPub) < 1) {
                 wolfCLU_LogError("Req Failed verification");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else if (copyExt) {
+                leaf = req;
+            }
+            else if ((leaf = wolfSSL_X509_new()) == NULL) {
+                wolfCLU_LogError("Unable to create the certificate to issue");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else if (wolfSSL_X509_set_subject_name(leaf,
+                        wolfSSL_X509_get_subject_name(req))
+                            != WOLFSSL_SUCCESS ||
+                    wolfSSL_X509_set_pubkey(leaf, reqPub) != WOLFSSL_SUCCESS) {
+                wolfCLU_LogError("Unable to copy the subject name and public "
+                        "key out of the request");
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         wolfSSL_EVP_PKEY_free(reqPub);
-     }
-
+    }
 
     /* Bump to v3 */
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) !=
+        if (wolfSSL_X509_set_version(leaf, WOLFSSL_X509_V3) !=
                 WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Error setting CSR version");
             ret = WOLFCLU_FATAL_ERROR;
@@ -1029,7 +1136,7 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
 
     /* Issuer == the CA's subject */
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfSSL_X509_set_issuer_name(x509,
+        if (wolfSSL_X509_set_issuer_name(leaf,
                 wolfSSL_X509_get_subject_name(caCert)) != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Error setting issuer name");
             ret = WOLFCLU_FATAL_ERROR;
@@ -1053,8 +1160,8 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                wolfSSL_X509_set_notBefore(x509, notBefore);
-                wolfSSL_X509_set_notAfter(x509, notAfter);
+                wolfSSL_X509_set_notBefore(leaf, notBefore);
+                wolfSSL_X509_set_notAfter(leaf, notAfter);
             }
 
             wolfSSL_ASN1_TIME_free(notBefore);
@@ -1063,24 +1170,13 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
     }
 
     /* Assign the CA-chosen serial */
-    if (ret == WOLFCLU_SUCCESS && serial > 0) {
-        WOLFSSL_ASN1_INTEGER* asn1SerialNum = wolfSSL_ASN1_INTEGER_new();
-        if (asn1SerialNum != NULL) {
-            /* wolfSSL statuses are kept out of 'ret', which carries the
-             * WOLFCLU status; the two only happen to agree on success */
-            if (wolfSSL_ASN1_INTEGER_set(asn1SerialNum, serial)
-                        != WOLFSSL_SUCCESS ||
-                    wolfSSL_X509_set_serialNumber(x509, asn1SerialNum)
-                        != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Unable to set serial number");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-        }
-        else {
+    if (ret == WOLFCLU_SUCCESS && serial != NULL) {
+        /* the wolfSSL status is kept out of 'ret', which carries the WOLFCLU
+         * status; the two only happen to agree on success */
+        if (wolfSSL_X509_set_serialNumber(leaf, serial) != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Unable to set serial number");
             ret = WOLFCLU_FATAL_ERROR;
         }
-        wolfSSL_ASN1_INTEGER_free(asn1SerialNum);
     }
 
 
@@ -1089,10 +1185,18 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
      *      - Subject Key Id derived from this cert's own public key
      *      - Authority Key Id copied from the CA cert's Subject Key Id */
     if (ret == WOLFCLU_SUCCESS &&
-            wolfSSL_X509_ext_isSet_by_NID(x509, NID_basic_constraints) &&
-            wolfSSL_X509_check_ca(x509) == 1) {
+            wolfSSL_X509_ext_isSet_by_NID(req, NID_basic_constraints) &&
+            wolfSSL_X509_check_ca(req) == 1) {
         WOLFCLU_LOG(WOLFCLU_L0, "Warning: request asked for Basic Constraints "
                 "CA:TRUE; issuing a leaf with CA:FALSE");
+    }
+
+    /* Say so rather than handing back a certificate quietly missing the
+     * subjectAltName the operator believed the request would supply. */
+    if (ret == WOLFCLU_SUCCESS && !copyExt &&
+            wolfSSL_X509_get_ext_count(req) > 0) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Ignoring the extensions in the request; pass "
+                "-copy_extensions copy to carry them over");
     }
 
 #if defined(WOLFSSL_CERT_EXT) && !defined(NO_SHA)
@@ -1109,7 +1213,7 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
         }
         else {
             obj->ca = 0; /* CA:FALSE -- this is a leaf, not a CA */
-            if (wolfSSL_X509_add_ext(x509, ext, -1) != WOLFSSL_SUCCESS) {
+            if (wolfSSL_X509_add_ext(leaf, ext, -1) != WOLFSSL_SUCCESS) {
                 WOLFCLU_LOG(WOLFCLU_E0,
                         "error adding Basic Constraints extension");
                 ret = WOLFCLU_FATAL_ERROR;
@@ -1119,17 +1223,35 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
     }
 
 
-    /* Subject Key Id from this cert's own public key */
+    /* Subject Key Id from this cert's own public key.
+     *
+     * Derived on the request and copied over, rather than derived on the leaf.
+     * wolfSSL hashes whatever WOLFSSL_X509.pubKey holds, and that is the bare
+     * public key bits on a parsed request but a whole SubjectPublicKeyInfo on
+     * a key installed with wolfSSL_X509_set_pubkey(). Only the former is the
+     * value RFC 5280 4.2.1.2 describes and every other tool computes, and the
+     * two certify the same key, so the request's is the one to use. */
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfSSL_X509_set_subject_key_id_ex(x509) != WOLFSSL_SUCCESS) {
+        if (wolfSSL_X509_set_subject_key_id_ex(req) != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Error setting Subject Key Identifier");
             ret = WOLFCLU_FATAL_ERROR;
+        }
+        else if (leaf != req) {
+            byte skid[WC_SHA_DIGEST_SIZE];
+            int  skidSz = (int)sizeof(skid);
+
+            if (wolfSSL_X509_get_subjectKeyID(req, skid, &skidSz) == NULL ||
+                    wolfSSL_X509_set_subject_key_id(leaf, skid, skidSz)
+                        != WOLFSSL_SUCCESS) {
+                wolfCLU_LogError("Error setting Subject Key Identifier");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
         }
     }
 
     /* Authority Key Id = the CA cert's Subject Key Id (links the chain) */
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfSSL_X509_set_authority_key_id_ex(x509, caCert) !=
+        if (wolfSSL_X509_set_authority_key_id_ex(leaf, caCert) !=
                 WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Error setting Authority Key Identifier");
             ret = WOLFCLU_FATAL_ERROR;
@@ -1137,7 +1259,7 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
     }
 #else
     if (ret == WOLFCLU_SUCCESS) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Skipping basicConstaints AKI and SKI "
+        WOLFCLU_LOG(WOLFCLU_L0, "Skipping basicConstraints, AKI and SKI: "
                 "WOLFSSL_CERT_EXT or SHA-1 disabled");
     }
 #endif
@@ -1145,7 +1267,7 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
     /* Sign with the CA key. wolfSSL_X509_sign() hands back the cert length
      * on success rather than WOLFSSL_SUCCESS, so it is kept in a local. */
     if (ret == WOLFCLU_SUCCESS) {
-        int signSz = wolfSSL_X509_sign(x509, caKey, md);
+        int signSz = wolfSSL_X509_sign(leaf, caKey, md);
 
         if (signSz <= 0) {
             wolfCLU_LogError("Error signing certificate");
@@ -1165,7 +1287,7 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            if (wolfSSL_X509_verify(x509, pubKey) != 1) {
+            if (wolfSSL_X509_verify(leaf, pubKey) != 1) {
                 wolfCLU_LogError("New x509 ca signed cert could not be "
                         "verified");
                 ret = WOLFCLU_FATAL_ERROR;
@@ -1177,6 +1299,18 @@ static int caSignCert(WOLFSSL_X509* x509, WOLFSSL_BIO* caBio,
         }
     }
     /* the caller writes the encoded form out, after -text / -verify */
+
+    /* Hand the issued certificate back in place of the request. On failure
+     * the caller still owns the request, so only the half-built leaf goes. */
+    if (leaf != req) {
+        if (ret == WOLFCLU_SUCCESS) {
+            wolfSSL_X509_free(req);
+            *x509 = leaf;
+        }
+        else {
+            wolfSSL_X509_free(leaf);
+        }
+    }
 
     wolfSSL_X509_free(caCert);
     wolfSSL_EVP_PKEY_free(caKey);
@@ -1254,13 +1388,13 @@ int wolfCLU_requestSetup(int argc, char** argv)
 {
 #ifndef WOLFSSL_CERT_REQ
     wolfCLU_LogError("wolfSSL not compiled with --enable-certreq");
-     /* silence unused variable warnings */
+    /* silence unused variable warnings */
     (void) argc;
     (void) argv;
     return NOT_COMPILED_IN;
 #elif defined(WOLFCLU_NO_FILESYSTEM)
     WOLFCLU_LOG(WOLFCLU_E0, "No Filesystem Support.");
-     /* silence unused variable warnings */
+    /* silence unused variable warnings */
     (void) argc;
     (void) argv;
     return NOT_COMPILED_IN;
@@ -1277,6 +1411,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     const WOLFSSL_EVP_MD *md  = wolfSSL_EVP_sha256();
 
     long serialNumber = -1;
+    WOLFSSL_ASN1_INTEGER* serial = NULL;
 
     int     ret = WOLFCLU_SUCCESS;
     char*   subj = NULL;
@@ -1295,9 +1430,9 @@ int wolfCLU_requestSetup(int argc, char** argv)
     int     mdSet = 0;
 
     char password[MAX_PASSWORD_SIZE] = {0};
-    /* the length wolfCLU_GetPassword() parsed, not the buffer capacity;
-     * writeOutPkey() is handed sizeof(password) for that */
-    int passwordLen = MAX_PASSWORD_SIZE;
+    /* capacity in, parsed length out; the out value goes unread because
+     * writeOutPkey() is handed sizeof(password) and recomputes the length */
+    int passwordLen = (int)sizeof(password);
     int passoutSet = 0;
 
     byte doVerify  = 0;
@@ -1309,6 +1444,9 @@ int wolfCLU_requestSetup(int argc, char** argv)
     /* cleared once the run has produced a certificate rather than a request,
      * so -text prints the right object regardless of which printer is used */
     byte isCSR     = 1;
+    /* -copy_extensions: off, so a requester cannot pick its own extensions */
+    int  copyExt    = 0;
+    byte copyExtSet = 0;
 
     /* Multiple -addext is not yet supported. Detect it up front and fail
      * instead of silently dropping the extension and exiting success. */
@@ -1340,6 +1478,31 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 addExt = optarg;
                 break;
 
+            /* OpenSSL's spelling: "copy" skips extensions the issuer already
+             * set and "copyall" does not, but wolfCLU sets Basic Constraints,
+             * SKID and AKID after the copy either way, so the two land in the
+             * same place and are accepted as one. */
+            case WOLFCLU_COPY_EXTENSIONS:
+                if (optarg == NULL) {
+                    wolfCLU_LogError("-copy_extensions has no arg");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else if (XSTRCMP(optarg, "none") == 0) {
+                    copyExt = 0;
+                    copyExtSet = 1;
+                }
+                else if (XSTRCMP(optarg, "copy") == 0 ||
+                        XSTRCMP(optarg, "copyall") == 0) {
+                    copyExt = 1;
+                    copyExtSet = 1;
+                }
+                else {
+                    wolfCLU_LogError("-copy_extensions expects none, copy or "
+                            "copyall, got %s", optarg);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                break;
+
             case WOLFCLU_NODES:
                 useDes = 0;
                 break;
@@ -1369,7 +1532,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                      * is not accepted as rsa */
                     keyType = ((split - optarg) == 3 &&
                             XSTRNCMP("rsa", optarg, 3) == 0) ?
-                                                EVP_PKEY_RSA : 0;
+                                                WC_EVP_PKEY_RSA : 0;
                     if (keyType == 0) {
                         wolfCLU_LogError("-newkey only supports rsa generation "
                                 "saw request for %.*s, "
@@ -1431,7 +1594,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 outKeyFile = optarg;
                 break;
 
-            case WOLFCLU_CA:
+            case WOLFCLU_CAFILE:
                 caFile = optarg;
                 break;
 
@@ -1544,6 +1707,11 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_PASSWORD_OUT:
+                if (optarg == NULL) {
+                    ret = WOLFCLU_FATAL_ERROR;
+                    wolfCLU_LogError("-passout requires and argument");
+                    break;
+                }
                 ret = wolfCLU_GetPassword(password, &passwordLen, optarg);
                 passoutSet = 1;
                 break;
@@ -1570,6 +1738,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 break;
 
             case ARG_FOUND_TWICE:
+                wolfCLU_LogError("Found duplicate argument");
                 ret = WOLFCLU_FATAL_ERROR;
                 break;
 
@@ -1641,8 +1810,17 @@ int wolfCLU_requestSetup(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    /* -CA passes the request through untouched, so reject anything that would
-     * alter it. Done here so -newkey cannot truncate -keyout before failing. */
+    /* and the mirror image: -CA names the issuing certificate, -CAkey the key
+     * it was issued under, so neither option is usable on its own */
+    if (ret == WOLFCLU_SUCCESS && caFile != NULL && caKeyFile == NULL) {
+        wolfCLU_LogError("-CAkey was not set but -CA was passed; -CAkey names "
+                "the key for the certificate given to -CA");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    /* -CA certifies the request as it stands rather than editing it, so
+     * reject anything that would alter it. Done here so -newkey cannot
+     * truncate -keyout before failing. */
     if (ret == WOLFCLU_SUCCESS && caFile != NULL &&
             (subj != NULL || configFile != NULL || addExt != NULL ||
              keyFile != NULL || keyType != 0)) {
@@ -1651,6 +1829,12 @@ int wolfCLU_requestSetup(int argc, char** argv)
         wolfCLU_LogError("create the request with those options first, then "
                 "sign it");
         ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    /* -copy_extensions only steers what -CA carries out of the request; the
+     * CSR and -x509 paths already build from the options given here. */
+    if (ret == WOLFCLU_SUCCESS && copyExtSet && caFile == NULL) {
+        WOLFCLU_LOG(WOLFCLU_L0, "Ignoring -copy_extensions, it applies to -CA");
     }
 
     /* A PKCS#10 request has neither field, so say so rather than dropping
@@ -1663,50 +1847,12 @@ int wolfCLU_requestSetup(int argc, char** argv)
                     (serialNumber >= 0 ? "-set_serial" : "-days"));
     }
 
-    if (ret == WOLFCLU_SUCCESS && serialNumber < 0 && (caFile != NULL
-            || genX509)) {
-        WC_RNG rng = {0};
-        if (wc_InitRng(&rng) != 0) {
-            wolfCLU_LogError("Unable to initialize RNG for serial number");
+    /* Only the certificate paths carry a serial; makeSerial() draws a random
+     * one when -set_serial was not given. */
+    if (ret == WOLFCLU_SUCCESS && (caFile != NULL || genX509)) {
+        serial = makeSerial(serialNumber);
+        if (serial == NULL) {
             ret = WOLFCLU_FATAL_ERROR;
-        }
-        else {
-            /* Fill a whole long with random bytes, accumulated separately
-             * because serialNumber still holds the all-ones -1 sentinel that
-             * OR-ing into would be a no-op. 'unsigned long' is the unsigned
-             * twin of the long the setters take, so the byte count, mask and
-             * final cast are one width on every target -- word64 matches long
-             * only on LP64 and does not exist without a 64-bit type. */
-            word32 index = 0;
-            unsigned long serial = 0;
-            byte randBytes[sizeof(unsigned long)];
-
-            /* wolfCrypt returns 0 on success, not WOLFSSL_SUCCESS */
-            if (wc_RNG_GenerateBlock(&rng, randBytes, (word32)sizeof(randBytes))
-                    != 0) {
-                wolfCLU_LogError("Unable to generate serial number");
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                for (; index < (word32)sizeof(randBytes); index++) {
-                    serial = (serial << 8) | randBytes[index];
-                }
-            }
-            wc_FreeRng(&rng);
-
-            if (ret == WOLFCLU_SUCCESS) {
-                /* Clear the sign bit: a serial has to be a positive integer
-                 * (RFC 5280 4.1.2.2), and the setters below take a signed
-                 * long. Zero is then steered away from because both signing
-                 * helpers gate on "serial > 0" and would otherwise skip
-                 * wolfSSL_X509_set_serialNumber entirely, silently emitting
-                 * wolfSSL's default serial instead of the one drawn here. */
-                serial &= ~0UL >> 1;
-                if (serial == 0) {
-                    serial = 1;
-                }
-                serialNumber = (long)serial;
-            }
         }
     }
 
@@ -1843,7 +1989,19 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 }
 
                 if (ret == WOLFCLU_SUCCESS && pkey != NULL) {
-                    if (wolfSSL_X509_set_pubkey(x509, pkey)
+                    /* Installing an unrelated -key over an -in request would
+                     * silently write out a different request than the one the
+                     * user pointed at, and would leave -verify checking a
+                     * signature wolfCLU just created. */
+                    if (reqBio != NULL && keyBio != NULL &&
+                            wolfSSL_X509_check_private_key(x509, pkey)
+                                != WOLFSSL_SUCCESS) {
+                        wolfCLU_LogError("The key passed to -key does not "
+                                "match the public key of the request passed "
+                                "to -in");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    else if (wolfSSL_X509_set_pubkey(x509, pkey)
                             != WOLFSSL_SUCCESS) {
                         ret = WOLFCLU_FATAL_ERROR;
                     }
@@ -1935,24 +2093,20 @@ int wolfCLU_requestSetup(int argc, char** argv)
 
             if (ret == WOLFCLU_SUCCESS) {
                 if (caBio != NULL) {
-                    /* -CA: issue a CA-signed cert. caSignCert reads */
-                    if (caKeyFile == NULL) {
-                        wolfCLU_LogError("-CAkey was not set but -ca "
-                                "was passed");
-                        ret = WOLFCLU_FATAL_ERROR;
-                    }
-                    if (ret == WOLFCLU_SUCCESS) {
-                        ret = caSignCert(x509, caBio, caKeyBio, md,
-                                days == 0 ? WOLFCLU_DEFAULT_VALIDITY : days,
-                                serialNumber, doVerify);
-                        isCSR = 0;
-                    }
+                    /* -CA: issue a CA-signed cert. caSignCert reads the CA
+                     * material off the BIOs and replaces 'x509' with the
+                     * certificate it issues. The -CAkey pairing was checked
+                     * with the rest of the option validation above. */
+                    ret = caSignCert(&x509, caBio, caKeyBio, md,
+                            days == 0 ? WOLFCLU_DEFAULT_VALIDITY : days,
+                            serial, doVerify, copyExt);
+                    isCSR = 0;
                 }
                 else if (genX509) {
                     /* -x509: self-signed cert, own key is issuer + signer */
                     ret = selfSignCert(x509, pkey, md,
                             days == 0 ? WOLFCLU_DEFAULT_VALIDITY : days,
-                            serialNumber);
+                            serial);
                     isCSR = 0;
                 }
                 else if (reqBio == NULL || reSign) {
@@ -1980,15 +2134,15 @@ int wolfCLU_requestSetup(int argc, char** argv)
             ret = verifyX509(keyBio, x509, isCSR);
         }
 
-         /* Nothing is opened when there is nothing to write: "wb" truncates,
-          * so "-noout -out f" used to leave f an empty file. */
+        /* Nothing is opened when there is nothing to write: "wb" truncates,
+         * so "-noout -out f" used to leave f an empty file. */
         if (ret == WOLFCLU_SUCCESS && (!noOut || doTextOut)) {
             if (outFile != NULL) {
                 /* "-keyout f -out f" appends both objects to one file, as
                  * OpenSSL's req does. Reopening with "wb" would truncate the
                  * key and leave both BIOs flushing from offset 0. */
                 if (outKeyBio != NULL &&
-                        wolfCLU_isSameFile(outKeyFile, outFile)) {
+                        XSTRCMP(outKeyFile, outFile) == 0) {
                     outBio = outKeyBio;
                     sharedOutBio = 1;
                 }
@@ -2049,6 +2203,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         wolfSSL_X509_free(x509);
     }
 
+    wolfSSL_ASN1_INTEGER_free(serial);
     wolfCLU_ForceZero(password, sizeof(password));
 
     return ret;

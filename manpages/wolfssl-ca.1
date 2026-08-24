@@ -42,7 +42,9 @@ the configuration file (see -config).
 -md digest            signing digest to use, e.g. sha256.
 .br
 .LP
--days n               number of days the certificate is valid for.
+-days n               number of days the certificate is valid for, in the
+.br
+                      range [1, 24855].
 .br
 .LP
 -extensions section   section of the config file to read extensions from.
