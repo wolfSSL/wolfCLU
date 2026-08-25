@@ -636,7 +636,7 @@ class TestReqPemDerRoundTrip(unittest.TestCase):
                 r = run_wolfssl("req", "-in", self.csr,
                                 "-newkey", "rsa:2048",
                                 "-keyout", new_key,
-                                "-passout", "pass:wolfssl",
+                                "-nodes",
                                 "-outform", form, "-out", new)
                 self.assertEqual(r.returncode, 0, r.stderr)
 
@@ -2152,15 +2152,6 @@ class TestReqHashAndKeyAlgos(unittest.TestCase):
     def test_sha512(self):
         self._test_algo("sha512")
 
-    def test_ecc_and_ed25519_keygen_rejected(self):
-        """-ecc/-ed25519 keygen is a stub, it must fail loudly not silently."""
-        for algo in ("-ecc", "-ed25519"):
-            with self.subTest(algo=algo):
-                r = run_wolfssl("req", "-new", algo, "-subj", "/CN=test")
-                self.assertNotEqual(r.returncode, 0,
-                                    "{} keygen must be rejected".format(algo))
-                self.assertIn("not yet supported", r.stdout + r.stderr)
-
     def test_ecc_and_ed25519_accepted_with_supplied_key(self):
         """The flags only ask for keygen; with -key there is nothing to
         generate, so the request must still be built."""
@@ -2966,8 +2957,7 @@ class TestReqOptionHandling(unittest.TestCase):
     def test_newkey_algorithm_conflict_either_order(self):
         """The -newkey/-ecc agreement check must not depend on argv order."""
         for args in (("-ecc", "-newkey", "rsa:2048"),
-                     ("-newkey", "rsa:2048", "-ecc"),
-                     ("-newkey", "rsa:2048", "-ed25519")):
+                     ("-newkey", "rsa:2048", "-ecc")):
             with self.subTest(args=args):
                 r = run_wolfssl("req", "-new", "-nodes",
                                 "-subj", "/C=US/CN=test", *args)

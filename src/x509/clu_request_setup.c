@@ -83,7 +83,6 @@ static const struct option req_options[] = {
     /* key gen algorithms */
     {"-rsa",       no_argument,       0, WOLFCLU_RSA       },
     {"-ecc",       no_argument,       0, WOLFCLU_ECC       },
-    {"-ed25519",   no_argument,       0, WOLFCLU_ED25519   },
 
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
@@ -1636,15 +1635,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
                 algCheck = WC_EVP_PKEY_EC;
                 break;
 
-            case WOLFCLU_ED25519:
-                if (algCheck != 0) {
-                    wolfCLU_LogError("More than one key algorithm passed in");
-                    ret = WOLFCLU_FATAL_ERROR;
-                    break;
-                }
-                algCheck = WC_EVP_PKEY_ED25519;
-                break;
-
             case WOLFCLU_CONFIG:
                 configFile = optarg;
                 break;
@@ -1758,15 +1748,15 @@ int wolfCLU_requestSetup(int argc, char** argv)
         ret = WOLFCLU_FATAL_ERROR;
     }
 
-    /* wolfCLU cannot generate an ECC or ED25519 key yet, but it can build a
+    /* wolfCLU cannot generate an ECC, but it can build a
      * request around one given by -key or carried by -in, so this only fails
      * when a key would actually have to be generated. */
     if (ret == WOLFCLU_SUCCESS &&
-            (algCheck == WC_EVP_PKEY_EC || algCheck == WC_EVP_PKEY_ED25519) &&
+            (algCheck == WC_EVP_PKEY_EC) &&
             keyFile == NULL && reqFile == NULL) {
         wolfCLU_LogError("%s key generation is not yet supported; pass a "
                 "pre-generated key with -key",
-                algCheck == WC_EVP_PKEY_EC ? "ECC" : "ED25519");
+                "ECC");
         ret = WOLFCLU_FATAL_ERROR;
     }
 
