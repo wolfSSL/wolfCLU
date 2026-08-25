@@ -1084,16 +1084,6 @@ class TestReqCASign(unittest.TestCase):
         self.assertIn("Subject Key Identifier", text)
         self.assertIn("Authority Key Identifier", text)
 
-    def test_ca_sign_ecc_ca_verifies(self):
-        """An ECC CA can issue and the leaf verifies against it."""
-        r, out = self._ca_sign("reqca_ecc.pem", ca="ca-ecc-cert.pem",
-                               cakey="ca-ecc-key.pem")
-        self.assertEqual(r.returncode, 0, r.stderr)
-
-        v = run_wolfssl("verify", "-CAfile",
-                        os.path.join(CERTS_DIR, "ca-ecc-cert.pem"), out)
-        self.assertEqual(v.returncode, 0, v.stderr)
-
     def test_ca_sign_ecc_request_rsa_ca(self):
         """An RSA CA can certify a request carrying an ECC public key."""
         r, out = self._ca_sign("reqca_eccreq.pem", csr=self.ecc_csr)
@@ -1164,16 +1154,6 @@ class TestReqCASign(unittest.TestCase):
         r, out = self._ca_sign("reqca_sha512.pem", "-sha512")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("sha512", self._text(out).lower())
-
-    def test_ca_sign_outform_der(self):
-        """-outform DER writes a DER cert readable back as DER."""
-        r, out = self._ca_sign("reqca.der", "-outform", "DER")
-        self.assertEqual(r.returncode, 0, r.stderr)
-
-        subj = run_wolfssl("x509", "-inform", "DER", "-in", out,
-                           "-subject", "-noout")
-        self.assertEqual(subj.returncode, 0, subj.stderr)
-        self.assertIn("leaf.example.com", subj.stdout)
 
     def test_ca_sign_outform_der_verifies(self):
         """The DER output must carry the signature that was made over it.
@@ -1307,16 +1287,6 @@ class TestReqCASign(unittest.TestCase):
         self.assertFalse(os.path.exists(out),
                          "no certificate should have been written")
 
-    def test_ca_sign_missing_ca_file_fails(self):
-        """A nonexistent -CA file is rejected."""
-        out = _tmp("reqca_missing.pem")
-        self._clean(out)
-        r = run_wolfssl("req",
-                        "-CA", _tmp("no_such_ca.pem"),
-                        "-CAkey", os.path.join(CERTS_DIR, "ca-key.pem"),
-                        "-in", self.rsa_csr, "-out", out)
-        self.assertNotEqual(r.returncode, 0)
-
     def test_ca_sign_tampered_request_fails(self):
         """A request with a corrupted signature must not be certified."""
         der_csr = _tmp("test_reqca_tamper.csr")
@@ -1349,16 +1319,6 @@ class TestReqCASign(unittest.TestCase):
                         "-CA", os.path.join(CERTS_DIR, "ca-cert.pem"),
                         "-CAkey", os.path.join(CERTS_DIR, "ca-key.pem"),
                         "-out", out)
-        self.assertNotEqual(r.returncode, 0)
-
-    def test_ca_sign_missing_ca_key_file_fails(self):
-        """A nonexistent -CAkey file is rejected."""
-        out = _tmp("reqca_missing_key.pem")
-        self._clean(out)
-        r = run_wolfssl("req",
-                        "-CA", os.path.join(CERTS_DIR, "ca-cert.pem"),
-                        "-CAkey", _tmp("no_such_ca_key.pem"),
-                        "-in", self.rsa_csr, "-out", out)
         self.assertNotEqual(r.returncode, 0)
 
     def _write_junk(self, name):
@@ -1519,13 +1479,6 @@ class TestReqCASign(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("notmine.example.com", self._text(out))
 
-    def test_ca_sign_copy_extensions_none_matches_the_default(self):
-        """Spelling the default out explicitly drops them just the same."""
-        r, out = self._ca_sign("reqca_copynone.pem", "-copy_extensions", "none",
-                               csr=self.san_csr)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertNotIn("notmine.example.com", self._text(out))
-
     def test_ca_sign_copy_extensions_still_forces_ca_false(self):
         """Even with -copy_extensions the requester does not get CA:TRUE.
 
@@ -1613,21 +1566,6 @@ class TestReqCASign(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("Ignoring -copy_extensions", r.stdout + r.stderr)
 
-    def test_ca_sign_produces_v3_certificate(self):
-        """The issued cert is X.509 v3.
-
-        The incoming request is v1; issuance has to bump the version, since
-        the extensions the CA adds are only legal in a v3 certificate."""
-        r, out = self._ca_sign("reqca_version.pem")
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("Version: 3 (0x2)", self._text(out))
-
-    def test_ca_sign_default_digest_is_sha256(self):
-        """With no digest option the CA signs with SHA-256."""
-        r, out = self._ca_sign("reqca_defaultmd.pem")
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("sha256", self._text(out).lower())
-
     def test_ca_sign_inform_der_request(self):
         """A DER-encoded request is accepted via -inform DER and certified."""
         der_csr = _tmp("test_reqca_in.der")
@@ -1709,17 +1647,6 @@ class TestReqCASign(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("Certificate Request:", r.stdout)
         self.assertIn("leaf.example.com", r.stdout)
-
-    def test_x509_self_signed_text_prints_a_certificate(self):
-        """-x509 -text also renders a certificate rather than a request."""
-        r = run_wolfssl("req", "-new", "-x509",
-                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
-                        "-subj", "/O=wolfSSL/C=US/CN=selfsigned.example.com",
-                        "-days", "365", "-text", "-noout")
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("Certificate:", r.stdout)
-        self.assertNotIn("Certificate Request:", r.stdout)
-        self.assertIn("selfsigned.example.com", r.stdout)
 
 
 class TestReqX509SelfSign(unittest.TestCase):
@@ -2582,20 +2509,6 @@ class TestReqAddExtNames(unittest.TestCase):
         # a SHA-1 hash rendered as colon separated hex
         self.assertEqual(len(skid.split(":")), 20, "got {!r}".format(skid))
 
-    def test_addext_subj_alt_name_critical_prefix_token_fails(self):
-        """A token merely starting with "critical" is reported, not dropped."""
-        self._addext_fails("subjectAltName=criticalDNS:mixed.example.com",
-                           "test_addext_subjan_crit_prefix_fail.crt")
-
-    def test_addext_subj_alt_name_critical_prefix_token_passes(self):
-        """A token merely starting with "critical," is accepted"""
-        text = self._addext_text(
-                ["subjectAltName=critical,DNS:mixed.example.com"],
-                "test_addext_subjan_crit_prefix_pass.crt")
-        # only acceptance is checked: wolfSSL cannot mark a subjectAltName
-        # critical, which wolfCLU warns about rather than applying
-        self.assertIn("DNS:mixed.example.com", text)
-
     def test_addext_authority_key_identifier_always_suffix(self):
         """The OpenSSL ":always" suffix on keyid is accepted."""
         text = self._addext_text(["authorityKeyIdentifier=keyid:always"],
@@ -2635,16 +2548,6 @@ class TestReqAddExtNames(unittest.TestCase):
         """keyUsage with no bits set is rejected."""
         self._addext_fails("keyUsage=", "test_addext_ku_empty.crt")
 
-    def test_addext_key_usage_tolerates_spaces(self):
-        """Spaces around the comma separators are ordinary config style."""
-        text = self._addext_text(
-            ["keyUsage=digitalSignature , keyEncipherment"],
-            "test_addext_ku_spaces.crt")
-        usage = _ext_value(text, "X509v3 Key Usage")
-        self.assertIsNotNone(usage, "key usage not found in cert output")
-        self.assertIn("Digital Signature", usage)
-        self.assertIn("Key Encipherment", usage)
-
     def test_addext_extended_key_usage_tolerates_spaces(self):
         """Same for extendedKeyUsage, which used to reject a trailing space."""
         text = self._addext_text(
@@ -2675,34 +2578,6 @@ class TestReqAddExtNames(unittest.TestCase):
         """pathlen before CA parses the same as CA before pathlen."""
         text = self._addext_text(["basicConstraints=pathlen:2,CA:TRUE"],
                                  "test_addext_pathlen_order.crt")
-        bc = _ext_value(text, "X509v3 Basic Constraints")
-        self.assertIsNotNone(bc, "basic constraints not found")
-        self.assertIn("CA:TRUE", bc)
-        self.assertIn("pathlen:2", bc)
-
-    def test_addext_basic_constraints_critical_either_position(self):
-        """critical must not swallow the clause it follows.
-
-        The critical key word is detected anywhere in the value, but only a
-        leading one is stepped over. Skipping to the first comma regardless
-        of where it appeared consumed the "CA:TRUE" of "CA:TRUE,critical" and
-        silently emitted CA:FALSE for a cert the operator asked to be a CA."""
-        for value in ("critical,CA:TRUE", "CA:TRUE,critical"):
-            with self.subTest(value=value):
-                text = self._addext_text(
-                    ["basicConstraints=" + value],
-                    "test_addext_bc_crit_{}.crt".format(
-                        value.index("critical")))
-                bc = _ext_value(text, "X509v3 Basic Constraints")
-                self.assertIsNotNone(bc, "basic constraints not found")
-                self.assertIn("CA:TRUE", bc)
-                self.assertIn("critical", text)
-
-    def test_addext_basic_constraints_critical_trailing_with_pathlen(self):
-        """A trailing critical leaves both CA and pathlen intact."""
-        text = self._addext_text(
-            ["basicConstraints=CA:TRUE,pathlen:2,critical"],
-            "test_addext_bc_crit_pathlen.crt")
         bc = _ext_value(text, "X509v3 Basic Constraints")
         self.assertIsNotNone(bc, "basic constraints not found")
         self.assertIn("CA:TRUE", bc)

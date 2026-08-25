@@ -115,7 +115,6 @@ static const struct option req_options[] = {
     {0, 0, 0, 0} /* terminal element */
 };
 
-
 #define MAX_WIDTH 80
 #ifdef NO_WOLFSSL_REQ_PRINT
 /* print serial number out
@@ -177,7 +176,6 @@ static int _wolfSSL_X509_print_serial(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
     }
     return WOLFSSL_SUCCESS;
 }
-
 
 /* convert key usage type to human readable print out
  * return WOLFSSL_SUCCESS on success
@@ -242,7 +240,6 @@ static int _keyUsagePrint(WOLFSSL_BIO* bio, int keyUsage, int indent)
 
     return WOLFSSL_SUCCESS;
 }
-
 
 /* iterate through certificate extensions printing them out in human readable
  * form
@@ -318,7 +315,6 @@ static int _wolfSSL_X509_extensions_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
     return WOLFSSL_SUCCESS;
 }
 
-
 /* @TODO print out of REQ attributes
  * return WOLFSSL_SUCCESS on success
  */
@@ -363,7 +359,6 @@ static int _wolfSSL_X509_REQ_attributes_print(WOLFSSL_BIO* bio,
 
     return WOLFSSL_SUCCESS;
 }
-
 
 /* print out the signature in human readable format for use with
  * wolfSSL_X509_print()
@@ -445,7 +440,6 @@ static int _wolfSSL_X509_signature_print_ex(WOLFSSL_BIO* bio,
     return WOLFSSL_SUCCESS;
 }
 
-
 /* print out the public key in human readable format for use with
  * wolfSSL_X509_print()
  * return WOLFSSL_SUCCESS on success
@@ -465,7 +459,6 @@ static int _wolfSSL_X509_pubkey_print(WOLFSSL_BIO* bio, WOLFSSL_X509* x509,
     return WOLFSSL_SUCCESS;
 }
 
-
 /* human readable print out of x509 name formatted for use with
  * wolfSSL_X509_print()
  * return WOLFSSL_SUCCESS on success
@@ -482,7 +475,6 @@ static int _X509_name_print(WOLFSSL_BIO* bio, WOLFSSL_X509_NAME* name,
     }
     return WOLFSSL_SUCCESS;
 }
-
 
 /* human readable print out of x509 or CSR version
  * return WOLFSSL_SUCCESS on success
@@ -772,7 +764,6 @@ static int writeOutX509(WOLFSSL_BIO* outBio, WOLFSSL_X509* x509, int outForm,
 
     return WOLFCLU_SUCCESS;
 }
-
 
 static int makeReq(WOLFSSL_X509* x509, WOLFSSL_EVP_PKEY* pkey,
         const WOLFSSL_EVP_MD* md, byte reSign)
@@ -1179,7 +1170,6 @@ static int caSignCert(WOLFSSL_X509** x509, WOLFSSL_BIO* caBio,
         }
     }
 
-
     /* Chaining extensions for a leaf cert:
      *      - Basic Constraints CA:FALSE, overriding whatever the req carried
      *      - Subject Key Id derived from this cert's own public key
@@ -1221,7 +1211,6 @@ static int caSignCert(WOLFSSL_X509** x509, WOLFSSL_BIO* caBio,
             wolfSSL_X509_EXTENSION_free(ext);
         }
     }
-
 
     /* Subject Key Id from this cert's own public key.
      *
@@ -1317,7 +1306,6 @@ static int caSignCert(WOLFSSL_X509** x509, WOLFSSL_BIO* caBio,
 
     return ret;
 }
-
 
 /* A WOLFSSL_X509 read in from a request carries an internal "is a CSR" flag,
  * and wolfSSL uses that flag to pick the type it re-parses the DER as when
@@ -1506,7 +1494,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
             case WOLFCLU_NODES:
                 useDes = 0;
                 break;
-
 
             case WOLFCLU_NEWKEY:
                 if (keyFile != NULL) {
@@ -1872,7 +1859,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
         /* -out names the same file as -keyout: one stream, one free */
         byte sharedOutBio = 0;
 
-
         if (ret == WOLFCLU_SUCCESS && keyFile != NULL) {
             keyBio = wolfSSL_BIO_new_file(keyFile, "rb");
             if (keyBio == NULL) {
@@ -1979,7 +1965,6 @@ int wolfCLU_requestSetup(int argc, char** argv)
                             ret = WOLFCLU_FATAL_ERROR;
                         }
                     }
-
 
                 }
                 else if (wolfSSL_X509_get_pubkey_type(x509) <= 0) {
@@ -2209,4 +2194,3 @@ int wolfCLU_requestSetup(int argc, char** argv)
     return ret;
 #endif
 }
-
