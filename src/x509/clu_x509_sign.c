@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1335, USA
  */
 
+/* isalpha() below; do not rely on a wolfSSL header pulling this in */
 #include <ctype.h>
 
 #include <wolfclu/clu_header_main.h>
@@ -1008,24 +1009,34 @@ enum wc_HashType wolfCLU_StringToHashType(char* in)
 }
 
 
-static int _wolfCLU_CertSetDate(WOLFSSL_X509* x509, int days)
+/* Set the validity window on 'x509' to 'days' starting now. Shared with
+ * wolfCLU_certSetup() so the two commands cannot drift apart.
+ * returns WOLFCLU_SUCCESS on success */
+int wolfCLU_CertSetDate(WOLFSSL_X509* x509, int days)
 {
     int ret = WOLFCLU_SUCCESS;
 
     if (x509 != NULL && days > 0) {
-        WOLFSSL_ASN1_TIME *notBefore, *notAfter;
+        WOLFSSL_ASN1_TIME *notBefore = NULL, *notAfter = NULL;
         time_t t;
 
-        t = time(NULL);
+        if ((t = time(NULL)) == (time_t)-1) {
+            wolfCLU_LogError("Error fetching time");
+            return WOLFCLU_FATAL_ERROR;
+        }
+
         notBefore = wolfSSL_ASN1_TIME_adj(NULL, t, 0, 0);
-        notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, days, 0);
+        notAfter = wolfSSL_ASN1_TIME_adj(NULL, t, (int)days, 0);
         if (notBefore == NULL || notAfter == NULL) {
             wolfCLU_LogError("Error creating not before/after dates");
             ret = WOLFCLU_FATAL_ERROR;
         }
-        else {
-            wolfSSL_X509_set_notBefore(x509, notBefore);
-            wolfSSL_X509_set_notAfter(x509, notAfter);
+        else if (wolfSSL_X509_set_notBefore(x509, notBefore)
+                    != WOLFSSL_SUCCESS ||
+                wolfSSL_X509_set_notAfter(x509, notAfter)
+                    != WOLFSSL_SUCCESS) {
+            wolfCLU_LogError("Error setting not before/after dates");
+            ret = WOLFCLU_FATAL_ERROR;
         }
 
         wolfSSL_ASN1_TIME_free(notBefore);
@@ -1277,7 +1288,7 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
 
     /* set cert date */
     if (ret == WOLFCLU_SUCCESS) {
-        ret = _wolfCLU_CertSetDate(x509, csign->days);
+        ret = wolfCLU_CertSetDate(x509, csign->days);
     }
 
     /* set cert issuer */
@@ -1375,9 +1386,11 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
         wolfSSL_ASN1_INTEGER_free(s);
     }
 
-    /* set extensions */
+    /* set extensions. The signing certificate is handed over so an
+     * authorityKeyIdentifier names its key rather than the certified one. */
     if (ret == WOLFCLU_SUCCESS && csign->ext != NULL) {
-        ret = wolfCLU_setExtensions(x509, csign->config, csign->ext);
+        ret = wolfCLU_setExtensions(x509, csign->config, csign->ext,
+                csign->ca == x509 ? NULL : csign->ca);
     }
 
     /* sign the certificate */

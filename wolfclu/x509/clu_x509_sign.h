@@ -36,6 +36,8 @@ int wolfCLU_GenChimeraCertSign(WOLFSSL_BIO *bioCaKey, WOLFSSL_BIO *bioAltCaKey,
 void wolfCLU_CertSignSetHash(WOLFCLU_CERT_SIGN* csign,
         enum wc_HashType hashType);
 void wolfCLU_CertSignSetDate(WOLFCLU_CERT_SIGN* csign, int d);
+/* set notBefore/notAfter on 'x509' to a window of 'days' starting now */
+int wolfCLU_CertSetDate(WOLFSSL_X509* x509, int days);
 int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509);
 WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect);
 int wolfCLU_CertSignAppendOut(WOLFCLU_CERT_SIGN* csign, char* out);

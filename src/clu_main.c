@@ -353,6 +353,8 @@ int main(int argc, char** argv)
             ret = WOLFCLU_FATAL_ERROR;
     }
 
+    /* WOLFCLU_FAILURE is 0, which the return below would hand back as a
+     * success status, so fold every non-positive code into one error first */
     if (ret <= 0) {
         wolfCLU_LogError("Error returned: %d.", ret);
         ret = WOLFCLU_FATAL_ERROR;

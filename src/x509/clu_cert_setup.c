@@ -25,6 +25,7 @@
 #include <wolfclu/clu_optargs.h>
 #include <wolfclu/x509/clu_cert.h>
 #include <wolfclu/x509/clu_parse.h>
+#include <wolfclu/x509/clu_x509_sign.h> /* for wolfCLU_CertSetDate() */
 
 #define PEM_BEGIN_CERT "-----BEGIN CERTIFICATE-----"
 #define BEGIN_CERT_REQ "-----BEGIN CERTIFICATE REQUEST-----"
@@ -38,6 +39,9 @@ void wolfCLU_certHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "-out output file to write to");
     WOLFCLU_LOG(WOLFCLU_L0, "-req input file is a CSR file");
     WOLFCLU_LOG(WOLFCLU_L0, "-signkey a key for signing");
+    WOLFCLU_LOG(WOLFCLU_L0,
+                "-days number of days the re-signed cert is valid for "
+                "(requires -req)");
     WOLFCLU_LOG(WOLFCLU_L0, "-* supported digests for signing");
     WOLFCLU_LOG(WOLFCLU_L0, "-extfile config file");
     WOLFCLU_LOG(WOLFCLU_L0, "-extensions section of the config file to use");
@@ -88,6 +92,7 @@ static const struct option cert_options[] = {
     { "-signkey", required_argument, 0, WOLFCLU_SIGNKEY },
     { "-extfile", required_argument, 0, WOLFCLU_EXTFILE },
     { "-extensions", required_argument, 0, WOLFCLU_EXTENSIONS },
+    { "-days", required_argument, 0, WOLFCLU_DAYS },
 
     { "-req", no_argument, 0, WOLFCLU_REQ },
     { "-noout", no_argument, 0, WOLFCLU_NOOUT },
@@ -123,6 +128,7 @@ int wolfCLU_certSetup(int argc, char **argv)
     int reqFlag = 0;    /* set to read csr file */
     int silentFlag = 0; /* set to disable echo to command line */
     int modulus = 0;    /* set to view modulus of cert */
+    int days = 0;       /* how long the cert is valid for */
 
     char *inFile = NULL;  /* pointer to the inFile name */
     char *outFile = NULL; /* pointer to the outFile name */
@@ -298,6 +304,21 @@ int wolfCLU_certSetup(int argc, char **argv)
                 printSubjHash = 1;
                 break;
 
+            case WOLFCLU_DAYS:
+            {
+                long d = 0;
+
+                if (optarg == NULL || wolfCLU_parseDecimalBounded(optarg, 1,
+                            WOLFCLU_MAX_VALIDITY, &d) != WOLFCLU_SUCCESS) {
+                    wolfCLU_LogError("-days expects a positive integer, got %s",
+                            optarg != NULL ? optarg : "(nothing)");
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+                }
+                days = (int)d;
+                break;
+            }
+
             case ARG_FOUND_TWICE:
                 wolfCLU_LogError("Found duplicate argument");
                 ret = WOLFCLU_FATAL_ERROR;
@@ -437,6 +458,16 @@ int wolfCLU_certSetup(int argc, char **argv)
         keyIn = NULL;
     }
 
+    /* Both -extfile and -days mutate the certificate, and a mutated
+     * certificate is only written out when -req makes it re-signed. Checked
+     * once for both so the two options do not disagree: without this,
+     * -extfile exited 0 having quietly dropped every extension asked for. */
+    if (ret == WOLFCLU_SUCCESS && !reqFlag && (extFile != NULL || days > 0)) {
+        wolfCLU_LogError("Altering a Cert requires a resign and -req was "
+                "not set");
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
     if (ret == WOLFCLU_SUCCESS && extFile != NULL) {
         WOLFSSL_CONF *conf = NULL;
         long line = 0;
@@ -450,9 +481,15 @@ int wolfCLU_certSetup(int argc, char **argv)
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            ret = wolfCLU_setExtensions(x509, conf, ext);
+            /* this command re-signs a certificate with its own key (-signkey),
+             * so there is no separate issuing certificate to name */
+            ret = wolfCLU_setExtensions(x509, conf, ext, NULL);
         }
         wolfSSL_NCONF_free(conf);
+    }
+
+    if (ret == WOLFCLU_SUCCESS && days > 0) {
+        ret = wolfCLU_CertSetDate(x509, days);
     }
 
     /*default to version 3 which supports extensions */
@@ -769,16 +806,46 @@ int wolfCLU_certSetup(int argc, char **argv)
 
     /* write out certificate */
     if (ret == WOLFCLU_SUCCESS && !nooutFlag) {
-        byte *derBuf = inBuf;
         byte *pt; /* use pt with i2d to handle potential pointer increment */
+        /* DER input is already the encoding to write out, PEM input is
+         * converted below */
+        byte *derBuf = inBuf;
         int derBufSz = inBufSz;
+        byte derBufAllocated = 0;
 
         /* if inform is PEM we convert to DER for excluding input that is not
          * part of the certificate */
         if (inForm == PEM_FORM) {
             if (reqFlag) {
-                pt = derBuf;
-                derBufSz = wolfSSL_i2d_X509(x509, &pt);
+                /* the re-encoded cert is written back over the input buffer,
+                 * so check it fits before writing rather than after */
+                int needed = wolfSSL_i2d_X509(x509, NULL);
+
+                if (needed <= 0) {
+                    wolfCLU_LogError("Unable to get re-encoded certificate "
+                            "size");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else if (needed > inBufSz) {
+                    derBuf = (byte *)XMALLOC(needed, HEAP_HINT,
+                            DYNAMIC_TYPE_TMP_BUFFER);
+                    if (derBuf == NULL) {
+                        wolfCLU_LogError("Could not allocate space for "
+                                "reencoded certificate");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                    else {
+                        derBufAllocated = 1;
+                    }
+                }
+                if (ret == WOLFCLU_SUCCESS) {
+                    pt = derBuf;
+                    derBufSz = wolfSSL_i2d_X509(x509, &pt);
+                    if (derBufSz <= 0) {
+                        wolfCLU_LogError("Unable to re-encode the certificate");
+                        ret = WOLFCLU_FATAL_ERROR;
+                    }
+                }
             }
             else {
                 derBuf = derObj->buffer;
@@ -786,14 +853,15 @@ int wolfCLU_certSetup(int argc, char **argv)
             }
         }
 
-        /* PEM/DER -> DER */
-        if (outForm == DER_FORM) {
+        /* PEM/DER -> DER. Guarded on 'ret' so a failed re-encode above leaves
+         * nothing to write. */
+        if (ret == WOLFCLU_SUCCESS && outForm == DER_FORM) {
             if (wolfSSL_BIO_write(out, derBuf, derBufSz) <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         /* PEM/DER -> PEM */
-        else if (outForm == PEM_FORM) {
+        else if (ret == WOLFCLU_SUCCESS && outForm == PEM_FORM) {
             tmpOutBufSz = wc_DerToPem(derBuf, derBufSz, NULL, 0, CERT_TYPE);
             if (tmpOutBufSz <= 0) {
                 wolfCLU_LogError("wc_DerToPem to get necessary length failed");
@@ -819,6 +887,9 @@ int wolfCLU_certSetup(int argc, char **argv)
                     }
                 }
             }
+        }
+        if (derBufAllocated) {
+            XFREE(derBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
         }
     }
 

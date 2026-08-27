@@ -556,8 +556,13 @@ int wolfCLU_readConfig(WOLFSSL_X509* x509, char* config, char* sect, char* ext);
 /**
  * @brief used to read the 'extensions' section from a config file and put the
  *  extensions found into 'x509'
+ *
+ * @param issuer the certificate that will sign 'x509', or NULL when it signs
+ *  itself. The authority key identifier is taken from it when given, since
+ *  deriving one from 'x509' is only correct for a self signed certificate.
  */
-int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect);
+int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect,
+        WOLFSSL_X509* issuer);
 
 /**
  * @brief parse a command line "-addext name=value" argument and apply it to
