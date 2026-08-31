@@ -851,6 +851,27 @@ int wolfCLU_ReadCertDer(const char* filename, byte** outDer);
  */
 int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz);
 
+/**
+ * @brief Io types that passed to Io fucntions
+ */
+enum WOLFCLU_IO_TYPE {
+    WOLFCLU_IO_STDIN,
+    WOLFCLU_IO_STDOUT,
+    WOLFCLU_IO_FILE,
+};
+
+/*
+ * @brief read contence of fp to buf paramter. You must free buffer
+ * yourself.
+ */
+int wolfCLU_readInIo(enum WOLFCLU_IO_TYPE ioType, XFILE fp, char** buf,
+        word32* len);
+
+/*
+ * @brief write the contense of buf parameter to fp
+ */
+int wolfCLU_writeOutIo(enum WOLFCLU_IO_TYPE ioType, XFILE fp,
+        char* buf, word32 len);
 #ifdef __cplusplus
 }
 #endif

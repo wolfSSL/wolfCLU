@@ -175,6 +175,7 @@
     <ClCompile Include="src\sign-verify\clu_verify.c" />
     <ClCompile Include="src\sign-verify\clu_x509_verify.c" />
     <ClCompile Include="src\tools\clu_funcs.c" />
+    <ClCompile Include="src\tools\clu_io.c" />
     <ClCompile Include="src\tools\clu_hex_to_bin.c" />
     <ClCompile Include="src\tools\clu_http.c" />
     <ClCompile Include="src\tools\clu_pem_der.c" />
