@@ -34,8 +34,6 @@
 #endif
 #include <wolfssl/wolfcrypt/settings.h>
 
-#include <ctype.h>
-
 #include <wolfssl/ssl.h>
 
 #include <wolfclu/clu_header_main.h>
@@ -136,10 +134,12 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
     }
 
     if (ipv6 == NULL) {
+        struct in_addr tmp = {0};
         XMEMSET(addr, 0, sizeof(SOCKADDR_IN4_T));
 
         /* peer could be in human readable form */
-        if ( ((size_t)peer != INADDR_ANY) && isalpha((int)peer[0])) {
+        if ( ((size_t)peer != INADDR_ANY) &&
+                XINET_PTON(AF_INET_V, peer, &tmp) != 1) {
         #ifdef WOLFSSL_USE_POPEN_HOST
             char host_ipaddr[4] = { 127, 0, 0, 1 };
             int found = 1;
