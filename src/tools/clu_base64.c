@@ -120,7 +120,7 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         else {
             XFILE fp = XFOPEN(bioInFile, "rb");
             if (fp == NULL) {
-                wolfCLU_LogError("Could not open file %s", bioOutFile);
+                wolfCLU_LogError("Could not open file %s", bioInFile);
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
@@ -252,7 +252,7 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         else {
             XFILE fp = XFOPEN(bioOutFile, "wb");
             if (fp == NULL) {
-                wolfCLU_LogError("Could not open file %s", bioInFile);
+                wolfCLU_LogError("Could not open file %s", bioOutFile);
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {

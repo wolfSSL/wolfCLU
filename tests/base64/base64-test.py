@@ -103,6 +103,34 @@ class Base64Test(unittest.TestCase):
         self.assertEqual(result.returncode, 0,
                          "Couldn't parse input from stdin")
 
+    def test_empty_stdin(self):
+        """Empty stdin produces empty output, matching 'openssl base64'."""
+        result = subprocess.run(
+            [WOLFSSL_BIN, "base64"],
+            input=b"",
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, b"", "empty input should give no output")
+
+    def test_empty_file(self):
+        """An empty input file produces an empty output file."""
+        empty_file = "test-b64-empty.txt"
+        out_file = "test-b64-empty.b64"
+        self.addCleanup(lambda: os.remove(empty_file)
+                        if os.path.exists(empty_file) else None)
+        self.addCleanup(lambda: os.remove(out_file)
+                        if os.path.exists(out_file) else None)
+
+        with open(empty_file, "wb"):
+            pass
+
+        result = run_wolfssl("base64", "-in", empty_file, "-out", out_file)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(os.path.getsize(out_file), 0,
+                         "empty input should give an empty output file")
+
     def test_help(self):
         """ Test help flag """
         result = subprocess.run(

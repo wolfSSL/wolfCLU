@@ -9,17 +9,134 @@
     #include <fcntl.h>
 #endif
 
+typedef struct WOLFCLU_IO_BUFFER {
+    char* outBuf;
+    int len;
+    int cap;
+} WOLFCLU_IO_BUFFER;
+
+static int StreamRead(WOLFSSL_BIO* bio, WOLFCLU_IO_BUFFER* buffer)
+{
+    char* tmp = NULL;
+    sword32 read = 0;
+    char cannotBump = 0;
+    int ret = WOLFCLU_SUCCESS;
+    while (1) {
+        if (buffer->cap == buffer->len) {
+            if (cannotBump == 1) {
+                wolfCLU_LogError("input too big needs to be %d "
+                        "bytes or less", INT_MAX);
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
+            if (buffer->cap > ((INT_MAX - 1024) / 2)) {
+                buffer->cap = INT_MAX;
+                cannotBump = 1;
+            }
+            else {
+                buffer->cap *= 2;
+                buffer->cap += 1024;
+            }
+            tmp = XREALLOC(buffer->outBuf, buffer->cap,
+                    HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+            if (tmp == NULL) {
+                wolfCLU_LogError("Could not allocate space for io "
+                        "read.");
+                ret = WOLFCLU_FATAL_ERROR;
+                break;
+            }
+            buffer->outBuf = tmp;
+        }
+        read = wolfSSL_BIO_read(bio, buffer->outBuf + buffer->len,
+                buffer->cap - buffer->len);
+        if (read < 0) {
+            wolfCLU_LogError("Error while reading from stdin.");
+            ret = WOLFCLU_FATAL_ERROR;
+            break;
+        }
+
+        if (read == 0) {
+            break;
+        }
+
+        buffer->len += read;
+    }
+
+    /* shrink the over allocated buffer down to what was actually read. A
+     * zero length read is left alone since XREALLOC to 0 may free the buffer
+     * and hand back NULL */
+    if (ret == WOLFCLU_SUCCESS && buffer->len > 0 &&
+            buffer->len < buffer->cap) {
+        tmp = XREALLOC(buffer->outBuf, buffer->len,
+                HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+        if (tmp == NULL) {
+            wolfCLU_LogError("Could not allocate space for io "
+                    "read");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
+            buffer->outBuf = tmp;
+            buffer->cap = buffer->len;
+        }
+    }
+
+    return ret;
+}
+
+static int FileRead(WOLFSSL_BIO* bio, WOLFCLU_IO_BUFFER* buffer)
+{
+    sword32 read = 0;
+    long fileSize = 0;
+    XFILE innerFp = NULL;
+    if (wolfSSL_BIO_get_fp(bio, &innerFp) != WOLFSSL_SUCCESS) {
+        wolfCLU_LogError("Could not get file pointer from BIO");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (XFSEEK(innerFp, 0, SEEK_END) != 0) {
+        wolfCLU_LogError("Could not seek input file");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if ((fileSize = XFTELL(innerFp)) < 0) {
+        wolfCLU_LogError("Could not get length of file");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (wolfSSL_BIO_reset(bio) != WOLFSSL_SUCCESS) {
+        wolfCLU_LogError("Could not reset Bio");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    buffer->len = (sword32)fileSize;
+    if (buffer->len < 0) {
+        wolfCLU_LogError("Could not get length of file data");
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    buffer->outBuf = XMALLOC(buffer->len, HEAP_HINT,
+            DYNAMIC_TYPE_TMP_BUFFER);
+    if (buffer->outBuf == NULL) {
+        wolfCLU_LogError("Could not allocate space for io "
+                "read.");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    buffer->cap = buffer->len;
+    read = wolfSSL_BIO_read(bio, buffer->outBuf, buffer->len);
+    if (read != buffer->len) {
+        wolfCLU_LogError("Could not read all of the file data");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    return WOLFCLU_SUCCESS;
+}
+
 int wolfCLU_readInIo(enum WOLFCLU_IO_TYPE ioType, XFILE fp, char** buf,
         word32* len)
 {
     WOLFSSL_BIO* bio = NULL;
     int ret = WOLFCLU_SUCCESS;
+    WOLFCLU_IO_BUFFER buffer = {0};
 
-    struct {
-        char* outBuf;
-        sword32 len;
-        sword32 cap;
-    } buffer = {0};
+    if (fp == XBADFILE || buf == NULL || len == NULL) {
+        wolfCLU_LogError("Bad arg passed to wolfCLU_readInIo");
+        return BAD_FUNC_ARG;
+    }
 
     switch (ioType) {
         case WOLFCLU_IO_STDIN:
@@ -51,111 +168,12 @@ int wolfCLU_readInIo(enum WOLFCLU_IO_TYPE ioType, XFILE fp, char** buf,
 
     switch (ioType) {
         case WOLFCLU_IO_STDIN:
-            {
-                char* tmp = NULL;
-                sword32 read = 0;
-                char cannotBump = 0;
-                while (1) {
-                    if (buffer.cap == buffer.len) {
-                        if (cannotBump == 1) {
-                            wolfCLU_LogError("input too big needs to be %d "
-                                    "bytes or less", INT_MAX);
-                            ret = WOLFCLU_FATAL_ERROR;
-                            break;
-                        }
-                        if (buffer.cap > (INT_MAX - 1024 / 2)) {
-                            buffer.cap = INT_MAX;
-                            cannotBump = 1;
-                        }
-                        else {
-                            buffer.cap *= 2;
-                            buffer.cap += 1024;
-                        }
-                        tmp = XREALLOC(buffer.outBuf, buffer.cap,
-                                HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                        if (tmp == NULL) {
-                            wolfCLU_LogError("Could not allocate space for io "
-                                    "read.");
-                            ret = WOLFCLU_FATAL_ERROR;
-                            break;
-                        }
-                    }
-                    buffer.outBuf = tmp;
-                    read = wolfSSL_BIO_read(bio, buffer.outBuf + buffer.len,
-                            buffer.cap - buffer.len);
-                    if (read < 0) {
-                        wolfCLU_LogError("Error while reading from stdin.");
-                        ret = WOLFCLU_FATAL_ERROR;
-                        break;
-                    }
-
-                    if (read == 0) {
-                        break;
-                    }
-
-                    buffer.len += read;
-                }
-
-                tmp = XREALLOC(buffer.outBuf, buffer.cap,
-                        HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-                if (tmp == NULL) {
-                    wolfCLU_LogError("Could not allocate space for io "
-                            "read.");
-                    ret = WOLFCLU_FATAL_ERROR;
-                    break;
-                }
-                buffer.outBuf = tmp;
-            }
+            ret = StreamRead(bio, &buffer);
             break;
 
-        case WOLFCLU_IO_FILE: {
-            sword32 read = 0;
-            long fileSize = 0;
-            XFILE innerFp = NULL;
-            if (wolfSSL_BIO_get_fp(bio, &innerFp) != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Could not get file pointer from BIO");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-            if (XFSEEK(innerFp, 0, SEEK_END) != 0) {
-                wolfCLU_LogError("Could not seek input file");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-            if ((fileSize = XFTELL(innerFp)) < 0) {
-                wolfCLU_LogError("Could not get length of file");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-            if (wolfSSL_BIO_reset(bio) != WOLFSSL_SUCCESS) {
-                wolfCLU_LogError("Could not reset Bio");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-            buffer.len = (sword32)fileSize;
-            if (buffer.len < 0) {
-                wolfCLU_LogError("Could not get length of file data");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-
-            buffer.outBuf = XMALLOC(buffer.len, HEAP_HINT,
-                    DYNAMIC_TYPE_TMP_BUFFER);
-            if (buffer.outBuf == NULL) {
-                wolfCLU_LogError("Could not allocate space for io "
-                        "read.");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
-            buffer.cap = buffer.len;
-            read = wolfSSL_BIO_read(bio, buffer.outBuf, buffer.len);
-            if (read != buffer.len) {
-                wolfCLU_LogError("Could not create BIO");
-                ret = WOLFCLU_FATAL_ERROR;
-                break;
-            }
+        case WOLFCLU_IO_FILE:
+            ret = FileRead(bio, &buffer);
             break;
-        }
 
         case WOLFCLU_IO_STDOUT:
         default:
@@ -184,6 +202,11 @@ int wolfCLU_writeOutIo(enum WOLFCLU_IO_TYPE ioType, XFILE fp,
 {
     WOLFSSL_BIO* bio = NULL;
     int ret = WOLFCLU_SUCCESS;
+    if (fp == XBADFILE || (buf == NULL && len > 0) || len > INT_MAX) {
+        wolfCLU_LogError("Bad arg passed to wolfCLU_writeOutIo");
+        return BAD_FUNC_ARG;
+    }
+
     switch (ioType) {
 
         case WOLFCLU_IO_STDOUT: {
@@ -215,7 +238,7 @@ int wolfCLU_writeOutIo(enum WOLFCLU_IO_TYPE ioType, XFILE fp,
             return WOLFCLU_FATAL_ERROR;
     }
 
-    if (wolfSSL_BIO_write(bio, buf, len) != (int)len) {
+    if (len > 0 && wolfSSL_BIO_write(bio, buf, (int)len) != (int)len) {
         wolfCLU_LogError("Could not write buffer out to target");
         ret = WOLFCLU_FATAL_ERROR;
     }
