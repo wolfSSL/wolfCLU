@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Base64 encode/decode tests for wolfCLU."""
 
+import base64
 import filecmp
 import os
+import random
 import subprocess
 import sys
 import unittest
@@ -10,6 +12,13 @@ import unittest
 # Allow importing the shared helper when run standalone or via the test runner
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+
+
+def pem_lines(data):
+    """Base64 encode data as 64 character lines, the way wolfssl writes it."""
+    encoded = base64.b64encode(data)
+    return b"".join(encoded[i:i + 64] + b"\n"
+                    for i in range(0, len(encoded), 64))
 
 
 class Base64Test(unittest.TestCase):
@@ -103,10 +112,66 @@ class Base64Test(unittest.TestCase):
         self.assertEqual(result.returncode, 0,
                          "Couldn't parse input from stdin")
 
+    def test_stdin_input_long(self):
+        """Encode 100,000 bytes from stdin, spanning several buffer grows."""
+        data = random.Random(0).randbytes(100000)
+
+        result = subprocess.run(
+            [WOLFSSL_BIN, "base64"],
+            input=data,
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.replace(b"\n", b""),
+                         base64.b64encode(data),
+                         "stdin encode does not match python base64")
+
+    def test_stdin_decode_long(self):
+        """Decode more than the old 8000 byte stdin limit."""
+        data = random.Random(1).randbytes(100000)
+
+        result = subprocess.run(
+            [WOLFSSL_BIN, "base64", "-d"],
+            input=pem_lines(data),
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, data,
+                         "stdin decode does not match the original data")
+
+    @unittest.skipUnless(os.path.exists("/dev/stdin"), "needs /dev/stdin")
+    def test_pipe_input_file(self):
+        """-in on a pipe, which can't be sized with seek, reads like stdin."""
+        data = random.Random(2).randbytes(5000)
+
+        result = subprocess.run(
+            [WOLFSSL_BIN, "base64", "-in", "/dev/stdin"],
+            input=data,
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.replace(b"\n", b""),
+                         base64.b64encode(data),
+                         "pipe input encode does not match python base64")
+
     def test_empty_stdin(self):
         """Empty stdin produces empty output, matching 'openssl base64'."""
         result = subprocess.run(
             [WOLFSSL_BIN, "base64"],
+            input=b"",
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, b"", "empty input should give no output")
+
+    def test_empty_stdin_decode(self):
+        """Empty stdin with -d produces empty output, like 'openssl base64'."""
+        result = subprocess.run(
+            [WOLFSSL_BIN, "base64", "-d"],
             input=b"",
             capture_output=True,
             timeout=60,
@@ -130,6 +195,78 @@ class Base64Test(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(os.path.getsize(out_file), 0,
                          "empty input should give an empty output file")
+
+    def test_missing_input_file(self):
+        """A missing -in file gives a non-zero exit."""
+        result = run_wolfssl("base64", "-in", "test-b64-does-not-exist.bin")
+        self.assertNotEqual(result.returncode, 0,
+                            "missing input file should fail")
+
+    def test_output_dir_missing(self):
+        """An -out path in a missing directory gives a non-zero exit."""
+        result = run_wolfssl("base64", "-in",
+                             os.path.join(CERTS_DIR, "server-key.der"),
+                             "-out", os.path.join("test-b64-no-such-dir",
+                                                  "out.b64"))
+        self.assertNotEqual(result.returncode, 0,
+                            "output in a missing directory should fail")
+
+    def test_failed_decode_keeps_output(self):
+        """A failed -d does not create or truncate the -out file."""
+        out_file = "test-b64-keep.txt"
+        self.addCleanup(lambda: os.remove(out_file)
+                        if os.path.exists(out_file) else None)
+
+        with open(out_file, "wb") as f:
+            f.write(b"keep")
+
+        result = run_wolfssl("base64", "-d", "-out", out_file,
+                             stdin_data="@@@@")
+        self.assertNotEqual(result.returncode, 0, "bad base64 should fail")
+        with open(out_file, "rb") as f:
+            self.assertEqual(f.read(), b"keep",
+                             "failed decode should leave -out unchanged")
+
+    def test_in_place(self):
+        """-in and -out naming the same file encodes it in place."""
+        work_file = "test-b64-inplace.bin"
+        self.addCleanup(lambda: os.remove(work_file)
+                        if os.path.exists(work_file) else None)
+
+        with open(os.path.join(CERTS_DIR, "server-key.der"), "rb") as f:
+            original = f.read()
+        with open(work_file, "wb") as f:
+            f.write(original)
+
+        result = run_wolfssl("base64", "-in", work_file, "-out", work_file)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(work_file, "rb") as f:
+            self.assertEqual(f.read().replace(b"\n", b""),
+                             base64.b64encode(original),
+                             "in place encode does not match python base64")
+
+    @unittest.skipUnless(os.path.exists("/dev/full"), "needs /dev/full")
+    def test_stdout_write_error(self):
+        """A failed write to stdout gives a non-zero exit."""
+        with open("/dev/full", "wb") as full:
+            result = subprocess.run(
+                [WOLFSSL_BIN, "base64", "-in",
+                 os.path.join(CERTS_DIR, "server-key.der")],
+                stdout=full,
+                stderr=subprocess.PIPE,
+                timeout=60,
+            )
+        self.assertNotEqual(result.returncode, 0,
+                            "write to a full device should fail")
+
+    @unittest.skipUnless(os.path.exists("/dev/full"), "needs /dev/full")
+    def test_output_file_write_error(self):
+        """A failed write to the -out file gives a non-zero exit."""
+        result = run_wolfssl("base64", "-in",
+                             os.path.join(CERTS_DIR, "server-key.der"),
+                             "-out", "/dev/full")
+        self.assertNotEqual(result.returncode, 0,
+                            "write to a full device should fail")
 
     def test_help(self):
         """ Test help flag """

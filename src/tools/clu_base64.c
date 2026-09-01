@@ -49,14 +49,14 @@ static void wolfCLU_Base64Help(void)
 int wolfCLU_Base64Setup(int argc, char** argv)
 {
 #if !defined(WOLFCLU_NO_FILESYSTEM) && !defined(NO_CODING)
-    char *bioInFile = NULL;
-    char *bioOutFile = NULL;
+    char *inFile = NULL;
+    char *outFile = NULL;
     byte* input = NULL;
     byte* output = NULL;
     int ret = WOLFCLU_SUCCESS;
     int decode = 0;
     int isPEM = 0;
-    /* initial buffer size to read stdin */
+    /* set by wolfCLU_ReadIo */
     word32 inputSz = 0;
     word32 outputSz = 0;
     int option;
@@ -80,7 +80,9 @@ int wolfCLU_Base64Setup(int argc, char** argv)
                     wolfCLU_LogError("-in expected a value");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
-                bioInFile = optarg;
+                else {
+                    inFile = optarg;
+                }
                 break;
 
             case WOLFCLU_OUTFILE:
@@ -88,7 +90,9 @@ int wolfCLU_Base64Setup(int argc, char** argv)
                     wolfCLU_LogError("-out expected a value");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
-                bioOutFile = optarg;
+                else {
+                    outFile = optarg;
+                }
                 break;
 
             case 'd':
@@ -113,27 +117,26 @@ int wolfCLU_Base64Setup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (bioInFile == NULL) {
-           ret = wolfCLU_readInIo(WOLFCLU_IO_STDIN, stdin, (char**)(&input),
-                   &inputSz);
+        if (inFile == NULL) {
+            ret = wolfCLU_ReadIo(WOLFCLU_IO_READABLE_STREAM, stdin, &input,
+                    &inputSz);
         }
         else {
-            XFILE fp = XFOPEN(bioInFile, "rb");
-            if (fp == NULL) {
-                wolfCLU_LogError("Could not open file %s", bioInFile);
+            XFILE fp = XFOPEN(inFile, "rb");
+            if (fp == XBADFILE) {
+                wolfCLU_LogError("Could not open file %s", inFile);
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                ret = wolfCLU_readInIo(WOLFCLU_IO_FILE, fp,
-                       (char**)(&input), &inputSz);
+                ret = wolfCLU_ReadIo(WOLFCLU_IO_READABLE_FILE, fp,
+                       &input, &inputSz);
                 XFCLOSE(fp);
             }
         }
     }
 
-    /* For decoding, check if input is in PEM format */
-    if (ret == WOLFCLU_SUCCESS && decode && inputSz > 11) {
-        /* Check if the input starts with a PEM header */
+    /* when decoding, check for a PEM header on the input */
+    if (ret == WOLFCLU_SUCCESS && decode && inputSz >= 10) {
         if (XMEMCMP(input, "-----BEGIN", 10) == 0) {
             isPEM = 1;
         }
@@ -245,24 +248,26 @@ int wolfCLU_Base64Setup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
-        if (bioOutFile == NULL) {
-            ret = wolfCLU_writeOutIo(WOLFCLU_IO_STDOUT, stdout, (char*)output,
+        if (outFile == NULL) {
+            ret = wolfCLU_WriteIo(WOLFCLU_IO_WRITABLE_STREAM, stdout, output,
                     outputSz);
         }
         else {
-            XFILE fp = XFOPEN(bioOutFile, "wb");
-            if (fp == NULL) {
-                wolfCLU_LogError("Could not open file %s", bioOutFile);
+            XFILE fp = XFOPEN(outFile, "wb");
+            if (fp == XBADFILE) {
+                wolfCLU_LogError("Could not open file %s", outFile);
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                ret = wolfCLU_writeOutIo(WOLFCLU_IO_FILE, fp,
-                        (char*)output, outputSz);
-                XFCLOSE(fp);
+                ret = wolfCLU_WriteIo(WOLFCLU_IO_WRITABLE_FILE, fp,
+                        output, outputSz);
+                if (XFCLOSE(fp) != 0 && ret == WOLFCLU_SUCCESS) {
+                    wolfCLU_LogError("Could not write file %s", outFile);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
             }
         }
     }
-
 
     /* Clean up */
     if (input != NULL) {
