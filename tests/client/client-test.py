@@ -7,7 +7,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, run_wolfssl,
+                          skip_if_no_filesystem, test_main)
 
 
 class ClientTest(unittest.TestCase):
@@ -17,11 +18,7 @@ class ClientTest(unittest.TestCase):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
 
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
+        skip_if_no_filesystem()
 
     def test_s_client_x509(self):
         """Connect to a TLS server, extract cert, and verify PEM output."""
@@ -65,6 +62,65 @@ class ClientTest(unittest.TestCase):
         r = run_wolfssl("s_client", "-help")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("s_client" , r.stderr, "help menu was not printed")
+
+class PortArgTest(unittest.TestCase):
+    """Regression tests for the port half of -connect <host>:<port>.
+
+    -connect forwards the text after ':' to the client's -p handler, which
+    used to be (word16)atoi(): "99999" silently truncated to 34463 and the
+    client happily connected to the wrong port.  The port is now parsed with
+    wolfCLU_parseDecimalBounded(), so anything outside 1-65535, and anything
+    that is not a plain decimal number, is rejected before any connection is
+    attempted.
+    """
+
+    PORT_ERROR = "port number must be between 1 and 65535"
+
+    @classmethod
+    def setUpClass(cls):
+        # s_client is compiled out under --disable-filesystem, so it never
+        # reaches the port parser and never prints PORT_ERROR.
+        skip_if_no_filesystem()
+
+    def _assert_rejected(self, port, description):
+        """Run s_client against localhost:<port> and require that the port
+        itself was rejected -- a non-zero exit alone is not enough, since a
+        truncated port would also fail to connect."""
+        r = run_wolfssl("s_client", "-connect", "localhost:" + port,
+                        timeout=30)
+        self.assertNotEqual(r.returncode, 0,
+                            f"{description} port {port!r} was accepted")
+        self.assertIn(self.PORT_ERROR, r.stdout + r.stderr,
+                      f"{description} port {port!r} was not rejected as an "
+                      f"out-of-range port: {r.stdout + r.stderr}")
+
+    def test_port_zero(self):
+        """0 must be rejected: it is not a port that can be connected to."""
+        self._assert_rejected("0", "zero")
+
+    def test_port_above_word16(self):
+        """99999 must be rejected, not truncated to 34463."""
+        self._assert_rejected("99999", "out-of-range")
+
+    def test_port_just_above_word16(self):
+        """65536 must be rejected, not truncated to 0."""
+        self._assert_rejected("65536", "out-of-range")
+
+    def test_port_negative(self):
+        """A negative port must be rejected, not wrapped."""
+        self._assert_rejected("-1", "negative")
+
+    def test_port_non_numeric(self):
+        """A non-numeric port must be rejected, not read as 0."""
+        self._assert_rejected("abc", "non-numeric")
+
+    def test_port_trailing_junk(self):
+        """Trailing junk must be rejected, not silently ignored."""
+        self._assert_rejected("443abc", "trailing junk")
+
+    def test_port_empty(self):
+        """An empty port must be rejected."""
+        self._assert_rejected("", "empty")
 
 class ShellInjectionTest(unittest.TestCase):
     """Regression tests for shell command injection via hostname.
