@@ -236,6 +236,7 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
             if (getaddrinfo((char*)peer, portStr, &hints, &addrInfo) == 0) {
                 XMEMCPY(addr, addrInfo->ai_addr, sizeof(*addr));
                 useLookup = 1;
+                zsock_freeaddrinfo(addrInfo);
             }
         #endif
             else
