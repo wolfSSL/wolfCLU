@@ -34,6 +34,9 @@
 #endif
 #include <wolfssl/wolfcrypt/settings.h>
 
+#include <ctype.h>
+#include <limits.h>
+
 #include <wolfssl/ssl.h>
 
 #include <wolfclu/clu_header_main.h>
@@ -92,6 +95,11 @@ static const char *wolfsentry_config_path = NULL;
 #ifndef MAX_NON_BLOCK_SEC
 #define MAX_NON_BLOCK_SEC   10
 #endif
+
+/* Scratch buffer for a decimal command line argument. LONG_MAX is 19 decimal
+ * digits, so 24 leaves room for that plus a NUL and a little slack; anything
+ * longer is out of range for the values parsed with it. */
+#define MAX_DECIMAL_ARG_LEN 24
 
 #define OCSP_STAPLING 1
 #define OCSP_STAPLINGV2 2
@@ -236,7 +244,7 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
             if (getaddrinfo((char*)peer, portStr, &hints, &addrInfo) == 0) {
                 XMEMCPY(addr, addrInfo->ai_addr, sizeof(*addr));
                 useLookup = 1;
-                zsock_freeaddrinfo(addrInfo);
+                freeaddrinfo(addrInfo);
             }
         #endif
             else
@@ -1109,6 +1117,7 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
     if (ret == WOLFSSL_SUCCESS) {
         /* Perform throughput test */
         char *tx_buffer, *rx_buffer;
+        const char* errMsg = NULL;
 
         /* Record connection time */
         conn_time = current_time(0) - start;
@@ -1164,8 +1173,9 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
                     } while (err == WC_PENDING_E);
                     if (ret != len) {
                         printf("SSL_write bench error %d!\n", err);
-                        if (!exitWithRet)
-                            err_sys("SSL_write failed");
+                        if (err == 0)
+                            err = WOLFSSL_FATAL_ERROR;
+                        errMsg = "SSL_write failed";
                         goto doExit;
                     }
                     tx_time += current_time(0) - start;
@@ -1174,9 +1184,9 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
                     select_ret = tcp_select(sockfd, DEFAULT_TIMEOUT_SEC);
                     if (select_ret != TEST_RECV_READY) {
                         printf("SSL_read bench select error %d!\n", select_ret);
-                        if (!exitWithRet)
-                            err_sys("SSL_read timeout");
                         err = WOLFSSL_FATAL_ERROR;
+                        errMsg = (select_ret == TEST_TIMEOUT) ?
+                                "SSL_read timeout" : "SSL_read select failed";
                         goto doExit;
                     }
 
@@ -1207,16 +1217,19 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
                     /* Only compare once the full block has been received */
                     if (rx_pos != len) {
                         printf("SSL_read bench error %d!\n", err);
-                        if (!exitWithRet)
-                            err_sys("SSL_read failed");
+                        /* wolfSSL_read() can return <= 0 without setting an
+                         * error code, so normalize it here. Otherwise a short
+                         * read would be returned as EXIT_SUCCESS under -H. */
+                        if (err == 0)
+                            err = WOLFSSL_FATAL_ERROR;
+                        errMsg = "SSL_read failed";
                         goto doExit;
                     }
 
                     /* Compare TX and RX buffers */
                     if (XMEMCMP(tx_buffer, rx_buffer, len) != 0) {
-                        if (!exitWithRet)
-                            err_sys("Compare TX and RX buffers failed");
                         err = WOLFSSL_FATAL_ERROR;
+                        errMsg = "Compare TX and RX buffers failed";
                         goto doExit;
                     }
 
@@ -1235,6 +1248,10 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
 doExit:
         if (tx_buffer) XFREE(tx_buffer, NULL, DYNAMIC_TYPE_TMP_BUFFER);
         if (rx_buffer) XFREE(rx_buffer, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+        /* err_sys() does not return, so only report the failure once the
+         * buffers have been released */
+        if (errMsg != NULL && !exitWithRet)
+            err_sys(errMsg);
     }
     else {
         err_sys("wolfSSL_connect failed");
@@ -2509,10 +2526,14 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
             case 'p' :
             {
-                long  portArg;
-                if (wolfCLU_parseDecimalBounded(myoptarg, 0, 65535, &portArg) ==
-                        WOLFCLU_FATAL_ERROR) {
-                    err_sys("port number must be between 0 and 65535");
+                long  portArg = 0;
+                /* 0 is not a usable port to connect to, and the port == 0
+                 * check below is compiled out of every wolfCLU build
+                 * (wolfclu/client.h defines NO_MAIN_DRIVER), so reject it
+                 * here. */
+                if (wolfCLU_parseDecimalBounded(myoptarg, 1, 65535, &portArg)
+                        != WOLFCLU_SUCCESS) {
+                    err_sys("port number must be between 1 and 65535");
                 }
                 port = (word16)portArg;
                 #if !defined(NO_MAIN_DRIVER) || defined(USE_WINDOWS_API)
@@ -2628,21 +2649,39 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
             case 'B' :
             {
-                long throughputArg = atol(myoptarg);
+                long   throughputArg = 0;
+                long   blockArg      = (long)block;
+                const char* comma    = XSTRSTR(myoptarg, ",");
+                size_t numLen        = (comma != NULL) ?
+                        (size_t)(comma - myoptarg) : XSTRLEN(myoptarg);
+                char   numBuf[MAX_DECIMAL_ARG_LEN];
 
-                for (; *myoptarg != '\0'; myoptarg++) {
-                    if (*myoptarg == ',') {
-                        block = atoi(myoptarg + 1);
-                        break;
-                    }
-                }
-                /* Reject non-positive and out-of-range values here so the
-                 * benchmark never runs with a wrapped size_t throughput. */
-                if (throughputArg <= 0 || block <= 0) {
+                /* Parse both halves with the bounded decimal parser so that
+                 * negative, out-of-range and trailing-junk input is rejected
+                 * instead of silently saturating or truncating the way
+                 * atol()/atoi() do, which would let the benchmark run with a
+                 * wrapped size_t throughput. */
+                if (numLen == 0 || numLen >= sizeof(numBuf)) {
                     Usage();
                     XEXIT_T(MY_EX_USAGE);
                 }
+                XMEMCPY(numBuf, myoptarg, numLen);
+                numBuf[numLen] = '\0';
+
+                if (wolfCLU_parseDecimalBounded(numBuf, 1, LONG_MAX,
+                            &throughputArg) != WOLFCLU_SUCCESS) {
+                    Usage();
+                    XEXIT_T(MY_EX_USAGE);
+                }
+                if (comma != NULL &&
+                        wolfCLU_parseDecimalBounded(comma + 1, 1, INT_MAX,
+                            &blockArg) != WOLFCLU_SUCCESS) {
+                    Usage();
+                    XEXIT_T(MY_EX_USAGE);
+                }
+
                 throughput = (size_t)throughputArg;
+                block      = (int)blockArg;
                 break;
             }
 
