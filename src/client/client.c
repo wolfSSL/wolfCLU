@@ -311,22 +311,20 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
 static WC_INLINE void clu_tcp_socket(SOCKET_T* sockfd, int udp, int sctp,
         int isIpv6)
 {
+    /* The address built by clu_build_addr() is AF_INET6 whenever isIpv6 is
+     * set, so every socket type has to be opened in the matching family. */
+    int family = isIpv6 ? AF_INET6_V : AF_INET_V;
+
     (void)sctp;
 
     if (udp)
-        *sockfd = socket(AF_INET_V, SOCK_DGRAM, IPPROTO_UDP);
+        *sockfd = socket(family, SOCK_DGRAM, IPPROTO_UDP);
 #ifdef WOLFSSL_SCTP
     else if (sctp)
-        *sockfd = socket(AF_INET_V, SOCK_STREAM, IPPROTO_SCTP);
+        *sockfd = socket(family, SOCK_STREAM, IPPROTO_SCTP);
 #endif
-    else {
-        if (isIpv6) {
-            *sockfd = socket(AF_INET6_V, SOCK_STREAM, IPPROTO_TCP);
-        }
-        else {
-            *sockfd = socket(AF_INET_V, SOCK_STREAM, IPPROTO_TCP);
-        }
-    }
+    else
+        *sockfd = socket(family, SOCK_STREAM, IPPROTO_TCP);
     if(WOLFSSL_SOCKET_IS_INVALID(*sockfd)) {
         err_sys_with_errno("socket failed\n");
     }
@@ -371,7 +369,11 @@ static WC_INLINE void clu_tcp_connect(SOCKET_T* sockfd, const char* ip,
 
     if (isIpv6) {
         clu_build_addr(NULL, &ipv6, ip, port, udp, sctp);
+        if (udp) {
+            wolfSSL_dtls_set_peer(ssl, &ipv6, sizeof(ipv6));
+        }
         clu_tcp_socket(sockfd, udp, sctp, isIpv6);
+
         if (!udp) {
             if (WOLFSSL_SOCKET_IS_INVALID(*sockfd))
                 err_sys_with_errno("tcp bad socket");
