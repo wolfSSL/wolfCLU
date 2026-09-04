@@ -1165,40 +1165,52 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
 
                     /* Perform RX */
                     select_ret = tcp_select(sockfd, DEFAULT_TIMEOUT_SEC);
-                    if (select_ret == TEST_RECV_READY) {
-                        start = current_time(1);
-                        rx_pos = 0;
-                        while (rx_pos < len) {
-                            ret = wolfSSL_read(ssl, &rx_buffer[rx_pos],
-                                                                len - rx_pos);
-                            if (ret <= 0) {
-                                err = wolfSSL_get_error(ssl, 0);
-                            #ifdef WOLFSSL_ASYNC_CRYPT
-                                if (err == WC_PENDING_E) {
-                                    ret = wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
-                                    if (ret < 0) break;
-                                }
-                                else
-                            #endif
-                                if (err != WOLFSSL_ERROR_WANT_READ) {
-                                    printf("SSL_read bench error %d\n", err);
-                                    err_sys("SSL_read failed");
-                                }
+                    if (select_ret != TEST_RECV_READY) {
+                        printf("SSL_read bench select error %d!\n", select_ret);
+                        if (!exitWithRet)
+                            err_sys("SSL_read timeout");
+                        err = WOLFSSL_FATAL_ERROR;
+                        goto doExit;
+                    }
+
+                    start = current_time(1);
+                    rx_pos = 0;
+                    while (rx_pos < len) {
+                        ret = wolfSSL_read(ssl, &rx_buffer[rx_pos],
+                                                            len - rx_pos);
+                        if (ret <= 0) {
+                            err = wolfSSL_get_error(ssl, 0);
+                        #ifdef WOLFSSL_ASYNC_CRYPT
+                            if (err == WC_PENDING_E) {
+                                ret = wolfSSL_AsyncPoll(ssl, WOLF_POLL_FLAG_CHECK_HW);
+                                if (ret < 0) break;
                             }
-                            else {
-                                rx_pos += ret;
+                            else
+                        #endif
+                            if (err != WOLFSSL_ERROR_WANT_READ) {
+                                break;
                             }
                         }
-                        rx_time += current_time(0) - start;
+                        else {
+                            rx_pos += ret;
+                        }
+                    }
+                    rx_time += current_time(0) - start;
+
+                    /* Only compare once the full block has been received */
+                    if (rx_pos != len) {
+                        printf("SSL_read bench error %d!\n", err);
+                        if (!exitWithRet)
+                            err_sys("SSL_read failed");
+                        goto doExit;
                     }
 
                     /* Compare TX and RX buffers */
                     if (XMEMCMP(tx_buffer, rx_buffer, len) != 0) {
-                        free(tx_buffer);
-                        tx_buffer = NULL;
-                        free(rx_buffer);
-                        rx_buffer = NULL;
-                        err_sys("Compare TX and RX buffers failed");
+                        if (!exitWithRet)
+                            err_sys("Compare TX and RX buffers failed");
+                        err = WOLFSSL_FATAL_ERROR;
+                        goto doExit;
                     }
 
                     /* Update overall position */
