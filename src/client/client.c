@@ -1136,9 +1136,13 @@ static int ClientBenchmarkThroughput(WOLFSSL_CTX* ctx, char* host, word16 port,
                 xfer_bytes = 0;
                 while (throughput > xfer_bytes) {
                     int len, rx_pos, select_ret;
+                    size_t remain;
 
-                    /* Determine packet size */
-                    len = min(block, (int)(throughput - xfer_bytes));
+                    /* Determine packet size. Bound the size_t remainder by
+                     * the block size before narrowing it to int, otherwise a
+                     * remainder above INT_MAX becomes a negative length. */
+                    remain = throughput - xfer_bytes;
+                    len = (remain > (size_t)block) ? block : (int)remain;
 
                     /* Perform TX */
                     start = current_time(1);
@@ -2613,18 +2617,24 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 break;
 
             case 'B' :
-                throughput = atol(myoptarg);
+            {
+                long throughputArg = atol(myoptarg);
+
                 for (; *myoptarg != '\0'; myoptarg++) {
                     if (*myoptarg == ',') {
                         block = atoi(myoptarg + 1);
                         break;
                     }
                 }
-                if (throughput == 0 || block <= 0) {
+                /* Reject non-positive and out-of-range values here so the
+                 * benchmark never runs with a wrapped size_t throughput. */
+                if (throughputArg <= 0 || block <= 0) {
                     Usage();
                     XEXIT_T(MY_EX_USAGE);
                 }
+                throughput = (size_t)throughputArg;
                 break;
+            }
 
             case 'N' :
                 nonBlocking = 1;
