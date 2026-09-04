@@ -769,16 +769,20 @@ int wolfCLU_certSetup(int argc, char **argv)
 
     /* write out certificate */
     if (ret == WOLFCLU_SUCCESS && !nooutFlag) {
-        byte *derBuf = inBuf;
-        byte *pt; /* use pt with i2d to handle potential pointer increment */
+        const byte *derBuf = inBuf;
         int derBufSz = inBufSz;
 
         /* if inform is PEM we convert to DER for excluding input that is not
          * part of the certificate */
         if (inForm == PEM_FORM) {
             if (reqFlag) {
-                pt = derBuf;
-                derBufSz = wolfSSL_i2d_X509(x509, &pt);
+                /* the input buffer is sized for the PEM that was read in,
+                 * not for this certificate's encoding */
+                derBuf = wolfSSL_X509_get_der(x509, &derBufSz);
+                if (derBuf == NULL || derBufSz <= 0) {
+                    wolfCLU_LogError("unable to get certificate DER");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
             }
             else {
                 derBuf = derObj->buffer;
@@ -787,13 +791,13 @@ int wolfCLU_certSetup(int argc, char **argv)
         }
 
         /* PEM/DER -> DER */
-        if (outForm == DER_FORM) {
+        if (ret == WOLFCLU_SUCCESS && outForm == DER_FORM) {
             if (wolfSSL_BIO_write(out, derBuf, derBufSz) <= 0) {
                 ret = WOLFCLU_FATAL_ERROR;
             }
         }
         /* PEM/DER -> PEM */
-        else if (outForm == PEM_FORM) {
+        else if (ret == WOLFCLU_SUCCESS && outForm == PEM_FORM) {
             tmpOutBufSz = wc_DerToPem(derBuf, derBufSz, NULL, 0, CERT_TYPE);
             if (tmpOutBufSz <= 0) {
                 wolfCLU_LogError("wc_DerToPem to get necessary length failed");
