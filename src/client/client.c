@@ -2505,12 +2505,19 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                 break;
 
             case 'p' :
-                port = (word16)atoi(myoptarg);
+            {
+                long  portArg;
+                if (wolfCLU_parseDecimalBounded(myoptarg, 0, 65535, &portArg) ==
+                        WOLFCLU_FATAL_ERROR) {
+                    err_sys("port number must be between 0 and 65535");
+                }
+                port = (word16)portArg;
                 #if !defined(NO_MAIN_DRIVER) || defined(USE_WINDOWS_API)
                     if (port == 0)
                         err_sys("port number cannot be 0");
                 #endif
                 break;
+            }
 
             case 'v' :
                 if (myoptarg[0] == 'd') {
