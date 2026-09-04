@@ -93,6 +93,37 @@ email.1 = facts@wolfssl.com
 URI.1 = https://www.wolfssl.com
 """
 
+# A CSR built from this config carries no subjectAltName, so the input PEM
+# stays short. Applying v3_big_alt with -extfile then grows the signed
+# certificate well past the length of that PEM.
+BIG_EXT_CONF = """\
+[ req ]
+distinguished_name =req_distinguished_name
+attributes =req_attributes
+prompt =no
+[ req_distinguished_name ]
+countryName =US
+commonName = bigext
+[ req_attributes ]
+[ v3_big_alt ]
+basicConstraints = CA:TRUE
+keyUsage = digitalSignature
+subjectAltName = @big_alt_names
+[big_alt_names]
+DNS.1 = first-of-the-long-alternative-names.overflow.example.com
+DNS.2 = second-of-the-long-alternative-names.overflow.example.com
+DNS.3 = third-of-the-long-alternative-names.overflow.example.com
+DNS.4 = fourth-of-the-long-alternative-names.overflow.example.com
+DNS.5 = fifth-of-the-long-alternative-names.overflow.example.com
+DNS.6 = sixth-of-the-long-alternative-names.overflow.example.com
+DNS.7 = seventh-of-the-long-alternative-names.overflow.example.com
+DNS.8 = eighth-of-the-long-alternative-names.overflow.example.com
+DNS.9 = ninth-of-the-long-alternative-names.overflow.example.com
+DNS.10 = tenth-of-the-long-alternative-names.overflow.example.com
+DNS.11 = eleventh-of-the-long-alternative-names.overflow.example.com
+DNS.12 = twelfth-of-the-long-alternative-names.overflow.example.com
+"""
+
 
 def _cleanup(*files):
     for f in files:
@@ -750,6 +781,97 @@ class TestX509ReqExtensions(unittest.TestCase):
         self.assertEqual(r2.returncode, 0, r2.stderr)
         self.assertIn("CA:TRUE", r2.stdout)
 
+
+class TestX509ReqLargeExtensions(unittest.TestCase):
+    """Test x509 -req when the added extensions outgrow the input PEM.
+
+    Sizing the output against the input used to write past the buffer
+    holding it while still emitting correct bytes, so these cases do not
+    reliably fail on such a build unless a sanitizer catches the write.
+    The ci.yml matrix runs make check under -fsanitize=address."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.conf_file = _tmp("test_x509req_bigext.conf")
+        with open(cls.conf_file, "w", encoding="utf-8", newline="\n") as f:
+            f.write(BIG_EXT_CONF)
+        cls.csr = _tmp("test_x509req_bigext.csr")
+        r = run_wolfssl("req", "-new",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-config", cls.conf_file,
+                        "-out", cls.csr)
+        assert r.returncode == 0, "setup CSR creation failed: " + r.stderr
+
+    @classmethod
+    def tearDownClass(cls):
+        _cleanup(cls.conf_file, cls.csr)
+
+    def _clean(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: _cleanup(p))
+
+    def _sign_with_big_ext(self, out, *extra):
+        """Sign the CSR applying the oversized v3_big_alt extensions."""
+        r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
+                        "-extfile", self.conf_file,
+                        "-extensions", "v3_big_alt",
+                        "-signkey",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", out, *extra)
+        combined = r.stdout + r.stderr
+        if "not compiled with cert extensions" in combined:
+            self.skipTest("cert extensions not compiled in")
+        if "WOLFSSL_ALT_NAMES" in combined:
+            self.skipTest("alt names not compiled in")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def _assert_alt_names(self, text):
+        for name in ("first-of-the-long-alternative-names.overflow.example.com",
+                     "sixth-of-the-long-alternative-names.overflow.example.com",
+                     "twelfth-of-the-long-alternative-names.overflow."
+                     "example.com"):
+            self.assertIn(name, text)
+
+    def test_extfile_larger_than_input_pem_der_out(self):
+        """x509 -req -outform der output may exceed the input PEM length.
+
+        The certificate is re-encoded after the extensions are applied, so
+        its DER outgrows the CSR PEM that was read in. Nothing on the
+        output path may be sized against that input."""
+        out = _tmp("tmp_bigext_der.cert")
+        self._clean(out)
+
+        csr_pem_len = os.path.getsize(self.csr)
+        self._sign_with_big_ext(out, "-outform", "der")
+
+        # Without the extensions the output cannot outgrow the input, and
+        # this case would no longer cover the sizing it is here to check.
+        self.assertGreater(os.path.getsize(out), csr_pem_len,
+                           "certificate DER did not outgrow the input PEM")
+
+        r2 = run_wolfssl("x509", "-in", out, "-inform", "der",
+                         "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        self._assert_alt_names(r2.stdout)
+
+    def test_extfile_larger_than_input_pem_pem_out(self):
+        """x509 -req PEM output covers the same sizing on the DerToPem path."""
+        out = _tmp("tmp_bigext_pem.cert")
+        self._clean(out)
+
+        csr_pem_len = os.path.getsize(self.csr)
+        self._sign_with_big_ext(out)
+
+        with open(out, encoding="utf-8") as f:
+            pem = f.read()
+        self.assertTrue(pem.startswith("-----BEGIN CERTIFICATE-----"),
+                        "default output form should be PEM")
+        self.assertGreater(os.path.getsize(out), csr_pem_len,
+                           "certificate PEM did not outgrow the input PEM")
+
+        r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        self._assert_alt_names(r2.stdout)
 
 
 class TestReqConfigSubject(unittest.TestCase):
