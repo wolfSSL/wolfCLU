@@ -2181,6 +2181,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
                                           because can't tell if we're really
                                           going there to detect old chacha-poly
                                        */
+    const char* checkDomain = NULL;
+    const char* checkIpAddr = NULL;
 #ifndef WOLFSSL_VXWORKS
     int    ch;
     static const struct mygetopt_long_config long_options[] = {
@@ -2194,6 +2196,8 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         { "pqc", 1, 259 },
 #endif
         { "disable_stdin_check", 0, 260 },
+        { "verify_hostname", 1, 300 },
+        { "verify_ip", 1, 301 },
         { 0, 0, 0 }
     };
 #endif
@@ -2214,6 +2218,7 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
     int    dtlsSCTP  = 0;
     int    doMcast   = 0;
     int    matchName = 0;
+    int    matchIpAddr = 0;
     int    doPeerCheck = 1;
     int    nonBlocking = 0;
     int    simulateWantWrite = 0;
@@ -2402,6 +2407,16 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
 
             case 260 :
                 disable_stdin_chk = 1;
+                break;
+
+            case 300 :
+                matchName = 1;
+                checkDomain = myoptarg;
+                break;
+
+            case 301 :
+                matchIpAddr = 1;
+                checkIpAddr = myoptarg;
                 break;
 
             case 'g' :
@@ -3877,8 +3892,23 @@ THREAD_RETURN WOLFSSL_THREAD client_test(void* args)
         SetupAtomicUser(ctx, ssl);
 #endif
 
-    if (matchName && doPeerCheck)
-        wolfSSL_check_domain_name(ssl, domain);
+    if (matchName && doPeerCheck) {
+        if (wolfSSL_check_domain_name(ssl,
+                checkDomain != NULL ? checkDomain : domain)
+                != WOLFSSL_SUCCESS) {
+            wolfSSL_free(ssl); ssl = NULL;
+            wolfSSL_CTX_free(ctx); ctx = NULL;
+            err_sys("can't set domain name to check");
+        }
+    }
+
+    if (matchIpAddr && doPeerCheck) {
+        if (wolfSSL_check_ip_address(ssl, checkIpAddr) != WOLFSSL_SUCCESS) {
+            wolfSSL_free(ssl); ssl = NULL;
+            wolfSSL_CTX_free(ctx); ctx = NULL;
+            err_sys("can't set IP address to check");
+        }
+    }
 #ifndef WOLFSSL_CALLBACKS
     if (nonBlocking) {
 #ifdef WOLFSSL_DTLS

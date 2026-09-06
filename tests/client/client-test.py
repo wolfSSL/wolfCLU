@@ -65,6 +65,38 @@ class ClientTest(unittest.TestCase):
         r = run_wolfssl("s_client", "-help")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("s_client" , r.stderr, "help menu was not printed")
+        self.assertIn("-verify_hostname", r.stderr,
+                      "-verify_hostname missing from help menu")
+        self.assertIn("-verify_ip", r.stderr,
+                      "-verify_ip missing from help menu")
+
+    def test_no_verify_option_warns(self):
+        """With no verify option, s_client says it is not verifying.
+
+        The warning is the only signal that a connection went unchecked,
+        so its wording is worth pinning. No server is needed; it prints
+        before the connection is attempted.
+        """
+        r = run_wolfssl("s_client", "-connect", "127.0.0.1:1")
+        self.assertIn("Defaulting to NOT verifying peer", r.stderr,
+                      f"no-verification warning missing: {r.stderr}")
+
+    def test_verify_option_requires_value(self):
+        """-verify_hostname and -verify_ip must fail when given no value.
+
+        wolfCLU_GetOpt leaves optarg NULL for a required_argument option in
+        the last position; falling back to an unverified connection would
+        hand the user the opposite of what they asked for.
+        """
+        for flag in ("-verify_hostname", "-verify_ip"):
+            with self.subTest(flag=flag):
+                r = run_wolfssl("s_client", "-connect", "127.0.0.1:1", flag)
+                self.assertNotEqual(r.returncode, 0,
+                                    f"SECURITY FAILURE: {flag} with no value "
+                                    "did not fail")
+                self.assertIn("requires", r.stderr,
+                              f"{flag} with no value failed, but not for "
+                              f"the missing value: {r.stderr}")
 
 class ShellInjectionTest(unittest.TestCase):
     """Regression tests for shell command injection via hostname.
