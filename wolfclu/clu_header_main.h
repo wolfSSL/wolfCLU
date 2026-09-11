@@ -851,6 +851,60 @@ int wolfCLU_ReadCertDer(const char* filename, byte** outDer);
  */
 int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz);
 
+/**
+ * @brief IO types passed to the IO functions below
+ */
+enum WOLFCLU_IO_TYPE {
+    /* base types */
+    WOLFCLU_IO_READABLE_STREAM = 1 << 0,
+    WOLFCLU_IO_WRITABLE_STREAM = 1 << 1,
+    WOLFCLU_IO_READABLE_FILE = 1 << 2,
+    WOLFCLU_IO_WRITABLE_FILE = 1 << 3,
+
+    /* type groups */
+    WOLFCLU_IO_RW_STREAM =
+        WOLFCLU_IO_READABLE_STREAM |
+        WOLFCLU_IO_WRITABLE_STREAM,
+
+    WOLFCLU_IO_RW_FILE =
+        WOLFCLU_IO_READABLE_FILE |
+        WOLFCLU_IO_WRITABLE_FILE,
+
+    WOLFCLU_IO_READABLE =
+        WOLFCLU_IO_READABLE_STREAM |
+        WOLFCLU_IO_READABLE_FILE,
+
+    WOLFCLU_IO_WRITABLE =
+        WOLFCLU_IO_WRITABLE_STREAM |
+        WOLFCLU_IO_WRITABLE_FILE,
+};
+
+/**
+ * @brief read all of fp into a new buffer
+ * @param ioType a readable stream or file type. Streams are read until EOF,
+ *        files are sized with seek first and read as a stream if that fails
+ * @param fp file pointer to read from
+ * @param buf pointer to store the buffer, NULL if empty. The caller frees it,
+ *        wiping it first with wolfCLU_ForceZero if it holds secrets
+ * @param len pointer to store the number of bytes read
+ * @return WOLFCLU_SUCCESS on success, negative on error
+ */
+int wolfCLU_ReadIo(enum WOLFCLU_IO_TYPE ioType, XFILE fp, byte** buf,
+        word32* len);
+
+/**
+ * @brief write len bytes of buf to fp and flush it
+ * @param ioType a writable stream or file type
+ * @param fp file pointer to write to
+ * @param buf buffer to write, may be NULL when len is 0
+ * @param len number of bytes to write
+ * @return WOLFCLU_SUCCESS on success, negative on error
+ */
+int wolfCLU_WriteIo(enum WOLFCLU_IO_TYPE ioType, XFILE fp, const byte* buf,
+        word32 len);
+
+
+
 #ifdef __cplusplus
 }
 #endif

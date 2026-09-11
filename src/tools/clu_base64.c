@@ -49,14 +49,15 @@ static void wolfCLU_Base64Help(void)
 int wolfCLU_Base64Setup(int argc, char** argv)
 {
 #if !defined(WOLFCLU_NO_FILESYSTEM) && !defined(NO_CODING)
-    WOLFSSL_BIO *bioIn = NULL;
-    WOLFSSL_BIO *bioOut = NULL;
+    char *inFile = NULL;
+    char *outFile = NULL;
     byte* input = NULL;
     byte* output = NULL;
     int ret = WOLFCLU_SUCCESS;
     int decode = 0;
     int isPEM = 0;
-    sword32 inputSz = 8000;
+    /* set by wolfCLU_ReadIo */
+    word32 inputSz = 0;
     word32 outputSz = 0;
     int option;
     int longIndex = 1;
@@ -75,19 +76,22 @@ int wolfCLU_Base64Setup(int argc, char** argv)
                 break;
 
             case WOLFCLU_INFILE:
-                bioIn = wolfSSL_BIO_new_file(optarg, "rb");
-                if (bioIn == NULL) {
-                    wolfCLU_LogError("unable to open file %s", optarg);
+                if (optarg == NULL) {
+                    wolfCLU_LogError("-in expected a value");
                     ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    inFile = optarg;
                 }
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("unable to open output file %s",
-                            optarg);
+                if (optarg == NULL) {
+                    wolfCLU_LogError("-out expected a value");
                     ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    outFile = optarg;
                 }
                 break;
 
@@ -97,12 +101,6 @@ int wolfCLU_Base64Setup(int argc, char** argv)
 
             case WOLFCLU_HELP:
                 wolfCLU_Base64Help();
-                if (bioIn != NULL) {
-                    wolfSSL_BIO_free(bioIn);
-                }
-                if (bioOut != NULL) {
-                    wolfSSL_BIO_free(bioOut);
-                }
                 return WOLFCLU_SUCCESS;
 
             case ':':
@@ -118,56 +116,38 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && bioIn == NULL) {
-        bioIn = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
-        if (bioIn != NULL)
-            wolfSSL_BIO_set_fp(bioIn, stdin, BIO_NOCLOSE);
-    }
-    else if (ret == WOLFCLU_SUCCESS) {
-        /* get data size using raw FILE pointer and seek */
-        XFILE f;
-        if (wolfSSL_BIO_get_fp(bioIn, &f) != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Unable to get raw file pointer");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS && XFSEEK(f, 0, XSEEK_END) != 0) {
-            wolfCLU_LogError("Unable to seek end of file");
-            ret = WOLFCLU_FATAL_ERROR;
-        }
-
-        if (ret == WOLFCLU_SUCCESS) {
-            inputSz = (sword32)XFTELL(f);
-            wolfSSL_BIO_reset(bioIn);
-        }
-    }
-
     if (ret == WOLFCLU_SUCCESS) {
-        input = (byte*)XMALLOC(inputSz, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
-        if (input == NULL) {
-            wolfCLU_LogError("Memory allocation error for input buffer");
-            ret = MEMORY_E;
+        if (inFile == NULL) {
+            ret = wolfCLU_ReadIo(WOLFCLU_IO_READABLE_STREAM, stdin, &input,
+                    &inputSz);
         }
         else {
-            inputSz = wolfSSL_BIO_read(bioIn, input, inputSz);
-
-            if (inputSz < 0) {
-                wolfCLU_LogError("Could not read input.");
+            XFILE fp = XFOPEN(inFile, "rb");
+            if (fp == XBADFILE) {
+                wolfCLU_LogError("Could not open file %s", inFile);
                 ret = WOLFCLU_FATAL_ERROR;
             }
-            /* For decoding, check if input is in PEM format */
-            else if (decode && inputSz > 11) {
-                /* Check if the input starts with a PEM header */
-                if (XMEMCMP(input, "-----BEGIN", 10) == 0) {
-                    isPEM = 1;
-                }
+            else {
+                ret = wolfCLU_ReadIo(WOLFCLU_IO_READABLE_FILE, fp,
+                       &input, &inputSz);
+                XFCLOSE(fp);
             }
+        }
+    }
 
+    /* when decoding, check for a PEM header on the input */
+    if (ret == WOLFCLU_SUCCESS && decode && inputSz >= 10) {
+        if (XMEMCMP(input, "-----BEGIN", 10) == 0) {
+            isPEM = 1;
         }
     }
 
     /* Perform encoding/decoding */
-    if (ret == WOLFCLU_SUCCESS && decode) {
+    if (ret == WOLFCLU_SUCCESS && inputSz == 0) {
+        /* empty input produces empty output, matching 'openssl base64' */
+        outputSz = 0;
+    }
+    else if (ret == WOLFCLU_SUCCESS && decode) {
         if (isPEM) {
 #ifdef WOLFSSL_PEM_TO_DER
             /* Try different PEM types */
@@ -259,44 +239,33 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         }
 
         if (ret == WOLFCLU_SUCCESS) {
-            if (Base64_Encode(input, inputSz, output, &outputSz) < 0) {
-                wolfCLU_LogError("Base64 encode failed: %d", ret);
+            int encRet = Base64_Encode(input, inputSz, output, &outputSz);
+            if (encRet < 0) {
+                wolfCLU_LogError("Base64 encode failed: %d", encRet);
                 ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                ret = WOLFCLU_SUCCESS;
             }
         }
     }
 
-    if (ret == WOLFCLU_SUCCESS && bioOut != NULL) {
-        /* Write output */
-        ret = wolfSSL_BIO_write(bioOut, output, outputSz);
-        if (ret <= 0) {
-            wolfCLU_LogError("Failed to write output data: %d", ret);
-            ret = WOLFCLU_FATAL_ERROR;
+    if (ret == WOLFCLU_SUCCESS) {
+        if (outFile == NULL) {
+            ret = wolfCLU_WriteIo(WOLFCLU_IO_WRITABLE_STREAM, stdout, output,
+                    outputSz);
         }
         else {
-            ret = WOLFCLU_SUCCESS;
-        }
-    }
-    else if (ret == WOLFCLU_SUCCESS) {
-        /* Write to stdout */
-        bioOut = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
-        if (bioOut != NULL) {
-            wolfSSL_BIO_set_fp(bioOut, stdout, BIO_NOCLOSE);
-            ret = wolfSSL_BIO_write(bioOut, output, outputSz);
-            if (ret <= 0) {
-                wolfCLU_LogError("Failed to write to stdout: %d", ret);
+            XFILE fp = XFOPEN(outFile, "wb");
+            if (fp == XBADFILE) {
+                wolfCLU_LogError("Could not open file %s", outFile);
                 ret = WOLFCLU_FATAL_ERROR;
             }
             else {
-                ret = WOLFCLU_SUCCESS;
+                ret = wolfCLU_WriteIo(WOLFCLU_IO_WRITABLE_FILE, fp,
+                        output, outputSz);
+                if (XFCLOSE(fp) != 0 && ret == WOLFCLU_SUCCESS) {
+                    wolfCLU_LogError("Could not write file %s", outFile);
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
             }
-        }
-        else {
-            wolfCLU_LogError("Failed to create stdout BIO");
-            ret = MEMORY_E;
         }
     }
 
@@ -312,12 +281,6 @@ int wolfCLU_Base64Setup(int argc, char** argv)
         wc_FreeDer(&der);
     }
 #endif
-    if (bioIn != NULL) {
-        wolfSSL_BIO_free(bioIn);
-    }
-    if (bioOut != NULL) {
-        wolfSSL_BIO_free(bioOut);
-    }
 
     return ret;
 #else
