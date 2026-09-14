@@ -196,6 +196,7 @@
     <ClInclude Include="wolfclu\clu_error_codes.h" />
     <ClInclude Include="wolfclu\clu_header_main.h" />
     <ClInclude Include="wolfclu\clu_log.h" />
+    <ClInclude Include="wolfclu\clu_io.h" />
     <ClInclude Include="wolfclu\clu_optargs.h" />
     <ClInclude Include="wolfclu\genkey\clu_genkey.h" />
     <ClInclude Include="wolfclu\pkey\clu_pkey.h" />

@@ -167,6 +167,9 @@
     <ClInclude Include="wolfclu\clu_log.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="wolfclu\clu_io.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="wolfclu\clu_optargs.h">
       <Filter>Header Files</Filter>
     </ClInclude>

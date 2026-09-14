@@ -201,6 +201,8 @@ class Base64Test(unittest.TestCase):
         result = run_wolfssl("base64", "-in", "test-b64-does-not-exist.bin")
         self.assertNotEqual(result.returncode, 0,
                             "missing input file should fail")
+        self.assertNotIn("Could not close io", result.stderr,
+                         "a failed open should not be closed")
 
     def test_output_dir_missing(self):
         """An -out path in a missing directory gives a non-zero exit."""
@@ -210,6 +212,8 @@ class Base64Test(unittest.TestCase):
                                                   "out.b64"))
         self.assertNotEqual(result.returncode, 0,
                             "output in a missing directory should fail")
+        self.assertNotIn("Could not close io", result.stderr,
+                         "a failed open should not be closed")
 
     def test_failed_decode_keeps_output(self):
         """A failed -d does not create or truncate the -out file."""
@@ -267,6 +271,200 @@ class Base64Test(unittest.TestCase):
                              "-out", "/dev/full")
         self.assertNotEqual(result.returncode, 0,
                             "write to a full device should fail")
+
+    def test_stdin_buffer_boundaries(self):
+        """Stream reads at and around each buffer grow size (1024, 3072, 7168)."""
+        rng = random.Random(3)
+        for size in (1, 1023, 1024, 1025, 3071, 3072, 3073, 7168, 7169):
+            with self.subTest(size=size):
+                data = rng.randbytes(size)
+                result = subprocess.run(
+                    [WOLFSSL_BIN, "base64"],
+                    input=data,
+                    capture_output=True,
+                    timeout=60,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.replace(b"\n", b""),
+                                 base64.b64encode(data),
+                                 "stdin encode does not match python base64")
+
+    @unittest.skipUnless(os.path.exists("/dev/stdin"), "needs /dev/stdin")
+    def test_pipe_input_file_boundaries(self):
+        """-in on a pipe falls back to stream reads, including at grow sizes."""
+        rng = random.Random(4)
+        for size in (1024, 3072, 7168):
+            with self.subTest(size=size):
+                data = rng.randbytes(size)
+                result = subprocess.run(
+                    [WOLFSSL_BIN, "base64", "-in", "/dev/stdin"],
+                    input=data,
+                    capture_output=True,
+                    timeout=60,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.replace(b"\n", b""),
+                                 base64.b64encode(data),
+                                 "pipe input encode does not match python base64")
+
+    def test_stdin_from_regular_file(self):
+        """stdin redirected from a seekable file is read in full as a stream."""
+        in_file = "test-b64-stdin-file.bin"
+        self.addCleanup(lambda: os.remove(in_file)
+                        if os.path.exists(in_file) else None)
+
+        data = random.Random(5).randbytes(20000)
+        with open(in_file, "wb") as f:
+            f.write(data)
+
+        with open(in_file, "rb") as f:
+            result = subprocess.run(
+                [WOLFSSL_BIN, "base64"],
+                stdin=f,
+                capture_output=True,
+                timeout=60,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.replace(b"\n", b""),
+                         base64.b64encode(data),
+                         "redirected stdin encode does not match python base64")
+
+    def test_binary_file_roundtrip(self):
+        """Every byte value, including NUL, CR and LF, survives -in/-out files."""
+        in_file = "test-b64-binary.bin"
+        encoded_file = "test-b64-binary.b64"
+        decoded_file = "test-b64-binary.out"
+        for name in (in_file, encoded_file, decoded_file):
+            self.addCleanup(lambda n=name: os.remove(n)
+                            if os.path.exists(n) else None)
+
+        data = bytes(range(256)) * 40 + b"\r\n\r\n\x00\x1a"
+        with open(in_file, "wb") as f:
+            f.write(data)
+
+        result = run_wolfssl("base64", "-in", in_file, "-out", encoded_file)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(encoded_file, "rb") as f:
+            self.assertEqual(f.read().replace(b"\n", b""),
+                             base64.b64encode(data),
+                             "file encode does not match python base64")
+
+        result = run_wolfssl("base64", "-d", "-in", encoded_file,
+                             "-out", decoded_file)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(decoded_file, "rb") as f:
+            self.assertEqual(f.read(), data,
+                             "binary file round trip does not match")
+
+    @unittest.skipUnless(os.path.exists("/dev/null"), "needs /dev/null")
+    def test_dev_null_input(self):
+        """-in on a device that reports a size of 0 gives empty output."""
+        for args in (("base64",), ("base64", "-d")):
+            with self.subTest(args=args):
+                result = run_wolfssl(*args, "-in", "/dev/null")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, "",
+                                 "empty device should give no output")
+
+    @unittest.skipUnless(os.path.exists("/sys/class/net/lo/address"),
+                         "needs /sys/class/net/lo/address")
+    def test_short_read_sysfs_file(self):
+        """-in on a sysfs file that reports a size larger than its data."""
+        sysfs_file = "/sys/class/net/lo/address"
+        with open(sysfs_file, "rb") as f:
+            data = f.read()
+
+        result = subprocess.run(
+            [WOLFSSL_BIN, "base64", "-in", sysfs_file],
+            capture_output=True,
+            timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.replace(b"\n", b""),
+                         base64.b64encode(data),
+                         "sysfs file encode does not match python base64")
+
+    def test_output_file_truncated(self):
+        """An existing -out file longer than the output is fully replaced."""
+        in_file = "test-b64-trunc.bin"
+        out_file = "test-b64-trunc.b64"
+        for name in (in_file, out_file):
+            self.addCleanup(lambda n=name: os.remove(n)
+                            if os.path.exists(n) else None)
+
+        data = b"short"
+        with open(in_file, "wb") as f:
+            f.write(data)
+        with open(out_file, "wb") as f:
+            f.write(b"x" * 10000)
+
+        result = run_wolfssl("base64", "-in", in_file, "-out", out_file)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(out_file, "rb") as f:
+            self.assertEqual(f.read().replace(b"\n", b""),
+                             base64.b64encode(data),
+                             "old -out contents were not truncated")
+
+    def test_missing_input_file_no_output(self):
+        """A missing -in file does not create the -out file."""
+        out_file = "test-b64-missing-in.b64"
+        self.addCleanup(lambda: os.remove(out_file)
+                        if os.path.exists(out_file) else None)
+
+        result = run_wolfssl("base64", "-in", "test-b64-does-not-exist.bin",
+                             "-out", out_file)
+        self.assertNotEqual(result.returncode, 0,
+                            "missing input file should fail")
+        self.assertNotIn("Could not close io", result.stderr,
+                         "a failed open should not be closed")
+        self.assertFalse(os.path.exists(out_file),
+                         "failed read should not create -out")
+
+    def test_input_is_directory(self):
+        """-in naming a directory gives a non-zero exit."""
+        in_dir = "test-b64-in-dir"
+        os.makedirs(in_dir, exist_ok=True)
+        self.addCleanup(lambda: os.rmdir(in_dir)
+                        if os.path.isdir(in_dir) else None)
+
+        result = run_wolfssl("base64", "-in", in_dir)
+        self.assertNotEqual(result.returncode, 0,
+                            "directory as input should fail")
+        self.assertNotIn("Could not close io", result.stderr,
+                         "closing a dir after a failed read should succeed")
+
+    def test_output_is_directory(self):
+        """-out naming a directory gives a non-zero exit."""
+        out_dir = "test-b64-out-dir"
+        os.makedirs(out_dir, exist_ok=True)
+        self.addCleanup(lambda: os.rmdir(out_dir)
+                        if os.path.isdir(out_dir) else None)
+
+        result = run_wolfssl("base64", "-in",
+                             os.path.join(CERTS_DIR, "server-key.der"),
+                             "-out", out_dir)
+        self.assertNotEqual(result.returncode, 0,
+                            "directory as output should fail")
+
+    @unittest.skipIf(not hasattr(os, "geteuid") or os.geteuid() == 0,
+                     "needs a non-root POSIX user")
+    def test_unreadable_input_file(self):
+        """An -in file without read permission gives a non-zero exit."""
+        in_file = "test-b64-unreadable.bin"
+        self.addCleanup(lambda: os.remove(in_file)
+                        if os.path.exists(in_file) else None)
+
+        with open(in_file, "wb") as f:
+            f.write(b"secret")
+        os.chmod(in_file, 0o200)
+
+        result = run_wolfssl("base64", "-in", in_file)
+        self.assertNotEqual(result.returncode, 0,
+                            "unreadable input file should fail")
+        self.assertNotIn("Could not close io", result.stderr,
+                         "a failed open should not be closed")
+        self.assertEqual(result.stdout, "",
+                         "unreadable input should give no output")
 
     def test_help(self):
         """ Test help flag """

@@ -23,6 +23,7 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
+#include <wolfclu/clu_io.h>
 
 static const struct option base64_options[] = {
     {"-in",           required_argument, 0, WOLFCLU_INFILE    },
@@ -117,21 +118,23 @@ int wolfCLU_Base64Setup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
+        WOLFCLU_IO ioIn = {0};
         if (inFile == NULL) {
-            ret = wolfCLU_ReadIo(WOLFCLU_IO_READABLE_STREAM, stdin, &input,
-                    &inputSz);
+            ioIn = wolfCLU_OpenIo_fp(stdin, WOLFCLU_IO_READABLE_STREAM |
+                    WOLFCLU_IO_NOCLOSE);
         }
         else {
-            XFILE fp = XFOPEN(inFile, "rb");
-            if (fp == XBADFILE) {
-                wolfCLU_LogError("Could not open file %s", inFile);
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                ret = wolfCLU_ReadIo(WOLFCLU_IO_READABLE_FILE, fp,
-                       &input, &inputSz);
-                XFCLOSE(fp);
-            }
+            ioIn = wolfCLU_OpenIo_file(inFile, WOLFCLU_IO_READABLE_FILE);
+        }
+
+        if (ioIn.type <= 0 ||
+                wolfCLU_ReadIo(&ioIn, &input, &inputSz, 0) !=
+                WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ioIn.type > 0 && wolfCLU_CloseIo(&ioIn) != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Could not close io");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -248,32 +251,32 @@ int wolfCLU_Base64Setup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS) {
+        WOLFCLU_IO ioOut = {0};
         if (outFile == NULL) {
-            ret = wolfCLU_WriteIo(WOLFCLU_IO_WRITABLE_STREAM, stdout, output,
-                    outputSz);
+            ioOut = wolfCLU_OpenIo_fp(stdout, WOLFCLU_IO_WRITABLE_STREAM |
+                                              WOLFCLU_IO_NOCLOSE);
         }
         else {
-            XFILE fp = XFOPEN(outFile, "wb");
-            if (fp == XBADFILE) {
-                wolfCLU_LogError("Could not open file %s", outFile);
-                ret = WOLFCLU_FATAL_ERROR;
-            }
-            else {
-                ret = wolfCLU_WriteIo(WOLFCLU_IO_WRITABLE_FILE, fp,
-                        output, outputSz);
-                if (XFCLOSE(fp) != 0 && ret == WOLFCLU_SUCCESS) {
-                    wolfCLU_LogError("Could not write file %s", outFile);
-                    ret = WOLFCLU_FATAL_ERROR;
-                }
-            }
+            ioOut = wolfCLU_OpenIo_file(outFile, WOLFCLU_IO_WRITABLE_FILE);
+        }
+
+        if (ioOut.type <= 0 ||
+                wolfCLU_WriteIo(&ioOut, output, outputSz) != WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        if (ioOut.type > 0 && wolfCLU_CloseIo(&ioOut) != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Could not close io");
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
     /* Clean up */
     if (input != NULL) {
+        wolfCLU_ForceZero(input, inputSz);
         XFREE(input, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
     if (output != NULL) {
+        wolfCLU_ForceZero(output, outputSz);
         XFREE(output, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     }
 #ifdef WOLFSSL_PEM_TO_DER
