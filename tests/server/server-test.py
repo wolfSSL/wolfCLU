@@ -8,21 +8,17 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main, find_free_port
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, find_free_port,
+                          no_filesystem, test_main)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class ServerClientTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
     def test_help(self):
         """s_server -help prints usage and exits cleanly."""

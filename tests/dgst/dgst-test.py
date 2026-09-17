@@ -9,24 +9,19 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import (CERTS_DIR, is_fips, not_compiled_in, run_wolfssl,
-                          test_main, truncate_sparse)
+from wolfclu_test import (CERTS_DIR, is_fips, no_filesystem, not_compiled_in,
+                          run_wolfssl, test_main, truncate_sparse)
 
 DGST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstVerifyTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
     def test_verify_sha256_rsa(self):
         r = run_wolfssl("dgst", "-sha256", "-verify",
@@ -162,6 +157,7 @@ class DgstVerifyTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstLargeFileTest(unittest.TestCase):
 
     LARGE_FILE = "large-test.txt"
@@ -170,12 +166,6 @@ class DgstLargeFileTest(unittest.TestCase):
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
         # Create large file: 5000 copies of server-key.der
         der_path = os.path.join(CERTS_DIR, "server-key.der")
@@ -354,6 +344,7 @@ class LargeFileDgstTest(unittest.TestCase):
                     self.assertNotEqual(r.returncode, 0)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstSignVerifyRoundtripTest(unittest.TestCase):
 
     @classmethod
@@ -397,6 +388,7 @@ class DgstSignVerifyRoundtripTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class DgstHmacTest(unittest.TestCase):
     """HMAC test vectors for `dgst -mac HMAC`.
 
@@ -445,12 +437,6 @@ class DgstHmacTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
-
         cls._tmpdir = tempfile.mkdtemp(prefix="wolfclu-hmac-")
         cls.data_file = os.path.join(cls._tmpdir, "data.bin")
         with open(cls.data_file, "wb") as f:

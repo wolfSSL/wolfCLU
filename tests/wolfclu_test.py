@@ -88,6 +88,39 @@ def run_wolfssl(*args, stdin_data=None, timeout=60):
     return subprocess.run(cmd, **kwargs)
 
 
+_NO_FILESYSTEM = None
+
+# The probe names a file that cannot exist, so the command must always exit
+# non-zero; exit 0 means it has stopped measuring anything.
+_NO_FS_PROBE_ARGS = ("x509", "-in", "wolfclu-no-filesystem-probe")
+
+# Case-insensitive: clu_cert_setup.c prints "No filesystem support",
+# clu_request_setup.c "No Filesystem Support.".
+_NO_FS_MESSAGE = "no filesystem support"
+
+
+def no_filesystem():
+    """True when the build under test has no filesystem support.
+
+    Fails loud rather than open: returning False on a --disable-filesystem
+    build would stop every suite below from skipping, turning a clean SKIP
+    run into hundreds of unrelated failures. A missing binary, a timeout or
+    an unexpectedly successful probe therefore raises instead of guessing.
+    """
+    global _NO_FILESYSTEM
+    if _NO_FILESYSTEM is None:
+        # OSError/SubprocessError deliberately uncaught: not a verdict.
+        r = run_wolfssl(*_NO_FS_PROBE_ARGS)
+        combined = r.stdout + r.stderr
+        if r.returncode == 0:
+            raise RuntimeError(
+                "filesystem probe `%s %s` unexpectedly succeeded; it can no "
+                "longer detect --disable-filesystem builds:\n%s"
+                % (WOLFSSL_BIN, " ".join(_NO_FS_PROBE_ARGS), combined))
+        _NO_FILESYSTEM = _NO_FS_MESSAGE in combined.lower()
+    return _NO_FILESYSTEM
+
+
 def is_fips():
     """True when linked against a FIPS wolfSSL build (per `wolfssl -v`)."""
     r = run_wolfssl("-v")
@@ -181,6 +214,32 @@ def truncate_sparse(fileobj, size):
         raise ctypes.WinError()
 
 
+class _CountingResult(unittest.TextTestResult):
+    """TextTestResult that also counts the tests which actually ran.
+
+    testsRun cannot answer "did anything run?" on its own: a SkipTest
+    raised from setUpClass lands in result.skipped without incrementing
+    testsRun, while @unittest.skipIf increments it once per skipped
+    method.  Counting completions is exact under either style.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ran = 0
+
+    def addSuccess(self, test):
+        super().addSuccess(test)
+        self.ran += 1
+
+    def addExpectedFailure(self, test, err):
+        super().addExpectedFailure(test, err)
+        self.ran += 1
+
+
+class _CountingRunner(unittest.TextTestRunner):
+    resultclass = _CountingResult
+
+
 def test_main():
     """Run tests with automake-compatible exit codes.
 
@@ -188,13 +247,14 @@ def test_main():
     when every test was skipped, so automake would report PASS.  This
     wrapper runs unittest with exit=False and translates the result:
       - failures/errors  -> exit 1
-      - all skipped / no tests run -> exit 77  (automake SKIP)
+      - nothing actually ran -> exit 77  (automake SKIP)
       - otherwise        -> exit 0  (automake PASS)
     """
-    prog = unittest.main(module='__main__', exit=False)
+    prog = unittest.main(module='__main__', exit=False,
+                         testRunner=_CountingRunner)
     result = prog.result
     if not result.wasSuccessful():
         sys.exit(1)
-    if result.testsRun == 0 or len(result.skipped) == result.testsRun:
+    if result.ran == 0:
         sys.exit(77)
     sys.exit(0)

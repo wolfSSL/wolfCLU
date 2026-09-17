@@ -7,21 +7,17 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, no_filesystem, run_wolfssl,
+                          test_main)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class Pkcs7Test(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
         r = run_wolfssl("pkcs7", "-inform", "DER", "-in",
                         os.path.join(CERTS_DIR, "signed.p7b"))
