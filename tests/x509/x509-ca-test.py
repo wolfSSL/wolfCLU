@@ -809,5 +809,112 @@ class TestCAOutdirPath(unittest.TestCase):
                         "File not found at {}".format(expected))
 
 
+def _has_ml_dsa():
+    """Check whether ML-DSA key generation is available in this build."""
+    r = run_wolfssl("genkey", "-h")
+    return "ml-dsa" in (r.stdout + r.stderr)
+
+
+@unittest.skipUnless(_has_ml_dsa(), "ml-dsa not available")
+class TestCAMlDsa(unittest.TestCase):
+    """ML-DSA (post-quantum) CA-signing tests.
+
+    Regression coverage for two bugs found while building a ML-KEM/ML-DSA
+    mutual-TLS demo, both of which let a broken certificate through with a
+    0 exit code instead of failing loudly:
+
+      1. `req -new [-x509] -key <ml-dsa priv>` failed to embed the
+         certificate's public key, because wolfSSL's ML-DSA private-key
+         decode does not recompute the public key from imported private-key
+         components. Fixed in wolfSSL by having
+         wc_MlDsaKey_PrivateKeyToDer() include the public key in the
+         RFC 5958 OneAsymmetricKey `publicKey [1]` field.
+      2. `ca -in <csr> -keyfile <ml-dsa priv> ...` silently skipped the
+         signing step for any non-RSA/ECDSA CA key (wolfCLU_GetTypeFromPKEY,
+         wolfCLU_CertSignSetCA, and wolfCLU_CertSign only recognized
+         RSAk/ECDSAk), yet still wrote out a certificate file and exited 0;
+         the file was missing its issuer name and validity dates and failed
+         to parse. Fixed by recognizing ML-DSA keys in those three
+         functions.
+    """
+
+    def setUp(self):
+        _cleanup(_tmp("index.txt"))
+        _touch(_tmp("index.txt"))
+
+    def tearDown(self):
+        _cleanup(_tmp("index.txt"))
+
+    def _clean(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: _cleanup(p))
+
+    def _genkey_mldsa(self, keybase):
+        priv = keybase + ".priv"
+        pub = keybase + ".pub"
+        self._clean(priv, pub)
+        r = run_wolfssl("genkey", "ml-dsa", "-level", "5",
+                        "-out", keybase, "-output", "keypair",
+                        "-outform", "PEM")
+        self.assertEqual(r.returncode, 0,
+                         "genkey ml-dsa failed: {}".format(r.stderr))
+        return priv, pub
+
+    def test_mldsa_self_signed_ca(self):
+        """A self-signed ML-DSA-87 CA cert must embed its own public key."""
+        ca_key, _ = self._genkey_mldsa(_tmp("tmp_mldsa_ca_key"))
+        ca_cert = _tmp("tmp_mldsa_ca_cert.pem")
+        self._clean(ca_cert)
+
+        r = run_wolfssl("req", "-new", "-x509", "-key", ca_key,
+                        "-subj", "O=wolfCLU-Test/C=US/CN=MLDSA-Test-CA",
+                        "-out", ca_cert, "-outform", "PEM")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("x509", "-in", ca_cert, "-inform", "PEM",
+                        "-issuer", "-noout")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("MLDSA-Test-CA", r.stdout)
+
+    def test_mldsa_ca_sign_server_cert(self):
+        """A CSR signed by an ML-DSA CA key must produce a well-formed
+        certificate that still carries its issuer name and validity
+        dates, and verifies against the CA."""
+        ca_key, _ = self._genkey_mldsa(_tmp("tmp_mldsa2_ca_key"))
+        server_key, _ = self._genkey_mldsa(_tmp("tmp_mldsa2_server_key"))
+        ca_cert = _tmp("tmp_mldsa2_ca_cert.pem")
+        server_csr = _tmp("tmp_mldsa2_server.csr")
+        server_cert = _tmp("tmp_mldsa2_server_cert.pem")
+        self._clean(ca_cert, server_csr, server_cert)
+
+        r = run_wolfssl("req", "-new", "-x509", "-key", ca_key,
+                        "-subj", "O=wolfCLU-Test/C=US/CN=MLDSA-Test-CA2",
+                        "-out", ca_cert, "-outform", "PEM")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("req", "-new", "-key", server_key,
+                        "-subj", "O=wolfCLU-Test/C=US/CN=mldsa-server",
+                        "-out", server_csr, "-outform", "PEM")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("ca", "-in", server_csr, "-keyfile", ca_key,
+                        "-cert", ca_cert, "-out", server_cert,
+                        "-days", "30")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r = run_wolfssl("x509", "-in", server_cert, "-inform", "PEM",
+                        "-issuer", "-noout")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("MLDSA-Test-CA2", r.stdout)
+
+        r = run_wolfssl("x509", "-in", server_cert, "-inform", "PEM",
+                        "-dates", "-noout")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(r.stdout.strip(), "no validity dates printed")
+
+        r = run_wolfssl("verify", "-CAfile", ca_cert, server_cert)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+
 if __name__ == "__main__":
     test_main()

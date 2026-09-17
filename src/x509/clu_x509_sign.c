@@ -123,7 +123,11 @@ int wolfCLU_CertSignFree(WOLFCLU_CERT_SIGN* csign)
         }
         wolfSSL_BIO_free(csign->randFile);
         wolfSSL_X509_free(csign->ca);
-        if (csign->keyType == RSAk || csign->keyType == ECDSAk) {
+        if (csign->keyType == RSAk || csign->keyType == ECDSAk
+        #ifdef HAVE_DILITHIUM
+                || csign->keyType == ML_DSA_87k
+        #endif
+        ) {
             wolfSSL_EVP_PKEY_free(csign->caKey.pkey);
         }
         XFREE(csign, HEAP_HINT, DYNAMIC_TYPE_CERT);
@@ -201,6 +205,9 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
             switch (keyType) {
                 case RSAk:
                 case ECDSAk:
+            #ifdef HAVE_DILITHIUM
+                case ML_DSA_87k:
+            #endif
                     wolfSSL_EVP_PKEY_free(csign->caKey.pkey);
                     csign->caKey.pkey = (WOLFSSL_EVP_PKEY*)key;
                     break;
@@ -1394,9 +1401,20 @@ int wolfCLU_CertSign(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* x509)
             wolfCLU_LogError("Error signing certificate");
             ret = WOLFCLU_FATAL_ERROR;
         }
-    } /* @TODO else case here could get the tbs buffer or just the der of the
-       * x509 struct and use a different method for signing and creating the
-       * certificate */
+    }
+#ifdef HAVE_DILITHIUM
+    /* ML-DSA: wolfSSL_X509_sign() itself resolves the ML-DSA level/sig type
+     * from the WOLFSSL_EVP_PKEY and ignores `md`. */
+    else if (ret == WOLFCLU_SUCCESS && csign->keyType == ML_DSA_87k) {
+        if (wolfSSL_X509_sign(x509, csign->caKey.pkey, md) <= 0) {
+            wolfCLU_LogError("Error signing certificate");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+#endif
+    /* @TODO else case here could get the tbs buffer or just the der of the
+     * x509 struct and use a different method for signing and creating the
+     * certificate */
 
     /* check if unique subject name is required */
     if (ret == WOLFCLU_SUCCESS && csign->unique == 1) {
