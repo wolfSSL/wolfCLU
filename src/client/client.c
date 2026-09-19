@@ -857,10 +857,11 @@ static void EarlyData(WOLFSSL_CTX* ctx, WOLFSSL* ssl, const char* msg,
 {
     int err;
     int ret;
+    int written = 0;
 
     do {
         err = 0; /* reset error */
-        ret = wolfSSL_write_early_data(ssl, msg, msgSz, &msgSz);
+        ret = wolfSSL_write_early_data(ssl, msg, msgSz, &written);
         if (ret <= 0) {
             err = wolfSSL_get_error(ssl, 0);
         #ifdef WOLFSSL_ASYNC_CRYPT
@@ -872,15 +873,16 @@ static void EarlyData(WOLFSSL_CTX* ctx, WOLFSSL* ssl, const char* msg,
         }
     } while (err == WC_PENDING_E);
     if (ret != msgSz) {
-        printf("SSL_write_early_data msg error %d, %s\n", err,
-                                         wolfSSL_ERR_error_string(err, buffer));
+        err = wolfSSL_get_error(ssl, ret);
+        printf("SSL_write_early_data msg error %d, %s, wrote %d of %d\n",
+                err, wolfSSL_ERR_error_string(err, buffer), written, msgSz);
         wolfSSL_free(ssl); ssl = NULL;
         wolfSSL_CTX_free(ctx); ctx = NULL;
         err_sys("SSL_write_early_data failed");
     }
     do {
         err = 0; /* reset error */
-        ret = wolfSSL_write_early_data(ssl, msg, msgSz, &msgSz);
+        ret = wolfSSL_write_early_data(ssl, msg, msgSz, &written);
         if (ret <= 0) {
             err = wolfSSL_get_error(ssl, 0);
         #ifdef WOLFSSL_ASYNC_CRYPT
@@ -892,8 +894,9 @@ static void EarlyData(WOLFSSL_CTX* ctx, WOLFSSL* ssl, const char* msg,
         }
     } while (err == WC_PENDING_E);
     if (ret != msgSz) {
-        printf("SSL_write_early_data msg error %d, %s\n", err,
-                                         wolfSSL_ERR_error_string(err, buffer));
+        err = wolfSSL_get_error(ssl, ret);
+        printf("SSL_write_early_data msg error %d, %s, wrote %d of %d\n",
+                err, wolfSSL_ERR_error_string(err, buffer), written, msgSz);
         wolfSSL_free(ssl);
         wolfSSL_CTX_free(ctx);
         err_sys("SSL_write_early_data failed");
