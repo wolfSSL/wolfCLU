@@ -37,6 +37,8 @@ static const struct option client_options[] = {
     {"-verify_return_error", no_argument,       0, WOLFCLU_VERIFY_RETURN_ERROR},
     {"-disable_stdin_check", no_argument,       0, WOLFCLU_DISABLE_STDINCHK   },
     {"-noservername",        no_argument,       0, WOLFCLU_NOSERVERNAME       },
+    {"-verify_hostname",     required_argument, 0, WOLFCLU_VERIFY_HOSTNAME    },
+    {"-verify_ip",           required_argument, 0, WOLFCLU_VERIFY_IP          },
     {"-help",                no_argument,       0, WOLFCLU_HELP               },
     {"-h",                   no_argument,       0, WOLFCLU_HELP               },
 
@@ -58,6 +60,11 @@ static void wolfCLU_ClientHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-verify_return_error close connection on verification error");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-disable_stdin_check ");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-noservername do not send Server Name Indication");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-verify_hostname <name> check the peer certificate"
+            " against <name>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-verify_ip <ip> check the peer certificate against"
+            " <ip>");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t\teither one turns on peer verification");
 }
 
 static const char hostFlag[]       = "-h";
@@ -69,6 +76,8 @@ static const char noClientCert[]   = "-x";
 static const char startTLSFlag[]   = "-M";
 static const char disableCRLFlag[] = "-C";
 static const char sniFlag[]       = "-S";
+static const char verifyHostFlag[] = "--verify_hostname";
+static const char verifyIpFlag[]   = "--verify_ip";
 
 int myoptind = 0;
 char* myoptarg = NULL;
@@ -105,6 +114,8 @@ int wolfCLU_Client(int argc, char** argv)
     int   verify = 0;
     int   noservername = 0;
     char* ipv6 = NULL;
+    char* verifyHost = NULL;
+    char* verifyIp = NULL;
 
     int    clientArgc = 0;
     const char* clientArgv[MAX_CLIENT_ARGS];
@@ -236,6 +247,26 @@ int wolfCLU_Client(int argc, char** argv)
                 noservername = 1;
                 break;
 
+            case WOLFCLU_VERIFY_HOSTNAME:
+                if (optarg == NULL) {
+                    wolfCLU_LogError("-verify_hostname requires a name");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    verifyHost = optarg;
+                }
+                break;
+
+            case WOLFCLU_VERIFY_IP:
+                if (optarg == NULL) {
+                    wolfCLU_LogError("-verify_ip requires an address");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    verifyIp = optarg;
+                }
+                break;
+
             case ARG_FOUND_TWICE:
                 wolfCLU_LogError("Found duplicate argument");
                 return WOLFCLU_FATAL_ERROR;
@@ -265,10 +296,27 @@ int wolfCLU_Client(int argc, char** argv)
         }
     }
 
+    if (ret == WOLFCLU_SUCCESS && verifyHost != NULL) {
+        verify = 1;
+        ret = _addClientArg(clientArgv, verifyHostFlag, &clientArgc);
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _addClientArg(clientArgv, verifyHost, &clientArgc);
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && verifyIp != NULL) {
+        verify = 1;
+        ret = _addClientArg(clientArgv, verifyIpFlag, &clientArgc);
+        if (ret == WOLFCLU_SUCCESS) {
+            ret = _addClientArg(clientArgv, verifyIp, &clientArgc);
+        }
+    }
+
     if (ret == WOLFCLU_SUCCESS && !verify) {
         ret = _addClientArg(clientArgv, noVerifyFlag, &clientArgc);
 
-        WOLFCLU_LOG(WOLFCLU_L0, "\nWarning: -verify_return_error not specified."
+        WOLFCLU_LOG(WOLFCLU_L0, "\nWarning: none of -verify_return_error,"
+            " -verify_hostname or -verify_ip specified."
             " Defaulting to NOT verifying peer.");
     }
 
