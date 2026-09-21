@@ -51,7 +51,6 @@ static void wolfCLU_x509VerifyHelp(void)
             "1 cert as -untrusted");
 
 }
-#endif
 
 static X509* load_cert_from_file(const char* filename) {
     WOLFSSL_BIO*  bio = NULL;
@@ -75,6 +74,7 @@ static X509* load_cert_from_file(const char* filename) {
 
     return cert;
 }
+#endif /* !WOLFCLU_NO_FILESYSTEM */
 
 int wolfCLU_x509Verify(int argc, char** argv)
 {

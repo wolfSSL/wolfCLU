@@ -8,21 +8,17 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, is_fips, no_filesystem,
+                          run_wolfssl, test_main)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class Pkcs8Test(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
         r = run_wolfssl("pkcs8", "-in",
                         os.path.join(CERTS_DIR, "server-keyEnc.pem"),

@@ -6,7 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import CERTS_DIR, no_filesystem, run_wolfssl, test_main
 
 
 def _get_curve_names():
@@ -26,18 +26,13 @@ def _get_curve_names():
     return names
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class EcparamTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
     def _cleanup(self, *files):
         for f in files:
