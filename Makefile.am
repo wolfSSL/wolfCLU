@@ -53,6 +53,7 @@ man_MANS+= manpages/wolfssl-hash.1
 man_MANS+= manpages/wolfssl-enc.1
 man_MANS+= manpages/wolfssl-ca.1
 man_MANS+= manpages/wolfssl-x509.1
+man_MANS+= manpages/wolfssl-asn1parse.1
 man_MANS+= manpages/wolfssl-req.1
 man_MANS+= manpages/wolfssl-verify.1
 man_MANS+= manpages/wolfssl-crl.1
@@ -95,6 +96,7 @@ include tests/dsa/include.am
 include tests/pkey/include.am
 include tests/dgst/include.am
 include tests/rand/include.am
+include tests/asn1/include.am
 include tests/base64/include.am
 include tests/ocsp/include.am
 include tests/ocsp-scgi/include.am

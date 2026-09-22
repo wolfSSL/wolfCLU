@@ -95,6 +95,20 @@ AC_ARG_ENABLE([manpages],
 
 AM_CONDITIONAL([ENABLE_MANPAGES], [test "x$ENABLED_MANPAGES" != "xno"])
 
+# OID Name Table Build
+ENABLED_OIDTABLE_DEFAULT=yes
+AC_ARG_ENABLE([oid-table],
+    [AS_HELP_STRING([--disable-oid-table],[Disable OID-to-name lookup table (default: enabled)])],
+    [ ENABLED_OIDTABLE=$enableval ],
+    [ ENABLED_OIDTABLE=$ENABLED_OIDTABLE_DEFAULT ]
+    )
+
+if test "x$ENABLED_OIDTABLE" != "xno"
+then
+    AC_DEFINE([HAVE_OID_TABLE], [1],
+              [Enable OID-to-name lookup table])
+fi
+
 
 #wolfssl
 AC_MSG_CHECKING([for wolfSSL])
@@ -140,7 +154,6 @@ AC_CHECK_FUNC([wolfSSL_X509_REQ_print],
 AC_CHECK_FUNC([wc_EncodeObjectId],
     [],
     [AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
-
 
 ###############################################
 #                                             #
@@ -209,3 +222,4 @@ echo "   * C Flags:                   $CFLAGS"
 echo "   * CPP Flags:                 $CPPFLAGS"
 echo "   * LIB Flags:                 $LIB"
 echo "   * Debug enabled:             $ax_enable_debug"
+echo "   * OID Name Table:            $ENABLED_OIDTABLE"
