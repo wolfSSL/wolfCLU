@@ -213,7 +213,10 @@ int wolfCLU_PKCS8(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && pass == NULL && pkey == NULL) {
-        wolfCLU_GetStdinPassword((byte*)password, (word32*)&passwordSz);
+        ret = wolfCLU_GetStdinPassword((byte*)password, (word32*)&passwordSz);
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Unable to get password from stdin");
+        }
         pass = (byte*)password;
     }
 

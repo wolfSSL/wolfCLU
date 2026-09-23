@@ -1298,7 +1298,7 @@ int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz)
     DWORD originalTerm;
 #endif
 
-    if (password == NULL || passwordSz == NULL) {
+    if (password == NULL || passwordSz == NULL || *passwordSz == 0) {
         return WOLFCLU_FATAL_ERROR;
     }
 
@@ -1312,9 +1312,15 @@ int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz)
             char* c = strpbrk((char*)password, "\r\n");
             if (c != NULL)
                 *c = '\0';
+            *passwordSz = (word32)XSTRLEN((const char*)password);
         }
-        *passwordSz = (word32)XSTRLEN((const char*)password);
         ShowEcho(&originalTerm);
+    }
+
+    /* On EOF or error the buffer holds no valid string. */
+    if (ret != WOLFCLU_SUCCESS) {
+        password[0] = '\0';
+        *passwordSz = 0;
     }
     return ret;
 }
