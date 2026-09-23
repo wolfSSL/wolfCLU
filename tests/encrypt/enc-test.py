@@ -975,6 +975,43 @@ class EncKeyInputTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
                         "rand-hex -> -inkey workflow did not round-trip")
 
+    def test_legacy_cipher_key_iv_roundtrip(self):
+        """The non-EVP cipher path with -key/-iv must strip its padding.
+
+        Camellia uses wolfCLU_encrypt/wolfCLU_decrypt, which pad the input
+        to a whole block and record in the salt header whether they did.
+        Sizes 27 and 1025 need padding; 32 and 2048 are block aligned.
+        """
+        if not _camellia_available():
+            self.skipTest("Camellia not compiled in")
+
+        for size in (27, 32, 1025, 2048):
+            orig = "legacy_key_iv_{}.bin".format(size)
+            enc = "legacy_key_iv_{}.enc".format(size)
+            dec = "legacy_key_iv_{}.dec".format(size)
+            self._cleanup(orig, enc, dec)
+            data = bytes(i % 251 for i in range(size))
+            with open(orig, "wb") as f:
+                f.write(data)
+
+            with self.subTest(size=size):
+                r = run_wolfssl("-encrypt", "camellia-cbc-256",
+                                "-in", orig, "-out", enc,
+                                "-key", self.KEY_HEX, "-iv", self.IV_HEX)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                r = run_wolfssl("-decrypt", "camellia-cbc-256",
+                                "-in", enc, "-out", dec,
+                                "-key", self.KEY_HEX, "-iv", self.IV_HEX)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                with open(dec, "rb") as f:
+                    got = f.read()
+                self.assertEqual(len(got), size,
+                                 "decrypted length differs from original")
+                self.assertEqual(got, data,
+                                 "decrypted data differs from original")
+
 
 @unittest.skipUnless(HAVE_PTY, "pty not available (non-POSIX)")
 class EncStdinPasswordTest(unittest.TestCase):
