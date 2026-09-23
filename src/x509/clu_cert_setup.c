@@ -631,15 +631,29 @@ int wolfCLU_certSetup(int argc, char **argv)
         int derSz;
         const unsigned char *der;
         byte digest[WC_MAX_DIGEST_SIZE];
-        word32 digestSz = WC_MAX_DIGEST_SIZE;
+        int digestSz;
         enum wc_HashType digestType = WC_HASH_TYPE_SHA;
 
         der = wolfSSL_X509_get_der(x509, &derSz);
-        if (der != NULL) {
+        if (der == NULL || derSz <= 0) {
+            wolfCLU_LogError("Unable to get certificate DER for fingerprint");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+        else {
             digestSz = wc_HashGetDigestSize(digestType);
-            if (wc_Hash(digestType, der, derSz, digest, digestSz) == 0) {
+            if (digestSz <= 0 || digestSz > WC_MAX_DIGEST_SIZE) {
+                wolfCLU_LogError("SHA-1 not available, unable to print "
+                                 "fingerprint");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else if (wc_Hash(digestType, der, (word32)derSz, digest,
+                             (word32)digestSz) != 0) {
+                wolfCLU_LogError("Unable to hash certificate for fingerprint");
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
                 char txt[MAX_TERM_WIDTH];
-                word32 i;
+                int i;
 
                 XSNPRINTF(txt, MAX_TERM_WIDTH, "SHA1 of cert. DER : ");
                 if (wolfSSL_BIO_write(out, txt, (int)XSTRLEN(txt)) <= 0) {
