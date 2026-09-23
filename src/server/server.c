@@ -393,8 +393,8 @@ static int ServerEchoData(SSL* ssl, int clientfd, int echoData, int block,
         int select_ret = tcp_select(clientfd, 1); /* Timeout=1 second */
         if (select_ret == TEST_RECV_READY) {
 
-            if (throughput)
-                len = min(block, (int)(throughput - xfer_bytes));
+            if (throughput && throughput - xfer_bytes < (size_t)block)
+                len = (int)(throughput - xfer_bytes);
             else
                 len = block;
             rx_pos = 0;
