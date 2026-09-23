@@ -77,6 +77,7 @@ int wolfCLU_RSA(int argc, char** argv)
     int noOut = 0;
     int option;
     int longIndex = 1;
+    char *outFile = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
     WOLFSSL_RSA *rsa = NULL;
@@ -101,10 +102,9 @@ int wolfCLU_RSA(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("unable to open out file %s",
-                            optarg);
+                outFile = optarg;
+                if (outFile == NULL) {
+                    wolfCLU_LogError("-out requires a file name");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
@@ -198,6 +198,20 @@ int wolfCLU_RSA(int argc, char** argv)
         if (rsa == NULL) {
             wolfCLU_LogError("error reading key from file");
             ret = USER_INPUT_ERROR;
+        }
+    }
+
+    /* open -out once options are known. A private key file is owner-only */
+    if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
+        if (pubOut || noOut) {
+            bioOut = wolfSSL_BIO_new_file(outFile, "wb");
+        }
+        else {
+            bioOut = wolfCLU_BioOpenOwner(outFile);
+        }
+        if (bioOut == NULL) {
+            wolfCLU_LogError("unable to open out file %s", outFile);
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
