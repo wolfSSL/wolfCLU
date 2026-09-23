@@ -297,6 +297,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
         wolfCLU_LogError("null input to get algo function");
         return WOLFCLU_FATAL_ERROR;
     }
+    *alg = WOLFCLU_ALGO_NONE;
 
     /* gets name after first '-' and before the second */
     tmpAlg = strtok_r(name, "-", &end);
@@ -338,7 +339,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     }
 
     for (i = 0; i < (int) (sizeof(acceptMode)/sizeof(acceptMode[0])); i++) {
-        if (XSTRNCMP(tmpMode, acceptMode[i], XSTRLEN(tmpMode)) == 0)
+        if (XSTRCMP(tmpMode, acceptMode[i]) == 0)
             modeCheck = 1;
     }
 
@@ -433,6 +434,11 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     else {
         wolfCLU_LogError("Invalid algorithm: %s", tmpAlg);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ret >= 0 && *alg == WOLFCLU_ALGO_NONE) {
+        wolfCLU_LogError("Invalid mode %s for algorithm %s", tmpMode, tmpAlg);
         ret = WOLFCLU_FATAL_ERROR;
     }
 
