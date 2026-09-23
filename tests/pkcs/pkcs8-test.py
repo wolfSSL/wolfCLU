@@ -72,6 +72,36 @@ class Pkcs8Test(unittest.TestCase):
                         pkcs1_pem, shallow=False),
             "server-key.pem -traditional check failed")
 
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_out_file_owner_only(self):
+        """-out holds a private key, so it must be created 0600 (F-9854)."""
+        old_umask = os.umask(0o022)
+        self.addCleanup(os.umask, old_umask)
+
+        key = os.path.join(CERTS_DIR, "server-key.pem")
+        cases = [
+            ("perm-pkcs8.pem", ["-in", key, "-outform", "PEM"]),
+            ("perm-pkcs8.der", ["-in", key, "-outform", "DER"]),
+            ("perm-pkcs1.pem", ["-in", key, "-traditional"]),
+        ]
+        if not self.is_fips:
+            cases.append(("perm-pkcs8-dec.pem",
+                          ["-in", os.path.join(CERTS_DIR, "server-keyEnc.pem"),
+                           "-passin", "pass:yassl123"]))
+
+        for out, args in cases:
+            with self.subTest(out=out):
+                self._cleanup(out)
+                # Start from a new file so the create mode applies.
+                if os.path.exists(out):
+                    os.remove(out)
+                r = run_wolfssl("pkcs8", *(args + ["-out", out]))
+                self.assertEqual(r.returncode, 0, r.stderr)
+                mode = os.stat(out).st_mode & 0o777
+                self.assertEqual(mode, 0o600,
+                                 "{} mode is {:o}, expected 600".format(
+                                     out, mode))
+
     def test_help(self):
         for flag in ("-help", "-h"):
             r = run_wolfssl("pkcs8", flag)
