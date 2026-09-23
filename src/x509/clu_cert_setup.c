@@ -455,10 +455,10 @@ int wolfCLU_certSetup(int argc, char **argv)
         wolfSSL_NCONF_free(conf);
     }
 
-    /*default to version 3 which supports extensions */
-    if (ret == WOLFCLU_SUCCESS &&
-        wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS &&
-        reqFlag) {
+    /* A certificate made from a CSR takes the CSR's version (v1), which
+     * cannot carry extensions. Issue it as v3. */
+    if (ret == WOLFCLU_SUCCESS && reqFlag &&
+        wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) != WOLFSSL_SUCCESS) {
         wolfCLU_LogError("Unable to set version 3 for cert");
         ret = WOLFCLU_FATAL_ERROR;
     }
