@@ -147,6 +147,38 @@ def _flip_last_der_byte(src, dst):
         f.write(data)
 
 
+def _der_tlv(data, pos):
+    """Return (tag, value_start, value_end) of the DER element at pos."""
+    tag = data[pos]
+    length = data[pos + 1]
+    pos += 2
+    if length & 0x80:
+        n = length & 0x7F
+        length = int.from_bytes(data[pos:pos + n], "big")
+        pos += n
+    return tag, pos, pos + length
+
+
+def _csr_subject_string_tags(der):
+    """Return [(attribute OID bytes, string tag), ...] for a DER CSR subject.
+
+    CertificationRequest -> CertificationRequestInfo -> version, subject.
+    Name is a SEQUENCE of SET of SEQUENCE { OID, string }."""
+    _, pos, _ = _der_tlv(der, 0)
+    _, pos, _ = _der_tlv(der, pos)
+    _, _, pos = _der_tlv(der, pos)
+    _, pos, end = _der_tlv(der, pos)
+    out = []
+    while pos < end:
+        _, set_start, set_end = _der_tlv(der, pos)
+        _, atv, _ = _der_tlv(der, set_start)
+        _, oid_start, oid_end = _der_tlv(der, atv)
+        val_tag, _, _ = _der_tlv(der, oid_end)
+        out.append((bytes(der[oid_start:oid_end]), val_tag))
+        pos = set_end
+    return out
+
+
 class TestReqNew(unittest.TestCase):
     """Test req -new with various options."""
 
@@ -189,6 +221,24 @@ class TestReqNew(unittest.TestCase):
         expected = "        Subject: O=wolfSSL, C=US, ST=WA, L=Seattle, CN=wolfSSL, OU=org-unit"
         self.assertEqual(subject_line, expected,
                          "Got: {!r}".format(subject_line))
+
+    def test_req_new_subj_country_encoding_not_reused(self):
+        """-subj encodes C as PrintableString and the entries after it as
+        UTF8String. '_' and '@' are not valid PrintableString characters."""
+        tmp = _tmp("test_req_subj_encoding.csr")
+        self._clean(tmp)
+        r = run_wolfssl("req", "-new",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", "/C=US/CN=user_name@example/O=wolfSSL",
+                        "-outform", "der", "-out", tmp)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        with open(tmp, "rb") as f:
+            tags = _csr_subject_string_tags(f.read())
+        printable, utf8 = 0x13, 0x0C
+        self.assertEqual(tags, [(b"\x55\x04\x06", printable),
+                                (b"\x55\x04\x03", utf8),
+                                (b"\x55\x04\x0a", utf8)])
 
 
     def test_req_new_interactive_name(self):
