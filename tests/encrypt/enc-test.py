@@ -11,7 +11,8 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, WOLFSSL_BIN, run_wolfssl, test_main
+from wolfclu_test import (CERTS_DIR, WOLFSSL_BIN, run_wolfssl,
+                          run_wolfssl_pty, test_main)
 
 # The interactive password prompt only reads from stdin when stdin is a real
 # terminal (wolfCLU_GetStdinPassword -> tcgetattr fails on a pipe), so driving
@@ -1155,6 +1156,21 @@ class EncStdinPasswordTest(unittest.TestCase):
         with open(dec, "rb") as f:
             self.assertEqual(f.read(), self.PLAINTEXT,
                              "decrypted plaintext mismatch")
+
+    def test_password_prompt_eof_fails(self):
+        """EOF at the password prompt must fail and write no output."""
+        plain = "f12121_eof_in.txt"
+        cipher = "f12121_eof.bin"
+        self._cleanup(plain, cipher)
+        self._write_plaintext(plain)
+
+        code, out = run_wolfssl_pty("encrypt", "aes-cbc-256",
+                                    "-in", plain, "-out", cipher,
+                                    reply=b"\x04")
+        self.assertIn(b"Input Password", out)
+        self.assertGreater(code, 0, out)
+        self.assertFalse(os.path.exists(cipher), out)
+        self.assertNotIn(b"AddressSanitizer", out)
 
 
 if __name__ == "__main__":

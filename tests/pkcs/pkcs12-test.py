@@ -7,7 +7,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, HAVE_PTY, is_fips,
+                          run_wolfssl, run_wolfssl_pty, test_main)
 
 P12_FILE = os.path.join(CERTS_DIR, "test-servercert.p12")
 
@@ -92,7 +93,7 @@ class Pkcs12Test(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0)
         self.assertNotIn("PRIVATE KEY", r.stdout)
 
-    def _out_mode(self, out, *args, stdin_data=None):
+    def _out_mode(self, out, *args):
         """Run pkcs12 -out under umask 022. Return the new file's mode and
         contents."""
         old_umask = os.umask(0o022)
@@ -103,7 +104,7 @@ class Pkcs12Test(unittest.TestCase):
             os.remove(out)
         r = run_wolfssl("pkcs12", "-passin", 'pass:wolfSSL test',
                         "-passout", "pass:", "-in", P12_FILE, "-out", out,
-                        *args, stdin_data=stdin_data)
+                        *args)
         self.assertEqual(r.returncode, 0, r.stderr)
         with open(out, "r") as f:
             content = f.read()
@@ -118,10 +119,23 @@ class Pkcs12Test(unittest.TestCase):
                              mode))
 
     @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    @unittest.skipUnless(HAVE_PTY, "pty not available")
     def test_out_encrypted_key_owner_only(self):
-        mode, content = self._out_mode("pkcs12-perm-enc.pem",
-                                       stdin_data="wolfSSL test\n")
-        self.assertIn("ENCRYPTED PRIVATE KEY", content)
+        # The key password is read from a terminal.
+        out = "pkcs12-perm-enc.pem"
+        old_umask = os.umask(0o022)
+        self.addCleanup(os.umask, old_umask)
+        self.addCleanup(lambda: os.remove(out) if os.path.exists(out) else None)
+        if os.path.exists(out):
+            os.remove(out)
+        code, output = run_wolfssl_pty("pkcs12", "-passin",
+                                       "pass:wolfSSL test", "-passout", "pass:",
+                                       "-in", P12_FILE, "-out", out,
+                                       reply=b"wolfSSL test\n")
+        self.assertEqual(code, 0, output)
+        with open(out, "r") as f:
+            self.assertIn("ENCRYPTED PRIVATE KEY", f.read())
+        mode = os.stat(out).st_mode & 0o777
         self.assertEqual(mode, 0o600,
                          "encrypted key output mode is {:o}, "
                          "expected 600".format(mode))
@@ -135,14 +149,34 @@ class Pkcs12Test(unittest.TestCase):
                          "-nokeys output mode is {:o}, expected 644".format(
                              mode))
 
-    def test_nocerts_with_passout(self):
+    def test_nocerts_with_passout_no_terminal_fails(self):
+        """Without -nodes the key password is read from a terminal. With no
+        terminal the command must fail and write no key.
+
+        It used to succeed with the key encrypted under the whole 256-byte
+        password buffer, which no typed password matches."""
         r = subprocess.run(
             [WOLFSSL_BIN, "pkcs12", "-passin", "stdin", "-passout", "pass:",
              "-in", P12_FILE, "-nocerts"],
             input=b"wolfSSL test\n", capture_output=True, text=False,
             timeout=60,
         )
-        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertNotIn(b"PRIVATE KEY", r.stdout)
+
+    @unittest.skipUnless(HAVE_PTY, "pty not available")
+    def test_key_password_prompt_eof_fails(self):
+        """EOF at the key password prompt must fail and write no key.
+
+        The prompt buffer still held the -passin password, so the key was
+        written encrypted under it and the command succeeded."""
+        code, out = run_wolfssl_pty("pkcs12", "-nocerts",
+                                    "-passin", "pass:wolfSSL test",
+                                    "-in", P12_FILE, reply=b"\x04")
+        self.assertIn(b"Input Password", out)
+        self.assertGreater(code, 0, out)
+        self.assertNotIn(b"PRIVATE KEY", out)
+        self.assertNotIn(b"AddressSanitizer", out)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, HAVE_PTY, is_fips,
+                          run_wolfssl, run_wolfssl_pty, test_main)
 
 
 def _tmp(name):
@@ -988,6 +989,26 @@ class TestReqFIPS(unittest.TestCase):
                         "-x509", "-out", tmp, "-passout", "stdin",
                         stdin_data="long test password\n")
         self.assertEqual(r.returncode, 0, r.stderr)
+
+    @unittest.skipUnless(HAVE_PTY, "pty not available")
+    def test_newkey_password_prompt_eof_fails(self):
+        """EOF at the -newkey key password prompt must fail cleanly.
+
+        The uninitialised password buffer was measured with strlen after
+        the failed read."""
+        tmp = _tmp("test_req_prompt_eof.cert")
+        key = _tmp("test_req_prompt_eof.pem")
+        self._clean(tmp, key)
+        code, out = run_wolfssl_pty("req", "-new", "-newkey", "rsa:2048",
+                                    "-keyout", key, "-config", self.conf_file,
+                                    "-x509", "-out", tmp, reply=b"\x04")
+        self.assertIn(b"Input Password", out)
+        self.assertIn(b"Unable to get password from stdin", out)
+        self.assertGreater(code, 0, out)
+        self.assertNotIn(b"AddressSanitizer", out)
+        if os.path.exists(key):
+            with open(key, "rb") as f:
+                self.assertNotIn(b"PRIVATE KEY", f.read())
 
 
 @unittest.skipIf(os.name == "nt", "POSIX file permissions only")

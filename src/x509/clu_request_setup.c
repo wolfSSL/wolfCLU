@@ -1131,9 +1131,12 @@ int wolfCLU_requestSetup(int argc, char** argv)
             if (useDes) {
                 if (!passout) {
                     byte pass[MAX_PASSWORD_SIZE];
-                    wolfCLU_GetStdinPassword(pass, (word32*)&passwordSz);
+                    ret = wolfCLU_GetStdinPassword(pass, (word32*)&passwordSz);
 
-                    if (pass[0] == '\0') {
+                    if (ret != WOLFCLU_SUCCESS) {
+                        wolfCLU_LogError("Unable to get password from stdin");
+                    }
+                    else if (pass[0] == '\0') {
                         wolfCLU_LogError("Please enter a password");
                         ret = WOLFCLU_FATAL_ERROR;
                     }
