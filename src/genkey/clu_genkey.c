@@ -32,6 +32,13 @@
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
 
+#if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFCLU_POSIX_FILE)
+    #include <errno.h>
+    #include <fcntl.h>
+    #include <sys/file.h>
+    #define WOLFCLU_XMSS_POSIX
+#endif
+
 #ifdef HAVE_ED25519
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
@@ -1598,6 +1605,26 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
         return WC_XMSS_RC_WRITE_FAIL;
     }
 
+    /* The new state must reach the disk before the signature is used. */
+    err = XFFLUSH(file);
+#ifdef WOLFCLU_XMSS_POSIX
+    if (err == 0) {
+        err = fsync(fileno(file));
+    }
+#ifdef F_FULLFSYNC
+    /* macOS fsync() does not flush the drive cache. Not all file systems
+     * support this, so a failure is ignored. */
+    if (err == 0) {
+        (void)fcntl(fileno(file), F_FULLFSYNC);
+    }
+#endif
+#endif
+    if (err) {
+        fprintf(stderr, "error: flushing %s failed\n", filename);
+        fclose(file);
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
     err = fclose(file);
     if (err) {
         fprintf(stderr, "error: fclose returned %d\n", err);
@@ -1682,6 +1709,54 @@ enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte * priv,
     fclose(file);
 
     return WC_XMSS_RC_READ_TO_MEMORY;
+}
+
+/* Lock the private key file so only one process loads, signs and saves the
+ * one-time key state at a time. flock() is used because, unlike fcntl()
+ * locks, it is not released when the callbacks close their own handles.
+ * No lock is taken on other platforms. */
+int wolfCLU_XmssKey_Lock(const char* fileName, XFILE* lockFile)
+{
+#ifdef WOLFCLU_XMSS_POSIX
+    XFILE file;
+    int   err;
+#endif
+
+    if (fileName == NULL || lockFile == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    *lockFile = XBADFILE;
+
+#ifdef WOLFCLU_XMSS_POSIX
+    /* NFS only allows an exclusive flock() on a file open for writing. */
+    file = XFOPEN(fileName, "r+b");
+    if (file == XBADFILE) {
+        wolfCLU_LogError("Unable to open %s: %s", fileName, strerror(errno));
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    /* wolfSSL has no file lock wrapper */
+    do {
+        err = flock(fileno(file), LOCK_EX);
+    } while (err != 0 && errno == EINTR);
+
+    if (err != 0) {
+        wolfCLU_LogError("Unable to lock %s: %s", fileName, strerror(errno));
+        XFCLOSE(file);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    *lockFile = file;
+#endif
+
+    return WOLFCLU_SUCCESS;
+}
+
+void wolfCLU_XmssKey_Unlock(XFILE lockFile)
+{
+    /* Closing the file releases the lock. */
+    if (lockFile != XBADFILE) {
+        XFCLOSE(lockFile);
+    }
 }
 #endif  /* WOLFSSL_HAVE_XMSS */
 

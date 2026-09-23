@@ -2,8 +2,14 @@
 """Key generation, signing, and verification tests for wolfCLU."""
 
 import os
+import subprocess
 import sys
 import unittest
+
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, not_compiled_in,
@@ -132,6 +138,62 @@ class _GenkeySignVerifyBase(unittest.TestCase):
         r = run_wolfssl(*args)
         self.assertEqual(r.returncode, 0,
                          f"public verify {algo} failed: {r.stderr}")
+
+    def _start_sign(self, algo, priv_key, sig_file):
+        """Start a raw-format sign in the background."""
+        self._track(sig_file)
+        proc = subprocess.Popen(
+            [WOLFSSL_BIN, f"-{algo}", "-sign", "-inkey", priv_key,
+             "-inform", "raw", "-in", self.SIGN_FILE, "-out", sig_file],
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True)
+        self.addCleanup(self._stop_process, proc)
+        return proc
+
+    @staticmethod
+    def _stop_process(proc):
+        if proc.poll() is None:
+            proc.kill()
+        proc.communicate()
+
+    @staticmethod
+    def _xmss_sig_index(sig_file, idx_len):
+        """The XMSS/XMSS^MT signature starts with the big-endian leaf index."""
+        with open(sig_file, "rb") as f:
+            return int.from_bytes(f.read(idx_len), "big")
+
+    def _check_sign_waits_for_lock(self, algo, keybase, genkey_args,
+                                   idx_len):
+        """Signing must hold an exclusive lock on the private state file
+        from reload until the new state is saved (F-12944)."""
+        if fcntl is None:
+            self.skipTest("fcntl.flock not available")
+        priv, pub = self._genkey(algo, keybase, "raw", genkey_args,
+                                 use_output_flag=True)
+        first_sig = keybase + "-lock-1.sig"
+        second_sig = keybase + "-lock-2.sig"
+        self._sign(algo, priv, "raw", first_sig)
+
+        lock_file = open(priv, "rb+")
+        self.addCleanup(lock_file.close)
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+
+        proc = self._start_sign(algo, priv, second_sig)
+        try:
+            proc.wait(timeout=1.5)
+        except subprocess.TimeoutExpired:
+            pass
+        self.assertIsNone(proc.returncode,
+                          "{} sign did not wait for the lock on {}".format(
+                              algo, priv))
+
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+        _, err = proc.communicate(timeout=60)
+        self.assertEqual(proc.returncode, 0, f"sign {algo} failed: {err}")
+        self.assertNotEqual(self._xmss_sig_index(first_sig, idx_len),
+                            self._xmss_sig_index(second_sig, idx_len),
+                            "{} signature index was reused".format(algo))
+        self._verify_pub(algo, pub, "raw", second_sig)
 
     def _gen_sign_verify(self, algo, keybase, sig_file, fmt,
                          extra_genkey_args=None, skip_priv_verify=False,
@@ -482,6 +544,30 @@ class XmssTest(_GenkeySignVerifyBase):
             extra_genkey_args=["-height", "10"],
             skip_priv_verify=True, use_output_flag=True)
 
+    def test_xmss_sign_waits_for_state_lock(self):
+        self._check_sign_waits_for_lock("xmss", "XMSS-SHA2_10_256",
+                                        ["-height", "10"], 4)
+
+    def test_xmss_concurrent_sign_unique_index(self):
+        """Concurrent signers must each use a new one-time key (F-12944)."""
+        if fcntl is None:
+            self.skipTest("no file locking on this platform")
+        priv, _ = self._genkey("xmss", "XMSS-SHA2_10_256", "raw",
+                               ["-height", "10"], use_output_flag=True)
+        signers = []
+        for i in range(6):
+            sig_file = "xmss-concurrent-{}.sig".format(i)
+            signers.append((self._start_sign("xmss", priv, sig_file),
+                            sig_file))
+        indices = []
+        for proc, sig_file in signers:
+            _, err = proc.communicate(timeout=60)
+            self.assertEqual(proc.returncode, 0,
+                             "concurrent xmss sign failed: {}".format(err))
+            indices.append(self._xmss_sig_index(sig_file, 4))
+        self.assertEqual(len(set(indices)), len(indices),
+                         "xmss signature index reused: {}".format(indices))
+
     def test_xmss_missing_height_value(self):
         """-height with no value must fail gracefully (no crash)."""
         self._track("xmss-bad.priv", "xmss-bad.pub")
@@ -513,6 +599,11 @@ class XmssmtTest(_GenkeySignVerifyBase):
             "xmssmt", keybase, "xmss-signed.sig", "raw",
             extra_genkey_args=["-height", "20"],
             skip_priv_verify=True, use_output_flag=True)
+
+    def test_xmssmt_sign_waits_for_state_lock(self):
+        # XMSS^MT with height 20 uses a 3-byte index.
+        self._check_sign_waits_for_lock("xmssmt", "XMSSMT-SHA2_20-2_256",
+                                        ["-height", "20"], 3)
 
     def test_xmssmt_missing_height_value(self):
         """-height with no value must fail gracefully (no crash)."""
