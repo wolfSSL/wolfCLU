@@ -173,6 +173,69 @@ class EcparamTest(unittest.TestCase):
                 self.assertIn(name, text,
                               f"curve name {name} not in text output")
 
+    def _new_file(self, name):
+        # Start from no file so the create mode applies.
+        if os.path.exists(name):
+            os.remove(name)
+        self._cleanup(name)
+        return name
+
+    def _mode(self, name):
+        return os.stat(name).st_mode & 0o777
+
+    def _use_umask_022(self):
+        old_umask = os.umask(0o022)
+        self.addCleanup(os.umask, old_umask)
+
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_genkey_out_mode(self):
+        """-genkey output holds a private key so it must be owner-only."""
+        key_file = self._new_file("ecparam-perm-genkey.key")
+        self._use_umask_022()
+
+        r = run_wolfssl("ecparam", "-genkey", "-name", "secp384r1",
+                        "-out", key_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(key_file, "r") as f:
+            data = f.read()
+        self.assertIn("-----BEGIN EC PARAMETERS-----", data)
+        self.assertIn("-----BEGIN EC PRIVATE KEY-----", data)
+        mode = self._mode(key_file)
+        self.assertEqual(mode, 0o600,
+                         "EC private key mode is {:o}, expected 600".format(
+                             mode))
+
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_genkey_der_out_mode(self):
+        """DER -genkey output is also a private key and must be owner-only."""
+        key_file = self._new_file("ecparam-perm-genkey.der")
+        self._use_umask_022()
+
+        r = run_wolfssl("ecparam", "-genkey", "-name", "secp256r1",
+                        "-outform", "der", "-out", key_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertGreater(os.path.getsize(key_file), 0)
+        mode = self._mode(key_file)
+        self.assertEqual(mode, 0o600,
+                         "EC private key mode is {:o}, expected 600".format(
+                             mode))
+
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_params_out_mode(self):
+        """Parameter-only output is public and keeps default permissions."""
+        params_file = self._new_file("ecparam-perm-params.pem")
+        self._use_umask_022()
+
+        r = run_wolfssl("ecparam", "-in",
+                        os.path.join(CERTS_DIR, "ecc-key.pem"),
+                        "-out", params_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(params_file, "r") as f:
+            data = f.read()
+        self.assertIn("-----BEGIN EC PARAMETERS-----", data)
+        self.assertNotIn("PRIVATE KEY", data)
+        self.assertEqual(self._mode(params_file), 0o644)
+
 
 if __name__ == "__main__":
     test_main()
