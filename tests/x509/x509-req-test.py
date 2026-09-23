@@ -770,6 +770,79 @@ class TestReqVerify(unittest.TestCase):
                             "tampered CSR verify should fail")
         self.assertNotIn("BEGIN CERTIFICATE REQUEST", r.stdout)
 
+    def _req_verify(self, out, header, *args):
+        """Run req with -verify into out and expect verify OK and a PEM
+        of the given type."""
+        self._clean(out)
+        r = run_wolfssl("req", *args, "-verify", "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("verify OK", r.stdout + r.stderr)
+        with open(out) as f:
+            self.assertIn("-----BEGIN {}-----".format(header), f.read())
+
+    def _new_x509_verify(self, key, out):
+        """req -new -x509 -verify checks the certificate it made (F-9846)."""
+        self._req_verify(out, "CERTIFICATE", "-new", "-x509", "-days", "30",
+                         "-key", os.path.join(CERTS_DIR, key),
+                         "-subj", "/O=wolfSSL/C=US/CN=verify-test")
+        r = run_wolfssl("x509", "-in", out, "-noout", "-subject")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_verify_new_x509_rsa(self):
+        """req -new -x509 -verify with an RSA key (F-9846)."""
+        self._new_x509_verify("server-key.pem",
+                              _tmp("test_req_verify_x509_rsa.pem"))
+
+    def test_verify_new_x509_ecc(self):
+        """req -new -x509 -verify with an ECC key (F-9846)."""
+        self._new_x509_verify("ecc-key.pem",
+                              _tmp("test_req_verify_x509_ecc.pem"))
+
+    def test_verify_newkey_x509(self):
+        """req -newkey -x509 -verify checks the new certificate (F-9846)."""
+        key = _tmp("test_req_verify_newkey.key")
+        self._clean(key)
+        self._req_verify(_tmp("test_req_verify_newkey.pem"), "CERTIFICATE",
+                         "-new", "-x509", "-days", "30",
+                         "-newkey", "rsa:2048", "-nodes", "-keyout", key,
+                         "-subj", "/O=wolfSSL/C=US/CN=verify-test")
+
+    def test_verify_in_csr_x509(self):
+        """req -in csr -x509 -verify checks the re-signed cert (F-9846)."""
+        self._req_verify(_tmp("test_req_verify_in_x509.pem"), "CERTIFICATE",
+                         "-in", self.csr_pem, "-x509", "-days", "30",
+                         "-key", self.key)
+
+    def test_verify_new_csr_rsa(self):
+        """req -new -verify still checks a new CSR (F-9846)."""
+        self._req_verify(_tmp("test_req_verify_new_rsa.csr"),
+                         "CERTIFICATE REQUEST", "-new", "-key", self.key,
+                         "-subj", "/O=wolfSSL/C=US/CN=verify-test")
+
+    def test_verify_new_csr_ecc(self):
+        """req -new -verify still checks a new ECC CSR (F-9846)."""
+        self._req_verify(_tmp("test_req_verify_new_ecc.csr"),
+                         "CERTIFICATE REQUEST", "-new",
+                         "-key", os.path.join(CERTS_DIR, "ecc-key.pem"),
+                         "-subj", "/O=wolfSSL/C=US/CN=verify-test")
+
+    def test_verify_in_csr_key(self):
+        """req -in csr -key -verify still checks the CSR (F-9846)."""
+        self._req_verify(_tmp("test_req_verify_in_key.csr"),
+                         "CERTIFICATE REQUEST", "-in", self.csr_pem,
+                         "-key", self.key)
+
+    def test_verify_in_csr_wrong_key_fails(self):
+        """req -in csr -verify with a -key that did not sign it fails."""
+        r = run_wolfssl("req", "-in", self.csr_pem, "-noout", "-verify",
+                        "-key", os.path.join(CERTS_DIR, "ecc-key.pem"))
+        self.assertNotEqual(r.returncode, 0,
+                            "verify with the wrong key should fail")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "verify crashed with signal "
+                                "{}".format(r.returncode))
+        self.assertNotIn("verify OK", r.stdout + r.stderr)
+
 
 class TestX509ReqSign(unittest.TestCase):
     """Test x509 -req -signkey signing."""

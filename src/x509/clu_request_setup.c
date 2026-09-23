@@ -605,9 +605,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     byte reSign    = 0; /* flag for if resigning req is needed */
     byte noOut     = 0;
     byte useDes    = 1;
-#ifdef NO_WOLFSSL_REQ_PRINT
     byte isCSR     = 1;
-#endif
     /* Multiple -addext is not yet supported. Detect it up front and fail
      * instead of silently dropping the extension and exiting success. */
     {
@@ -1019,9 +1017,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
     /* sign the req/cert */
     if (ret == WOLFCLU_SUCCESS && (reqIn == NULL || reSign)) {
         if (genX509) {
-#ifdef NO_WOLFSSL_REQ_PRINT
             isCSR = 0;
-#endif
             /* default to version 3 which supports extensions */
             if (wolfSSL_X509_set_version(x509, WOLFSSL_X509_V3) !=
                     WOLFSSL_SUCCESS) {
@@ -1049,18 +1045,26 @@ int wolfCLU_requestSetup(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && doVerify) {
+        WOLFSSL_EVP_PKEY* pubKey;
+        int verifyRet;
 
-        /* get public key from req if not passed in */
-        if (pkey == NULL) {
-            pkey = wolfSSL_X509_get_pubkey(x509);
-        }
-
-        if (pkey == NULL) {
+        /* Verify with the req/cert public key. -key and -newkey set it, and
+         * wolfSSL can not verify with an RSA private key object. */
+        pubKey = wolfSSL_X509_get_pubkey(x509);
+        if (pubKey == NULL) {
             wolfCLU_LogError("Error getting the public key to verify");
             ret = WOLFCLU_FATAL_ERROR;
         }
         else {
-            if (wolfSSL_X509_REQ_verify(x509, pkey) == 1) {
+            if (isCSR) {
+                verifyRet = wolfSSL_X509_REQ_verify(x509, pubKey);
+            }
+            else {
+                verifyRet = wolfSSL_X509_verify(x509, pubKey);
+            }
+            wolfSSL_EVP_PKEY_free(pubKey);
+
+            if (verifyRet == 1) {
                 WOLFCLU_LOG(WOLFCLU_L0, "verify OK");
             }
             else {
