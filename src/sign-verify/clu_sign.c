@@ -922,6 +922,7 @@ int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey)
     word32 outBufSz = 0;                 /* signature buffer size   */
     char* paramStr = NULL;               /* parameter string        */
     int paramLen   = XMSS_NAME_LEN + 1;  /* parameter string length */
+    XFILE lockFile = XBADFILE;           /* private key file lock   */
 
 #ifdef WOLFSSL_SMALL_STACK
     XmssKey *key = (XmssKey*)XMALLOC(sizeof(XmssKey),
@@ -1024,6 +1025,15 @@ int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey)
         }
     }
 
+    /* lock the private key file until the new state is saved */
+    if (ret == 0) {
+        if (wolfCLU_XmssKey_Lock(privKey, &lockFile) != WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+            wolfCLU_LogError("Failed to lock XMSS private key file %s.",
+                             privKey);
+        }
+    }
+
     /* reload XMSS key to be signable state */
     if (ret == 0) {
         ret = wc_XmssKey_Reload(key);
@@ -1059,6 +1069,7 @@ int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey)
     }
 
     /* clena up allocated memory */
+    wolfCLU_XmssKey_Unlock(lockFile);
     if (outFile != NULL) {
         XFCLOSE(outFile);
     }
@@ -1102,6 +1113,7 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
     int paramLen    = 0;                 /* parameter string length      */
     int privKeyLen  = 0;                 /* private key file name length */
     int fileHeadLen = 7;                 /* file header(XMSSMT-) length  */
+    XFILE lockFile  = XBADFILE;          /* private key file lock        */
 
     if (privKey == NULL) {
         return BAD_FUNC_ARG;
@@ -1222,6 +1234,15 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
         }
     }
 
+    /* lock the private key file until the new state is saved */
+    if (ret == 0) {
+        if (wolfCLU_XmssKey_Lock(privKey, &lockFile) != WOLFCLU_SUCCESS) {
+            ret = WOLFCLU_FATAL_ERROR;
+            wolfCLU_LogError("Failed to lock XMSS^MT private key file %s.",
+                             privKey);
+        }
+    }
+
     /* reload XMSS^MT key to be signable state */
     if (ret == 0) {
         ret = wc_XmssKey_Reload(key);
@@ -1258,6 +1279,7 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
     }
 
     /* clena up allocated memory */
+    wolfCLU_XmssKey_Unlock(lockFile);
     if (outFile != NULL) {
         XFCLOSE(outFile);
     }
