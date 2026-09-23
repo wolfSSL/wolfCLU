@@ -109,7 +109,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
+                bioOut = wolfCLU_BioOpenOwner(optarg);
                 if (bioOut == NULL) {
                     wolfCLU_LogError("Unable to open output file %s",
                             optarg);
