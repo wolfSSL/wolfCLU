@@ -990,6 +990,40 @@ class TestReqFIPS(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+@unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+class TestReqKeyoutPermissions(unittest.TestCase):
+    """req -keyout must be owner-only under umask 022 (F-9860)."""
+
+    def setUp(self):
+        old_umask = os.umask(0o022)
+        self.addCleanup(os.umask, old_umask)
+
+    def _new_key(self, name, *extra):
+        key = _tmp(name + ".pem")
+        csr = _tmp(name + ".csr")
+        # Start from new files so the create mode applies.
+        _cleanup(key, csr)
+        self.addCleanup(_cleanup, key, csr)
+        r = run_wolfssl("req", "-new", "-newkey", "rsa:2048",
+                        "-keyout", key, "-out", csr,
+                        "-subj", "O=wolfSSL/C=US/CN=keyout-perm", *extra)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        key_mode = os.stat(key).st_mode & 0o777
+        csr_mode = os.stat(csr).st_mode & 0o777
+        self.assertEqual(key_mode, 0o600,
+                         "keyout mode is {:o}, expected 600".format(key_mode))
+        self.assertEqual(csr_mode, 0o644,
+                         "csr mode is {:o}, expected 644".format(csr_mode))
+
+    def test_nodes_keyout_mode(self):
+        self._new_key("test_req_perm_nodes", "-nodes")
+
+    def test_encrypted_keyout_mode(self):
+        if is_fips():
+            self.skipTest("FIPS build")
+        self._new_key("test_req_perm_enc", "-passout",
+                      "pass:123456789wolfssl")
+
 
 class TestReqHashAndKeyAlgos(unittest.TestCase):
     """Test hash and key algorithm options for req."""
