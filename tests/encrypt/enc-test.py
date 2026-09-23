@@ -463,6 +463,68 @@ class EncLegacyNamesTest(unittest.TestCase):
         self._roundtrip("-aes-cbc-128", "-aes-cbc-128",
                         "legacy aes-cbc-128 round trip failed")
 
+    # Modes must match exactly. A truncated mode (or one the algorithm does
+    # not support) selects no cipher, so the command must fail.
+    BAD_MODE_NAMES = ["aes-c-128", "aes-cb-256", "aes-ct-192", "aes-128-c",
+                      "aes-256-cb", "camellia-c-128", "camellia-cb-256",
+                      "camellia-ctr-128"]
+
+    def test_abbreviated_mode_encrypt_rejected(self):
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        for i, name in enumerate(self.BAD_MODE_NAMES):
+            for j, args in enumerate((["-encrypt", name],
+                                      ["enc", "-" + name])):
+                enc = "test-abbrev-{}-{}.enc".format(i, j)
+                self._cleanup(enc)
+                with self.subTest(args=args):
+                    r = run_enc(*args, "-in", orig, "-out", enc,
+                                password="test password")
+                    self.assertNotEqual(r.returncode, 0,
+                                        "{} must be rejected".format(name))
+                    self.assertRegex(r.stderr, "Invalid (entry|mode)",
+                                     "{} not rejected when parsed".format(
+                                         name))
+                    self.assertFalse(os.path.exists(enc),
+                                     "{} left an output file".format(name))
+
+    def test_abbreviated_mode_decrypt_rejected(self):
+        src = os.path.join(CERTS_DIR, "crl.der.enc")
+        for i, name in enumerate(self.BAD_MODE_NAMES):
+            dec = "test-abbrev-{}.dec".format(i)
+            self._cleanup(dec)
+            with self.subTest(name=name):
+                r = run_enc("-decrypt", name, "-in", src, "-out", dec,
+                            password="")
+                self.assertNotEqual(r.returncode, 0,
+                                    "{} must be rejected".format(name))
+                self.assertRegex(r.stderr, "Invalid (entry|mode)",
+                                 "{} not rejected when parsed".format(name))
+                self.assertFalse(os.path.exists(dec),
+                                 "{} left an output file".format(name))
+
+    def test_full_mode_names_roundtrip(self):
+        names = ["aes-cbc-128", "aes-256-cbc"]
+        r = run_wolfssl("-encrypt", "-help")
+        if "aes-ctr-128" in r.stdout + r.stderr:
+            names.append("aes-ctr-192")
+        if _camellia_available():
+            names.append("camellia-cbc-128")
+
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        for name in names:
+            enc = "test-fullmode-{}.enc".format(name)
+            dec = "test-fullmode-{}.dec".format(name)
+            self._cleanup(enc, dec)
+            with self.subTest(name=name):
+                r = run_enc("-encrypt", name, "-in", orig, "-out", enc,
+                            password="test password")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                r = run_enc("-decrypt", name, "-in", enc, "-out", dec,
+                            password="test password")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertTrue(filecmp.cmp(orig, dec, shallow=False),
+                                "{} round trip failed".format(name))
+
 
 def _camellia_available():
     """Check if Camellia support is enabled in the wolfssl binary."""

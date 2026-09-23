@@ -219,7 +219,7 @@ int wolfCLU_setup(int argc, char** argv, char action)
     char     outNameDec[256];     /* default outfile for decrypt */
     char     inName[256];       /* name of the in File if not provided */
 
-    int      alg;               /* algorithm from name */
+    int      alg = WOLFCLU_ALGO_NONE; /* algorithm from name */
     char*    mode = NULL;       /* mode from name */
     char*    out  = NULL;       /* default output file name */
     char*    in = inName;       /* default in data */
