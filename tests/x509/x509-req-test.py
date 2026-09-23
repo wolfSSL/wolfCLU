@@ -50,6 +50,9 @@ subjectAltName = @alt_names
 basicConstraints = CA:TRUE
 keyUsage = digitalSignature
 subjectAltName = @alt_names_full_skip
+[ v3_ca_pathlen ]
+basicConstraints = critical, CA:TRUE, pathlen:1
+keyUsage = keyCertSign, cRLSign
 [alt_names]
 DNS.1 = extraName
 DNS.2 = alt-name
@@ -177,6 +180,43 @@ def _csr_subject_string_tags(der):
         out.append((bytes(der[oid_start:oid_end]), val_tag))
         pos = set_end
     return out
+
+
+def _cert_basic_constraints(der):
+    """Return (critical, cA, pathLen) of a DER certificate's
+    basicConstraints extension, or None if it has none. pathLen is None
+    when absent.
+
+    Certificate -> TBSCertificate -> [3] Extensions. Each Extension is
+    SEQUENCE { OID, critical BOOLEAN OPTIONAL, OCTET STRING } and the
+    OCTET STRING holds SEQUENCE { cA BOOLEAN OPTIONAL, INTEGER OPTIONAL }."""
+    _, pos, _ = _der_tlv(der, 0)
+    _, pos, end = _der_tlv(der, pos)
+    while pos < end:
+        tag, start, pos = _der_tlv(der, pos)
+        if tag != 0xA3:
+            continue
+        _, ext_pos, exts_end = _der_tlv(der, start)
+        while ext_pos < exts_end:
+            _, field, ext_pos = _der_tlv(der, ext_pos)
+            _, oid_start, field = _der_tlv(der, field)
+            if bytes(der[oid_start:field]) != b"\x55\x1d\x13":
+                continue
+            critical = False
+            tag, val_start, val_end = _der_tlv(der, field)
+            if tag == 0x01:
+                critical = der[val_start] != 0
+                _, val_start, val_end = _der_tlv(der, val_end)
+            _, bc_pos, bc_end = _der_tlv(der, val_start)
+            ca, pathlen = False, None
+            while bc_pos < bc_end:
+                tag, val_start, bc_pos = _der_tlv(der, bc_pos)
+                if tag == 0x01:
+                    ca = der[val_start] != 0
+                elif tag == 0x02:
+                    pathlen = int.from_bytes(der[val_start:bc_pos], "big")
+            return critical, ca, pathlen
+    return None
 
 
 class TestReqNew(unittest.TestCase):
@@ -447,6 +487,74 @@ class TestReqNew(unittest.TestCase):
                          "DNS SAN not trimmed of surrounding whitespace")
         self.assertIn("IP Address:10.0.0.1", san_line,
                       "IP SAN not applied/trimmed from inline config form")
+
+    def _req_basic_constraints(self, value, name):
+        """Run req -new -x509 with a config setting basicConstraints to value.
+        Return the result and the path of the DER certificate."""
+        conf = _tmp(name + ".conf")
+        out = _tmp(name + ".der")
+        self._clean(conf, out)
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                "[ req ]\n"
+                "distinguished_name = dn\n"
+                "prompt = no\n"
+                "x509_extensions = v3_bc\n"
+                "[ dn ]\n"
+                "commonName = basic-constraints-test\n"
+                "[ v3_bc ]\n"
+                "basicConstraints = " + value + "\n")
+        r = run_wolfssl("req", "-new", "-x509",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-config", conf, "-outform", "der", "-out", out)
+        if "not compiled with cert extensions" in r.stdout + r.stderr:
+            self.skipTest("cert extensions not compiled in")
+        return r, out
+
+    def test_req_config_basic_constraints(self):
+        """A config basicConstraints value is a comma separated list of
+        NAME:VALUE pairs with an optional leading "critical", as in OpenSSL.
+        CA and pathlen must both reach the certificate."""
+        cases = [
+            ("CA:TRUE, pathlen:0", (False, True, 0)),
+            ("CA:TRUE,pathlen:3", (False, True, 3)),
+            ("critical, CA:TRUE, pathlen:0", (True, True, 0)),
+            ("critical,CA:TRUE", (True, True, None)),
+            ("CA:FALSE", (False, False, None)),
+            ("pathlen:2 , CA : true", (False, True, 2)),
+        ]
+        for i, (value, expected) in enumerate(cases):
+            with self.subTest(value=value):
+                r, out = self._req_basic_constraints(
+                    value, "test_req_bc_{}".format(i))
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                with open(out, "rb") as f:
+                    got = _cert_basic_constraints(f.read())
+                self.assertEqual(got, expected,
+                                 "(critical, CA, pathlen) mismatch")
+
+    def test_req_config_basic_constraints_bad_fails(self):
+        """Unknown or malformed basicConstraints entries fail instead of
+        producing a certificate with the wrong constraints."""
+        values = [
+            "CA:TRUE, bogus:1",
+            "CA:maybe",
+            "CA",
+            "CA:TRUE,",
+            "CA:TRUE, pathlen:abc",
+            "CA:TRUE, pathlen:-1",
+            "CA:TRUE, pathlen:1000",
+            "CA:TRUE, critical",
+            "critical",
+        ]
+        for i, value in enumerate(values):
+            with self.subTest(value=value):
+                r, out = self._req_basic_constraints(
+                    value, "test_req_bc_bad_{}".format(i))
+                self.assertNotEqual(r.returncode, 0,
+                                    "bad basicConstraints accepted")
+                self.assertFalse(os.path.exists(out),
+                                 "certificate written for bad input")
 
     def test_req_x509_addext_subject_alt_name(self):
         """req -x509 -addext subjectAltName adds IP and DNS alt names."""
@@ -845,6 +953,26 @@ class TestX509ReqExtensions(unittest.TestCase):
         r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
         self.assertEqual(r2.returncode, 0, r2.stderr)
         self.assertIn("CA:TRUE", r2.stdout)
+
+    def test_extfile_basic_constraints_pathlen(self):
+        """x509 -req -extfile applies "critical, CA:TRUE, pathlen:1".
+        wolfSSL drops pathlen unless keyUsage has keyCertSign, so the
+        section also replaces the CSR's keyUsage."""
+        out = _tmp("tmp_ext_pathlen.der")
+        self._clean(out)
+        r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
+                        "-extfile", self.conf_file,
+                        "-extensions", "v3_ca_pathlen",
+                        "-signkey",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-outform", "der", "-out", out)
+        if "not compiled with cert extensions" in r.stdout + r.stderr:
+            self.skipTest("cert extensions not compiled in")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        with open(out, "rb") as f:
+            got = _cert_basic_constraints(f.read())
+        self.assertEqual(got, (True, True, 1),
+                         "(critical, CA, pathlen) mismatch")
 
 
 class TestX509ReqLargeExtensions(unittest.TestCase):
