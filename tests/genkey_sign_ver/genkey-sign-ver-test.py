@@ -532,6 +532,69 @@ class XmssmtTest(_GenkeySignVerifyBase):
                             "crash)")
 
 
+@unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+class GenkeyPermissionsTest(_GenkeySignVerifyBase):
+    """Private key files must be owner-only under umask 022 (F-8096)."""
+
+    def setUp(self):
+        old_umask = os.umask(0o022)
+        self.addCleanup(os.umask, old_umask)
+
+    def _check_modes(self, algo, keybase, fmt, extra_args=None):
+        # Start from new files so the create mode applies.
+        _cleanup_files([keybase + ".priv", keybase + ".pub"])
+        priv, pub = self._genkey(algo, keybase, fmt, extra_args,
+                                 use_output_flag=True)
+        priv_mode = os.stat(priv).st_mode & 0o777
+        pub_mode = os.stat(pub).st_mode & 0o777
+        self.assertEqual(priv_mode, 0o600,
+                         "{} {} private key mode is {:o}, expected 600".format(
+                             algo, fmt, priv_mode))
+        self.assertEqual(pub_mode, 0o644,
+                         "{} {} public key mode is {:o}, expected 644".format(
+                             algo, fmt, pub_mode))
+
+    def test_rsa_key_modes(self):
+        for fmt in ["der", "pem"]:
+            with self.subTest(fmt=fmt):
+                self._check_modes("rsa", "perm-rsa-" + fmt, fmt)
+
+    def test_ecc_key_modes(self):
+        for fmt in ["der", "pem"]:
+            with self.subTest(fmt=fmt):
+                self._check_modes("ecc", "perm-ecc-" + fmt, fmt)
+
+    def test_ed25519_key_modes(self):
+        for fmt in ["raw", "der", "pem"]:
+            with self.subTest(fmt=fmt):
+                self._check_modes("ed25519", "perm-ed25519-" + fmt, fmt)
+
+    def test_dilithium_key_modes(self):
+        if not _has_algorithm("dilithium"):
+            self.skipTest("dilithium not available")
+        for algo in ["dilithium", "ml-dsa"]:
+            with self.subTest(algo=algo):
+                self._check_modes(algo, "perm-" + algo, "der",
+                                  ["-level", "2"])
+
+    def test_xmss_key_modes(self):
+        if not _has_algorithm("xmss"):
+            self.skipTest("xmss not available")
+        self._check_modes("xmss", "perm-xmss", "raw", ["-height", "10"])
+
+    def test_priv_only_key_mode(self):
+        keybase = "perm-ecc-privonly"
+        priv = keybase + ".priv"
+        self._track(priv, keybase + ".pub")
+        _cleanup_files([priv])
+        r = run_wolfssl("-genkey", "ecc", "-out", keybase, "-outform", "der",
+                        "-output", "priv")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        mode = os.stat(priv).st_mode & 0o777
+        self.assertEqual(mode, 0o600,
+                         "private key mode is {:o}, expected 600".format(mode))
+
+
 class SignVerifySetupArgsTest(unittest.TestCase):
     """Argument-parsing branches in clu_sign_verify_setup.c.
 

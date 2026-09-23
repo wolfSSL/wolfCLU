@@ -34,6 +34,11 @@
 #include <wolfssl/wolfcrypt/hash.h>
 #include <wolfssl/wolfcrypt/memory.h>
 
+#ifdef WOLFCLU_POSIX_FILE
+    #include <fcntl.h>
+    #include <sys/stat.h>
+#endif
+
 #define SALT_SIZE       8
 #define DES3_BLOCK_SIZE 24
 
@@ -1111,6 +1116,56 @@ void wolfCLU_ForceZero(void* mem, unsigned int len)
     while (len--) *z++ = 0;
 #endif
 }
+
+#ifndef NO_FILESYSTEM
+/* Open a file for binary write. On POSIX a new file is created with owner
+ * only access (0600). An existing file is truncated and keeps its mode. */
+XFILE wolfCLU_FileOpenOwner(const char* fileName)
+{
+    XFILE file;
+#ifdef WOLFCLU_POSIX_FILE
+    int fd;
+#endif
+
+    if (fileName == NULL) {
+        return XBADFILE;
+    }
+
+#ifdef WOLFCLU_POSIX_FILE
+    /* wolfSSL's open() wrappers are internal, so open() is called here */
+    fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        return XBADFILE;
+    }
+    file = XFDOPEN(fd, "wb");
+    if (file == XBADFILE) {
+        XCLOSE(fd);
+    }
+#else
+    file = XFOPEN(fileName, "wb");
+#endif
+
+    return file;
+}
+
+/* BIO version of wolfCLU_FileOpenOwner. The BIO closes the file when freed. */
+WOLFSSL_BIO* wolfCLU_BioOpenOwner(const char* fileName)
+{
+    XFILE file;
+    WOLFSSL_BIO* bio;
+
+    file = wolfCLU_FileOpenOwner(fileName);
+    if (file == XBADFILE) {
+        return NULL;
+    }
+
+    bio = wolfSSL_BIO_new_fp(file, BIO_CLOSE);
+    if (bio == NULL) {
+        XFCLOSE(file);
+    }
+    return bio;
+}
+#endif /* !NO_FILESYSTEM */
 
 #ifndef WOLFCLU_NO_TERM_SUPPORT
 

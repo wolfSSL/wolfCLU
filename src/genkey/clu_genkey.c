@@ -121,7 +121,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
             /* open the file for writing the private key */
             if (ret == 0) {
-                file = XFOPEN(finalOutFNm, "wb");
+                file = wolfCLU_FileOpenOwner(finalOutFNm);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -663,7 +663,7 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
                     WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
 
-                    bioPri = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
+                    bioPri = wolfCLU_BioOpenOwner(fOutNameBuf);
                     if (bioPri == NULL) {
                         wolfCLU_LogError("unable to read outfile %s",
                                 fOutNameBuf);
@@ -849,7 +849,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
             /* open the file for writing the private key */
             if (ret == WOLFCLU_SUCCESS) {
-                file = XFOPEN(fOutNameBuf, "wb");
+                file = wolfCLU_FileOpenOwner(fOutNameBuf);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -1180,7 +1180,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Private key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
+                    file = wolfCLU_FileOpenOwner(fOutNameBuf);
                     if (file == XBADFILE) {
                         wolfCLU_LogError("unable to open file %s",
                                         fOutNameBuf);
@@ -1428,7 +1428,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Private key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
+                    file = wolfCLU_FileOpenOwner(fOutNameBuf);
                     if (file == XBADFILE) {
                         wolfCLU_LogError("unable to open file %s",
                                         fOutNameBuf);
@@ -1582,9 +1582,9 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
     file = fopen(filename, "rb+");
     if (!file) {
         /* Create the file if it didn't exist. */
-        file = fopen(filename, "wb+");
+        file = wolfCLU_FileOpenOwner(filename);
         if (!file) {
-            fprintf(stderr, "error: fopen(%s, \"w+\") failed.\n", filename);
+            fprintf(stderr, "error: unable to create %s\n", filename);
             return WC_XMSS_RC_WRITE_FAIL;
         }
     }
