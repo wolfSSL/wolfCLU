@@ -174,6 +174,9 @@ enum {
 /* 3des */
 #define WOLFCLU_DESCBC 2018
 
+/* no cipher selected */
+#define WOLFCLU_ALGO_NONE 0
+
 /* PQC signeture */
 #define WOLFCLU_DILITHIUM 2019
 #define WOLFCLU_XMSS      2020
