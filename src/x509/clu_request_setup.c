@@ -1110,7 +1110,7 @@ int wolfCLU_requestSetup(int argc, char** argv)
         WOLFSSL_BIO* keyOutBio;
 
         if (keyOut != NULL) {
-            keyOutBio = wolfSSL_BIO_new_file(keyOut, "wb");
+            keyOutBio = wolfCLU_BioOpenOwner(keyOut);
         }
         else {
             keyOutBio = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
