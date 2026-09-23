@@ -8,7 +8,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, HAVE_PTY, is_fips,
+                          run_wolfssl, run_wolfssl_pty, test_main)
 
 
 class Pkcs8Test(unittest.TestCase):
@@ -145,6 +146,21 @@ class Pkcs8Test(unittest.TestCase):
                         os.path.join(CERTS_DIR, "server-keyEnc.pem"),
                         "-inform", "DER", "-passin", "pass:yassl123")
         self.assertNotEqual(r.returncode, 0)
+
+    @unittest.skipUnless(HAVE_PTY, "pty not available")
+    def test_password_prompt_eof_fails(self):
+        """EOF at the password prompt for an encrypted key must fail cleanly.
+
+        The password buffer was measured with strlen after the failed read,
+        although nothing had been written to it."""
+        code, out = run_wolfssl_pty(
+            "pkcs8", "-in", os.path.join(CERTS_DIR, "server-keyEnc.pem"),
+            reply=b"\x04")
+        self.assertIn(b"Input Password", out)
+        self.assertIn(b"Unable to get password from stdin", out)
+        self.assertGreater(code, 0, out)
+        self.assertNotIn(b"PRIVATE KEY", out)
+        self.assertNotIn(b"AddressSanitizer", out)
 
 
 if __name__ == "__main__":

@@ -88,6 +88,73 @@ def run_wolfssl(*args, stdin_data=None, timeout=60):
     return subprocess.run(cmd, **kwargs)
 
 
+try:
+    import pty
+    HAVE_PTY = True
+except ImportError:
+    # POSIX only; not available on Windows.
+    HAVE_PTY = False
+
+
+def run_wolfssl_pty(*args, reply=b"", prompt=b"Input Password", timeout=30):
+    """Run the wolfssl binary on a pseudo-terminal.
+
+    Interactive password prompts need a terminal on stdin. Once `prompt`
+    appears in the output, `reply` is written to the terminal (b"\\x04" sends
+    EOF). Returns (returncode, output), where output is the combined terminal
+    output as bytes and a negative returncode is the signal that killed it.
+    """
+    import select
+    import signal
+    import time
+
+    cmd = [WOLFSSL_BIN] + list(args)
+    pid, fd = pty.fork()
+    if pid == 0:
+        try:
+            os.execv(cmd[0], cmd)
+        finally:
+            os._exit(127)
+
+    output = b""
+    sent = False
+    deadline = time.monotonic() + timeout
+    try:
+        while time.monotonic() < deadline:
+            ready, _, _ = select.select([fd], [], [], 0.5)
+            if not ready:
+                continue
+            try:
+                data = os.read(fd, 4096)
+            except OSError:
+                break  # EIO once the child has closed the terminal
+            if not data:
+                break
+            output += data
+            if not sent and prompt in output:
+                os.write(fd, reply)
+                sent = True
+    finally:
+        os.close(fd)
+
+    # Bounded reap so a child stuck at the prompt cannot hang the suite.
+    status = None
+    end = time.monotonic() + 5
+    while status is None and time.monotonic() < end:
+        wpid, st = os.waitpid(pid, os.WNOHANG)
+        if wpid == pid:
+            status = st
+        else:
+            time.sleep(0.05)
+    if status is None:
+        os.kill(pid, signal.SIGKILL)
+        _, status = os.waitpid(pid, 0)
+
+    if os.WIFEXITED(status):
+        return os.WEXITSTATUS(status), output
+    return -os.WTERMSIG(status), output
+
+
 def is_fips():
     """True when linked against a FIPS wolfSSL build (per `wolfssl -v`)."""
     r = run_wolfssl("-v")
