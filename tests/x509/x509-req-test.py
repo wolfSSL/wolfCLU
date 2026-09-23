@@ -669,6 +669,20 @@ class TestX509ReqSign(unittest.TestCase):
                         "-out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    def test_x509_req_signkey_sets_v3(self):
+        """x509 -req issues a v3 certificate from the v1 CSR."""
+        out = _tmp("tmp_x509req_v3.cert")
+        self._clean(out)
+        r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
+                        "-signkey",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        self.assertIn("Version: 3 (0x2)", r2.stdout)
+
 
 class TestX509ReqHashAlgorithms(unittest.TestCase):
     """Test hash algorithm options for x509 -req."""
