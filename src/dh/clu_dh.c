@@ -534,7 +534,13 @@ int wolfCLU_DhParamSetup(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support. Unable to open output file");
             ret = WOLFCLU_FATAL_ERROR;
 #else
-            bioOut = wolfSSL_BIO_new_file(out, "wb");
+            /* a generated key is private, so create the file owner-only */
+            if (genKey) {
+                bioOut = wolfCLU_BioOpenOwner(out);
+            }
+            else {
+                bioOut = wolfSSL_BIO_new_file(out, "wb");
+            }
             if (bioOut == NULL) {
                 wolfCLU_LogError("Unable to open output file %s",
                         optarg);
