@@ -191,8 +191,9 @@ void wolfCLU_CertSignSetHash(WOLFCLU_CERT_SIGN* csign,
 void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
         void* key, int keyType)
 {
+    /* csign takes its own reference; the caller still frees its copy */
     if (csign != NULL) {
-        if (ca != NULL) {
+        if (ca != NULL && wolfSSL_X509_up_ref(ca) == WOLFSSL_SUCCESS) {
             wolfSSL_X509_free(csign->ca);
             csign->ca = ca;
         }
@@ -201,8 +202,11 @@ void wolfCLU_CertSignSetCA(WOLFCLU_CERT_SIGN* csign, WOLFSSL_X509* ca,
             switch (keyType) {
                 case RSAk:
                 case ECDSAk:
-                    wolfSSL_EVP_PKEY_free(csign->caKey.pkey);
-                    csign->caKey.pkey = (WOLFSSL_EVP_PKEY*)key;
+                    if (wolfSSL_EVP_PKEY_up_ref((WOLFSSL_EVP_PKEY*)key)
+                            == WOLFSSL_SUCCESS) {
+                        wolfSSL_EVP_PKEY_free(csign->caKey.pkey);
+                        csign->caKey.pkey = (WOLFSSL_EVP_PKEY*)key;
+                    }
                     break;
 
                 default:
@@ -1814,12 +1818,12 @@ WOLFCLU_CERT_SIGN* wolfCLU_readSignConfig(char* config, char* sect)
     }
 
     wolfCLU_CertSignSetCA(ret, ca, caKey, keyType);
+    wolfSSL_X509_free(ca);
+    wolfSSL_EVP_PKEY_free(caKey);
 
     /* in fail case free up memory */
     if (ret == NULL) {
         wolfSSL_NCONF_free(conf);
-        wolfSSL_X509_free(ca);
-        wolfSSL_EVP_PKEY_free(caKey);
     }
     return ret;
 }
