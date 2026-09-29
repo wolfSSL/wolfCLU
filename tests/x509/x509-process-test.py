@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Tests for wolfssl x509 processing (converted from x509-process-test.sh)."""
 
+import filecmp
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -12,6 +14,13 @@ from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
 
 TESTS_X509_DIR = os.path.dirname(os.path.abspath(__file__))
 HAS_OPENSSL = shutil.which("openssl") is not None
+
+# ML-DSA-44 public key and signature sizes, from FIPS 204.
+ML_DSA_44_PUB_SZ = 1312
+ML_DSA_44_SIG_SZ = 2420
+
+# One line of a printed hex block, e.g. "A4:2A:BB:...:78:" or "...:F0:18".
+_HEX_LINE = re.compile(r"(?:[0-9A-Fa-f]{2}:)*[0-9A-Fa-f]{2}:?\Z")
 
 
 def _check_cert_signature(cert_path, digest, inform="PEM"):
@@ -82,6 +91,27 @@ def _cleanup(*files):
     for f in files:
         if os.path.exists(f):
             os.remove(f)
+
+
+def _hex_block(lines, start):
+    """Return the bytes of the hex block printed directly under lines[start].
+
+    Stops at the first line that is not colon separated hex, so a block that
+    was cut short is reported as a short byte count rather than skipped.
+    """
+    out = []
+    for line in lines[start + 1:]:
+        text = line.strip()
+        if not _HEX_LINE.match(text):
+            break
+        out.extend(b for b in text.split(":") if b)
+    return out
+
+
+def _find_line(lines, text):
+    """Index of the only line containing 'text', -1 when absent."""
+    hits = [i for i, l in enumerate(lines) if text in l]
+    return hits[0] if len(hits) == 1 else -1
 
 
 class TestX509ProcessValid(unittest.TestCase):
@@ -530,6 +560,165 @@ class TestX509ModulusNoout(unittest.TestCase):
         self.assertGreaterEqual(r.returncode, 0,
                                 "x509 -modulus -noout crashed with signal "
                                 "{}".format(r.returncode))
+
+
+class TestX509MlDsaText(unittest.TestCase):
+    """x509 -text on a pure ML-DSA-44 certificate."""
+
+    CERT_PEM = os.path.join(CERTS_DIR, "mldsa", "mldsa44-cert.pem")
+    CERT_DER = os.path.join(CERTS_DIR, "mldsa", "mldsa44-cert.der")
+    PUB_DER = os.path.join(CERTS_DIR, "mldsa", "mldsa44-keyPub.der")
+
+    @classmethod
+    def setUpClass(cls):
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+
+        r = run_wolfssl("genkey", "ml-dsa", "-level", "2", "-out",
+                        "mldsa509-probe", "-output", "keypair",
+                        "-outform", "pem")
+        _cleanup("mldsa509-probe.priv", "mldsa509-probe.pub")
+        if r.returncode != 0 or "not enabled" in (r.stdout + r.stderr):
+            raise unittest.SkipTest("ML-DSA support not compiled in")
+
+    def _text(self, *extra):
+        r = run_wolfssl("x509", "-in", self.CERT_PEM, "-text", "-noout", *extra)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout
+
+    def test_names_parameter_set(self):
+        """The parameter set is named in the key and both algorithm slots."""
+        out = self._text()
+        self.assertEqual(out.count("Signature Algorithm: ML-DSA 44"), 2,
+                         "expected both the tbs and the outer algorithm")
+        self.assertIn("Public Key Algorithm: ML-DSA 44", out)
+        self.assertIn("ML-DSA 44 Public-Key:", out)
+
+    def test_prints_whole_key_and_signature(self):
+        """The key and signature print in full, at their FIPS 204 sizes."""
+        lines = self._text().splitlines()
+
+        pub = _find_line(lines, "pub:")
+        self.assertNotEqual(pub, -1, "no 'pub:' block")
+        self.assertEqual(len(_hex_block(lines, pub)), ML_DSA_44_PUB_SZ)
+
+        sig = [i for i, l in enumerate(lines)
+               if l.strip().startswith("Signature Algorithm:")]
+        self.assertEqual(len(sig), 2, "expected two algorithm lines")
+        self.assertEqual(len(_hex_block(lines, sig[-1])), ML_DSA_44_SIG_SZ)
+
+    def test_der_text_matches_pem(self):
+        """The DER form of the cert prints identically to the PEM form."""
+        r = run_wolfssl("x509", "-inform", "der", "-text", "-noout",
+                        "-in", self.CERT_DER)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout, self._text(), "DER/PEM text mismatch")
+
+    def test_pubkey_matches_cert_key(self):
+        """-pubkey prints the cert's SPKI."""
+        out, der = "mldsa44-spki.pem", "mldsa44-spki.der"
+        self.addCleanup(lambda: _cleanup(out, der))
+
+        r = run_wolfssl("x509", "-in", self.CERT_PEM, "-pubkey", "-noout",
+                        "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(out) as f:
+            self.assertIn("BEGIN PUBLIC KEY", f.read())
+
+        r = run_wolfssl("pkey", "-pubin", "-in", out, "-inform", "pem",
+                        "-outform", "der", "-out", der)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertTrue(filecmp.cmp(self.PUB_DER, der, shallow=False),
+                        "-pubkey did not match the cert's public key")
+
+
+class TestX509MlDsaDualAlgText(unittest.TestCase):
+    """x509 -text on chimera certs with ML-DSA-44 as the alternative alg."""
+
+    # Primary alg  : ECDSA
+    # Secondary alg: ML-DSA-44
+    CERTS = (os.path.join(CERTS_DIR, "ca-chimera-cert.pem"),
+             os.path.join(CERTS_DIR, "server-chimera-cert.pem"))
+
+    ALT_PUB = "X509v3 Subject Alternative Public Key Info"
+    ALT_ALG = "X509v3 Alternative Signature Algorithm"
+    ALT_SIG = "X509v3 Alternative Signature Value"
+
+    @classmethod
+    def setUpClass(cls):
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+
+        # '-altextend' is only built with WOLFSSL_DUAL_ALG_CERTS and
+        # HAVE_DILITHIUM, the same pair that gates printing the alt extensions.
+        r = run_wolfssl("ca", "-help")
+        if "altextend" not in r.stdout + r.stderr:
+            raise unittest.SkipTest("altextend not available")
+
+    def _text(self, cert):
+        r = run_wolfssl("x509", "-in", cert, "-text", "-noout")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return r.stdout
+
+    def test_alt_extensions_are_decoded(self):
+        """ECDSA, then the ML-DSA 44 alt extensions, then ECDSA again."""
+        expected = ("Signature Algorithm: sha256WithECDSA",
+                    "Public Key Algorithm: id-ecPublicKey",
+                    self.ALT_PUB, "ML-DSA 44 Public-Key:",
+                    self.ALT_ALG, "ML-DSA 44",
+                    self.ALT_SIG,
+                    "Signature Algorithm: sha256WithECDSA")
+        for cert in self.CERTS:
+            with self.subTest(cert=cert):
+                lines = self._text(cert).splitlines()
+                prev = -1
+                for text in expected:
+                    i = next((j for j, l in enumerate(lines)
+                              if j > prev and text in l), -1)
+                    self.assertNotEqual(
+                        i, -1, "'{}' missing or out of order".format(text))
+                    prev = i
+
+    def test_alt_key_and_signature_are_whole(self):
+        """The alternative key and signature print at their full sizes."""
+        for cert in self.CERTS:
+            with self.subTest(cert=cert):
+                lines = self._text(cert).splitlines()
+
+                # The alt key's own "pub:" header, not the EC key's.
+                start = _find_line(lines, self.ALT_PUB)
+                self.assertNotEqual(start, -1, "no alternative key info")
+                pub = next((i for i, l in enumerate(lines)
+                            if i > start and l.strip() == "pub:"), -1)
+                self.assertNotEqual(pub, -1, "no alternative 'pub:' block")
+                self.assertEqual(len(_hex_block(lines, pub)), ML_DSA_44_PUB_SZ)
+
+                sig = _find_line(lines, self.ALT_SIG)
+                self.assertNotEqual(sig, -1, "no alternative signature value")
+                self.assertEqual(len(_hex_block(lines, sig)), ML_DSA_44_SIG_SZ)
+
+    def test_der_text_matches_pem(self):
+        """The alternative extensions survive a round trip through DER."""
+        for i, cert in enumerate(self.CERTS):
+            with self.subTest(cert=cert):
+                der = "x509-chimera-%d.der" % i
+                self.addCleanup(lambda p=der: _cleanup(p))
+
+                r = run_wolfssl("x509", "-in", cert, "-outform", "der",
+                                "-out", der)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                r = run_wolfssl("x509", "-inform", "der", "-in", der,
+                                "-text", "-noout")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout, self._text(cert),
+                                 "DER/PEM text mismatch")
 
 
 if __name__ == "__main__":

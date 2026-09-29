@@ -56,6 +56,86 @@ static void wolfCLU_pKeyHelp(void)
 }
 
 
+#ifdef HAVE_DILITHIUM
+/* Get the DER encoding of an ML-DSA private key
+ * returns the size of *out on success
+ */
+static int _MLDSApKeyToPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
+{
+    int derSz;
+
+    if (pkey == NULL || out == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    derSz = wolfSSL_i2d_PrivateKey(pkey, out);
+    if (derSz <= 0) {
+        wolfCLU_LogError("Unable to get DER from ML-DSA private key");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    return derSz;
+}
+
+
+/* Get the DER encoding of an ML-DSA public key
+ * returns the size of *out on success
+ */
+static int _MLDSApKeyToPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
+{
+    int derSz;
+
+    if (pkey == NULL || out == NULL) {
+        return BAD_FUNC_ARG;
+    }
+
+    derSz = wolfSSL_i2d_PUBKEY(pkey, out);
+    if (derSz <= 0) {
+        wolfCLU_LogError("Unable to get DER from ML-DSA public key");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    return derSz;
+}
+
+
+/* Write an ML-DSA key out as PEM.
+ * return WOLFSSL_SUCCESS on success
+ */
+static int _MLDSApKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
+        int isPrivate)
+{
+    unsigned char* der = NULL;
+    int derSz;
+    int ret = WOLFCLU_FAILURE;
+
+    if (isPrivate) {
+        derSz = _MLDSApKeyToPriKey(pkey, &der);
+    }
+    else {
+        derSz = _MLDSApKeyToPubKey(pkey, &der);
+    }
+
+    if (derSz > 0) {
+        if (isPrivate) {
+            ret = wolfCLU_printDerPriKey(bio, der, derSz,
+                    PKCS8_PRIVATEKEY_TYPE);
+        }
+        else {
+            ret = wolfCLU_printDerPubKey(bio, der, derSz);
+        }
+    }
+
+    if (der != NULL) {
+        if (isPrivate) {
+            wolfCLU_ForceZero(der, derSz);
+        }
+        XFREE(der, HEAP_HINT, DYNAMIC_TYPE_OPENSSL);
+    }
+
+    return (ret == WOLFCLU_SUCCESS) ? WOLFSSL_SUCCESS : WOLFSSL_FAILURE;
+}
+#endif /* HAVE_DILITHIUM */
+
+
 /* helper function for ECC EVP_PKEY
  * return WOLFSSL_SUCCESS on success */
 static int _ECCpKeyPEMtoKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey,
@@ -135,7 +215,11 @@ static int wolfCLU_pKeyPEMtoPubKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
         case EVP_PKEY_EC:
             ret = _ECCpKeyPEMtoKey(bio, pkey, 0);
             break;
-
+    #ifdef HAVE_DILITHIUM
+        case EVP_PKEY_DILITHIUM:
+            ret = _MLDSApKeyPEMtoKey(bio, pkey, 0);
+            break;
+    #endif
         case EVP_PKEY_DSA:
             FALL_THROUGH;
         default:
@@ -244,7 +328,11 @@ int wolfCLU_pKeyPEMtoPriKey(WOLFSSL_BIO* bio, WOLFSSL_EVP_PKEY* pkey)
         case EVP_PKEY_EC:
             ret = _ECCpKeyPEMtoKey(bio, pkey, 1);
             break;
-
+    #ifdef HAVE_DILITHIUM
+        case EVP_PKEY_DILITHIUM:
+            ret = _MLDSApKeyPEMtoKey(bio, pkey, 1);
+            break;
+    #endif
         case EVP_PKEY_DSA:
             FALL_THROUGH;
         default:
@@ -369,6 +457,12 @@ int wolfCLU_pKeytoPubKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
             ret = wolfCLU_pKeyToKeyECC(pkey, out, 0);
             break;
 
+    #ifdef HAVE_DILITHIUM
+        case EVP_PKEY_DILITHIUM:
+            ret = _MLDSApKeyToPubKey(pkey, out);
+            break;
+    #endif
+
         default:
             wolfCLU_LogError("unknown / unsupported key type");
             ret = USER_INPUT_ERROR;
@@ -401,6 +495,12 @@ int wolfCLU_pKeytoPriKey(WOLFSSL_EVP_PKEY* pkey, unsigned char** out)
         case EVP_PKEY_EC:
             ret = wolfCLU_pKeyToKeyECC(pkey, out, 1);
             break;
+
+    #ifdef HAVE_DILITHIUM
+        case EVP_PKEY_DILITHIUM:
+            ret = _MLDSApKeyToPriKey(pkey, out);
+            break;
+    #endif
 
         default:
             wolfCLU_LogError("unknown / unsupported key type");
