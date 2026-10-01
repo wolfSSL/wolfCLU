@@ -338,12 +338,10 @@ int wolfCLU_CASetup(int argc, char** argv)
     if (subjKey != NULL) {
         wolfSSL_BIO_free(subjKey);
     }
-    if (!selfSigned) {
-        wolfSSL_X509_free(x509);
-    }
-    if ((selfSigned || altSign) && ca != NULL) {
-        wolfSSL_X509_free(ca);
-    }
+    /* signer holds its own references to anything passed to SetCA */
+    wolfSSL_X509_free(x509);
+    wolfSSL_X509_free(ca);
+    wolfSSL_EVP_PKEY_free(pkey);
 
     /* check for success on signer free since random data is output */
     if (wolfCLU_CertSignFree(signer) != WOLFCLU_SUCCESS) {
