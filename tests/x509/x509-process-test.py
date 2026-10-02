@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Tests for wolfssl x509 processing (converted from x509-process-test.sh)."""
 
+import base64
 import os
 import shutil
 import subprocess
@@ -516,6 +517,62 @@ class TestMalformedArguments(unittest.TestCase):
                         "/O=wolfSSL/C=US/ST=WA/L=Seattle/CN=wolfSSL/OUorg-unit")
         self.assertNotEqual(r.returncode, 0, r.stderr)
         self.assertGreater(len(r.stderr), 0)
+
+
+class TestX509V1Cert(unittest.TestCase):
+    """Regression: inspecting a v1 certificate must not change its version."""
+
+    V1_CERT = os.path.join(CERTS_DIR, "server-ecc-v1-cert.pem")
+
+    def _clean(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: _cleanup(p))
+
+    def _v1_der(self):
+        with open(self.V1_CERT) as f:
+            lines = f.read().splitlines()
+        b64 = "".join(line for line in lines
+                      if line and not line.startswith("-----"))
+        return base64.b64decode(b64)
+
+    def _assert_v1_text(self, r):
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("Version: 1 (0x0)", r.stdout)
+        self.assertNotIn("Version: 3", r.stdout)
+
+    def test_v1_pem_text(self):
+        r = run_wolfssl("x509", "-in", self.V1_CERT, "-text", "-noout")
+        self._assert_v1_text(r)
+
+    def test_v1_der_text(self):
+        der = "test_v1_text_in.der"
+        self._clean(der)
+        with open(der, "wb") as f:
+            f.write(self._v1_der())
+        r = run_wolfssl("x509", "-inform", "der", "-in", der,
+                        "-text", "-noout")
+        self._assert_v1_text(r)
+
+    def test_v1_pem_to_der_unchanged(self):
+        out = "test_v1_out.der"
+        self._clean(out)
+        r = run_wolfssl("x509", "-in", self.V1_CERT, "-outform", "der",
+                        "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(out, "rb") as f:
+            self.assertEqual(f.read(), self._v1_der())
+
+    def test_v1_der_to_pem_unchanged(self):
+        der = "test_v1_pem_in.der"
+        out = "test_v1_out.pem"
+        self._clean(der, out)
+        with open(der, "wb") as f:
+            f.write(self._v1_der())
+        r = run_wolfssl("x509", "-inform", "der", "-in", der,
+                        "-outform", "pem", "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(out) as f1, open(self.V1_CERT) as f2:
+            self.assertEqual(f1.read(), f2.read())
 
 
 class TestX509ModulusNoout(unittest.TestCase):

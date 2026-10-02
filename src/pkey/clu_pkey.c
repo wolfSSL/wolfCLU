@@ -421,6 +421,7 @@ int wolfCLU_pKeySetup(int argc, char** argv)
     int pubOut = 0;
     int option;
     int longIndex = 1;
+    char *outFile = NULL;
     WOLFSSL_EVP_PKEY *pkey = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
@@ -453,10 +454,9 @@ int wolfCLU_pKeySetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
+                outFile = optarg;
+                if (outFile == NULL) {
+                    wolfCLU_LogError("-out requires a file name");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
@@ -506,6 +506,20 @@ int wolfCLU_pKeySetup(int argc, char** argv)
         if (pkey == NULL) {
             wolfCLU_LogError("Error reading key from file");
             ret = USER_INPUT_ERROR;
+        }
+    }
+
+    /* open -out once options are known. A private key file is owner-only */
+    if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
+        if (pubOut) {
+            bioOut = wolfSSL_BIO_new_file(outFile, "wb");
+        }
+        else {
+            bioOut = wolfCLU_BioOpenOwner(outFile);
+        }
+        if (bioOut == NULL) {
+            wolfCLU_LogError("Unable to open output file %s", outFile);
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 

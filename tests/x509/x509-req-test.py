@@ -9,7 +9,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, HAVE_PTY, is_fips,
+                          run_wolfssl, run_wolfssl_pty, test_main)
 
 
 def _tmp(name):
@@ -49,6 +50,9 @@ subjectAltName = @alt_names
 basicConstraints = CA:TRUE
 keyUsage = digitalSignature
 subjectAltName = @alt_names_full_skip
+[ v3_ca_pathlen ]
+basicConstraints = critical, CA:TRUE, pathlen:1
+keyUsage = keyCertSign, cRLSign
 [alt_names]
 DNS.1 = extraName
 DNS.2 = alt-name
@@ -146,6 +150,75 @@ def _flip_last_der_byte(src, dst):
         f.write(data)
 
 
+def _der_tlv(data, pos):
+    """Return (tag, value_start, value_end) of the DER element at pos."""
+    tag = data[pos]
+    length = data[pos + 1]
+    pos += 2
+    if length & 0x80:
+        n = length & 0x7F
+        length = int.from_bytes(data[pos:pos + n], "big")
+        pos += n
+    return tag, pos, pos + length
+
+
+def _csr_subject_string_tags(der):
+    """Return [(attribute OID bytes, string tag), ...] for a DER CSR subject.
+
+    CertificationRequest -> CertificationRequestInfo -> version, subject.
+    Name is a SEQUENCE of SET of SEQUENCE { OID, string }."""
+    _, pos, _ = _der_tlv(der, 0)
+    _, pos, _ = _der_tlv(der, pos)
+    _, _, pos = _der_tlv(der, pos)
+    _, pos, end = _der_tlv(der, pos)
+    out = []
+    while pos < end:
+        _, set_start, set_end = _der_tlv(der, pos)
+        _, atv, _ = _der_tlv(der, set_start)
+        _, oid_start, oid_end = _der_tlv(der, atv)
+        val_tag, _, _ = _der_tlv(der, oid_end)
+        out.append((bytes(der[oid_start:oid_end]), val_tag))
+        pos = set_end
+    return out
+
+
+def _cert_basic_constraints(der):
+    """Return (critical, cA, pathLen) of a DER certificate's
+    basicConstraints extension, or None if it has none. pathLen is None
+    when absent.
+
+    Certificate -> TBSCertificate -> [3] Extensions. Each Extension is
+    SEQUENCE { OID, critical BOOLEAN OPTIONAL, OCTET STRING } and the
+    OCTET STRING holds SEQUENCE { cA BOOLEAN OPTIONAL, INTEGER OPTIONAL }."""
+    _, pos, _ = _der_tlv(der, 0)
+    _, pos, end = _der_tlv(der, pos)
+    while pos < end:
+        tag, start, pos = _der_tlv(der, pos)
+        if tag != 0xA3:
+            continue
+        _, ext_pos, exts_end = _der_tlv(der, start)
+        while ext_pos < exts_end:
+            _, field, ext_pos = _der_tlv(der, ext_pos)
+            _, oid_start, field = _der_tlv(der, field)
+            if bytes(der[oid_start:field]) != b"\x55\x1d\x13":
+                continue
+            critical = False
+            tag, val_start, val_end = _der_tlv(der, field)
+            if tag == 0x01:
+                critical = der[val_start] != 0
+                _, val_start, val_end = _der_tlv(der, val_end)
+            _, bc_pos, bc_end = _der_tlv(der, val_start)
+            ca, pathlen = False, None
+            while bc_pos < bc_end:
+                tag, val_start, bc_pos = _der_tlv(der, bc_pos)
+                if tag == 0x01:
+                    ca = der[val_start] != 0
+                elif tag == 0x02:
+                    pathlen = int.from_bytes(der[val_start:bc_pos], "big")
+            return critical, ca, pathlen
+    return None
+
+
 class TestReqNew(unittest.TestCase):
     """Test req -new with various options."""
 
@@ -188,6 +261,24 @@ class TestReqNew(unittest.TestCase):
         expected = "        Subject: O=wolfSSL, C=US, ST=WA, L=Seattle, CN=wolfSSL, OU=org-unit"
         self.assertEqual(subject_line, expected,
                          "Got: {!r}".format(subject_line))
+
+    def test_req_new_subj_country_encoding_not_reused(self):
+        """-subj encodes C as PrintableString and the entries after it as
+        UTF8String. '_' and '@' are not valid PrintableString characters."""
+        tmp = _tmp("test_req_subj_encoding.csr")
+        self._clean(tmp)
+        r = run_wolfssl("req", "-new",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", "/C=US/CN=user_name@example/O=wolfSSL",
+                        "-outform", "der", "-out", tmp)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        with open(tmp, "rb") as f:
+            tags = _csr_subject_string_tags(f.read())
+        printable, utf8 = 0x13, 0x0C
+        self.assertEqual(tags, [(b"\x55\x04\x06", printable),
+                                (b"\x55\x04\x03", utf8),
+                                (b"\x55\x04\x0a", utf8)])
 
 
     def test_req_new_interactive_name(self):
@@ -396,6 +487,74 @@ class TestReqNew(unittest.TestCase):
                          "DNS SAN not trimmed of surrounding whitespace")
         self.assertIn("IP Address:10.0.0.1", san_line,
                       "IP SAN not applied/trimmed from inline config form")
+
+    def _req_basic_constraints(self, value, name):
+        """Run req -new -x509 with a config setting basicConstraints to value.
+        Return the result and the path of the DER certificate."""
+        conf = _tmp(name + ".conf")
+        out = _tmp(name + ".der")
+        self._clean(conf, out)
+        with open(conf, "w", encoding="utf-8", newline="\n") as f:
+            f.write(
+                "[ req ]\n"
+                "distinguished_name = dn\n"
+                "prompt = no\n"
+                "x509_extensions = v3_bc\n"
+                "[ dn ]\n"
+                "commonName = basic-constraints-test\n"
+                "[ v3_bc ]\n"
+                "basicConstraints = " + value + "\n")
+        r = run_wolfssl("req", "-new", "-x509",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-config", conf, "-outform", "der", "-out", out)
+        if "not compiled with cert extensions" in r.stdout + r.stderr:
+            self.skipTest("cert extensions not compiled in")
+        return r, out
+
+    def test_req_config_basic_constraints(self):
+        """A config basicConstraints value is a comma separated list of
+        NAME:VALUE pairs with an optional leading "critical", as in OpenSSL.
+        CA and pathlen must both reach the certificate."""
+        cases = [
+            ("CA:TRUE, pathlen:0", (False, True, 0)),
+            ("CA:TRUE,pathlen:3", (False, True, 3)),
+            ("critical, CA:TRUE, pathlen:0", (True, True, 0)),
+            ("critical,CA:TRUE", (True, True, None)),
+            ("CA:FALSE", (False, False, None)),
+            ("pathlen:2 , CA : true", (False, True, 2)),
+        ]
+        for i, (value, expected) in enumerate(cases):
+            with self.subTest(value=value):
+                r, out = self._req_basic_constraints(
+                    value, "test_req_bc_{}".format(i))
+                self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+                with open(out, "rb") as f:
+                    got = _cert_basic_constraints(f.read())
+                self.assertEqual(got, expected,
+                                 "(critical, CA, pathlen) mismatch")
+
+    def test_req_config_basic_constraints_bad_fails(self):
+        """Unknown or malformed basicConstraints entries fail instead of
+        producing a certificate with the wrong constraints."""
+        values = [
+            "CA:TRUE, bogus:1",
+            "CA:maybe",
+            "CA",
+            "CA:TRUE,",
+            "CA:TRUE, pathlen:abc",
+            "CA:TRUE, pathlen:-1",
+            "CA:TRUE, pathlen:1000",
+            "CA:TRUE, critical",
+            "critical",
+        ]
+        for i, value in enumerate(values):
+            with self.subTest(value=value):
+                r, out = self._req_basic_constraints(
+                    value, "test_req_bc_bad_{}".format(i))
+                self.assertNotEqual(r.returncode, 0,
+                                    "bad basicConstraints accepted")
+                self.assertFalse(os.path.exists(out),
+                                 "certificate written for bad input")
 
     def test_req_x509_addext_subject_alt_name(self):
         """req -x509 -addext subjectAltName adds IP and DNS alt names."""
@@ -611,6 +770,79 @@ class TestReqVerify(unittest.TestCase):
                             "tampered CSR verify should fail")
         self.assertNotIn("BEGIN CERTIFICATE REQUEST", r.stdout)
 
+    def _req_verify(self, out, header, *args):
+        """Run req with -verify into out and expect verify OK and a PEM
+        of the given type."""
+        self._clean(out)
+        r = run_wolfssl("req", *args, "-verify", "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("verify OK", r.stdout + r.stderr)
+        with open(out) as f:
+            self.assertIn("-----BEGIN {}-----".format(header), f.read())
+
+    def _new_x509_verify(self, key, out):
+        """req -new -x509 -verify checks the certificate it made (F-9846)."""
+        self._req_verify(out, "CERTIFICATE", "-new", "-x509", "-days", "30",
+                         "-key", os.path.join(CERTS_DIR, key),
+                         "-subj", "/O=wolfSSL/C=US/CN=verify-test")
+        r = run_wolfssl("x509", "-in", out, "-noout", "-subject")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_verify_new_x509_rsa(self):
+        """req -new -x509 -verify with an RSA key (F-9846)."""
+        self._new_x509_verify("server-key.pem",
+                              _tmp("test_req_verify_x509_rsa.pem"))
+
+    def test_verify_new_x509_ecc(self):
+        """req -new -x509 -verify with an ECC key (F-9846)."""
+        self._new_x509_verify("ecc-key.pem",
+                              _tmp("test_req_verify_x509_ecc.pem"))
+
+    def test_verify_newkey_x509(self):
+        """req -newkey -x509 -verify checks the new certificate (F-9846)."""
+        key = _tmp("test_req_verify_newkey.key")
+        self._clean(key)
+        self._req_verify(_tmp("test_req_verify_newkey.pem"), "CERTIFICATE",
+                         "-new", "-x509", "-days", "30",
+                         "-newkey", "rsa:2048", "-nodes", "-keyout", key,
+                         "-subj", "/O=wolfSSL/C=US/CN=verify-test")
+
+    def test_verify_in_csr_x509(self):
+        """req -in csr -x509 -verify checks the re-signed cert (F-9846)."""
+        self._req_verify(_tmp("test_req_verify_in_x509.pem"), "CERTIFICATE",
+                         "-in", self.csr_pem, "-x509", "-days", "30",
+                         "-key", self.key)
+
+    def test_verify_new_csr_rsa(self):
+        """req -new -verify still checks a new CSR (F-9846)."""
+        self._req_verify(_tmp("test_req_verify_new_rsa.csr"),
+                         "CERTIFICATE REQUEST", "-new", "-key", self.key,
+                         "-subj", "/O=wolfSSL/C=US/CN=verify-test")
+
+    def test_verify_new_csr_ecc(self):
+        """req -new -verify still checks a new ECC CSR (F-9846)."""
+        self._req_verify(_tmp("test_req_verify_new_ecc.csr"),
+                         "CERTIFICATE REQUEST", "-new",
+                         "-key", os.path.join(CERTS_DIR, "ecc-key.pem"),
+                         "-subj", "/O=wolfSSL/C=US/CN=verify-test")
+
+    def test_verify_in_csr_key(self):
+        """req -in csr -key -verify still checks the CSR (F-9846)."""
+        self._req_verify(_tmp("test_req_verify_in_key.csr"),
+                         "CERTIFICATE REQUEST", "-in", self.csr_pem,
+                         "-key", self.key)
+
+    def test_verify_in_csr_wrong_key_fails(self):
+        """req -in csr -verify with a -key that did not sign it fails."""
+        r = run_wolfssl("req", "-in", self.csr_pem, "-noout", "-verify",
+                        "-key", os.path.join(CERTS_DIR, "ecc-key.pem"))
+        self.assertNotEqual(r.returncode, 0,
+                            "verify with the wrong key should fail")
+        self.assertGreaterEqual(r.returncode, 0,
+                                "verify crashed with signal "
+                                "{}".format(r.returncode))
+        self.assertNotIn("verify OK", r.stdout + r.stderr)
+
 
 class TestX509ReqSign(unittest.TestCase):
     """Test x509 -req -signkey signing."""
@@ -667,6 +899,20 @@ class TestX509ReqSign(unittest.TestCase):
                         os.path.join(CERTS_DIR, "server-key.pem"),
                         "-out", out)
         self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_x509_req_signkey_sets_v3(self):
+        """x509 -req issues a v3 certificate from the v1 CSR."""
+        out = _tmp("tmp_x509req_v3.cert")
+        self._clean(out)
+        r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
+                        "-signkey",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-out", out)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
+        self.assertEqual(r2.returncode, 0, r2.stderr)
+        self.assertIn("Version: 3 (0x2)", r2.stdout)
 
 
 class TestX509ReqHashAlgorithms(unittest.TestCase):
@@ -780,6 +1026,26 @@ class TestX509ReqExtensions(unittest.TestCase):
         r2 = run_wolfssl("x509", "-in", out, "-text", "-noout")
         self.assertEqual(r2.returncode, 0, r2.stderr)
         self.assertIn("CA:TRUE", r2.stdout)
+
+    def test_extfile_basic_constraints_pathlen(self):
+        """x509 -req -extfile applies "critical, CA:TRUE, pathlen:1".
+        wolfSSL drops pathlen unless keyUsage has keyCertSign, so the
+        section also replaces the CSR's keyUsage."""
+        out = _tmp("tmp_ext_pathlen.der")
+        self._clean(out)
+        r = run_wolfssl("x509", "-req", "-in", self.csr, "-days", "3650",
+                        "-extfile", self.conf_file,
+                        "-extensions", "v3_ca_pathlen",
+                        "-signkey",
+                        os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-outform", "der", "-out", out)
+        if "not compiled with cert extensions" in r.stdout + r.stderr:
+            self.skipTest("cert extensions not compiled in")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        with open(out, "rb") as f:
+            got = _cert_basic_constraints(f.read())
+        self.assertEqual(got, (True, True, 1),
+                         "(critical, CA, pathlen) mismatch")
 
 
 class TestX509ReqLargeExtensions(unittest.TestCase):
@@ -989,6 +1255,60 @@ class TestReqFIPS(unittest.TestCase):
                         stdin_data="long test password\n")
         self.assertEqual(r.returncode, 0, r.stderr)
 
+    @unittest.skipUnless(HAVE_PTY, "pty not available")
+    def test_newkey_password_prompt_eof_fails(self):
+        """EOF at the -newkey key password prompt must fail cleanly.
+
+        The uninitialised password buffer was measured with strlen after
+        the failed read."""
+        tmp = _tmp("test_req_prompt_eof.cert")
+        key = _tmp("test_req_prompt_eof.pem")
+        self._clean(tmp, key)
+        code, out = run_wolfssl_pty("req", "-new", "-newkey", "rsa:2048",
+                                    "-keyout", key, "-config", self.conf_file,
+                                    "-x509", "-out", tmp, reply=b"\x04")
+        self.assertIn(b"Input Password", out)
+        self.assertIn(b"Unable to get password from stdin", out)
+        self.assertGreater(code, 0, out)
+        self.assertNotIn(b"AddressSanitizer", out)
+        if os.path.exists(key):
+            with open(key, "rb") as f:
+                self.assertNotIn(b"PRIVATE KEY", f.read())
+
+
+@unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+class TestReqKeyoutPermissions(unittest.TestCase):
+    """req -keyout must be owner-only under umask 022 (F-9860)."""
+
+    def setUp(self):
+        old_umask = os.umask(0o022)
+        self.addCleanup(os.umask, old_umask)
+
+    def _new_key(self, name, *extra):
+        key = _tmp(name + ".pem")
+        csr = _tmp(name + ".csr")
+        # Start from new files so the create mode applies.
+        _cleanup(key, csr)
+        self.addCleanup(_cleanup, key, csr)
+        r = run_wolfssl("req", "-new", "-newkey", "rsa:2048",
+                        "-keyout", key, "-out", csr,
+                        "-subj", "O=wolfSSL/C=US/CN=keyout-perm", *extra)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        key_mode = os.stat(key).st_mode & 0o777
+        csr_mode = os.stat(csr).st_mode & 0o777
+        self.assertEqual(key_mode, 0o600,
+                         "keyout mode is {:o}, expected 600".format(key_mode))
+        self.assertEqual(csr_mode, 0o644,
+                         "csr mode is {:o}, expected 644".format(csr_mode))
+
+    def test_nodes_keyout_mode(self):
+        self._new_key("test_req_perm_nodes", "-nodes")
+
+    def test_encrypted_keyout_mode(self):
+        if is_fips():
+            self.skipTest("FIPS build")
+        self._new_key("test_req_perm_enc", "-passout",
+                      "pass:123456789wolfssl")
 
 
 class TestReqHashAndKeyAlgos(unittest.TestCase):

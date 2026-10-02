@@ -109,7 +109,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
+                bioOut = wolfCLU_BioOpenOwner(optarg);
                 if (bioOut == NULL) {
                     wolfCLU_LogError("Unable to open output file %s",
                             optarg);
@@ -213,7 +213,10 @@ int wolfCLU_PKCS8(int argc, char** argv)
     }
 
     if (ret == WOLFCLU_SUCCESS && pass == NULL && pkey == NULL) {
-        wolfCLU_GetStdinPassword((byte*)password, (word32*)&passwordSz);
+        ret = wolfCLU_GetStdinPassword((byte*)password, (word32*)&passwordSz);
+        if (ret != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Unable to get password from stdin");
+        }
         pass = (byte*)password;
     }
 
@@ -258,7 +261,27 @@ int wolfCLU_PKCS8(int argc, char** argv)
             unsigned char *der = NULL;
             int derSz = 0;
 
-            if ((derSz = wolfCLU_pKeytoPriKey(pkey, &der)) <= 0) {
+            derSz = wolfCLU_pKeytoPriKey(pkey, &der);
+
+            /* -topk8 wraps the key in a PKCS#8 PrivateKeyInfo. Wrap the
+             * re-encoded key, since the cached input may already be PKCS#8. */
+            if (derSz > 0 && toPkcs8 == 1 && traditional == 0) {
+                const unsigned char *p = der;
+                WOLFSSL_EVP_PKEY *tradKey;
+
+                tradKey = wolfSSL_d2i_PrivateKey(wolfSSL_EVP_PKEY_id(pkey),
+                        NULL, &p, derSz);
+                wolfCLU_ForceZero(der, (unsigned int)derSz);
+                XFREE(der, HEAP_HINT, DYNAMIC_TYPE_OPENSSL);
+                der   = NULL;
+                derSz = 0;
+                if (tradKey != NULL) {
+                    derSz = wolfSSL_i2d_PKCS8_PKEY(tradKey, &der);
+                    wolfSSL_EVP_PKEY_free(tradKey);
+                }
+            }
+
+            if (derSz <= 0) {
                 WOLFCLU_LOG(WOLFCLU_E0,
                         "Error converting private key to der");
                 ret = WOLFCLU_FATAL_ERROR;
@@ -270,6 +293,9 @@ int wolfCLU_PKCS8(int argc, char** argv)
             }
 
             if (der != NULL) {
+                if (derSz > 0) {
+                    wolfCLU_ForceZero(der, (unsigned int)derSz);
+                }
                 XFREE(der, HEAP_HINT, DYNAMIC_TYPE_OPENSSL);
             }
         }
