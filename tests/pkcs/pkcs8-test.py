@@ -10,6 +10,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, is_fips, run_wolfssl, test_main
 
+ML_DSA_SETS = (44, 65, 87)
 
 class Pkcs8Test(unittest.TestCase):
 
@@ -115,6 +116,89 @@ class Pkcs8Test(unittest.TestCase):
                         os.path.join(CERTS_DIR, "server-keyEnc.pem"),
                         "-inform", "DER", "-passin", "pass:yassl123")
         self.assertNotEqual(r.returncode, 0)
+
+
+class Pkcs8MlDsaTest(unittest.TestCase):
+    """ML-DSA PEM<->DER conversion through `wolfssl pkcs8`."""
+
+    @classmethod
+    def setUpClass(cls):
+        config_log = os.path.join(".", "config.log")
+        if os.path.isfile(config_log):
+            with open(config_log, "r") as f:
+                if "disable-filesystem" in f.read():
+                    raise unittest.SkipTest("filesystem support disabled")
+
+        r = run_wolfssl("pkcs8", "-in",
+                        os.path.join(CERTS_DIR, "server-key.pem"))
+        if "Recompile wolfSSL with PKCS8 support" in (r.stdout + r.stderr):
+            raise unittest.SkipTest("PKCS8 support not compiled in")
+
+        r = run_wolfssl("genkey", "ml-dsa", "-level", "2", "-out",
+                        "mldsa8-probe", "-output", "keypair", "-outform", "pem")
+        for path in ("mldsa8-probe.priv", "mldsa8-probe.pub"):
+            if os.path.exists(path):
+                os.remove(path)
+        if r.returncode != 0 or "not enabled" in (r.stdout + r.stderr):
+            raise unittest.SkipTest("ML-DSA support not compiled in")
+
+    def _cleanup(self, *files):
+        for f in files:
+            self.addCleanup(lambda p=f: os.remove(p)
+                            if os.path.exists(p) else None)
+
+    def _file_matrix(self):
+        """Yield (path, stem) for the seed-form private key of each ML-DSA
+        parameter set. stem names output files."""
+        for n in ML_DSA_SETS:
+            path = os.path.join(CERTS_DIR, "mldsa", "mldsa%d_seed-only.der" % n)
+            if not os.path.isfile(path):
+                self.fail("%s not found" % path)
+            yield path, "pkcs8-mldsa%d-priv" % n
+
+    def _assert_der(self, path):
+        """A DER output must not be PEM text that slipped through."""
+        with open(path, "rb") as f:
+            head = f.read(1)
+        self.assertEqual(head, b"\x30",
+                         "%s is not DER (expected a SEQUENCE tag)" % path)
+
+    def test_round_trip_private(self):
+        """ML-DSA private key survives DER->PEM->DER at every level."""
+        for src, stem in self._file_matrix():
+            with self.subTest(key=src):
+                pem, der = stem + ".pem", stem + ".der"
+                self._cleanup(pem, der)
+
+                r = run_wolfssl("pkcs8", "-in", src, "-inform", "der",
+                                "-outform", "pem", "-out", pem)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                r = run_wolfssl("pkcs8", "-in", pem, "-inform", "pem",
+                                "-outform", "der", "-out", der)
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self._assert_der(der)
+
+                self.assertTrue(filecmp.cmp(src, der, shallow=False),
+                                "%s changed over DER->PEM->DER" % src)
+
+    def test_der_matches_pkey(self):
+        """ML-DSA DER from pkcs8 and from pkey are identical."""
+        for src, stem in self._file_matrix():
+            with self.subTest(key=src):
+                der8, der_pkey = stem + ".pkcs8.der", stem + ".pkey.der"
+                self._cleanup(der8, der_pkey)
+
+                r = run_wolfssl("pkcs8", "-in", src, "-inform", "der",
+                                "-outform", "der", "-out", der8)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                r = run_wolfssl("pkey", "-in", src, "-inform", "der",
+                                "-outform", "der", "-out", der_pkey)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                self.assertTrue(filecmp.cmp(der8, der_pkey, shallow=False),
+                                "pkcs8 and pkey disagree on the ML-DSA DER")
 
 
 if __name__ == "__main__":
