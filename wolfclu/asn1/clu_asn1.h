@@ -34,7 +34,7 @@
 
 /* number of str parse "digs" allowed */
 #ifndef WOLFCLU_ASN1_STR_PARSE_CAP
-    #define WOLFCLU_ASN1_STR_PARSE_CAP 10
+    #define WOLFCLU_ASN1_STR_PARSE_CAP 30
 #endif
 
 typedef struct WOLFCLU_ASN1_PARSE_OPTIONS

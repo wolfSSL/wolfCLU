@@ -426,7 +426,7 @@ static int OidToDer(char *oid, word32 *oidSz)
     if (ret == WOLFCLU_SUCCESS) {
         /* oid is overwritten by and replaces with DER encoding */
         XMEMSET(oid, '\0', *oidSz);
-        if ((err = wc_EncodeObjectId(arc, idx, (byte *)oid, oidSz)) != 0) {
+        if ((err = wc_EncodeObjectId32(arc, idx, (byte *)oid, oidSz)) != 0) {
             wolfCLU_LogError("%s", wc_GetErrorString(err));
             ret = WOLFCLU_FATAL_ERROR;
         }
