@@ -715,7 +715,7 @@ int wolfCLU_certSetup(int argc, char **argv)
     /* print modulus */
     if (ret == WOLFCLU_SUCCESS && modulus) {
         EVP_PKEY *pkey;
-        pkey = X509_get0_pubkey(x509);
+        pkey = wolfSSL_X509_get_pubkey(x509);
 
         if (pkey == NULL) {
             wolfCLU_LogError("Modulus=unavailable");
@@ -756,8 +756,6 @@ int wolfCLU_certSetup(int argc, char **argv)
                 char info[] = "Wrong Algorithm type";
                 wolfSSL_BIO_write(out, info, (int)XSTRLEN(info));
             }
-            /* wolfSSL's X509_get0_pubkey maps to wolfSSL_X509_get_pubkey
-             * which allocates, unlike OpenSSL's borrowed-ref convention */
             wolfSSL_EVP_PKEY_free(pkey);
         }
     }
