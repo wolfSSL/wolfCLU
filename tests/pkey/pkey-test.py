@@ -107,6 +107,53 @@ class PkeyTest(unittest.TestCase):
         with open(out, "r") as f:
             self.assertIn("BEGIN PUBLIC KEY", f.read())
 
+    def _out_mode(self, out, key, *args):
+        """Write a new -out file under umask 022 and return its mode."""
+        self._cleanup(out)
+        if os.path.exists(out):
+            os.remove(out)
+        old_umask = os.umask(0o022)
+        try:
+            r = run_wolfssl("pkey", "-in", os.path.join(CERTS_DIR, key),
+                            "-out", out, *args)
+        finally:
+            os.umask(old_umask)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return os.stat(out).st_mode & 0o777
+
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_private_out_mode(self):
+        """Private key output must be owner-only (F-9859)."""
+        for fmt in ("PEM", "DER"):
+            with self.subTest(outform=fmt):
+                mode = self._out_mode("test-pkey-perm-priv." + fmt.lower(),
+                                      "ecc-key.pem", "-outform", fmt)
+                self.assertEqual(mode, 0o600,
+                                 "private key mode is {:o}, expected 600"
+                                 .format(mode))
+
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_public_out_mode(self):
+        """Public only output keeps the umask default mode."""
+        cases = [
+            ("test-pkey-perm-pubout.pem", "ecc-key.pem", "-pubout"),
+            ("test-pkey-perm-pubin.pem", "ecc-keyPub.pem", "-pubin"),
+        ]
+        for out, key, *args in cases:
+            with self.subTest(args=args):
+                mode = self._out_mode(out, key, *args)
+                self.assertEqual(mode, 0o644,
+                                 "public output mode is {:o}, expected 644"
+                                 .format(mode))
+
+
+    def test_out_missing_file_name(self):
+        """A trailing -out must fail, not print the key to stdout."""
+        r = run_wolfssl("pkey", "-in",
+                        os.path.join(CERTS_DIR, "ecc-key.pem"), "-out")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertNotIn("PRIVATE KEY", r.stdout)
+
 
 if __name__ == "__main__":
     test_main()

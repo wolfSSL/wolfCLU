@@ -146,6 +146,11 @@ int wolfCLU_encrypt(int alg, char* mode, byte* pwdKey, byte* key, int size,
             key[i] = pwdKey[i];
         }
     }
+    else {
+        /* explicit key: salt is unused, but a non-zero salt[0] tells
+         * decrypt to strip the padding */
+        salt[0] = (byte)padCounter;
+    }
 
     /* open the outFile in write mode */
     outFile = XFOPEN(out, "wb");

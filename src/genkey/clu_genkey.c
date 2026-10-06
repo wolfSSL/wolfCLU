@@ -32,6 +32,13 @@
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_cert.h>    /* PER_FORM/DER_FORM */
 
+#if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFCLU_POSIX_FILE)
+    #include <errno.h>
+    #include <fcntl.h>
+    #include <sys/file.h>
+    #define WOLFCLU_XMSS_POSIX
+#endif
+
 #ifdef HAVE_ED25519
 /* return WOLFCLU_SUCCESS on success */
 int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
@@ -121,7 +128,7 @@ int wolfCLU_genKey_ED25519(WC_RNG* rng, char* fOutNm, int directive, int format)
 
             /* open the file for writing the private key */
             if (ret == 0) {
-                file = XFOPEN(finalOutFNm, "wb");
+                file = wolfCLU_FileOpenOwner(finalOutFNm);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -663,7 +670,7 @@ int wolfCLU_GenAndOutput_ECC(WC_RNG* rng, char* fName, int directive,
                     fOutNameBuf[fNameSz + fExtSz] = '\0';
                     WOLFCLU_LOG(WOLFCLU_L0, "Private key file = %s", fOutNameBuf);
 
-                    bioPri = wolfSSL_BIO_new_file(fOutNameBuf, "wb");
+                    bioPri = wolfCLU_BioOpenOwner(fOutNameBuf);
                     if (bioPri == NULL) {
                         wolfCLU_LogError("unable to read outfile %s",
                                 fOutNameBuf);
@@ -849,7 +856,7 @@ int wolfCLU_genKey_RSA(WC_RNG* rng, char* fName, int directive, int fmt, int
 
             /* open the file for writing the private key */
             if (ret == WOLFCLU_SUCCESS) {
-                file = XFOPEN(fOutNameBuf, "wb");
+                file = wolfCLU_FileOpenOwner(fOutNameBuf);
                 if (!file) {
                     ret = OUTPUT_FILE_ERROR;
                 }
@@ -1180,7 +1187,7 @@ int wolfCLU_genKey_Dilithium(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Private key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
+                    file = wolfCLU_FileOpenOwner(fOutNameBuf);
                     if (file == XBADFILE) {
                         wolfCLU_LogError("unable to open file %s",
                                         fOutNameBuf);
@@ -1428,7 +1435,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 
                 /* open file and write Private key */
                 if (ret == WOLFCLU_SUCCESS) {
-                    file = XFOPEN(fOutNameBuf, "wb");
+                    file = wolfCLU_FileOpenOwner(fOutNameBuf);
                     if (file == XBADFILE) {
                         wolfCLU_LogError("unable to open file %s",
                                         fOutNameBuf);
@@ -1582,9 +1589,9 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
     file = fopen(filename, "rb+");
     if (!file) {
         /* Create the file if it didn't exist. */
-        file = fopen(filename, "wb+");
+        file = wolfCLU_FileOpenOwner(filename);
         if (!file) {
-            fprintf(stderr, "error: fopen(%s, \"w+\") failed.\n", filename);
+            fprintf(stderr, "error: unable to create %s\n", filename);
             return WC_XMSS_RC_WRITE_FAIL;
         }
     }
@@ -1594,6 +1601,26 @@ enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
     if (n_write != privSz) {
         fprintf(stderr, "error: wrote %zu, expected %d: %d\n", n_write, privSz,
                 ferror(file));
+        fclose(file);
+        return WC_XMSS_RC_WRITE_FAIL;
+    }
+
+    /* The new state must reach the disk before the signature is used. */
+    err = XFFLUSH(file);
+#ifdef WOLFCLU_XMSS_POSIX
+    if (err == 0) {
+        err = fsync(fileno(file));
+    }
+#ifdef F_FULLFSYNC
+    /* macOS fsync() does not flush the drive cache. Not all file systems
+     * support this, so a failure is ignored. */
+    if (err == 0) {
+        (void)fcntl(fileno(file), F_FULLFSYNC);
+    }
+#endif
+#endif
+    if (err) {
+        fprintf(stderr, "error: flushing %s failed\n", filename);
         fclose(file);
         return WC_XMSS_RC_WRITE_FAIL;
     }
@@ -1682,6 +1709,54 @@ enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte * priv,
     fclose(file);
 
     return WC_XMSS_RC_READ_TO_MEMORY;
+}
+
+/* Lock the private key file so only one process loads, signs and saves the
+ * one-time key state at a time. flock() is used because, unlike fcntl()
+ * locks, it is not released when the callbacks close their own handles.
+ * No lock is taken on other platforms. */
+int wolfCLU_XmssKey_Lock(const char* fileName, XFILE* lockFile)
+{
+#ifdef WOLFCLU_XMSS_POSIX
+    XFILE file;
+    int   err;
+#endif
+
+    if (fileName == NULL || lockFile == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    *lockFile = XBADFILE;
+
+#ifdef WOLFCLU_XMSS_POSIX
+    /* NFS only allows an exclusive flock() on a file open for writing. */
+    file = XFOPEN(fileName, "r+b");
+    if (file == XBADFILE) {
+        wolfCLU_LogError("Unable to open %s: %s", fileName, strerror(errno));
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    /* wolfSSL has no file lock wrapper */
+    do {
+        err = flock(fileno(file), LOCK_EX);
+    } while (err != 0 && errno == EINTR);
+
+    if (err != 0) {
+        wolfCLU_LogError("Unable to lock %s: %s", fileName, strerror(errno));
+        XFCLOSE(file);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    *lockFile = file;
+#endif
+
+    return WOLFCLU_SUCCESS;
+}
+
+void wolfCLU_XmssKey_Unlock(XFILE lockFile)
+{
+    /* Closing the file releases the lock. */
+    if (lockFile != XBADFILE) {
+        XFCLOSE(lockFile);
+    }
 }
 #endif  /* WOLFSSL_HAVE_XMSS */
 

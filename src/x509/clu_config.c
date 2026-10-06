@@ -76,72 +76,154 @@ WOLFSSL_ASN1_OBJECT* wolfCLU_extenstionGetObjectNID(WOLFSSL_X509_EXTENSION *ext,
     return obj;
 }
 
+/* skip leading and cut trailing white space, returns the new start */
+static char* wolfCLU_trimSpace(char* str)
+{
+    size_t len;
+
+    while (*str == ' ' || *str == '\t' || *str == '\r' || *str == '\n') {
+        str++;
+    }
+    len = XSTRLEN(str);
+    while (len > 0 && (str[len - 1] == ' ' || str[len - 1] == '\t' ||
+                       str[len - 1] == '\r' || str[len - 1] == '\n')) {
+        str[--len] = '\0';
+    }
+    return str;
+}
+
+
+/* largest pathlen wolfSSL will encode */
+#ifdef WOLFSSL_MAX_PATH_LEN
+    #define WOLFCLU_MAX_PATH_LEN WOLFSSL_MAX_PATH_LEN
+#else
+    #define WOLFCLU_MAX_PATH_LEN 127
+#endif
+
+/* parse a decimal pathlen from 0 to WOLFCLU_MAX_PATH_LEN
+ * return WOLFCLU_SUCCESS on success */
+static int wolfCLU_parsePathLen(const char* str, int* pathLen)
+{
+    int val = 0;
+
+    if (*str == '\0') {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    for (; *str != '\0'; str++) {
+        if (*str < '0' || *str > '9') {
+            return WOLFCLU_FATAL_ERROR;
+        }
+        val = val * 10 + (*str - '0');
+        if (val > WOLFCLU_MAX_PATH_LEN) {
+            return WOLFCLU_FATAL_ERROR;
+        }
+    }
+    *pathLen = val;
+    return WOLFCLU_SUCCESS;
+}
+
+
+/* Parse an OpenSSL style basicConstraints value: comma separated NAME:VALUE
+ * pairs with an optional leading "critical", e.g.
+ * "critical, CA:TRUE, pathlen:0". Returns NULL on a bad entry. */
 static WOLFSSL_X509_EXTENSION* wolfCLU_parseBasicConstraint(char* in, int crit)
 {
-    int   idx = 0; /* offset into string */
-    char* word, *end, *str = in;
-    char* deli = (char*)":";
+    int   ret = WOLFCLU_SUCCESS;
+    int   first = 1;
+    int   inSz, pathLen;
+    char  *str, *cur, *next, *name, *value;
     WOLFSSL_X509_EXTENSION *ext;
     WOLFSSL_ASN1_OBJECT *obj;
 
-    if (str == NULL) {
+    if (in == NULL) {
         return NULL;
     }
 
-    /* if critical key word was found, then advance string pointer past
-     * 'critical,' */
-    if (crit) {
-        int inSz = (int)XSTRLEN(in);
-
-        for (idx = 0; idx < inSz; idx++) {
-            if (str[idx] == ',') break;
-        }
-
-        if (idx + 1 >= inSz) {
-            WOLFCLU_LOG(WOLFCLU_E0, "bad basic constraint string in conf file");
-            return NULL;
-        }
-
-        /* advance past any white spaces */
-        for (idx = idx + 1; idx < inSz; idx++) {
-            if (str[idx] != ' ') break;
-        }
+    /* tokenize a copy, the config value must stay intact */
+    inSz = (int)XSTRLEN(in);
+    str = (char*)XMALLOC(inSz + 1, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    if (str == NULL) {
+        wolfCLU_LogError("out of memory parsing basicConstraints");
+        return NULL;
     }
+    XMEMCPY(str, in, inSz + 1);
 
     ext = wolfSSL_X509_EXTENSION_new();
     obj = wolfCLU_extenstionGetObjectNID(ext, NID_basic_constraints, crit);
     if (obj == NULL) {
+        wolfCLU_LogError("error creating basicConstraints extension");
+        XFREE(str, NULL, DYNAMIC_TYPE_TMP_BUFFER);
         return NULL;
     }
 
+    for (cur = str; ret == WOLFCLU_SUCCESS && cur != NULL; cur = next) {
+        next = XSTRSTR(cur, ",");
+        if (next != NULL) {
+            *next++ = '\0';
+        }
 
-    for (word = XSTRTOK(str + idx, deli, &end); word != NULL;
-            word = XSTRTOK(NULL, deli, &end)) {
-        if (word != NULL && XSTRCMP(word, "CA") == 0) {
-            word = XSTRTOK(NULL, deli, &end);
-            if (word != NULL) {
-                int z, wordSz;
+        /* split at the first colon */
+        value = XSTRSTR(cur, ":");
+        if (value != NULL) {
+            *value++ = '\0';
+            value = wolfCLU_trimSpace(value);
+        }
+        name = wolfCLU_trimSpace(cur);
 
-                wordSz = (int)XSTRLEN(word);
-                for (z = 0; z < wordSz; z++)
-                    word[z] = toupper(word[z]);
-                if (XSTRCMP(word, "TRUE") == 0) {
-                    obj->ca = 1;
+        if (first && value == NULL && next != NULL &&
+                XSTRCMP(name, "critical") == 0) {
+            /* crit is already set by the caller */
+        }
+        else if (value != NULL && XSTRCMP(name, "CA") == 0) {
+            if (XSTRCASECMP(value, "TRUE") == 0 ||
+                    XSTRCASECMP(value, "YES") == 0 ||
+                    XSTRCASECMP(value, "Y") == 0) {
+                obj->ca = 1;
+            }
+            else if (XSTRCASECMP(value, "FALSE") == 0 ||
+                    XSTRCASECMP(value, "NO") == 0 ||
+                    XSTRCASECMP(value, "N") == 0) {
+                obj->ca = 0;
+            }
+            else {
+                wolfCLU_LogError("bad basicConstraints CA value \"%s\"",
+                        value);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+        }
+        else if (value != NULL && XSTRCMP(name, "pathlen") == 0) {
+            if (wolfCLU_parsePathLen(value, &pathLen) != WOLFCLU_SUCCESS) {
+                wolfCLU_LogError("bad basicConstraints pathlen \"%s\", "
+                        "expected 0 to %d", value, WOLFCLU_MAX_PATH_LEN);
+                ret = WOLFCLU_FATAL_ERROR;
+            }
+            else {
+                if (obj->pathlen == NULL) {
+                    obj->pathlen = wolfSSL_ASN1_INTEGER_new();
+                }
+                if (obj->pathlen == NULL) {
+                    wolfCLU_LogError("out of memory parsing basicConstraints");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    /* wolfSSL_X509_add_ext() reads the path length from the
+                     * length field */
+                    obj->pathlen->length = pathLen;
                 }
             }
         }
-
-        if (word != NULL && XSTRCMP(word, "pathlen") == 0) {
-            word = XSTRTOK(NULL, deli, &end);
-            if (word != NULL) {
-                if (obj->pathlen != NULL)
-                    wolfSSL_ASN1_INTEGER_free(obj->pathlen);
-                obj->pathlen = wolfSSL_ASN1_INTEGER_new();
-                wolfSSL_ASN1_INTEGER_set(obj->pathlen, XATOI(word));
-            }
+        else {
+            wolfCLU_LogError("bad basicConstraints entry \"%s\"", name);
+            ret = WOLFCLU_FATAL_ERROR;
         }
+        first = 0;
     }
 
+    XFREE(str, NULL, DYNAMIC_TYPE_TMP_BUFFER);
+    if (ret != WOLFCLU_SUCCESS) {
+        wolfSSL_X509_EXTENSION_free(ext);
+        ext = NULL;
+    }
     return ext;
 }
 
@@ -303,6 +385,9 @@ static int wolfCLU_parseExtension(WOLFSSL_X509* x509, char* str, int nid,
     switch (nid) {
         case NID_basic_constraints:
             ext = wolfCLU_parseBasicConstraint(str, crit);
+            if (ext == NULL) {
+                return WOLFCLU_FATAL_ERROR;
+            }
             break;
         case NID_subject_key_identifier:
             ext = wolfCLU_parseSubjectKeyID(str, crit, x509);
@@ -626,7 +711,11 @@ int wolfCLU_setExtensions(WOLFSSL_X509* x509, WOLFSSL_CONF* conf, char* sect)
 
     current = wolfSSL_NCONF_get_string(conf, sect, "basicConstraints");
     if (current != NULL) {
-        wolfCLU_parseExtension(x509, current, NID_basic_constraints, &idx);
+        ret = wolfCLU_parseExtension(x509, current, NID_basic_constraints,
+                &idx);
+        if (ret != WOLFCLU_SUCCESS) {
+            return ret;
+        }
     }
 
     current = wolfSSL_NCONF_get_string(conf, sect, "subjectKeyIdentifier");

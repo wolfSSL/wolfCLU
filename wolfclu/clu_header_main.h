@@ -150,6 +150,15 @@ extern "C" {
     #define WOLFCLU_NO_TERM_SUPPORT
 #endif
 
+/* POSIX file APIs, on the platforms where wolfSSL uses them for its own
+ * wc_fopen_owner_only(). XFDOPEN and XCLOSE come from wolfSSL. */
+#if !defined(NO_FILESYSTEM) && defined(XFDOPEN) && defined(XCLOSE) && \
+    (defined(__unix__) || defined(__APPLE__)) && \
+    !defined(WOLFSSL_KERNEL_MODE) && !defined(WOLFSSL_ZEPHYR) && \
+    !defined(WOLFSSL_SGX)
+    #define WOLFCLU_POSIX_FILE
+#endif
+
  /* @VERSION
   * Update every time library change,
   * functionality shift,
@@ -613,6 +622,21 @@ int wolfCLU_PKCS12(int argc, char** argv);
  * @brief function to write 0 at each index of 'mem' passed in
  */
 void wolfCLU_ForceZero(void* mem, unsigned int len);
+
+#ifndef NO_FILESYSTEM
+/**
+ * @brief open a file for writing private data. On POSIX a new file is
+ *  created with mode 0600. An existing file is truncated and keeps its mode.
+ * @return file handle on success, XBADFILE on failure
+ */
+XFILE wolfCLU_FileOpenOwner(const char* fileName);
+
+/**
+ * @brief BIO version of wolfCLU_FileOpenOwner, the BIO closes the file
+ * @return new BIO on success, NULL on failure
+ */
+WOLFSSL_BIO* wolfCLU_BioOpenOwner(const char* fileName);
+#endif
 
 /**
  * @brief example client
