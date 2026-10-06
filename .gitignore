@@ -1,7 +1,5 @@
-clu_src/stamp*
 libtool
 wolfssl_clu-config
-clu_src/config.h
 Makefile
 Makefile.in
 aclocal.m4
@@ -11,7 +9,7 @@ config.log
 config.status
 configure
 configure~
-clu_src/config.h.in*
+wolfclu/config.h.in*
 *.lo
 *.Plo
 *.o
