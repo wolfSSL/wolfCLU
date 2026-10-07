@@ -4,11 +4,12 @@
 .SH NAME
 wolfssl-s_client, s_client \- basic TLS client for testing connections
 .SH SYNOPSIS
-wolfssl s_client -connect <host>:<port> [-starttls proto] [-CAfile file] [-verify_return_error] [-disable_stdin_check] [-noservername] [-help]
+wolfssl s_client -connect <host>:<port> [-starttls proto] [-CAfile file] [-verify_return_error] [-verify_hostname name] [-verify_ip ip] [-disable_stdin_check] [-noservername] [-help]
 .SH DESCRIPTION
 Opens a TLS connection to a server for testing. Server Name Indication is
-sent by default. Certificate verification is disabled by default and can be
-enabled with -verify_return_error.
+sent by default. Certificate verification is off by default. When enabled
+it checks the certificate chain, not that the certificate was issued for
+the host being connected to; that is asked for separately.
 .SH OPTIONS
 -connect host:port    address and port to connect to. IPv6 addresses use
 .br
@@ -20,12 +21,22 @@ enabled with -verify_return_error.
 .LP
 -CAfile file          CA certificate file. Has no effect on whether the
 .br
-                      connection succeeds or fails unless
+                      connection succeeds or fails unless certificate
 .br
-                      \-verify_return_error is also given (see NOTES).
+                      verification is enabled (see NOTES).
 .br
 .LP
 -verify_return_error  close the connection on a verification error.
+.br
+.LP
+-verify_hostname name check the peer certificate against the DNS name
+.br
+                      \fIname\fR.
+.br
+.LP
+-verify_ip ip         check the peer certificate against the IP address
+.br
+                      \fIip\fR.
 .br
 .LP
 -disable_stdin_check  do not wait for or read input on stdin; useful when
@@ -48,6 +59,16 @@ Connect and verify the server's certificate:
 wolfssl s_client -connect example.com:443 -CAfile ca-cert.pem -verify_return_error
 .RE
 .LP
+Connect and require the certificate to be issued for the host:
+.RS
+wolfssl s_client -connect example.com:443 -CAfile ca-cert.pem -verify_hostname example.com
+.RE
+.LP
+Connect and require the certificate to carry the address dialed:
+.RS
+wolfssl s_client -connect 127.0.0.1:11111 -CAfile ca-cert.pem -verify_ip 127.0.0.1
+.RE
+.LP
 Connect to an SMTP server using STARTTLS:
 .RS
 wolfssl s_client -connect mail.example.com:25 -starttls smtp
@@ -59,8 +80,9 @@ Available only when wolfSSL is built with filesystem support.
 .LP
 The client negotiates the highest TLS version both peers support. CRL
 checking is not performed. The server certificate is only verified when
-\-verify_return_error is given; without it the connection proceeds
-unverified (with a warning) even if \-CAfile is supplied.
+\-verify_return_error, \-verify_hostname or \-verify_ip is given; each of
+them enables verification on its own. Without one of them the connection
+proceeds unverified (with a warning) even if \-CAfile is supplied.
 .SH BUGS
 No known bugs at this time.
 .SH AUTHOR
