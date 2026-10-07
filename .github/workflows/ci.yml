@@ -30,8 +30,14 @@ jobs:
           - os: macos-latest
             config: '--enable-wolfclu'
             sanitize: ''
+          # Keeps the no-filesystem build (and the tests that skip on it)
+          # from rotting; cheap enough to run without ASAN.
+          - os: ubuntu-latest
+            config: '--enable-wolfclu'
+            sanitize: ''
+            clu_config: '--disable-filesystem'
 
-    name: ${{ matrix.os }} ${{ matrix.sanitize && 'ASAN' || '' }} (${{ matrix.config }})
+    name: ${{ matrix.os }} ${{ matrix.sanitize && 'ASAN' || '' }} (${{ matrix.config }}${{ matrix.clu_config && format(' / wolfclu {0}', matrix.clu_config) || '' }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
 
@@ -73,7 +79,8 @@ jobs:
         working-directory: ./wolfclu
         run: |
           ./autogen.sh
-          ./configure ${{ matrix.sanitize }} --with-wolfssl=$GITHUB_WORKSPACE/build-dir
+          ./configure ${{ matrix.sanitize }} ${{ matrix.clu_config }} \
+              --with-wolfssl=$GITHUB_WORKSPACE/build-dir
           make -j
 
       - name: Run tests

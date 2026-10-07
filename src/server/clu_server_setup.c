@@ -23,9 +23,9 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
-#include <wolfclu/server.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
+#include <wolfclu/server.h>
 
 static const struct option server_options[] = {
     {"-port",           required_argument, 0, WOLFCLU_PORT                  },
@@ -98,6 +98,7 @@ static int _addServerArg(const char** args, const char* in, int* idx)
 
 int wolfCLU_Server(int argc, char** argv)
 {
+#ifndef WOLFCLU_NO_FILESYSTEM
     func_args args;
     int ret = WOLFCLU_SUCCESS;
     int longIndex = 1;
@@ -206,4 +207,10 @@ exit:
     FreeTcpReady(&ready);
 
     return ret;
+#else
+    (void)argc;
+    (void)argv;
+    WOLFCLU_LOG(WOLFCLU_E0, "No filesystem support");
+    return WOLFCLU_FATAL_ERROR;
+#endif
 }

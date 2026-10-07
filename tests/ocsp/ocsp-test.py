@@ -15,7 +15,9 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, test_main, find_free_port
+from wolfclu_test import (
+    WOLFSSL_BIN, CERTS_DIR, find_free_port, test_main
+)
 
 HAS_OPENSSL = shutil.which("openssl") is not None
 
@@ -107,6 +109,9 @@ def _run_client(binary, port, extra_args=None):
     return r.returncode, r.stdout + r.stderr
 
 
+# No no_filesystem() skip: wolfCLU_OcspSetup, client and responder paths
+# alike, is gated only on HAVE_OCSP / HAVE_OCSP_RESPONDER, already covered by
+# the _ocsp_supported() check in setUpClass.
 class _OCSPInteropBase(unittest.TestCase):
     """Base class for a single client/responder combination.
 
@@ -368,6 +373,11 @@ class TestOpensslClientOpensslResponder(_OCSPInteropBase):
         self.assertEqual(rc, 0, out)
         self.assertIn("good", out.lower(), out)
 
+
+# The -port/-nrequest range checks below live in wolfCLU_OcspSetup's argument
+# parser, which is not gated on WOLFCLU_NO_FILESYSTEM -- only on HAVE_OCSP /
+# HAVE_OCSP_RESPONDER, already covered by the _ocsp_supported() check in each
+# setUpClass.  So these classes need no no_filesystem() skip.
 class TestPortValidation(unittest.TestCase):
     """Boundary tests for the -port range check in wolfCLU_OcspSetup.
 

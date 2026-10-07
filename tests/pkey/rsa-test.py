@@ -8,7 +8,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, WOLFSSL_BIN, is_fips, run_wolfssl, test_main
+from wolfclu_test import (CERTS_DIR, WOLFSSL_BIN, is_fips, no_filesystem,
+                          run_wolfssl, test_main)
 
 RSA_PUBKEY_PEM = """\
 -----BEGIN PUBLIC KEY-----
@@ -22,18 +23,13 @@ oXe6E9KXc+JdJclqDcM5YKS0sGlCQgnp2Ai8MyCzWCKnquvE4eZhg8XSlt/Z0E+t
 -----END PUBLIC KEY-----"""
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class RsaTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
         cls.is_fips = is_fips()
 
