@@ -420,6 +420,81 @@ class TestX509ProcessValidFiles(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertEqual(r.stdout.strip(), expected)
 
+    def test_3j2_purpose_per_cert(self):
+        """-purpose must report exactly the EKUs each certificate carries.
+
+        The purposes are read from a bit map, so a cert with a single EKU has
+        to answer NO to every other purpose. Covers the regression where the
+        bit map was masked with OID sums instead of the XKU_* flags, which
+        made every purpose read YES (or every one NO) regardless of the cert.
+        """
+        # cert -> the purposes that must report YES; all others must be NO
+        cases = {
+            "server-cert.pem": ["TLS Web Server Authentication",
+                                "TLS Web Client Authentication"],
+            "server-ecc.pem": ["TLS Web Server Authentication"],
+            "client-int-cert.pem": ["TLS Web Client Authentication",
+                                    "Email Protect"],
+            "ocsp-responder-cert.pem": ["OCSP Signing"],
+        }
+        for cert, expected_yes in cases.items():
+            with self.subTest(cert=cert):
+                r = run_wolfssl("x509", "-in", os.path.join(CERTS_DIR, cert),
+                                "-purpose", "-noout")
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                lines = r.stdout.strip().splitlines()
+                self.assertEqual(lines[0].strip(), "Certificate Purpose:")
+
+                got_yes = []
+                for line in lines[1:]:
+                    name, _, verdict = line.rpartition(" : ")
+                    self.assertIn(verdict, ("YES", "NO"),
+                                  "bad purpose line: {}".format(line))
+                    if verdict == "YES":
+                        got_yes.append(name.strip())
+
+                self.assertEqual(sorted(got_yes), sorted(expected_yes))
+
+    @unittest.skipUnless(HAS_OPENSSL, "openssl is not avaliable")
+    def test_3j3_purpose_generated_ekus(self):
+        """-purpose on EKUs no checked-in certificate carries.
+
+        codeSigning, timeStamping and anyExtendedKeyUsage are absent from
+        certs/, so build a cert with them to cover the rest of the bit map.
+        """
+        key = "test_3j3.key"
+        cert = "test_3j3.pem"
+        conf = "test_3j3.cnf"
+        self._clean(key, cert, conf)
+
+        with open(conf, "w") as f:
+            f.write("[req]\n"
+                    "distinguished_name = dn\n"
+                    "x509_extensions = v3\n"
+                    "prompt = no\n"
+                    "[dn]\n"
+                    "CN = wolfCLU EKU test\n"
+                    "[v3]\n"
+                    "extendedKeyUsage = codeSigning, timeStamping, "
+                    "anyExtendedKeyUsage\n")
+        # TODO: change this to wolfssl when
+        # https://github.com/wolfSSL/wolfCLU/pull/285 is merged
+        subprocess.run(
+            ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+             "-keyout", key, "-out", cert, "-days", "1", "-config", conf],
+            check=True, capture_output=True, timeout=120)
+
+        r = run_wolfssl("x509", "-in", cert, "-purpose", "-noout")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+        got_yes = [line.rpartition(" : ")[0].strip()
+                   for line in r.stdout.strip().splitlines()[1:]
+                   if line.rstrip().endswith("YES")]
+        self.assertEqual(sorted(got_yes),
+                         sorted(["Any Extended Key Usage", "Code Signing",
+                                 "Time Stamp Signing"]))
+
     def test_3k_hash(self):
         expected_file = os.path.join(TESTS_X509_DIR, "expect-hash.txt")
         with open(expected_file) as f:

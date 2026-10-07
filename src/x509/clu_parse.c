@@ -143,11 +143,38 @@ int wolfCLU_printX509PubKey(WOLFSSL_X509* x509, WOLFSSL_BIO* out)
 }
 
 
+/* Print the extended key usages held in 'keyUsage'.
+ *
+ * 'keyUsage' is the bit map returned by wolfSSL_X509_get_extended_key_usage(),
+ * so it must be masked with the XKU_* flags rather than with the
+ * ExtKeyUsage_Sum OID values, which are not single bit flags.
+ *
+ * When 'flag' is set every purpose is listed with a YES/NO verdict, otherwise
+ * only the purposes present in the certificate are printed.
+ */
 int wolfCLU_extKeyUsagePrint(WOLFSSL_BIO* bio, unsigned int keyUsage,
         int indent, int flag)
 {
-    unsigned int ava;
+#if LIBWOLFSSL_VERSION_HEX > 0x05001000
+    unsigned int i;
     char scratch[MAX_TERM_WIDTH];
+
+    static const struct {
+        unsigned int bit;
+        const char* name;
+    } extKeyUsages[] = {
+        { XKU_ANYEKU, "Any Extended Key Usage" },
+        { XKU_SSL_SERVER, "TLS Web Server Authentication" },
+        { XKU_SSL_CLIENT, "TLS Web Client Authentication" },
+        { XKU_CODE_SIGN, "Code Signing" },
+        { XKU_OCSP_SIGN, "OCSP Signing" },
+        { XKU_SMIME, "Email Protect" },
+        { XKU_TIMESTAMP, "Time Stamp Signing" },
+    };
+
+    if (bio == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
 
     if (flag) {
         XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s\n", indent, "",
@@ -155,55 +182,28 @@ int wolfCLU_extKeyUsagePrint(WOLFSSL_BIO* bio, unsigned int keyUsage,
         wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
     }
 
-    ava = (EKU_ANY_OID & keyUsage);
-    if (ava | flag) {
-        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
-                "Any Extended Key Usage",
-                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
-        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+    for (i = 0; i < (sizeof(extKeyUsages) / sizeof(extKeyUsages[0])); i++) {
+        unsigned int ava = (extKeyUsages[i].bit & keyUsage);
+
+        if (ava || flag) {
+            XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
+                    extKeyUsages[i].name,
+                    (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
+            wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
+        }
     }
 
-    ava = (EKU_SERVER_AUTH_OID & keyUsage);
-    if (ava | flag) {
-        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
-                "TLS Web Server Authentication",
-                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
-        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
-    }
+    return WOLFCLU_SUCCESS;
+#else
+    (void)bio;
+    (void)keyUsage;
+    (void)indent;
+    (void)flag;
 
-    ava = (EKU_CLIENT_AUTH_OID & keyUsage);
-    if (ava | flag) {
-        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
-                "TLS Web Client Authentication",
-                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
-        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
-    }
-
-    ava = (EKU_OCSP_SIGN_OID & keyUsage);
-    if (ava | flag) {
-        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
-                "OCSP Signing",
-                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
-        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
-    }
-
-    ava = (EKU_EMAILPROTECT_OID & keyUsage);
-    if (ava | flag) {
-        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
-                "Email Protect",
-                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
-        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
-    }
-
-    ava = (EKU_TIMESTAMP_OID & keyUsage);
-    if (ava | flag) {
-        XSNPRINTF(scratch, MAX_TERM_WIDTH, "%*s%s%s\n", indent, "",
-                "Time Stamp Signing",
-                (flag == 1)? (ava > 0) ? " : YES" : " : NO" : "");
-        wolfSSL_BIO_write(bio, scratch, (int)XSTRLEN(scratch));
-    }
-
-    return WOLFSSL_SUCCESS;
+    wolfCLU_LogError("Extended key function not supported by this"
+                     " version of wolfSSL");
+    return NOT_COMPILED_IN;
+#endif
 }
 
 #endif /* WOLFCLU_NO_FILESYSTEM */
