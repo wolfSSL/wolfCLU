@@ -134,46 +134,41 @@ int main(int argc, char** argv)
     int     flag = 0;
     int     ret = WOLFCLU_SUCCESS;
     int     longIndex = 0;
-#ifdef HAVE_FIPS
-    WC_RNG rng;
 
+#ifdef HAVE_FIPS
     wolfCrypt_SetCb_fips(myFipsCb);
 
     #ifdef WC_RNG_SEED_CB
         wc_SetSeed_Cb(wc_GenerateSeed);
     #endif
-
-    ret = wc_InitRng(&rng);
-
-    if (ret != 0) {
-        wolfCLU_LogError("Err %d, update the FIPS hash\n", ret);
-        return ret;
-    }
-
-    wc_FreeRng(&rng);
 #endif
+
+    if (wolfSSL_Init() != WOLFSSL_SUCCESS) {
+        wolfCLU_LogError("wolfSSL initialization failed!");
+#ifdef HAVE_FIPS
+        if (wolfCrypt_GetStatus_fips() == IN_CORE_FIPS_E) {
+            wolfCLU_LogError("Err %d, update the FIPS hash\n", IN_CORE_FIPS_E);
+            WOLFCLU_LOG(WOLFCLU_L0, "Linked to a FIPS version of wolfSSL that "
+                    "has failed the in core integrity check.");
+            WOLFCLU_LOG(WOLFCLU_L0, "ALL FIPS crypto will report ERRORS when "
+                    "used.");
+            WOLFCLU_LOG(WOLFCLU_L0, "To resolve please recompile wolfSSL with "
+                    "the correct integrity hash.");
+            WOLFCLU_LOG(WOLFCLU_L0, "If the issue continues, contact "
+                    "fips @ wolfssl.com");
+        }
+    #endif
+        return -1;
+    }
 
     if (argc == 1) {
         WOLFCLU_LOG(WOLFCLU_L0, "Main Help.");
         wolfCLU_help();
     }
 
-#ifdef HAVE_FIPS
-    if (wolfCrypt_GetStatus_fips() == IN_CORE_FIPS_E) {
-        WOLFCLU_LOG(WOLFCLU_L0, "Linked to a FIPS version of wolfSSL that has failed the in core"
-               "integrity check. ALL FIPS crypto will report ERRORS when used."
-               "To resolve please recompile wolfSSL with the correct integrity"
-               "hash. If the issue continues, contact fips @ wolfssl.com");
-    }
-#endif
-
 #ifdef DEBUG_WOLFSSL
     wolfSSL_Debugging_ON();
 #endif
-    if (wolfSSL_Init() != WOLFSSL_SUCCESS) {
-        wolfCLU_LogError("wolfSSL initialization failed!");
-        return -1;
-    }
 
     optind = 0;
 
