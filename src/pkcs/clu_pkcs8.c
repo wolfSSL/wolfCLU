@@ -270,6 +270,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
             }
 
             if (der != NULL) {
+                wolfCLU_ForceZero(der, derSz);
                 XFREE(der, HEAP_HINT, DYNAMIC_TYPE_OPENSSL);
             }
         }
@@ -288,7 +289,7 @@ int wolfCLU_PKCS8(int argc, char** argv)
                 WOLFCLU_LOG(WOLFCLU_E0,
                         "Error writing from private key to pem");
                 ret = WOLFCLU_FATAL_ERROR;
-	    }
+            }
         }
     }
 
