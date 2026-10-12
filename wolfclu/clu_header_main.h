@@ -34,6 +34,7 @@ extern "C" {
     #include <windows.h>
     #include <sys/timeb.h>
     #include <io.h>
+    #include <stdint.h>
 #else
     #include <unistd.h>
     #include <sys/time.h>
