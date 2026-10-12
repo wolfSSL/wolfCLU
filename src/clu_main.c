@@ -143,6 +143,10 @@ int main(int argc, char** argv)
     #endif
 #endif
 
+#ifdef DEBUG_WOLFSSL
+    wolfSSL_Debugging_ON();
+#endif
+
     if (wolfSSL_Init() != WOLFSSL_SUCCESS) {
         wolfCLU_LogError("wolfSSL initialization failed!");
 #ifdef HAVE_FIPS
@@ -157,7 +161,7 @@ int main(int argc, char** argv)
             WOLFCLU_LOG(WOLFCLU_L0, "If the issue continues, contact "
                     "fips @ wolfssl.com");
         }
-    #endif
+#endif
         return -1;
     }
 
@@ -165,10 +169,6 @@ int main(int argc, char** argv)
         WOLFCLU_LOG(WOLFCLU_L0, "Main Help.");
         wolfCLU_help();
     }
-
-#ifdef DEBUG_WOLFSSL
-    wolfSSL_Debugging_ON();
-#endif
 
     optind = 0;
 
