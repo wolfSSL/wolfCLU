@@ -393,8 +393,8 @@ static int ServerEchoData(SSL* ssl, int clientfd, int echoData, int block,
         int select_ret = tcp_select(clientfd, 1); /* Timeout=1 second */
         if (select_ret == TEST_RECV_READY) {
 
-            if (throughput)
-                len = min(block, (int)(throughput - xfer_bytes));
+            if (throughput && throughput - xfer_bytes < (size_t)block)
+                len = (int)(throughput - xfer_bytes);
             else
                 len = block;
             rx_pos = 0;
@@ -2505,8 +2505,11 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
             fprintf(stderr, "Bad SSL version\n");
     }
 
-    if (method == NULL)
-        fprintf(stderr, "unable to get method\n");
+    if (method == NULL) {
+        release(ctx, ssl, "unable to get method");
+        ((func_args*)args)->return_code = VERSION_ERROR;
+        goto exit;
+    }
 
 #ifdef WOLFSSL_STATIC_MEMORY
     #ifdef DEBUG_WOLFSSL
@@ -2538,8 +2541,11 @@ THREAD_RETURN WOLFSSL_THREAD server_test(void* args)
     wolfSSL_CTX_set_msg_callback(ctx, msgDebugCb);
 #endif
 #endif /* WOLFSSL_STATIC_MEMORY */
-    if (ctx == NULL)
-        fprintf(stderr, "unable to get ctx\n");
+    if (ctx == NULL) {
+        release(ctx, ssl, "unable to get ctx");
+        ((func_args*)args)->return_code = SSL_ERROR_SSL;
+        goto exit;
+    }
 
     if (minVersion != SERVER_INVALID_VERSION) {
 #ifdef WOLFSSL_DTLS

@@ -34,6 +34,11 @@
 #include <wolfssl/wolfcrypt/hash.h>
 #include <wolfssl/wolfcrypt/memory.h>
 
+#ifdef WOLFCLU_POSIX_FILE
+    #include <fcntl.h>
+    #include <sys/stat.h>
+#endif
+
 #define SALT_SIZE       8
 #define DES3_BLOCK_SIZE 24
 
@@ -292,6 +297,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
         wolfCLU_LogError("null input to get algo function");
         return WOLFCLU_FATAL_ERROR;
     }
+    *alg = WOLFCLU_ALGO_NONE;
 
     /* gets name after first '-' and before the second */
     tmpAlg = strtok_r(name, "-", &end);
@@ -333,7 +339,7 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
     }
 
     for (i = 0; i < (int) (sizeof(acceptMode)/sizeof(acceptMode[0])); i++) {
-        if (XSTRNCMP(tmpMode, acceptMode[i], XSTRLEN(tmpMode)) == 0)
+        if (XSTRCMP(tmpMode, acceptMode[i]) == 0)
             modeCheck = 1;
     }
 
@@ -428,6 +434,11 @@ static int wolfCLU_parseAlgo(char* name, int* alg, char** mode, int* size)
 
     else {
         wolfCLU_LogError("Invalid algorithm: %s", tmpAlg);
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    if (ret >= 0 && *alg == WOLFCLU_ALGO_NONE) {
+        wolfCLU_LogError("Invalid mode %s for algorithm %s", tmpMode, tmpAlg);
         ret = WOLFCLU_FATAL_ERROR;
     }
 
@@ -887,14 +898,9 @@ void wolfCLU_AddNameEntry(WOLFSSL_X509_NAME* name, int type, int nid, char* str)
  * returns a newly created WOLFSSL_X509_NAME on success */
 WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
 {
-    int encoding = CTC_UTF8;
-    int tagSz = 0;
-    int nid;
     char* word, *end;
     char* deli = (char*)"/";
-    char* entry = NULL;
     WOLFSSL_X509_NAME* ret = NULL;
-    char  tag[5];
 
     if (n == NULL || nSz <= 0) {
         wolfCLU_LogError("unexpected null argument or size with parsing "
@@ -909,6 +915,9 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
     }
     for (word = strtok_r((char*)n, deli, &end); word != NULL;
             word = strtok_r(NULL, deli, &end)) {
+        int   tagSz;
+        char  tag[5];
+
         tagSz = (int)strcspn(word, "=");
         if (tagSz <= 0 || word[tagSz] != '=') {
             wolfCLU_LogError("error finding '=' char in name");
@@ -935,8 +944,10 @@ WOLFSSL_X509_NAME* wolfCLU_ParseX509NameString(const char* n, int nSz)
         }
 
         if (ret != NULL) {
-            entry = &word[tagSz+1];
-            nid = wolfSSL_OBJ_sn2nid(tag);
+            char* entry = &word[tagSz+1];
+            int   encoding = CTC_UTF8;
+            int   nid = wolfSSL_OBJ_sn2nid(tag);
+
             if (nid == 0) { /* try using old tag value */
                 char oldTag[8];
                 tagSz = (int)XSTRLEN(tag);
@@ -1112,6 +1123,56 @@ void wolfCLU_ForceZero(void* mem, unsigned int len)
 #endif
 }
 
+#ifndef NO_FILESYSTEM
+/* Open a file for binary write. On POSIX a new file is created with owner
+ * only access (0600). An existing file is truncated and keeps its mode. */
+XFILE wolfCLU_FileOpenOwner(const char* fileName)
+{
+    XFILE file;
+#ifdef WOLFCLU_POSIX_FILE
+    int fd;
+#endif
+
+    if (fileName == NULL) {
+        return XBADFILE;
+    }
+
+#ifdef WOLFCLU_POSIX_FILE
+    /* wolfSSL's open() wrappers are internal, so open() is called here */
+    fd = open(fileName, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (fd < 0) {
+        return XBADFILE;
+    }
+    file = XFDOPEN(fd, "wb");
+    if (file == XBADFILE) {
+        XCLOSE(fd);
+    }
+#else
+    file = XFOPEN(fileName, "wb");
+#endif
+
+    return file;
+}
+
+/* BIO version of wolfCLU_FileOpenOwner. The BIO closes the file when freed. */
+WOLFSSL_BIO* wolfCLU_BioOpenOwner(const char* fileName)
+{
+    XFILE file;
+    WOLFSSL_BIO* bio;
+
+    file = wolfCLU_FileOpenOwner(fileName);
+    if (file == XBADFILE) {
+        return NULL;
+    }
+
+    bio = wolfSSL_BIO_new_fp(file, BIO_CLOSE);
+    if (bio == NULL) {
+        XFCLOSE(file);
+    }
+    return bio;
+}
+#endif /* !NO_FILESYSTEM */
+
 #ifndef WOLFCLU_NO_TERM_SUPPORT
 
 int wolfCLU_GetPassword(char* password, int* passwordSz, char* arg)
@@ -1237,7 +1298,7 @@ int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz)
     DWORD originalTerm;
 #endif
 
-    if (password == NULL || passwordSz == NULL) {
+    if (password == NULL || passwordSz == NULL || *passwordSz == 0) {
         return WOLFCLU_FATAL_ERROR;
     }
 
@@ -1251,9 +1312,15 @@ int wolfCLU_GetStdinPassword(byte* password, word32* passwordSz)
             char* c = strpbrk((char*)password, "\r\n");
             if (c != NULL)
                 *c = '\0';
+            *passwordSz = (word32)XSTRLEN((const char*)password);
         }
-        *passwordSz = (word32)XSTRLEN((const char*)password);
         ShowEcho(&originalTerm);
+    }
+
+    /* On EOF or error the buffer holds no valid string. */
+    if (ret != WOLFCLU_SUCCESS) {
+        password[0] = '\0';
+        *passwordSz = 0;
     }
     return ret;
 }
