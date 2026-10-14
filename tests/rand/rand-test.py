@@ -8,18 +8,16 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, run_wolfssl, test_main
+from wolfclu_test import WOLFSSL_BIN, no_filesystem, run_wolfssl, test_main
+
+
+# `rand` writes to stdout without a filesystem, so only the tests that pass a
+# file path are skipped on a --disable-filesystem build.
+needs_filesystem = unittest.skipIf(no_filesystem(),
+                                   "filesystem support disabled")
 
 
 class RandTest(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(cls):
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
     def test_base64_random(self):
         r = run_wolfssl("rand", "-base64", "10")
@@ -35,6 +33,7 @@ class RandTest(unittest.TestCase):
         self.assertNotEqual(r1.stdout, r2.stdout,
                             "back-to-back random calls should differ")
 
+    @needs_filesystem
     def test_output_file(self):
         out = "entropy.txt"
         self.addCleanup(lambda: os.remove(out)
@@ -44,6 +43,7 @@ class RandTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertTrue(os.path.isfile(out), "entropy.txt not created")
 
+    @needs_filesystem
     def test_count_after_out_value(self):
         """`rand -out <file> <count>` binds <file> to -out and <count> as the
         byte count, even though <count> sits immediately after the -out value.
@@ -85,6 +85,7 @@ class RandTest(unittest.TestCase):
                          "plain `rand %d` must emit exactly %d raw bytes "
                          "(no encoding, no trailing newline)" % (n, n))
 
+    @needs_filesystem
     def test_hex_to_file(self):
         """`-hex -out file` writes a hex-only file with no trailing newline."""
         out = "hex_rand.hex"
@@ -124,6 +125,7 @@ class RandTest(unittest.TestCase):
                          "%s must not leak random bytes to stdout" % what)
         return r
 
+    @needs_filesystem
     def test_duplicate_out_does_not_leak_to_stdout(self):
         """Regression: `rand -out f1 N -out f2` must error, not leak bytes.
 
@@ -144,6 +146,7 @@ class RandTest(unittest.TestCase):
         self.assertFalse(os.path.exists(f2),
                          "no output file should be created on duplicate -out")
 
+    @needs_filesystem
     def test_duplicate_out_in_value_slot_does_not_leak(self):
         """Regression: `rand -out -out 16` must error, not leak bytes.
 
@@ -165,6 +168,7 @@ class RandTest(unittest.TestCase):
         self.assertFalse(os.path.exists("16"),
                          "no '16' file should be created on duplicate -out")
 
+    @needs_filesystem
     def test_duplicate_out_trailing_repeat_rejected(self):
         """`rand -out f1 16 -out`: the trailing -out repeat (count already
         consumed) must error too, exercising the main-loop seen[] path."""
@@ -188,6 +192,7 @@ class RandTest(unittest.TestCase):
         self._assert_dup_errors_no_leak(["-base64", "-base64", "16"],
                                         "duplicate -base64")
 
+    @needs_filesystem
     def test_duplicate_flag_first_seen_in_value_slot_rejected(self):
         """`rand -out -base64 -base64 16`: duplicate detection is symmetric.
 
@@ -231,6 +236,7 @@ class RandTest(unittest.TestCase):
         self.assertNotIn("wolfssl rand <num bytes>", out,
                          "rand 16 -hex must not be treated as help")
 
+    @needs_filesystem
     def test_large_raw_request_allowed(self):
         """A large raw request must still work (no arbitrary size cap),
         keeping large keyfiles/blobs supported like `openssl rand`."""
@@ -255,6 +261,7 @@ class RandTest(unittest.TestCase):
         self.assertNotEqual(data[:chunk], data[chunk:2 * chunk],
                             "consecutive chunks must differ (no chunk repeat)")
 
+    @needs_filesystem
     def test_large_base64_request_allowed(self):
         """A large -base64 request must work too: it forces the multi-chunk
         fill loop and then base64-expands, guarding that interaction."""
@@ -280,6 +287,7 @@ class RandTest(unittest.TestCase):
         self.assertNotEqual(decoded[:n - chunk], decoded[chunk:],
                             "the two chunks must differ (no chunk repeat)")
 
+    @needs_filesystem
     def test_chunk_boundary_exact_and_plus_one(self):
         """Pin the single/multi-chunk transition in the fill loop.
 
@@ -301,6 +309,7 @@ class RandTest(unittest.TestCase):
             self.assertNotEqual(data, b"\x00" * n,
                                 "output must not be all zeros")
 
+    @needs_filesystem
     def test_count_before_out_with_flag(self):
         """`rand -hex 16 -out f` must keep 16 as the count even though it
         sits ahead of the -out <value> pair: 16 bytes -> 32 hex chars."""
@@ -313,6 +322,7 @@ class RandTest(unittest.TestCase):
         self.assertEqual(os.path.getsize(out), 32,
                          "16 byte count before -out must yield 32 hex chars")
 
+    @needs_filesystem
     def test_flag_as_out_value_is_consistent(self):
         """`rand -out -hex 16`: -hex is BOTH bound as the -out filename and
         matched as the -hex flag (pre-existing GetOpt whole-argv scan), while
@@ -340,6 +350,7 @@ class RandTest(unittest.TestCase):
         self.assertTrue(all(chr(b) in "0123456789abcdef" for b in data),
                         "the -hex flag must still take effect (lowercase hex)")
 
+    @needs_filesystem
     def test_missing_count_errors(self):
         """`-out` with no byte count must error, not size from the path."""
         out = "missing_count.bin"
@@ -350,6 +361,7 @@ class RandTest(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0,
                             "rand -out <file> with no count must error")
 
+    @needs_filesystem
     def test_numeric_out_path_is_not_count(self):
         """`rand -out 32` must treat 32 as the path, not the count: it errors
         (no count given) and never creates a file named '32'."""
@@ -368,6 +380,7 @@ class RandTest(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0,
                             "rand with two positional counts must error")
 
+    @needs_filesystem
     def test_dangling_out_flag_with_count_errors(self):
         """`-out` as the final token with no filename must error, not fall
         through to stdout. Regressed once: the NULL filename skipped the open
@@ -392,6 +405,7 @@ class RandTest(unittest.TestCase):
         self.assertNotEqual(r.returncode, 0,
                             "rand with an unrecognized flag must error")
 
+    @needs_filesystem
     def test_bad_count_does_not_truncate_existing_out_file(self):
         """A bad/missing count must not truncate an existing -out file.
 

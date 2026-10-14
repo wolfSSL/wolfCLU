@@ -6,7 +6,13 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import CERTS_DIR, no_filesystem, run_wolfssl, test_main
+
+
+# `dsaparam` generates to stdout without a filesystem, so only the tests that
+# pass a file path are skipped on a --disable-filesystem build.
+needs_filesystem = unittest.skipIf(no_filesystem(),
+                                   "filesystem support disabled")
 
 
 class DsaParamTest(unittest.TestCase):
@@ -15,12 +21,6 @@ class DsaParamTest(unittest.TestCase):
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
         # Skip if DSA not compiled in
         r = run_wolfssl("dsaparam", "1024")
@@ -37,6 +37,7 @@ class DsaParamTest(unittest.TestCase):
         r = run_wolfssl("dsaparam", "0")
         self.assertNotEqual(r.returncode, 0)
 
+    @needs_filesystem
     def test_dsaparam_out_and_in(self):
         params_file = "dsa.params"
         self.addCleanup(lambda: os.remove(params_file)
@@ -49,6 +50,7 @@ class DsaParamTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("-----BEGIN DSA PARAMETERS-----", r.stdout)
 
+    @needs_filesystem
     def test_dsaparam_noout(self):
         params_file = "dsa.params"
         self.addCleanup(lambda: os.remove(params_file)
@@ -61,6 +63,7 @@ class DsaParamTest(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertNotIn("-----BEGIN DSA PARAMETERS-----", r.stdout)
 
+    @needs_filesystem
     def test_dsaparam_genkey(self):
         params_file = "dsa.params"
         self.addCleanup(lambda: os.remove(params_file)
@@ -74,6 +77,7 @@ class DsaParamTest(unittest.TestCase):
         self.assertIn("-----BEGIN DSA PARAMETERS-----", r.stdout)
         self.assertIn("-----BEGIN DSA PRIVATE KEY-----", r.stdout)
 
+    @needs_filesystem
     def test_dsaparam_genkey_noout(self):
         params_file = "dsa.params"
         self.addCleanup(lambda: os.remove(params_file)
@@ -87,6 +91,7 @@ class DsaParamTest(unittest.TestCase):
         self.assertNotIn("-----BEGIN DSA PARAMETERS-----", r.stdout)
         self.assertIn("-----BEGIN DSA PRIVATE KEY-----", r.stdout)
 
+    @needs_filesystem
     def test_bad_input_fails(self):
         r = run_wolfssl("dsaparam", "-in",
                         os.path.join(CERTS_DIR, "server-cert.pem"),

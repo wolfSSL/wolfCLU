@@ -23,6 +23,9 @@
  * https://github.com/wolfSSL/wolfssl-examples/tree/master/tls
  */
 
+/* Only compile when filesystem is enabled, like src/client/client.c. */
+#ifndef WOLFCLU_NO_FILESYSTEM
+
 #ifdef HAVE_CONFIG_H
     #include <config.h>
 #endif
@@ -3927,3 +3930,5 @@ exit:
     char* myoptarg = NULL;
 
 #endif /* NO_MAIN_DRIVER */
+
+#endif /* !WOLFCLU_NO_FILESYSTEM */
