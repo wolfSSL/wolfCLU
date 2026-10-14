@@ -88,6 +88,17 @@ def run_wolfssl(*args, stdin_data=None, timeout=60):
     return subprocess.run(cmd, **kwargs)
 
 
+def have_oid_table():
+    """True when the build includes the built-in OID-to-name table.
+
+    HAVE_OID_TABLE is compile-time only (--disable-oid-table) with no runtime
+    flag to query, so search the binary for a name only the table supplies.
+    """
+    oid_table_probe_name = b"Security Communication (SECOM) EV policy"
+    with open(WOLFSSL_BIN, "rb") as f:
+        return oid_table_probe_name in f.read()
+
+
 def is_fips():
     """True when linked against a FIPS wolfSSL build (per `wolfssl -v`)."""
     r = run_wolfssl("-v")
