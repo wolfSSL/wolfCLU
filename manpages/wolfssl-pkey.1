@@ -7,8 +7,8 @@ wolfssl-pkey, pkey \- public and private key processing
 wolfssl pkey [-in file] [-out file] [-inform PEM|DER] [-outform PEM|DER] [-pubin] [-pubout]
 .SH DESCRIPTION
 Reads a public or private key, converts it between PEM and DER, and
-optionally outputs only the public portion. RSA, ECC, and Ed25519 keys are
-supported; DSA keys are rejected.
+optionally outputs only the public portion. RSA, ECC, Ed25519, and ML-DSA keys
+are supported; DSA keys are rejected.
 .SH OPTIONS
 -in file              input file for the key to read (optional; without -in
 .br
