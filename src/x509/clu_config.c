@@ -1061,6 +1061,17 @@ int wolfCLU_GetTypeFromPKEY(WOLFSSL_EVP_PKEY* key)
         case EVP_PKEY_DH:
             keyType = DHk;
             break;
+
+#ifdef HAVE_DILITHIUM
+        case EVP_PKEY_DILITHIUM:
+            /* wolfCLU's CA-signing path only uses this as an opaque marker
+             * (to route into the generic wolfSSL_X509_sign() path, which
+             * itself resolves the correct ML-DSA level/signature type from
+             * the WOLFSSL_EVP_PKEY object); the specific level chosen here
+             * doesn't matter. */
+            keyType = ML_DSA_87k;
+            break;
+#endif
     }
     return keyType;
 }
