@@ -670,7 +670,10 @@ int wolfCLU_certSetup(int argc, char **argv)
             keyUsage = 0;
         }
 
-        wolfCLU_extKeyUsagePrint(out, keyUsage, 0, 1);
+        if ((ret = wolfCLU_extKeyUsagePrint(out, keyUsage, 0, 1))
+                != WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("Unable to print ext key usage");
+        }
 #else
         wolfCLU_LogError("Extended key function not supported by this"
                          " version of wolfSSL");
