@@ -116,6 +116,10 @@ AC_ARG_WITH(wolfssl,
         AM_LDFLAGS="$AM_LDFLAGS -L${wcpath}/lib"
         CPPFLAGS="$CPPFLAGS -I${wcpath}/include"
         AM_CPPFLAGS="$AM_CPPFLAGS -I${wcpath}/include"
+        # A static libwolfssl.a needs the libraries wolfssl.pc lists as private
+        if test -f "${wcpath}/lib/pkgconfig/wolfssl.pc"; then
+          LIBS="$LIBS `sed -n 's/^Libs.private://p' "${wcpath}/lib/pkgconfig/wolfssl.pc"`"
+        fi
       else
         AC_MSG_ERROR([wolfSSL path error (${withval}): missing lib and include])
       fi
