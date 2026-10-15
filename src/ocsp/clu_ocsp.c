@@ -311,6 +311,46 @@ static const char* ocspCrlReasonStr(int reason)
             return "certificateHold";
         case WC_CRL_REASON_REMOVE_FROM_CRL:
             return "removeFromCRL";
+        case WC_CRL_REASON_PRIVILEGE_WITHDRAWN:
+            return "privilegeWithdrawn";
+        case WC_CRL_REASON_AA_COMPROMISE:
+            return "aACompromise";
+        default:
+            return "(UNKNOWN)";
+    }
+}
+
+/* Certificate status names as printed by openssl ocsp */
+static const char* ocspCertStatusStr(int status)
+{
+    switch (status) {
+        case CERT_GOOD:
+            return "good";
+        case CERT_REVOKED:
+            return "revoked";
+        case CERT_UNKNOWN:
+            return "unknown";
+        default:
+            return "(UNKNOWN)";
+    }
+}
+
+/* OCSP response status names as printed by openssl ocsp */
+static const char* ocspRespStatusStr(int status)
+{
+    switch (status) {
+        case OCSP_SUCCESSFUL:
+            return "successful";
+        case OCSP_MALFORMED_REQUEST:
+            return "malformedrequest";
+        case OCSP_INTERNAL_ERROR:
+            return "internalerror";
+        case OCSP_TRY_LATER:
+            return "trylater";
+        case OCSP_SIG_REQUIRED:
+            return "sigrequired";
+        case OCSP_UNAUTHORIZED:
+            return "unauthorized";
         default:
             return "(UNKNOWN)";
     }
@@ -355,7 +395,7 @@ static int ocspPrintStatus(const char* name, const CertStatus* cs)
         return WOLFCLU_FATAL_ERROR;
     }
     wolfSSL_BIO_printf(bio, "%s: %s\n", name,
-        wolfSSL_OCSP_cert_status_str(cs->status));
+        ocspCertStatusStr(cs->status));
     ocspPrintTime(bio, "This Update", cs->thisDate, cs->thisDateFormat);
     if (cs->nextDate[0] != '\0') {
         ocspPrintTime(bio, "Next Update", cs->nextDate, cs->nextDateFormat);
@@ -399,7 +439,7 @@ static int ocspPrintResponderError(const byte* p, int sz)
     bio = ocspStdoutBio();
     if (bio != NULL) {
         wolfSSL_BIO_printf(bio, "Responder Error: %s (%d)\n",
-            wolfSSL_OCSP_response_status_str(status), status);
+            ocspRespStatusStr(status), status);
         wolfSSL_BIO_free(bio);
     }
     return 1;
