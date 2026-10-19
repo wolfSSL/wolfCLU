@@ -24,6 +24,11 @@
 #include <wolfclu/clu_log.h>
 #include <wolfclu/clu_optargs.h>
 
+#if !defined(WOLFCLU_NO_FILESYSTEM) && !defined(NO_CODING)
+    #define WOLFCLU_BASE64_ENABLED
+#endif
+
+#ifdef WOLFCLU_BASE64_ENABLED
 static const struct option base64_options[] = {
     {"-in",           required_argument, 0, WOLFCLU_INFILE    },
     {"-out",          required_argument, 0, WOLFCLU_OUTFILE   },
@@ -44,11 +49,12 @@ static void wolfCLU_Base64Help(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-d             Decode data");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-help          Display this message");
 }
+#endif /* WOLFCLU_BASE64_ENABLED */
 
 /* base64 setup function */
 int wolfCLU_Base64Setup(int argc, char** argv)
 {
-#if !defined(WOLFCLU_NO_FILESYSTEM) && !defined(NO_CODING)
+#ifdef WOLFCLU_BASE64_ENABLED
     WOLFSSL_BIO *bioIn = NULL;
     WOLFSSL_BIO *bioOut = NULL;
     byte* input = NULL;
@@ -330,5 +336,5 @@ int wolfCLU_Base64Setup(int argc, char** argv)
     wolfCLU_LogError("No filesystem support");
 #endif
     return WOLFCLU_FATAL_ERROR;
-#endif /* !WOLFCLU_NO_FILESYSTEM */
+#endif /* WOLFCLU_BASE64_ENABLED */
 }

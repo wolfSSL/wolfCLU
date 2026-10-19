@@ -8,8 +8,8 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import (CERTS_DIR, not_compiled_in, run_wolfssl, test_main,
-                          truncate_sparse)
+from wolfclu_test import (CERTS_DIR, no_filesystem, not_compiled_in,
+                          run_wolfssl, test_main, truncate_sparse)
 
 HASH_DIR = os.path.dirname(os.path.abspath(__file__))
 CERT_FILE = os.path.join(CERTS_DIR, "ca-cert.pem")
@@ -21,6 +21,7 @@ def _read_expected(name):
         return f.read().strip()
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class HashCommandTest(unittest.TestCase):
     """Tests using the -hash subcommand."""
 
@@ -28,12 +29,6 @@ class HashCommandTest(unittest.TestCase):
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
     def test_md5(self):
         r = run_wolfssl("-hash", "-md5", "-in", CERT_FILE)
@@ -82,6 +77,7 @@ class HashCommandTest(unittest.TestCase):
         self.assertEqual(r.stdout.strip(), _read_expected("blake2b-expect.hex"))
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class HashShortcutTest(unittest.TestCase):
     """Tests using the shortcut subcommands (md5, sha256, etc.)."""
 
@@ -89,12 +85,6 @@ class HashShortcutTest(unittest.TestCase):
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
     def test_md5(self):
         r = run_wolfssl("md5", CERT_FILE)

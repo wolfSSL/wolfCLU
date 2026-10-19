@@ -9,22 +9,17 @@ import unittest
 
 # Allow importing the shared helper when run standalone or via the test runner
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import WOLFSSL_BIN, CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import (WOLFSSL_BIN, CERTS_DIR, no_filesystem, run_wolfssl,
+                          test_main)
 
 
+@unittest.skipIf(no_filesystem(), "filesystem support disabled")
 class Base64Test(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
         if not os.path.isdir(CERTS_DIR):
             raise unittest.SkipTest("certs directory not found")
-
-        # Skip if filesystem support is disabled (Linux autotools build)
-        config_log = os.path.join(".", "config.log")
-        if os.path.isfile(config_log):
-            with open(config_log, "r") as f:
-                if "disable-filesystem" in f.read():
-                    raise unittest.SkipTest("filesystem support disabled")
 
         # Skip if base64 coding support is not compiled in
         result = run_wolfssl("base64", "-in",
