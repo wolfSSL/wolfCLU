@@ -99,6 +99,17 @@ def have_oid_table():
         return oid_table_probe_name in f.read()
 
 
+def oid_arcs_truncated():
+    """True when OID arcs above 65535 are rejected rather than encoded.
+
+    configure sets TRUNCATED_ENCODE_OBJECT_ID when the linked wolfSSL lacks
+    wc_EncodeObjectId32, which is compile-time only, so search the binary for
+    the error message only that build carries.
+    """
+    with open(WOLFSSL_BIN, "rb") as f:
+        return b"lacks wc_EncodeObjectId32" in f.read()
+
+
 def is_fips():
     """True when linked against a FIPS wolfSSL build (per `wolfssl -v`)."""
     r = run_wolfssl("-v")

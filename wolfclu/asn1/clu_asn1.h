@@ -41,7 +41,11 @@ typedef struct WOLFCLU_ASN1_PARSE_OPTIONS
 #if !defined(WOLFCLU_NO_FILESYSTEM) && defined(WOLFSSL_ASN_PRINT)
 {
     XFILE  inputFile;
-    XFILE  outputFile;
+    /* -out is opened only once the -offset/-length/-strparse selection
+     * succeeds, so a failed selection leaves it untouched and -in may name
+     * the same file. As with OpenSSL, the DER is written before it is
+     * parsed, so a parse failure after that still overwrites -out. */
+    const char* outputPath;
     XFILE  oidFile;
     Asn1OidToNameCb  nameCb;
     word32 strParse[WOLFCLU_ASN1_STR_PARSE_CAP];

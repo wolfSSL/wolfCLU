@@ -112,12 +112,21 @@ extern "C" {
     #include <wolfssl/wolfcrypt/camellia.h>
 #endif
 
-/* API break introduced in 5.9.3 so compile out affected functionality
- * when using previous version */
-#if LIBWOLFSSL_VERSION_HEX <= 0x05009002
-#ifndef NO_WC_ENCODE_OBJECT_ID
-    #define NO_WC_ENCODE_OBJECT_ID
+/* dotted OID strings can be DER encoded (wolfCLU_OidStrToDer). configure
+ * sets NO_WC_ENCODE_OBJECT_ID when wolfSSL does not export the encoder and
+ * TRUNCATED_ENCODE_OBJECT_ID when it lacks wc_EncodeObjectId32 */
+#if defined(HAVE_OID_ENCODING) && !defined(NO_WC_ENCODE_OBJECT_ID)
+    #define WOLFCLU_OID_ENCODE
 #endif
+
+/* builds without configure (user_settings.h, e.g. the Visual Studio project)
+ * can't probe for wc_EncodeObjectId32. No release up to 5.9.4 exports it, so
+ * fall back to the word16 encoder there; define WOLFCLU_ENCODE_OBJECT_ID32
+ * when building against a newer wolfSSL master that has it. */
+#if defined(WOLFSSL_USER_SETTINGS) && !defined(TRUNCATED_ENCODE_OBJECT_ID) && \
+    !defined(WOLFCLU_ENCODE_OBJECT_ID32) && \
+    LIBWOLFSSL_VERSION_HEX <= 0x05009004
+    #define TRUNCATED_ENCODE_OBJECT_ID
 #endif
 
 #include <wolfssl/wolfcrypt/coding.h>
@@ -460,13 +469,25 @@ int wolfCLU_hmacHash(WOLFSSL_HMAC_CTX *ctx, void* key, word32 keyLen,
 
 /* convert string to word32.
  *
- * @param  str   input string of digits.
+ * @param  arg   input string of digits.
  * @param  strSz size of input string.
  * @param  out   pointer to word32 that out put will be placed in on success.
- * @return       wolfCLU_FATAL_ERROR of str contains non-digit
- *               characters or overflows word32 size.
+ * @return       WOLFCLU_SUCCESS on success, WOLFCLU_FATAL_ERROR if arg
+ *               contains non-digit characters or overflows word32 size.
  * */
 int wolfCLU_StrToWord32(const char* arg, unsigned long strSz, word32* out);
+
+/* convert dotted-decimal OID string to DER content octets (no tag/length).
+ *
+ * @param  oidStr dotted OID such as "1.2.840.113549", at most
+ *                ASN1_OID_DOTTED_MAX_SZ components.
+ * @param  out    buffer for the encoding, may alias oidStr since the
+ *                whole string is parsed before out is written.
+ * @param  outSz  in: size of out, out: size of the encoding.
+ * @return        WOLFCLU_SUCCESS on success, WOLFCLU_FATAL_ERROR on
+ *                failure (the reason is logged unless an argument is NULL).
+ * */
+int wolfCLU_OidStrToDer(const char* oidStr, byte* out, word32* outSz);
 
 /**
  * @brief Used to create a hash from a specified algorithm

@@ -42,13 +42,20 @@ jobs:
 
           - os: ubuntu-latest
             config: '--enable-wolfclu'
-            sanitize: 'CC="cc -fsanitize=address"'
+            sanitize: 'CC="cc -fsanitize=address" CFLAGS="-g"'
             wolfCLUOpts: '--disable-oid-table'
 
           - os: macos-latest
             config: '--enable-wolfclu'
-            sanitize: 'CC="cc -fsanitize=address"'
+            sanitize: 'CC="cc -fsanitize=address" CFLAGS="-g"'
             wolfCLUOpts: '--disable-oid-table'
+
+          # wolfSSL master exports wc_EncodeObjectId32, so force the word16
+          # wc_EncodeObjectId fallback that released wolfSSL builds use.
+          - os: ubuntu-latest
+            config: '--enable-wolfclu'
+            sanitize: 'CC="cc -fsanitize=address" CFLAGS="-g"'
+            wolfCLUOpts: 'CPPFLAGS="-DTRUNCATED_ENCODE_OBJECT_ID"'
 
     name: ${{ matrix.os }} ${{ matrix.sanitize && 'ASAN' || '' }} (${{ matrix.config }})${{ matrix.wolfCLUOpts && format(' [{0}]', matrix.wolfCLUOpts) || '' }}
     runs-on: ${{ matrix.os }}

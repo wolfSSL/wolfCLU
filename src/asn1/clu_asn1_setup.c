@@ -51,38 +51,46 @@ static void wolfCLU_Asn1Help(void)
     WOLFCLU_LOG(WOLFCLU_L0, "\t-help                Display this text");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-oid <infile>        File of extra oid "
                             "definitions");
-    wolfCLU_Log(WOLFCLU_L0, "\t                     The built in Oid Table is "
+    WOLFCLU_LOG(WOLFCLU_L0, "\t                     The built in Oid Table is "
                             "on unless configured");
-    wolfCLU_Log(WOLFCLU_L0, "\t                     with: --disable-oid-table");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t                     with: --disable-oid-table");
 
     WOLFCLU_LOG(WOLFCLU_L0, "\nI/O Options:");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-inform <file type>  Input file format "
                             "- [DER, PEM, B64]");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-in <input file>     Input file");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t                     Defaults to DER");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-in <input file>     Input file (required)");
     WOLFCLU_LOG(
         WOLFCLU_L0,
         "\t-out <output file>   Output file for the Asn1 Der data "
         "after processing");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-noout               Do not print output");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-offset <int>        Offset in to the file "
-                            "to begin parsing");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-noout               Do not print output "
+                            "(requires -out)");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-offset <int>        Offset in to the DER "
+                            "data to begin parsing");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-length <int>        Number of bytes to parse");
     WOLFCLU_LOG(WOLFCLU_L0, "\t-strparse <int>      Offset to OCTET/BIT STRING "
-                            "to parse\n "
-                            "\t\t             can be used with a list. "
+                            "to parse");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t                     can be used with a list. "
                             "Ex:-strparse 702,64");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t                     -strparse is applied "
+                            "first, then -offset/-length");
     WOLFCLU_LOG(WOLFCLU_L0, "\nFormatting Options:");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-i                   Indents the output");
-    WOLFCLU_LOG(WOLFCLU_L0, "\t-dump                Unknown data in hex form");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-i                   Indent by depth instead of "
+                            "drawing branches");
+    WOLFCLU_LOG(WOLFCLU_L0, "\t-dump                Print data in hex form");
     WOLFCLU_LOG(WOLFCLU_L0, "\nOutput:");
     WOLFCLU_LOG(WOLFCLU_L0, "              Offset v      v Data Length");
-    WOLFCLU_LOG(WOLFCLU_L0, "                     0: 4 [1187]  (0) ┌SEQUENCE");
+    WOLFCLU_LOG(WOLFCLU_L0, "                     0: 4 [1187]  (0) "
+                            "\xe2\x94\x8c" "SEQUENCE");
     WOLFCLU_LOG(WOLFCLU_L0, "          Header Length ^    Depth ^");
     WOLFCLU_LOG(WOLFCLU_L0, "\n           Brackets indicate constructed "
                             "types");
-    WOLFCLU_LOG(WOLFCLU_L0, "                     0: 4 [1187] (0) ┌SEQUENCE");
+    WOLFCLU_LOG(WOLFCLU_L0, "                     0: 4 [1187] (0) "
+                            "\xe2\x94\x8c" "SEQUENCE");
     WOLFCLU_LOG(WOLFCLU_L0, "\n               Pluses indicate primitive types");
-    WOLFCLU_LOG(WOLFCLU_L0, "                     0: 4 +   7  (0) ┌INTEGER");
+    WOLFCLU_LOG(WOLFCLU_L0, "                     0: 4 +   7  (0) "
+                            "\xe2\x94\x8c" "INTEGER");
     WOLFCLU_LOG(WOLFCLU_L0, "\nOid File:\n");
     WOLFCLU_LOG(WOLFCLU_L0, "       Pass in a file to -oid in this format:");
     WOLFCLU_LOG(WOLFCLU_L0, "           1.2.3.4 shortName Long name with "
@@ -91,6 +99,9 @@ static void wolfCLU_Asn1Help(void)
                             "name long\n");
     WOLFCLU_LOG(WOLFCLU_L0, "       Entry Fields:");
     WOLFCLU_LOG(WOLFCLU_L0, "           <oid> <shortname> <longName>");
+    WOLFCLU_LOG(WOLFCLU_L0, "       Only the long name is printed, and names "
+                            "wolfSSL already knows");
+    WOLFCLU_LOG(WOLFCLU_L0, "       take precedence over the file.");
 }
 
 /* close all files opened during setup returns WOLFCLU_SUCCESS */
@@ -104,11 +115,7 @@ static int Asn1ParseOptions_clean_up(WOLFCLU_ASN1_PARSE_OPTIONS *opt)
         XFCLOSE(opt->inputFile);
     }
 
-    if (opt->outputFile != NULL) {
-        XFCLOSE(opt->outputFile);
-    }
-
-    wc_ForceZero(opt, sizeof(WOLFCLU_ASN1_PARSE_OPTIONS));
+    XMEMSET(opt, 0, sizeof(*opt));
 
     return WOLFCLU_SUCCESS;
 }
@@ -135,7 +142,7 @@ static int checkFileArg(const char *file, const char *flag, const char *mode,
     if (ret != WOLFCLU_SUCCESS) {
         file = file && (file[0] != '-') ? file : "*missing*";
         wolfCLU_LogError("%s argument either missing argument or "
-                         "file does not exist : %s",
+                         "file could not be opened : %s",
                          flag, file);
     }
 
@@ -148,12 +155,15 @@ static int checkStrParse(const char *arg, word32 *outSz, const word32 cap,
                          word32 *out)
 {
     int ret = WOLFCLU_SUCCESS;
-    char *end;
     char *token;
     unsigned long len;
     char* tmp;
 
-    if (out == NULL || arg == NULL || outSz == NULL) {
+    if (arg == NULL) {
+        wolfCLU_LogError("-strparse argument missing argument");
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (out == NULL || outSz == NULL) {
         return WOLFCLU_FATAL_ERROR;
     }
 
@@ -166,9 +176,14 @@ static int checkStrParse(const char *arg, word32 *outSz, const word32 cap,
 
     XMEMCPY(tmp, arg, len);
 
-    token = XSTRTOK(tmp, ",", &end);
-    while (token != NULL && ret == WOLFCLU_SUCCESS) {
+    /* split by hand rather than XSTRTOK so empty entries are rejected */
+    token = tmp;
+    while (ret == WOLFCLU_SUCCESS) {
         word32 val = 0;
+        char *comma = XSTRSTR(token, ",");
+        if (comma != NULL) {
+            *comma = '\0';
+        }
         if (wolfCLU_StrToWord32(token, XSTRLEN(token), &val) !=
                                                         WOLFCLU_SUCCESS) {
             ret = WOLFCLU_FATAL_ERROR;
@@ -182,7 +197,10 @@ static int checkStrParse(const char *arg, word32 *outSz, const word32 cap,
         }
         else {
             out[(*outSz)++] = val;
-            token = XSTRTOK(NULL, ",", &end);
+            if (comma == NULL) {
+                break;
+            }
+            token = comma + 1;
         }
     }
 
@@ -261,8 +279,13 @@ int wolfCLU_Asn1Setup(int argc, char *argv[])
                 break;
 
             case WOLFCLU_OUTFILE:
-                ret =
-                    checkFileArg(optarg, "-out", "wb", &asn1Config.outputFile);
+                if (optarg == NULL || optarg[0] == '-') {
+                    wolfCLU_LogError("-out argument missing argument");
+                    ret = WOLFCLU_FATAL_ERROR;
+                }
+                else {
+                    asn1Config.outputPath = optarg;
+                }
                 break;
 
             case WOLFCLU_INFILE:
@@ -270,13 +293,13 @@ int wolfCLU_Asn1Setup(int argc, char *argv[])
                 break;
 
             case WOLFCLU_OID:
-#ifndef NO_WC_ENCODE_OBJECT_ID
+#ifdef WOLFCLU_OID_ENCODE
                 ret = checkFileArg(optarg, "-oid", "rb", &asn1Config.oidFile);
 #else
                 wolfCLU_LogError("wolfSSL is not configured to "
                                  "handle encoding oids");
                 ret = WOLFCLU_FATAL_ERROR;
-#endif /* NO_WC_ENCODE_OBJECT_ID */
+#endif /* WOLFCLU_OID_ENCODE */
                 break;
 
             case WOLFCLU_OFFSET:

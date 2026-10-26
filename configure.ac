@@ -105,8 +105,7 @@ AC_ARG_ENABLE([oid-table],
 
 if test "x$ENABLED_OIDTABLE" != "xno"
 then
-    AC_DEFINE([HAVE_OID_TABLE], [1],
-              [Enable OID-to-name lookup table])
+    AM_CFLAGS="$AM_CFLAGS -DHAVE_OID_TABLE"
 fi
 
 
@@ -158,6 +157,11 @@ AC_CHECK_FUNC([wolfSSL_X509_REQ_print],
 AC_CHECK_FUNC([wc_EncodeObjectId],
     [],
     [AM_CFLAGS="$AM_CFLAGS -DNO_WC_ENCODE_OBJECT_ID"])
+# wolfSSL releases only have the word16 wc_EncodeObjectId, which truncates
+# OID arcs above 65535; wc_EncodeObjectId32 encodes the full word32 arc
+AC_CHECK_FUNC([wc_EncodeObjectId32],
+    [],
+    [AM_CFLAGS="$AM_CFLAGS -DTRUNCATED_ENCODE_OBJECT_ID"])
 
 ###############################################
 #                                             #

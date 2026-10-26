@@ -21,9 +21,6 @@
 #ifndef CLU_OID_NAME_TABLE_H
 #define CLU_OID_NAME_TABLE_H
 
-#ifdef HAVE_CONFIG_H
-    #include <config.h>
-#endif
 #include <wolfssl/ssl.h>
 
 typedef struct OidName{

@@ -4,7 +4,7 @@
 .SH NAME
 wolfssl-asn1parse, asn1parse \- ASN.1 parsing utility
 .SH SYNOPSIS
-wolfssl asn1parse [-in file] [-inform DER|PEM|B64] [-out file] [-oid file] [-offset n] [-length n] [-strparse n[,n...]] [-i] [-dump] [-noout] [-help]
+wolfssl asn1parse -in file [-inform DER|PEM|B64] [-out file] [-oid file] [-offset n] [-length n] [-strparse n[,n...]] [-i] [-dump] [-noout] [-help]
 .SH DESCRIPTION
 Parses an ASN.1 encoded structure (for example a certificate, key, or CRL)
 and prints a human readable listing of its tags, lengths, and contents.
@@ -17,14 +17,26 @@ Input may be read in DER, PEM, or Base64 form.
 .br
                       format: <oid> <shortName> <long name with spaces>.
 .br
+                      shortName is accepted for compatibility but only the
+.br
+                      long name is printed.
+.br
                       The built in OID table is used unless wolfCLU was
 .br
                       configured with --disable-oid-table.
+.br
+                      Names wolfSSL already knows take precedence over both
+.br
+                      the -oid file and the built in table.
 .SH I/O OPTIONS
 -in file              input file to read the ASN.1 structure from.
 .br
+                      Required.
+.br
 .LP
 -inform DER|PEM|B64   input file format. One of DER, PEM, or B64 (Base64).
+.br
+                      Defaults to DER.
 .br
 .LP
 -out file             output file for the ASN.1 DER data after processing.
@@ -32,23 +44,39 @@ Input may be read in DER, PEM, or Base64 form.
                       Best used with -strparse.
 .br
 .LP
--noout                do not print the parsed output.
+-noout                do not print the parsed output. Requires -out.
 .br
 .LP
--offset n             offset into the file at which to begin parsing.
+-offset n             offset into the DER data at which to begin parsing.
+.br
+                      For PEM and B64 input this is an offset into the
+.br
+                      decoded DER, not the file. With -strparse it is an
+.br
+                      offset into the nested structure.
 .br
 .LP
--length n             number of bytes to parse.
+-length n             number of bytes of DER data to parse. A length past
+.br
+                      the end of the data is reduced to the bytes remaining.
 .br
 .LP
 -strparse n[,n...]    offset to an OCTET/BIT STRING to parse. A comma
 .br
                       separated list may be given, e.g. -strparse 702,64.
+.br
+                      -strparse is applied first, starting from the
+.br
+                      beginning of the input, and -offset and -length then
+.br
+                      select bytes within the nested result.
 .SH FORMATTING OPTIONS
--i                    indent the output according to structure depth.
+-i                    indent the output by structure depth instead of
+.br
+                      drawing branches.
 .br
 .LP
--dump                 print unknown data in hex form.
+-dump                 print data in hex form.
 .SH OUTPUT
 Each line is formatted as:
 .RS
@@ -65,7 +93,7 @@ Parse a DER encoded certificate with indented output:
 wolfssl asn1parse -inform DER -in cert.der -i
 .RE
 .LP
-Parse a PEM file and dump unknown data as hex:
+Parse a PEM file and print data in hex form:
 .RS
 wolfssl asn1parse -in cert.pem -inform PEM -dump
 .RE
@@ -74,8 +102,8 @@ wolfssl asn1parse -in cert.pem -inform PEM -dump
 .SH NOTES
 Available only when wolfSSL is built with WOLFSSL_ASN_PRINT and wolfCLU is
 built with filesystem support (not WOLFCLU_NO_FILESYSTEM). The -oid option
-additionally requires object id encoding support (NO_WC_ENCODE_OBJECT_ID
-must not be defined).
+additionally requires object id encoding support (wolfSSL built with
+HAVE_OID_ENCODING, and NO_WC_ENCODE_OBJECT_ID not defined).
 .SH BUGS
 No known bugs at this time.
 .SH AUTHOR
