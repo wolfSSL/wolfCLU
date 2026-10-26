@@ -41,6 +41,20 @@ cp  $CERTS_DIR/intermediate/ca-int-cert.pem .
 cp  $CERTS_DIR/intermediate/ca-int2-cert.pem .
 cp  $CERTS_DIR/intermediate/client-int-cert.pem .
 
+echo "Copy over ML-DSA keys and certs"
+cp  $CERTS_DIR/mldsa/mldsa44-cert.pem      ./mldsa/.
+cp  $CERTS_DIR/mldsa/mldsa44-cert.der      ./mldsa/.
+cp  $CERTS_DIR/mldsa/mldsa44-key.pem       ./mldsa/.
+cp  $CERTS_DIR/mldsa/mldsa44_pub-spki.der  ./mldsa/.
+cp  $CERTS_DIR/mldsa/mldsa44_seed-only.der ./mldsa/.
+cp  $CERTS_DIR/mldsa/mldsa65_pub-spki.der  ./mldsa/.
+cp  $CERTS_DIR/mldsa/mldsa65_seed-only.der ./mldsa/.
+cp  $CERTS_DIR/mldsa/mldsa87_pub-spki.der  ./mldsa/.
+cp  $CERTS_DIR/mldsa/mldsa87_seed-only.der ./mldsa/.
+openssl x509 -in ./mldsa/mldsa44-cert.der -inform der -noout -pubkey | \
+    openssl pkey -pubin -outform der -out ./mldsa/mldsa44-keyPub.der || \
+    echo "OpenSSL 3.5+ is needed to generate mldsa44-keyPub.der, without it some ML-DSA tests will fail"
+
 # client is decoupled from wolfSSL example client
 #echo "Additional update of client example source code"
 #cp $CERTS_DIR/../examples/client/client.c ../src/client/client.c
