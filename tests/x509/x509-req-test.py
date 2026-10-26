@@ -433,6 +433,10 @@ class TestReqNew(unittest.TestCase):
                         "-subj", "CN=test",
                         "-addext", addext,
                         "-x509", "-out", crt)
+        # RIDs that wolfSSL_OBJ_txt2obj rejects need wolfCLU_OidStrToDer
+        if (r.returncode != 0 and
+                "OID encoding is not compiled in" in r.stdout + r.stderr):
+            self.skipTest("built without OID encoding support")
         self.assertEqual(r.returncode, 0, r.stderr)
 
         r2 = run_wolfssl("x509", "-in", crt, "-text", "-noout")
@@ -465,6 +469,38 @@ class TestReqNew(unittest.TestCase):
                                     "test_req_addext_rid.crt")
         self.assertIsNotNone(san, "SAN not found in cert output")
         self.assertIn("Registered ID:1.2.3.4", san)
+
+    def test_req_addext_san_rid_manual_encode(self):
+        """A dotted RID wolfSSL_OBJ_txt2obj rejects is encoded by wolfCLU.
+
+        txt2obj refuses a second arc above 127, so 2.999.1 (the X.660
+        example arc) falls through to wolfCLU_OidStrToDer.  The encoder's
+        validation and large-arc handling are covered in asn1-test.py.
+        """
+        san = self._addext_san_line("subjectAltName=RID:2.999.1",
+                                    "test_req_addext_rid_manual.crt")
+        self.assertIsNotNone(san, "SAN not found in cert output")
+        self.assertIn("Registered ID:2.999.1", san)
+
+    def test_req_addext_san_rid_manual_encode_max_components(self):
+        """A manually encoded RID with ASN1_OID_DOTTED_MAX_SZ (16) arcs."""
+        rid = "2.999." + ".".join(str(i) for i in range(1, 15))
+        san = self._addext_san_line("subjectAltName=RID:" + rid,
+                                    "test_req_addext_rid_16arcs.crt")
+        self.assertIsNotNone(san, "SAN not found in cert output")
+        self.assertIn("Registered ID:" + rid, san)
+
+    def test_req_addext_san_rid_invalid(self):
+        """An invalid dotted RID is rejected rather than encoded."""
+        crt = _tmp("test_req_addext_rid_bad.crt")
+        self._clean(crt)
+        r = run_wolfssl("req", "-new", "-days", "3650",
+                        "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+                        "-subj", "CN=test",
+                        "-addext", "subjectAltName=RID:3.1",
+                        "-x509", "-out", crt)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("bad RID found", r.stdout + r.stderr)
 
     def test_req_addext_san_ipv6(self):
         """req -addext subjectAltName=IP:<ipv6> keeps colons in the value.

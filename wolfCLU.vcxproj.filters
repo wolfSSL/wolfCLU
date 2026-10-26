@@ -129,6 +129,12 @@
     <ClCompile Include="src\ocsp\clu_ocsp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\asn1\clu_asn1_setup.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\asn1\clu_asn1_parse.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\pkcs\clu_pkcs8.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -201,6 +207,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="wolfclu\x509\clu_x509_sign.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wolfclu\asn1\clu_asn1.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="wolfclu\asn1\clu_oid_name_table.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\wolfssl\IDE\WIN\USER_SETTINGS.H">
