@@ -291,13 +291,176 @@ static void wolfCLU_OcspHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, " ");
 }
 
+/* CRLReason names as printed by openssl ocsp */
+static const char* ocspCrlReasonStr(int reason)
+{
+    switch (reason) {
+        case WC_CRL_REASON_UNSPECIFIED:
+            return "unspecified";
+        case WC_CRL_REASON_KEY_COMPROMISE:
+            return "keyCompromise";
+        case WC_CRL_REASON_CA_COMPROMISE:
+            return "cACompromise";
+        case WC_CRL_REASON_AFFILIATION_CHANGED:
+            return "affiliationChanged";
+        case WC_CRL_REASON_SUPERSEDED:
+            return "superseded";
+        case WC_CRL_REASON_CESSATION_OF_OPERATION:
+            return "cessationOfOperation";
+        case WC_CRL_REASON_CERTIFICATE_HOLD:
+            return "certificateHold";
+        case WC_CRL_REASON_REMOVE_FROM_CRL:
+            return "removeFromCRL";
+        case WC_CRL_REASON_PRIVILEGE_WITHDRAWN:
+            return "privilegeWithdrawn";
+        case WC_CRL_REASON_AA_COMPROMISE:
+            return "aACompromise";
+        default:
+            return "(UNKNOWN)";
+    }
+}
+
+/* Certificate status names as printed by openssl ocsp */
+static const char* ocspCertStatusStr(int status)
+{
+    switch (status) {
+        case CERT_GOOD:
+            return "good";
+        case CERT_REVOKED:
+            return "revoked";
+        case CERT_UNKNOWN:
+            return "unknown";
+        default:
+            return "(UNKNOWN)";
+    }
+}
+
+/* OCSP response status names as printed by openssl ocsp */
+static const char* ocspRespStatusStr(int status)
+{
+    switch (status) {
+        case OCSP_SUCCESSFUL:
+            return "successful";
+        case OCSP_MALFORMED_REQUEST:
+            return "malformedrequest";
+        case OCSP_INTERNAL_ERROR:
+            return "internalerror";
+        case OCSP_TRY_LATER:
+            return "trylater";
+        case OCSP_SIG_REQUIRED:
+            return "sigrequired";
+        case OCSP_UNAUTHORIZED:
+            return "unauthorized";
+        default:
+            return "(UNKNOWN)";
+    }
+}
+
+/* Print an ASN.1 time in the same form as openssl ocsp */
+static void ocspPrintTime(WOLFSSL_BIO* bio, const char* label,
+    const byte* date, byte format)
+{
+    static const char* const month[] = { "Jan", "Feb", "Mar", "Apr", "May",
+        "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+    struct tm t;
+
+    if (wc_GetDateAsCalendarTime(date, MAX_DATE_SIZE, format, &t) != 0 ||
+            t.tm_mon < 0 || t.tm_mon > 11) {
+        wolfSSL_BIO_printf(bio, "\t%s: Bad time value\n", label);
+        return;
+    }
+    wolfSSL_BIO_printf(bio, "\t%s: %s %2d %02d:%02d:%02d %d GMT\n", label,
+        month[t.tm_mon], t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec,
+        t.tm_year + 1900);
+}
+
+static WOLFSSL_BIO* ocspStdoutBio(void)
+{
+    WOLFSSL_BIO* bio = wolfSSL_BIO_new(wolfSSL_BIO_s_file());
+
+    if (bio != NULL &&
+            wolfSSL_BIO_set_fp(bio, stdout, BIO_NOCLOSE) != WOLFSSL_SUCCESS) {
+        wolfSSL_BIO_free(bio);
+        bio = NULL;
+    }
+    return bio;
+}
+
+/* Print the status summary like openssl ocsp */
+static int ocspPrintStatus(const char* name, const CertStatus* cs)
+{
+    WOLFSSL_BIO* bio = ocspStdoutBio();
+
+    if (bio == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+    wolfSSL_BIO_printf(bio, "%s: %s\n", name,
+        ocspCertStatusStr(cs->status));
+    ocspPrintTime(bio, "This Update", cs->thisDate, cs->thisDateFormat);
+    if (cs->nextDate[0] != '\0') {
+        ocspPrintTime(bio, "Next Update", cs->nextDate, cs->nextDateFormat);
+    }
+    if (cs->status == CERT_REVOKED) {
+        wolfSSL_BIO_printf(bio, "\tReason: %s\n",
+            ocspCrlReasonStr(cs->revocationReason));
+        ocspPrintTime(bio, "Revocation Time", cs->revocationDate,
+            ASN_GENERALIZED_TIME);
+    }
+    wolfSSL_BIO_free(bio);
+    return WOLFCLU_SUCCESS;
+}
+
+/* Print openssl's "Responder Error" line for an OCSP error status.
+ * Returns 1 when the response was an error status. */
+static int ocspPrintResponderError(const byte* p, int sz)
+{
+    int          idx = 0;
+    int          status;
+    WOLFSSL_BIO* bio;
+
+    /* OCSPResponse ::= SEQUENCE { responseStatus ENUMERATED, ... } */
+    if (p == NULL || sz < 5 || p[idx++] != (ASN_SEQUENCE | ASN_CONSTRUCTED)) {
+        return 0;
+    }
+    if (p[idx] & ASN_LONG_LENGTH) {
+        idx += (p[idx] & 0x7f) + 1;
+    }
+    else {
+        idx++;
+    }
+    if (idx + 3 > sz || p[idx] != ASN_ENUMERATED || p[idx + 1] != 1) {
+        return 0;
+    }
+    status = p[idx + 2];
+    if (status == OCSP_SUCCESSFUL) {
+        return 0;
+    }
+
+    bio = ocspStdoutBio();
+    if (bio != NULL) {
+        wolfSSL_BIO_printf(bio, "Responder Error: %s (%d)\n",
+            ocspRespStatusStr(status), status);
+        wolfSSL_BIO_free(bio);
+    }
+    return 1;
+}
+
 static int ocspClient(OcspClientConfig* config)
 {
-    WOLFSSL_CERT_MANAGER* cm  = NULL;
-    byte*                 der = NULL;
+    WOLFSSL_CERT_MANAGER* cm     = NULL;
+    OcspRequest*          req    = NULL;
+    byte*                 der    = NULL;
+    byte*                 reqBuf = NULL;
+    byte*                 resp   = NULL;
+    const char*           url    = NULL;
+    DecodedCert           cert;
+    CertStatus            status;
     int                   derSz;
-    int                   ocspFlags = 0;
-    int                   ret = WOLFCLU_SUCCESS;
+    int                   reqSz    = 0;
+    int                   respSz   = 0;
+    int                   urlSz    = 0;
+    int                   certInit = 0;
+    int                   ret      = WOLFCLU_SUCCESS;
 
     if (config->cert == NULL) {
         wolfCLU_LogError("Client mode requires -cert");
@@ -340,52 +503,110 @@ static int ocspClient(OcspClientConfig* config)
         }
     }
 
-    /* Build OCSP flags */
-    if (config->noNonce)
-        ocspFlags |= WOLFSSL_OCSP_NO_NONCE;
-    if (config->url != NULL)
-        ocspFlags |= WOLFSSL_OCSP_URL_OVERRIDE;
-
-    /* Enable OCSP in the CertManager */
+    /* Needed by wolfSSL_CertManagerCheckOCSPResponse */
     if (ret == WOLFCLU_SUCCESS) {
-        if (wolfSSL_CertManagerEnableOCSP(cm, ocspFlags)
-                != WOLFSSL_SUCCESS) {
+        if (wolfSSL_CertManagerEnableOCSP(cm, 0) != WOLFSSL_SUCCESS) {
             wolfCLU_LogError("Failed to enable OCSP");
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    /* Set override URL if provided */
-    if (ret == WOLFCLU_SUCCESS && config->url != NULL) {
-        if (wolfSSL_CertManagerSetOCSPOverrideURL(cm, config->url)
-                != WOLFSSL_SUCCESS) {
-            wolfCLU_LogError("Failed to set OCSP override URL");
+    /* Parse the certificate against its issuer, as
+     * wolfSSL_CertManagerCheckOCSP does, to fill in the CertID fields */
+    if (ret == WOLFCLU_SUCCESS) {
+        int err;
+
+        wc_InitDecodedCert(&cert, der, (word32)derSz, HEAP_HINT);
+        certInit = 1;
+        err = wc_ParseCert(&cert, CERT_TYPE, VERIFY_OCSP, cm);
+        if (err != 0) {
+            wolfCLU_LogError("Failed to verify %s (err %d: %s)", config->cert,
+                err, wolfSSL_ERR_reason_error_string(err));
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
-    /* Perform the OCSP check – wolfSSL handles networking and HTTP */
+    /* Responder URL from -url or the certificate's AIA extension */
     if (ret == WOLFCLU_SUCCESS) {
-        int ocspRet = wolfSSL_CertManagerCheckOCSP(cm, der, derSz);
-        if (ocspRet == WOLFSSL_SUCCESS) {
-            WOLFCLU_LOG(WOLFCLU_L0, "%s: good", config->cert);
+        if (config->url != NULL) {
+            url = config->url;
+            urlSz = (int)XSTRLEN(url);
         }
-        else if (ocspRet == OCSP_CERT_REVOKED) {
-            /* Certificate is revoked - report it but return success.
-             * OpenSSL returns exit code 0 for revoked certs because the OCSP
-             * transaction itself succeeded. The revocation status is in output. */
-            WOLFCLU_LOG(WOLFCLU_L0, "%s: revoked", config->cert);
-            /* ret remains WOLFCLU_SUCCESS */
+        else if (cert.extAuthInfo != NULL && cert.extAuthInfoSz > 0) {
+            url = (const char*)cert.extAuthInfo;
+            urlSz = cert.extAuthInfoSz;
         }
         else {
-            /* Other OCSP errors (network, malformed response, etc.) */
-            wolfCLU_LogError("OCSP check failed for %s (err %d: %s)",
-                config->cert, ocspRet,
-                wolfSSL_ERR_reason_error_string(ocspRet));
+            wolfCLU_LogError("No OCSP responder URL in %s, use -url",
+                config->cert);
             ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
+    if (ret == WOLFCLU_SUCCESS) {
+        req = wc_OcspRequest_new(HEAP_HINT);
+        if (req == NULL || wc_InitOcspRequest(req, &cert,
+                (byte)(config->noNonce == 0), HEAP_HINT) != 0) {
+            wolfCLU_LogError("Failed to create OCSP request");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS) {
+        reqSz = wc_EncodeOcspRequest(req, NULL, 0);
+        if (reqSz > 0) {
+            reqBuf = (byte*)XMALLOC((size_t)reqSz, HEAP_HINT,
+                DYNAMIC_TYPE_TMP_BUFFER);
+        }
+        if (reqBuf == NULL ||
+                wc_EncodeOcspRequest(req, reqBuf, (word32)reqSz) != reqSz) {
+            wolfCLU_LogError("Failed to encode OCSP request");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    /* HTTP POST to the responder */
+    if (ret == WOLFCLU_SUCCESS) {
+        respSz = EmbedOcspLookup(NULL, url, urlSz, reqBuf, reqSz, &resp);
+        if (respSz <= 0 || resp == NULL) {
+            wolfCLU_LogError("Error querying OCSP responder");
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (ret == WOLFCLU_SUCCESS && ocspPrintResponderError(resp, respSz)) {
+        ret = WOLFCLU_FATAL_ERROR;
+    }
+
+    /* Verify the response and get the status of the certificate */
+    if (ret == WOLFCLU_SUCCESS) {
+        int ocspRet;
+
+        XMEMSET(&status, 0, sizeof(status));
+        ocspRet = wolfSSL_CertManagerCheckOCSPResponse(cm, resp, respSz, NULL,
+            &status, NULL, req);
+        if (ocspRet == WOLFSSL_SUCCESS || ocspRet == OCSP_CERT_REVOKED ||
+                ocspRet == OCSP_CERT_UNKNOWN) {
+            /* Like openssl ocsp, print the status on stdout and exit 0
+             * whatever the status is. */
+            WOLFCLU_LOG(WOLFCLU_L0, "Response verify OK");
+            ret = ocspPrintStatus(config->cert, &status);
+        }
+        else {
+            wolfCLU_LogError("Response Verify Failure: %s (%d)",
+                wolfSSL_ERR_reason_error_string(ocspRet), ocspRet);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
+    }
+
+    if (resp != NULL) {
+        EmbedOcspRespFree(NULL, resp);
+    }
+    XFREE(reqBuf, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
+    wc_OcspRequest_free(req);
+    if (certInit) {
+        wc_FreeDecodedCert(&cert);
+    }
     wolfSSL_CertManagerFree(cm);
     XFREE(der, HEAP_HINT, DYNAMIC_TYPE_TMP_BUFFER);
     return ret;
