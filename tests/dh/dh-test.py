@@ -106,6 +106,77 @@ class DhParamTest(unittest.TestCase):
                         "-genkey", "-noout")
         self.assertNotEqual(r.returncode, 0)
 
+    def _new_file(self, name):
+        # Start from no file so the create mode applies.
+        if os.path.exists(name):
+            os.remove(name)
+        self.addCleanup(lambda: os.remove(name)
+                        if os.path.exists(name) else None)
+        return name
+
+    def _mode(self, name):
+        return os.stat(name).st_mode & 0o777
+
+    def _use_umask_022(self):
+        old_umask = os.umask(0o022)
+        self.addCleanup(os.umask, old_umask)
+
+    def _gen_params(self, params_file):
+        r = run_wolfssl("dhparam", "-out", self._new_file(params_file),
+                        "1024")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_dhparam_genkey_out_mode(self):
+        """-genkey output holds a private key so it must be owner-only."""
+        params_file = "dh-perm-genkey.params"
+        key_file = self._new_file("dh-perm-genkey.key")
+        self._use_umask_022()
+        self._gen_params(params_file)
+
+        r = run_wolfssl("dhparam", "-in", params_file, "-genkey", "-noout",
+                        "-out", key_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(key_file, "r") as f:
+            self.assertIn("-----BEGIN PRIVATE KEY-----", f.read())
+        mode = self._mode(key_file)
+        self.assertEqual(mode, 0o600,
+                         "DH private key mode is {:o}, expected 600".format(
+                             mode))
+
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_dhparam_genkey_with_params_out_mode(self):
+        """Params and key in one file: the file must be owner-only."""
+        params_file = "dh-perm-both.params"
+        key_file = self._new_file("dh-perm-both.key")
+        self._use_umask_022()
+        self._gen_params(params_file)
+
+        r = run_wolfssl("dhparam", "-in", params_file, "-genkey",
+                        "-out", key_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        with open(key_file, "r") as f:
+            data = f.read()
+        self.assertIn("-----BEGIN DH PARAMETERS-----", data)
+        self.assertIn("-----BEGIN PRIVATE KEY-----", data)
+        mode = self._mode(key_file)
+        self.assertEqual(mode, 0o600,
+                         "DH private key mode is {:o}, expected 600".format(
+                             mode))
+
+    @unittest.skipIf(os.name == "nt", "POSIX file permissions only")
+    def test_dhparam_params_out_mode(self):
+        """Parameter-only output is public and keeps default permissions."""
+        params_file = "dh-perm-params.params"
+        copy_file = self._new_file("dh-perm-params-copy.params")
+        self._use_umask_022()
+        self._gen_params(params_file)
+        self.assertEqual(self._mode(params_file), 0o644)
+
+        r = run_wolfssl("dhparam", "-in", params_file, "-out", copy_file)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(self._mode(copy_file), 0o644)
+
 
 if __name__ == "__main__":
     test_main()
