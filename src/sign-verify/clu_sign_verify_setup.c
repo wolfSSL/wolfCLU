@@ -144,10 +144,10 @@ static void wolfCLU_signHelp(int keyType)
         ,"ml-dsa"
         ,"dilithium"
         #endif
-        #ifdef WOLFSSL_HAVE_XMSS
+        #if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFSSL_XMSS_VERIFY_ONLY)
         ,"xmss"
         ,"xmssmt"
-        #endif
+        #endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */
         };
 
         WOLFCLU_LOG(WOLFCLU_L0, "\nAvailable keys with current configure settings:");
@@ -191,7 +191,7 @@ static void wolfCLU_signHelp(int keyType)
                        " -in <filename> -out <filename>\n");
                 break;
             #endif
-            #ifdef WOLFSSL_HAVE_XMSS
+            #if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFSSL_XMSS_VERIFY_ONLY)
             case XMSS_SIG_VER:
                 WOLFCLU_LOG(WOLFCLU_L0, "XMSS Sign Usage: \nwolfssl -xmss -sign -inkey <priv_key>"
                        " -in <filename> -out <filename>\n");
@@ -202,7 +202,7 @@ static void wolfCLU_signHelp(int keyType)
                        " -in <filename> -out <filename>\n");
                 WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
-            #endif
+            #endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */
             default:
                 WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
         }

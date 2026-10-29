@@ -912,7 +912,9 @@ int wolfCLU_sign_data_dilithium (byte* data, char* out, word32 dataSz, char* pri
 
 int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey)
 {
-#ifdef WOLFSSL_HAVE_XMSS
+/* Signing needs wc_XmssKey_Sign() and the private key callbacks, none of
+ * which exist in a verify-only wolfSSL build. */
+#if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFSSL_XMSS_VERIFY_ONLY)
     int ret         = 0;
     int fExtSz      = 5;                 /* size of ".priv"         */
     XFILE outFile   = NULL;              /* output file             */
@@ -1080,12 +1082,12 @@ int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey)
     (void)privKey;
 
     return NOT_COMPILED_IN;
-#endif  /* WOLFSSL_HAVE_XMSS */
+#endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */
 }
 
 int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
 {
-#ifdef WOLFSSL_HAVE_XMSS
+#if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFSSL_XMSS_VERIFY_ONLY)
     int ret         = 0;
     int fExtSz      = 5;                 /* size of ".priv"              */
     XFILE outFile   = NULL;              /* output file                  */
@@ -1274,7 +1276,7 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
     (void)privKey;
 
     return NOT_COMPILED_IN;
-#endif  /* WOLFSSL_HAVE_XMSS */
+#endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */
 }
 
 #endif /* !WOLFCLU_NO_FILESYSTEM */
