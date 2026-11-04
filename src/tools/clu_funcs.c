@@ -77,6 +77,7 @@ static const struct option crypt_algo_options[] = {
     WOLFCLU_LOG(WOLFCLU_L0, "-help           Help, print out this help menu");
     WOLFCLU_LOG(WOLFCLU_L0, " ");
     WOLFCLU_LOG(WOLFCLU_L0, "Only set one of the following.\n");
+    WOLFCLU_LOG(WOLFCLU_L0, "asn1parse      Parse and print ASN.1 structures");
     WOLFCLU_LOG(WOLFCLU_L0, "ca             Used for signing certificates");
     WOLFCLU_LOG(WOLFCLU_L0, "crl            Used for parsing CRL files");
     WOLFCLU_LOG(WOLFCLU_L0, "bench          Benchmark one of the algorithms");
@@ -1310,6 +1311,122 @@ int wolfCLU_GetOpt(int argc, char** argv, const char *options,
 
     return WOLFCLU_FATAL_ERROR;
 
+}
+
+/* Parse a base-10 string into a word32, rejecting non-digits and overflow.
+ * On success *out is set; on failure *out is left unchanged. Callers log
+ * their own context-specific error message.
+ */
+int wolfCLU_StrToWord32(const char* arg, unsigned long strSz, word32* out)
+{
+    word32 val = 0;
+    if (arg == NULL || out == NULL || strSz == 0) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    for (word32 i = 0; i < strSz; i++) {
+        word32 digit;
+        if (*arg < '0' || *arg > '9') {
+            return WOLFCLU_FATAL_ERROR;
+        }
+        digit = (word32)(*arg - '0');
+        /* Detect word32 overflow before val = val * 10 + digit. */
+        if (val > (0xFFFFFFFFU - digit) / 10) {
+            return WOLFCLU_FATAL_ERROR;
+        }
+        val = (val * 10) + digit;
+        arg++;
+    }
+
+    *out = val;
+    return WOLFCLU_SUCCESS;
+}
+
+
+/* Encode a dotted-decimal OID string into DER content octets. Shared by
+ * asn1parse -oid files and RID alt names so both validate the same way. */
+int wolfCLU_OidStrToDer(const char* oidStr, byte* out, word32* outSz)
+{
+#ifdef WOLFCLU_OID_ENCODE
+    word32 arcs[ASN1_OID_DOTTED_MAX_SZ];
+#ifdef TRUNCATED_ENCODE_OBJECT_ID
+    word16 arcs16[ASN1_OID_DOTTED_MAX_SZ];
+    word32 i;
+#endif
+    word32 arcCount = 0;
+    const char* p;
+    const char* dot;
+    int err;
+
+    if (oidStr == NULL || out == NULL || outSz == NULL) {
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    for (p = oidStr; p != NULL; p = (dot != NULL) ? dot + 1 : NULL) {
+        word32 segSz;
+
+        dot = XSTRSTR(p, ".");
+        segSz = (dot != NULL) ? (word32)(dot - p) : (word32)XSTRLEN(p);
+
+        if (arcCount >= ASN1_OID_DOTTED_MAX_SZ) {
+            wolfCLU_LogError("OID has too many components (max %d): %s",
+                    ASN1_OID_DOTTED_MAX_SZ, oidStr);
+            return WOLFCLU_FATAL_ERROR;
+        }
+        if (wolfCLU_StrToWord32(p, segSz, &arcs[arcCount]) !=
+                WOLFCLU_SUCCESS) {
+            wolfCLU_LogError("OID component not a valid 32 bit integer : "
+                    "%.*s", (int)segSz, p);
+            return WOLFCLU_FATAL_ERROR;
+        }
+        arcCount++;
+    }
+
+    /* the first two arcs share one subidentifier, 40 * arcs[0] + arcs[1] */
+    if (arcCount < 2) {
+        wolfCLU_LogError("OID needs at least two components: %s", oidStr);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (arcs[0] > 2) {
+        wolfCLU_LogError("OID first component must be 0, 1 or 2: %s", oidStr);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (arcs[0] < 2 && arcs[1] > 39) {
+        wolfCLU_LogError("OID second component must be below 40 when the "
+                "first is 0 or 1: %s", oidStr);
+        return WOLFCLU_FATAL_ERROR;
+    }
+    if (arcs[1] > 0xFFFFFFFFU - (arcs[0] * 40)) {
+        wolfCLU_LogError("OID second component too large: %s", oidStr);
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+#ifdef TRUNCATED_ENCODE_OBJECT_ID
+    for (i = 0; i < arcCount; i++) {
+        if (arcs[i] > 0xFFFF) {
+            wolfCLU_LogError("OID arc %u would be truncated, this wolfSSL "
+                    "lacks wc_EncodeObjectId32", arcs[i]);
+            return WOLFCLU_FATAL_ERROR;
+        }
+        arcs16[i] = (word16)arcs[i];
+    }
+    err = wc_EncodeObjectId(arcs16, arcCount, out, outSz);
+#else
+    err = wc_EncodeObjectId32(arcs, arcCount, out, outSz);
+#endif
+    if (err != 0) {
+        wolfCLU_LogError("Could not encode OID: %s", wc_GetErrorString(err));
+        return WOLFCLU_FATAL_ERROR;
+    }
+
+    return WOLFCLU_SUCCESS;
+#else
+    (void)oidStr;
+    (void)out;
+    (void)outSz;
+    wolfCLU_LogError("Couldn't encode OID. OID encoding is not compiled in");
+    return WOLFCLU_FATAL_ERROR;
+#endif /* WOLFCLU_OID_ENCODE */
 }
 
 

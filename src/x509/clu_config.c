@@ -24,6 +24,7 @@
 #include <wolfclu/clu_error_codes.h>
 #include <wolfclu/x509/clu_parse.h>
 #include <wolfclu/x509/clu_x509_sign.h>
+#include <wolfssl/wolfcrypt/types.h>
 
 #ifndef WOLFCLU_NO_FILESYSTEM
 
@@ -341,13 +342,12 @@ static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
     int ret = WOLFCLU_SUCCESS;
     WOLFSSL_ASN1_STRING *ipStr  = NULL;
     WOLFSSL_ASN1_OBJECT *ridObj = NULL;
-    char  *token, *ptr, *s      = NULL;
+    char  *s                    = NULL;
     int   sSz  = 0;
     int   type = 0;
-    byte oid[ASN1_OID_DOTTED_MAX_SZ];
-    word32 oidSz = ASN1_OID_DOTTED_MAX_SZ;
-    word32 decodedCount = 0;
-    word16 decoded[ASN1_OID_DOTTED_MAX_SZ];
+    /* a word32 arc takes at most 5 base-128 bytes */
+    byte oid[ASN1_OID_DOTTED_MAX_SZ * 5];
+    word32 oidSz = sizeof(oid);
 
     if (XSTRNCMP(name, "IP", 2) == 0) {
         ipStr = wolfSSL_a2i_IPADDRESS(value);
@@ -379,87 +379,14 @@ static int wolfCLU_addAltName(WOLFSSL_X509* x509, const char* name,
 
     else if (XSTRNCMP(name, "RID", 3) == 0) {
         if ((ridObj = wolfSSL_OBJ_txt2obj(value, 0)) == NULL) {
-    #if defined(HAVE_OID_ENCODING) && !defined(NO_WC_ENCODE_OBJECT_ID)
-            /* If RID value is not named OID, manually encode
-             * dotted OID into byte array. Tokenize a copy so the
-             * original value stays intact for error messages. */
-            int   ridLen = (int)XSTRLEN(value);
-            char* ridDup = (char*)XMALLOC(ridLen + 1, NULL,
-                    DYNAMIC_TYPE_TMP_BUFFER);
-            if (ridDup == NULL) {
-                wolfCLU_LogError("Failed to allocate memory for RID");
-                return MEMORY_E;
-            }
-            XMEMCPY(ridDup, value, ridLen + 1);
-
-            token = XSTRTOK(ridDup, ".", &ptr);
-
-            while (token != NULL) {
-                char* digit;
-                int n;
-
-                if (decodedCount >= ASN1_OID_DOTTED_MAX_SZ) {
-                    wolfCLU_LogError("RID has too many components "
-                            "(max %d): %s",
-                            ASN1_OID_DOTTED_MAX_SZ, value);
-                    ret = WOLFCLU_FATAL_ERROR;
-                    break;
-                }
-                /* require decimal-digits-only token so that things
-                 * like "1a" or "abc" are rejected instead of being
-                 * silently coerced by XATOI */
-                for (digit = token; *digit != '\0'; digit++) {
-                    if (*digit < '0' || *digit > '9') {
-                        wolfCLU_LogError("Non-numeric RID "
-                                "component '%s' in: %s", token,
-                                value);
-                        ret = WOLFCLU_FATAL_ERROR;
-                        break;
-                    }
-                }
-                if (ret != WOLFCLU_SUCCESS) {
-                    break;
-                }
-                n = XATOI(token);
-                if (n < 0 || n > 0xFFFF) {
-                    wolfCLU_LogError("RID component out of range "
-                            "[0, 65535]: %s", token);
-                    ret = WOLFCLU_FATAL_ERROR;
-                    break;
-                }
-                decoded[decodedCount] = (word16)n;
-                decodedCount++;
-                token = XSTRTOK(NULL, ".", &ptr);
-            }
-
-            XFREE(ridDup, NULL, DYNAMIC_TYPE_TMP_BUFFER);
-
-            if (ret != WOLFCLU_SUCCESS) {
-                return ret;
-            }
-
-            if (wc_EncodeObjectId(decoded, decodedCount, oid, &oidSz)
-                    == 0) {
-                s   = (char*)oid;
-                sSz = (int)oidSz;
-            }
-            else {
+            /* If RID value is not named OID, manually encode the dotted
+             * OID into a byte array. */
+            if (wolfCLU_OidStrToDer(value, oid, &oidSz) != WOLFCLU_SUCCESS) {
                 wolfCLU_LogError("bad RID found %s", value);
                 return WOLFCLU_FATAL_ERROR;
             }
-    #else
-            (void)token;
-            (void)ptr;
-            (void)decoded;
-            (void)decodedCount;
-            (void)oid;
-            (void)oidSz;
-
-            wolfCLU_LogError("Couldn't encode RID. OID encoding is not"
-                    " compiled in");
-            return WOLFCLU_FATAL_ERROR;
-
-    #endif
+            s   = (char*)oid;
+            sSz = (int)oidSz;
         }
         else {
             s   = (char*)wolfSSL_OBJ_get0_data(ridObj);
