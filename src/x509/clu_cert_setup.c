@@ -413,7 +413,12 @@ int wolfCLU_certSetup(int argc, char **argv)
         }
         else if (inForm == DER_FORM) {
             derBufPtr = inBuf;
-            x509 = wolfSSL_d2i_X509(NULL, &derBufPtr, inBufSz);
+            if (reqFlag) {
+                x509 = wolfSSL_X509_REQ_d2i(NULL, derBufPtr, inBufSz);
+            }
+            else {
+                x509 = wolfSSL_d2i_X509(NULL, &derBufPtr, inBufSz);
+            }
         }
 
         if (x509 == NULL) {
