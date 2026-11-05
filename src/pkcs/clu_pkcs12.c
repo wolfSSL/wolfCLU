@@ -74,6 +74,7 @@ int wolfCLU_PKCS12(int argc, char** argv)
     WOLF_STACK_OF(WOLFSSL_X509) *extra = NULL;
     WOLFSSL_BIO *bioIn  = NULL;
     WOLFSSL_BIO *bioOut = NULL;
+    char        *outFile = NULL;
 
     opterr = 0; /* do not display unrecognized options */
     optind = 0; /* start at indent 0 */
@@ -115,10 +116,9 @@ int wolfCLU_PKCS12(int argc, char** argv)
                 break;
 
             case WOLFCLU_OUTFILE:
-                bioOut = wolfSSL_BIO_new_file(optarg, "wb");
-                if (bioOut == NULL) {
-                    wolfCLU_LogError("Unable to open output file %s",
-                            optarg);
+                outFile = optarg;
+                if (outFile == NULL) {
+                    wolfCLU_LogError("-out requires a file name");
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
@@ -137,6 +137,20 @@ int wolfCLU_PKCS12(int argc, char** argv)
             default:
                 /* do nothing. */
                 (void)ret;
+        }
+    }
+
+    /* output with a key, even encrypted, is created owner only */
+    if (ret == WOLFCLU_SUCCESS && outFile != NULL) {
+        if (printKeys) {
+            bioOut = wolfCLU_BioOpenOwner(outFile);
+        }
+        else {
+            bioOut = wolfSSL_BIO_new_file(outFile, "wb");
+        }
+        if (bioOut == NULL) {
+            wolfCLU_LogError("Unable to open output file %s", outFile);
+            ret = WOLFCLU_FATAL_ERROR;
         }
     }
 
@@ -227,9 +241,15 @@ int wolfCLU_PKCS12(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && pkey != NULL && printKeys) {
         if (useDES) {
             passwordSz = MAX_PASSWORD_SIZE;
-            wolfCLU_GetStdinPassword((byte*)password, (word32*)&passwordSz);
-            ret = wolfCLU_pKeyPEMtoPriKeyEnc(bioOut, pkey, DES3b,
-                    (byte*)password, passwordSz);
+            ret = wolfCLU_GetStdinPassword((byte*)password,
+                    (word32*)&passwordSz);
+            if (ret != WOLFCLU_SUCCESS) {
+                wolfCLU_LogError("Unable to get password from stdin");
+            }
+            else {
+                ret = wolfCLU_pKeyPEMtoPriKeyEnc(bioOut, pkey, DES3b,
+                        (byte*)password, passwordSz);
+            }
         }
         else {
             ret = wolfCLU_pKeyPEMtoPriKey(bioOut, pkey);

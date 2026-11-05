@@ -11,7 +11,8 @@ import time
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, WOLFSSL_BIN, run_wolfssl, test_main
+from wolfclu_test import (CERTS_DIR, WOLFSSL_BIN, run_wolfssl,
+                          run_wolfssl_pty, test_main)
 
 # The interactive password prompt only reads from stdin when stdin is a real
 # terminal (wolfCLU_GetStdinPassword -> tcgetattr fails on a pipe), so driving
@@ -463,6 +464,68 @@ class EncLegacyNamesTest(unittest.TestCase):
         self._roundtrip("-aes-cbc-128", "-aes-cbc-128",
                         "legacy aes-cbc-128 round trip failed")
 
+    # Modes must match exactly. A truncated mode (or one the algorithm does
+    # not support) selects no cipher, so the command must fail.
+    BAD_MODE_NAMES = ["aes-c-128", "aes-cb-256", "aes-ct-192", "aes-128-c",
+                      "aes-256-cb", "camellia-c-128", "camellia-cb-256",
+                      "camellia-ctr-128"]
+
+    def test_abbreviated_mode_encrypt_rejected(self):
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        for i, name in enumerate(self.BAD_MODE_NAMES):
+            for j, args in enumerate((["-encrypt", name],
+                                      ["enc", "-" + name])):
+                enc = "test-abbrev-{}-{}.enc".format(i, j)
+                self._cleanup(enc)
+                with self.subTest(args=args):
+                    r = run_enc(*args, "-in", orig, "-out", enc,
+                                password="test password")
+                    self.assertNotEqual(r.returncode, 0,
+                                        "{} must be rejected".format(name))
+                    self.assertRegex(r.stderr, "Invalid (entry|mode)",
+                                     "{} not rejected when parsed".format(
+                                         name))
+                    self.assertFalse(os.path.exists(enc),
+                                     "{} left an output file".format(name))
+
+    def test_abbreviated_mode_decrypt_rejected(self):
+        src = os.path.join(CERTS_DIR, "crl.der.enc")
+        for i, name in enumerate(self.BAD_MODE_NAMES):
+            dec = "test-abbrev-{}.dec".format(i)
+            self._cleanup(dec)
+            with self.subTest(name=name):
+                r = run_enc("-decrypt", name, "-in", src, "-out", dec,
+                            password="")
+                self.assertNotEqual(r.returncode, 0,
+                                    "{} must be rejected".format(name))
+                self.assertRegex(r.stderr, "Invalid (entry|mode)",
+                                 "{} not rejected when parsed".format(name))
+                self.assertFalse(os.path.exists(dec),
+                                 "{} left an output file".format(name))
+
+    def test_full_mode_names_roundtrip(self):
+        names = ["aes-cbc-128", "aes-256-cbc"]
+        r = run_wolfssl("-encrypt", "-help")
+        if "aes-ctr-128" in r.stdout + r.stderr:
+            names.append("aes-ctr-192")
+        if _camellia_available():
+            names.append("camellia-cbc-128")
+
+        orig = os.path.join(CERTS_DIR, "crl.der")
+        for name in names:
+            enc = "test-fullmode-{}.enc".format(name)
+            dec = "test-fullmode-{}.dec".format(name)
+            self._cleanup(enc, dec)
+            with self.subTest(name=name):
+                r = run_enc("-encrypt", name, "-in", orig, "-out", enc,
+                            password="test password")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                r = run_enc("-decrypt", name, "-in", enc, "-out", dec,
+                            password="test password")
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertTrue(filecmp.cmp(orig, dec, shallow=False),
+                                "{} round trip failed".format(name))
+
 
 def _camellia_available():
     """Check if Camellia support is enabled in the wolfssl binary."""
@@ -912,6 +975,43 @@ class EncKeyInputTest(unittest.TestCase):
         self.assertTrue(filecmp.cmp(self._orig(), dec, shallow=False),
                         "rand-hex -> -inkey workflow did not round-trip")
 
+    def test_legacy_cipher_key_iv_roundtrip(self):
+        """The non-EVP cipher path with -key/-iv must strip its padding.
+
+        Camellia uses wolfCLU_encrypt/wolfCLU_decrypt, which pad the input
+        to a whole block and record in the salt header whether they did.
+        Sizes 27 and 1025 need padding; 32 and 2048 are block aligned.
+        """
+        if not _camellia_available():
+            self.skipTest("Camellia not compiled in")
+
+        for size in (27, 32, 1025, 2048):
+            orig = "legacy_key_iv_{}.bin".format(size)
+            enc = "legacy_key_iv_{}.enc".format(size)
+            dec = "legacy_key_iv_{}.dec".format(size)
+            self._cleanup(orig, enc, dec)
+            data = bytes(i % 251 for i in range(size))
+            with open(orig, "wb") as f:
+                f.write(data)
+
+            with self.subTest(size=size):
+                r = run_wolfssl("-encrypt", "camellia-cbc-256",
+                                "-in", orig, "-out", enc,
+                                "-key", self.KEY_HEX, "-iv", self.IV_HEX)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                r = run_wolfssl("-decrypt", "camellia-cbc-256",
+                                "-in", enc, "-out", dec,
+                                "-key", self.KEY_HEX, "-iv", self.IV_HEX)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+                with open(dec, "rb") as f:
+                    got = f.read()
+                self.assertEqual(len(got), size,
+                                 "decrypted length differs from original")
+                self.assertEqual(got, data,
+                                 "decrypted data differs from original")
+
 
 @unittest.skipUnless(HAVE_PTY, "pty not available (non-POSIX)")
 class EncStdinPasswordTest(unittest.TestCase):
@@ -1093,6 +1193,21 @@ class EncStdinPasswordTest(unittest.TestCase):
         with open(dec, "rb") as f:
             self.assertEqual(f.read(), self.PLAINTEXT,
                              "decrypted plaintext mismatch")
+
+    def test_password_prompt_eof_fails(self):
+        """EOF at the password prompt must fail and write no output."""
+        plain = "f12121_eof_in.txt"
+        cipher = "f12121_eof.bin"
+        self._cleanup(plain, cipher)
+        self._write_plaintext(plain)
+
+        code, out = run_wolfssl_pty("encrypt", "aes-cbc-256",
+                                    "-in", plain, "-out", cipher,
+                                    reply=b"\x04")
+        self.assertIn(b"Input Password", out)
+        self.assertGreater(code, 0, out)
+        self.assertFalse(os.path.exists(cipher), out)
+        self.assertNotIn(b"AddressSanitizer", out)
 
 
 if __name__ == "__main__":

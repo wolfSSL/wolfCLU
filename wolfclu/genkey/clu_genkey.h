@@ -150,6 +150,24 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 #ifdef WOLFSSL_HAVE_XMSS
 enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte* priv, word32 privSz, void* context);
 enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte* priv, word32 privSz, void* context);
+
+/**
+ * take an exclusive lock on a XMSS private key file, waiting for other
+ * signers to release it
+ *
+ * @param fileName  the private key file
+ * @param lockFile  set to the handle to pass to wolfCLU_XmssKey_Unlock
+ *
+ * return WOLFCLU_SUCCESS on success
+*/
+int wolfCLU_XmssKey_Lock(const char* fileName, XFILE* lockFile);
+
+/**
+ * release a lock taken by wolfCLU_XmssKey_Lock
+ *
+ * @param lockFile  the handle set by wolfCLU_XmssKey_Lock
+*/
+void wolfCLU_XmssKey_Unlock(XFILE lockFile);
 #endif
 
 /**

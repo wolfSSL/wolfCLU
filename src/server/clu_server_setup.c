@@ -200,6 +200,11 @@ int wolfCLU_Server(int argc, char** argv)
         args.argv = (char**)serverArgv;
         args.argc = serverArgc;
         server_test(&args);
+
+        if (args.return_code != 0) {
+            wolfCLU_LogError("s_server failed (%d).", args.return_code);
+            ret = WOLFCLU_FATAL_ERROR;
+        }
     }
 
 exit:
