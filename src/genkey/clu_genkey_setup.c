@@ -46,10 +46,12 @@ static void wolfCLU_genKeyHelp(void)
         ,"ml-dsa"
         ,"dilithium"
     #endif
-    #ifdef WOLFSSL_HAVE_XMSS
+    #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN) && \
+            !defined(WOLFSSL_XMSS_VERIFY_ONLY)
         ,"xmss"
         ,"xmssmt"
-    #endif
+    #endif  /* WOLFSSL_HAVE_XMSS && WOLFSSL_KEY_GEN &&
+            * !WOLFSSL_XMSS_VERIFY_ONLY */
         };
 
         WOLFCLU_LOG(WOLFCLU_L0, "Available keys with current configure settings:");
@@ -73,14 +75,16 @@ static void wolfCLU_genKeyHelp(void)
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey ml-dsa -level "
            "[2|3|5] -out mykey -outform pem -output KEYPAIR");
 #endif
-#ifdef WOLFSSL_HAVE_XMSS
+#if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN) && \
+    !defined(WOLFSSL_XMSS_VERIFY_ONLY)
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmss -height [10|16|20] -out mykey -outform raw"
                 " -output KEYPAIR");
     WOLFCLU_LOG(WOLFCLU_L0, "wolfssl -genkey xmssmt -height [20|40|60] -layer [2|4|8|3|6|12]"
                 "  -out mykey -outform raw -output KEYPAIR");
     WOLFCLU_LOG(WOLFCLU_L0, "XMSS key file name must be something like \"XMSS-SHA2_10_256\""
                 "\nXMSS/XMSS^MT parametaers are determined by file name when signing");
-#endif
+#endif  /* WOLFSSL_HAVE_XMSS && WOLFSSL_KEY_GEN &&
+        * !WOLFSSL_XMSS_VERIFY_ONLY */
     WOLFCLU_LOG(WOLFCLU_L0,
            "\n\nThe above command would output the files: mykey.priv "
            " and mykey.pub\nChanging the -output option to just PRIV would only"
@@ -474,7 +478,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
     #endif  /* HAVE_DILITHIUM */
     }
     else if (XSTRNCMP(keyType, "xmssmt", 6) == 0) {
-    #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN)
+    #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN) && \
+        !defined(WOLFSSL_XMSS_VERIFY_ONLY)
         int directiveArg = wolfCLU_genKeyDirective(output);
         char xmssmtParam[XMSSMT_NAME_MAX_LEN + 1];   /* XMSS^MT parameter */
         char xmssmtParamHead[] = "XMSSMT-SHA2_\0";
@@ -609,15 +614,23 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
         ret = wolfCLU_genKey_XMSS(&rng, keyOutFName, directiveArg, xmssmtParam);
     #else
-        wolfCLU_LogError("Invalid option, XMSS not enabled.");
-        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with"
-               "--enable-xmss --enable-experimental andtry again");
+        #ifdef WOLFSSL_XMSS_VERIFY_ONLY
+        wolfCLU_LogError("XMSS is verify-only in this wolfSSL build, as it "
+                         "is in FIPS builds; key generation is not "
+                         "available.");
+        #else
+        wolfCLU_LogError("Invalid option, XMSS key generation not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "
+               "--enable-xmss (and --enable-keygen) and try again.");
+        #endif
         wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
-    #endif  /* WOLFSSL_HAVE_XMSS */
+    #endif  /* WOLFSSL_HAVE_XMSS && WOLFSSL_KEY_GEN &&
+            * !WOLFSSL_XMSS_VERIFY_ONLY */
     }
     else if (XSTRNCMP(keyType, "xmss", 4) == 0) {
-    #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN)
+    #if defined(WOLFSSL_HAVE_XMSS) && defined(WOLFSSL_KEY_GEN) && \
+        !defined(WOLFSSL_XMSS_VERIFY_ONLY)
         int directiveArg = wolfCLU_genKeyDirective(output);
         char xmssParam[XMSS_NAME_LEN + 1];   /* XMSS parameter */
         char xmssParamHead[] = "XMSS-SHA2_";
@@ -683,12 +696,19 @@ int wolfCLU_genKeySetup(int argc, char** argv)
 
         ret = wolfCLU_genKey_XMSS(&rng, keyOutFName, directiveArg, xmssParam);
     #else
-        wolfCLU_LogError("Invalid option, XMSS not enabled.");
-        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with"
-               "--enable-xmss --enable-experimental andtry again");
+        #ifdef WOLFSSL_XMSS_VERIFY_ONLY
+        wolfCLU_LogError("XMSS is verify-only in this wolfSSL build, as it "
+                         "is in FIPS builds; key generation is not "
+                         "available.");
+        #else
+        wolfCLU_LogError("Invalid option, XMSS key generation not enabled.");
+        WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "
+               "--enable-xmss (and --enable-keygen) and try again.");
+        #endif
         wc_FreeRng(&rng);
         return NOT_COMPILED_IN;
-    #endif  /* WOLFSSL_HAVE_XMSS */
+    #endif  /* WOLFSSL_HAVE_XMSS && WOLFSSL_KEY_GEN &&
+            * !WOLFSSL_XMSS_VERIFY_ONLY */
     }
     else {
         wolfCLU_LogError("\"%s\" is an invalid key type, or not compiled in", keyType);
