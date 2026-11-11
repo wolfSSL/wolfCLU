@@ -148,7 +148,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
  * return WOLFCLU_SUCCESS on success
 */
 /* A verify-only wolfSSL XMSS build has no private key, so there is nothing
- * for these callbacks to read or write. FIPS builds are verify-only. */
+ * for these callbacks to read or write. */
 #if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFSSL_XMSS_VERIFY_ONLY)
 enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte* priv, word32 privSz, void* context);
 enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte* priv, word32 privSz, void* context);

@@ -1081,6 +1081,11 @@ int wolfCLU_sign_data_xmss(byte* data, char* out, int fSz, char* privKey)
     (void)fSz;
     (void)privKey;
 
+#ifdef WOLFSSL_XMSS_VERIFY_ONLY
+    wolfCLU_LogError("XMSS is verify-only in this wolfSSL build. Signing is "
+                     "not available.");
+#endif
+
     return NOT_COMPILED_IN;
 #endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */
 }
@@ -1274,6 +1279,11 @@ int wolfCLU_sign_data_xmssmt(byte* data, char* out, int fSz, char* privKey)
     (void)out;
     (void)fSz;
     (void)privKey;
+
+#ifdef WOLFSSL_XMSS_VERIFY_ONLY
+    wolfCLU_LogError("XMSS is verify-only in this wolfSSL build. Signing is "
+                     "not available.");
+#endif
 
     return NOT_COMPILED_IN;
 #endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */

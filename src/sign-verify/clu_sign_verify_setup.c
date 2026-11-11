@@ -191,7 +191,8 @@ static void wolfCLU_signHelp(int keyType)
                        " -in <filename> -out <filename>\n");
                 break;
             #endif
-            #if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFSSL_XMSS_VERIFY_ONLY)
+            #ifdef WOLFSSL_HAVE_XMSS
+            #ifndef WOLFSSL_XMSS_VERIFY_ONLY
             case XMSS_SIG_VER:
                 WOLFCLU_LOG(WOLFCLU_L0, "XMSS Sign Usage: \nwolfssl -xmss -sign -inkey <priv_key>"
                        " -in <filename> -out <filename>\n");
@@ -202,7 +203,16 @@ static void wolfCLU_signHelp(int keyType)
                        " -in <filename> -out <filename>\n");
                 WOLFCLU_LOG(WOLFCLU_L0, "***************************************************************");
                 break;
-            #endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */
+            #else
+            /* Verification of these is still supported, so explain why only
+             * signing is missing rather than falling through to the default. */
+            case XMSS_SIG_VER:
+            case XMSSMT_SIG_VER:
+                wolfCLU_LogError("XMSS is verify-only in this wolfSSL "
+                                 "build. Signing is not available.");
+                break;
+            #endif /* !WOLFSSL_XMSS_VERIFY_ONLY */
+            #endif /* WOLFSSL_HAVE_XMSS */
             default:
                 WOLFCLU_LOG(WOLFCLU_L0, "No valid key type defined.\n");
         }

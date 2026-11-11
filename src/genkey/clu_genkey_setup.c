@@ -615,9 +615,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_genKey_XMSS(&rng, keyOutFName, directiveArg, xmssmtParam);
     #else
         #ifdef WOLFSSL_XMSS_VERIFY_ONLY
-        wolfCLU_LogError("XMSS is verify-only in this wolfSSL build, as it "
-                         "is in FIPS builds; key generation is not "
-                         "available.");
+        wolfCLU_LogError("XMSS is verify-only in this wolfSSL build. Key "
+                         "generation is not available.");
         #else
         wolfCLU_LogError("Invalid option, XMSS key generation not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "
@@ -697,9 +696,8 @@ int wolfCLU_genKeySetup(int argc, char** argv)
         ret = wolfCLU_genKey_XMSS(&rng, keyOutFName, directiveArg, xmssParam);
     #else
         #ifdef WOLFSSL_XMSS_VERIFY_ONLY
-        wolfCLU_LogError("XMSS is verify-only in this wolfSSL build, as it "
-                         "is in FIPS builds; key generation is not "
-                         "available.");
+        wolfCLU_LogError("XMSS is verify-only in this wolfSSL build. Key "
+                         "generation is not available.");
         #else
         wolfCLU_LogError("Invalid option, XMSS key generation not enabled.");
         WOLFCLU_LOG(WOLFCLU_L0, "Please re-configure wolfSSL with "

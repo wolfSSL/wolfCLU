@@ -6,7 +6,13 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from wolfclu_test import CERTS_DIR, run_wolfssl, test_main
+from wolfclu_test import CERTS_DIR, is_fips, run_wolfssl, test_main
+
+
+# SECP192R1 key generation is not FIPS approved as of FIPS v7; earlier FIPS
+# versions still allow it. is_fips() does not report the version, so skip the
+# curve on any FIPS build rather than only on v7 and later.
+_NON_FIPS_CURVES = ("SECP192R1",)
 
 
 def _get_curve_names():
@@ -15,6 +21,7 @@ def _get_curve_names():
     combined = r.stdout + r.stderr
     in_names = False
     names = []
+    fips = is_fips()
     for line in combined.splitlines():
         if "name options" in line:
             in_names = True
@@ -22,6 +29,8 @@ def _get_curve_names():
         if in_names:
             name = line.strip()
             if name and "SAKKE" not in name:
+                if fips and name in _NON_FIPS_CURVES:
+                    continue
                 names.append(name)
     return names
 
