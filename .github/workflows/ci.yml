@@ -21,6 +21,7 @@ jobs:
           - '--enable-wolfclu --enable-smallstack'
           - '--enable-wolfclu --enable-experimental --enable-dilithium'
           - '--enable-wolfclu --enable-smallstack --enable-experimental --enable-dilithium'
+          - '--enable-wolfclu --enable-fips=dev-no-post'
           - '--enable-all'
         sanitize: ['CC="cc -fsanitize=address" CFLAGS="-g"']
         include:

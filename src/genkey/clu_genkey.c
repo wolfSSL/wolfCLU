@@ -1559,7 +1559,7 @@ int wolfCLU_genKey_ML_DSA(WC_RNG* rng, char* fName, int directive, int fmt,
 }
 
 /* The call back function of the writing xmss key */
-#ifdef WOLFSSL_HAVE_XMSS
+#if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFSSL_XMSS_VERIFY_ONLY)
 enum wc_XmssRc wolfCLU_XmssKey_WriteCb(const byte * priv,
                                        word32 privSz, void * context)
 {
@@ -1683,12 +1683,14 @@ enum wc_XmssRc wolfCLU_XmssKey_ReadCb(byte * priv,
 
     return WC_XMSS_RC_READ_TO_MEMORY;
 }
-#endif  /* WOLFSSL_HAVE_XMSS */
+#endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */
 
 int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
                         int directive, const char* paramStr)
 {
-#ifdef WOLFSSL_HAVE_XMSS
+/* XMSS key generation needs wc_XmssKey_MakeKey() and the private key
+ * callbacks, none of which exist in a verify-only wolfSSL build. */
+#if defined(WOLFSSL_HAVE_XMSS) && !defined(WOLFSSL_XMSS_VERIFY_ONLY)
     int ret            = 0;
     int fNameSz        = 0;           /* file name without append         */
     int fExtSz         = 6;           /* size of ".priv\0" and ".pub\0\0" */
@@ -1864,7 +1866,7 @@ int wolfCLU_genKey_XMSS(WC_RNG* rng, char* fName,
     (void)paramStr;
 
     return NOT_COMPILED_IN;
-#endif /* HAVE_XMSS */
+#endif /* WOLFSSL_HAVE_XMSS && !WOLFSSL_XMSS_VERIFY_ONLY */
 }
 
 #endif /* WOLFSSL_KEY_GEN && !NO_ASN*/
