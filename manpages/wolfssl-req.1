@@ -4,13 +4,14 @@
 .SH NAME
 wolfssl-req, req \- generate certificate requests and self-signed certificates
 .SH SYNOPSIS
-wolfssl req [-new] [-in file] [-out file] [-key file] [-newkey type:bits] [-keyout file] [-inform PEM|DER] [-outform PEM|DER] [-config file] [-days n] [-x509] [-subj name] [-extensions section] [-nodes] [-passout source] [-sha|-sha224|-sha256|-sha384|-sha512] [-verify] [-text] [-noout]
+wolfssl req [-new] [-in file] [-out file] [-key file] [-inkey file] [-newkey rsa:bits] [-keyout file] [-inform PEM|DER] [-outform PEM|DER] [-config file] [-days n] [-set_serial n] [-x509] [-CA file] [-CAkey file] [-copy_extensions none|copy|copyall] [-subj name] [-extensions section] [-addext ext] [-nodes] [-passout source] [-sha|-sha224|-sha256|-sha384|-sha512] [-verify] [-text] [-noout]
 .SH DESCRIPTION
 Creates a PKCS#10 certificate signing request (CSR), or with \-x509 a
-self-signed certificate. The signing key may be supplied with \-key or
-generated on the fly with \-newkey. Without -subj or -config, subject
-fields are collected interactively. Without -keyout, a generated private
-key is written to stdout.
+self-signed certificate, or with \-CA a certificate issued for an existing
+request. The signing key may be supplied with \-key or generated on the
+fly with \-newkey. Without -subj or -config, subject fields are collected
+interactively. Without -keyout, a generated private key is written to
+stdout.
 .SH OPTIONS
 -new                  OpenSSL compatibility flag (no-op).
 .br
@@ -24,13 +25,16 @@ key is written to stdout.
 -key file             private key used to sign the certificate request.
 .br
 .LP
--newkey type:bits     generate the private key to use with the request.
+-inkey file           alias for -key.
 .br
-                      RSA: rsa:2048. Dilithium (with -x509 and certgen):
+.LP
+-newkey rsa:bits      generate the private key to use with the request.
 .br
-                      dilithium:2, dilithium:3, dilithium:5, or ml-dsa:N.
+                      RSA only: rsa:2048, rsa:3072 or rsa:4096. ECC and
 .br
-                      For ECC keys, generate with ecparam first.
+                      Dilithium keys must be generated with ecparam or
+.br
+                      genkey and passed in with -key.
 .br
 .LP
 -keyout file          file to output the generated key to.
@@ -45,10 +49,44 @@ key is written to stdout.
 -config file          file to parse for certificate configuration.
 .br
 .LP
--days n               number of days the certificate should be valid for.
+-days n               number of days the certificate should be valid for,
+.br
+                      in the range [1, 24855] (default 30). Applies to
+.br
+                      -x509 and -CA only; ignored for a plain CSR.
+.br
+.LP
+-set_serial n         serial number for the issued certificate. Without it
+.br
+                      a random serial number is generated.
 .br
 .LP
 -x509                 generate a self-signed certificate instead of a CSR.
+.br
+.LP
+-CA file              certificate of the CA that issues the certificate,
+.br
+                      signing the request given with -in. Requires -CAkey.
+.br
+.LP
+-CAkey file           private key belonging to the certificate given to -CA.
+.br
+.LP
+-copy_extensions arg  whether -CA carries the extensions the request asked
+.br
+                      for into the issued certificate: none (the default),
+.br
+                      or copy/copyall. A request only states what its sender
+.br
+                      wants, so by default the issued certificate takes just
+.br
+                      the subject name and public key from it and carries no
+.br
+                      requested subjectAltName, keyUsage, extendedKeyUsage or
+.br
+                      certificate policies. Basic Constraints stays CA:FALSE
+.br
+                      either way. Ignored without -CA.
 .br
 .LP
 -subj name            subject name in /key=value/... format, e.g.
@@ -57,6 +95,13 @@ key is written to stdout.
 .br
 .LP
 -extensions section   section of the config file to read extensions from.
+.br
+.LP
+-addext ext           add a single extension, e.g.
+.br
+                      "subjectAltName=DNS:example.com,IP:192.168.1.2".
+.br
+                      Only one -addext may be given.
 .br
 .LP
 -nodes                do not encrypt the private key on output. Without
@@ -76,7 +121,13 @@ key is written to stdout.
                       signing digest (default SHA-256 when omitted).
 .br
 .LP
--verify               check the signature on the request.
+-verify               check the signature on the request. Not needed with
+.br
+                      -CA, which always verifies both the request it is
+.br
+                      given and the certificate it issues; there -verify
+.br
+                      only adds the "verify OK" line to the output.
 .br
 .LP
 -text                 output human readable text of the request.
@@ -92,6 +143,16 @@ wolfssl req -new -newkey rsa:2048 -nodes -keyout mykey.pem -out mycsr.pem -subj 
 Create a self-signed certificate valid for 365 days:
 .RS
 wolfssl req -new -x509 -newkey rsa:2048 -nodes -keyout mykey.pem -out mycert.pem -days 365 -subj "/C=US/O=Test/CN=localhost"
+.RE
+.LP
+Issue a certificate for an existing request under a CA:
+.RS
+wolfssl req -CA ca-cert.pem -CAkey ca-key.pem -in mycsr.pem -days 365 -out mycert.pem
+.RE
+.LP
+The same, carrying the extensions the request asked for:
+.RS
+wolfssl req -CA ca-cert.pem -CAkey ca-key.pem -copy_extensions copy -in mycsr.pem -out mycert.pem
 .RE
 .LP
 View a CSR in human-readable format:

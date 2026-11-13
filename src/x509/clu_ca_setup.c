@@ -37,9 +37,6 @@ static const struct option ca_options[] = {
     {"-in",        required_argument, 0, WOLFCLU_INFILE    },
     {"-out",       required_argument, 0, WOLFCLU_OUTFILE   },
     {"-keyfile",   required_argument, 0, WOLFCLU_KEY       },
-    {"-subjkey",   required_argument, 0, WOLFCLU_SUBJKEY   },
-    {"-altkey",    required_argument, 0, WOLFCLU_ALTKEY    },
-    {"-altpub",    required_argument, 0, WOLFCLU_ALTPUB    },
     {"-cert",      required_argument, 0, WOLFCLU_CAFILE    },
     {"-extensions",required_argument, 0, WOLFCLU_EXTENSIONS},
     {"-md",        required_argument, 0, WOLFCLU_MD        },
@@ -48,7 +45,12 @@ static const struct option ca_options[] = {
     {"-config",    required_argument, 0, WOLFCLU_CONFIG },
     {"-days",      required_argument, 0, WOLFCLU_DAYS },
     {"-selfsign",  no_argument, 0, WOLFCLU_SELFSIGN  },
+#if defined(WOLFSSL_DUAL_ALG_CERTS) && defined(HAVE_DILITHIUM)
     {"-altextend", no_argument, 0, WOLFCLU_ALTEXTEND },
+    {"-subjkey",   required_argument, 0, WOLFCLU_SUBJKEY   },
+    {"-altkey",    required_argument, 0, WOLFCLU_ALTKEY    },
+    {"-altpub",    required_argument, 0, WOLFCLU_ALTPUB    },
+#endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
     {"-h",         no_argument, 0, WOLFCLU_HELP },
     {"-help",      no_argument, 0, WOLFCLU_HELP },
 
@@ -120,7 +122,6 @@ int wolfCLU_CASetup(int argc, char** argv)
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
-
             case WOLFCLU_SELFSIGN:
                 selfSigned = 1;
                 break;
@@ -155,16 +156,16 @@ int wolfCLU_CASetup(int argc, char** argv)
             case WOLFCLU_ALTPUB:
                 altKeyPub = wolfSSL_BIO_new_file(optarg, "rb");
                 if (altKeyPub == NULL) {
-                    wolfCLU_LogError("Unable to open \
-                                    alternate public key file %s", optarg);
+                    wolfCLU_LogError("Unable to open alternate public key "
+                            "file %s", optarg);
                     ret = WOLFCLU_FATAL_ERROR;
                 }
                 break;
-#endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
 
             case WOLFCLU_ALTEXTEND:
                 altSign = 1;
                 break;
+#endif /* WOLFSSL_DUAL_ALG_CERTS && HAVE_DILITHIUM */
 
             case WOLFCLU_CAFILE:
                 ca = wolfSSL_X509_load_certificate_file(optarg,
@@ -205,7 +206,18 @@ int wolfCLU_CASetup(int argc, char** argv)
                 break;
 
             case WOLFCLU_DAYS:
-                days = XATOI(optarg);
+                {
+                long d = 0;
+
+                if (optarg == NULL || wolfCLU_parseDecimalBounded(optarg, 1,
+                            WOLFCLU_MAX_VALIDITY, &d) != WOLFCLU_SUCCESS) {
+                    wolfCLU_LogError("-days expects a positive integer, got %s",
+                            optarg != NULL ? optarg : "(nothing)");
+                    ret = WOLFCLU_FATAL_ERROR;
+                    break;
+                }
+                days = (int)d;
+                }
                 break;
 
             case WOLFCLU_EXTENSIONS:
@@ -234,7 +246,7 @@ int wolfCLU_CASetup(int argc, char** argv)
         }
     }
 
-    if (reqIn == NULL && !altSign) {
+    if (ret == WOLFCLU_SUCCESS && reqIn == NULL && !altSign) {
         wolfCLU_LogError("Expecting CSR input");
         ret = WOLFCLU_FATAL_ERROR;
     }
@@ -242,10 +254,10 @@ int wolfCLU_CASetup(int argc, char** argv)
     if (ret == WOLFCLU_SUCCESS && config != NULL) {
         signer = wolfCLU_readSignConfig(config, (char*)"ca");
     }
-    else {
+    else if (ret == WOLFCLU_SUCCESS) {
         signer = wolfCLU_CertSignNew();
     }
-    if (signer == NULL) {
+    if (ret == WOLFCLU_SUCCESS && signer == NULL) {
         wolfCLU_LogError("Unable to create a signer struct");
         ret = WOLFCLU_FATAL_ERROR;
     }
@@ -308,6 +320,16 @@ int wolfCLU_CASetup(int argc, char** argv)
         else {
             wolfCLU_CertSignSetCA(signer, ca, pkey,
                     wolfCLU_GetTypeFromPKEY(pkey));
+        }
+    }
+    else {
+        if (ca != NULL) {
+            wolfSSL_X509_free(ca);
+            ca = NULL;
+        }
+        if (pkey != NULL) {
+            wolfSSL_EVP_PKEY_free(pkey);
+            pkey = NULL;
         }
     }
 
