@@ -89,6 +89,59 @@ class ServerClientTest(unittest.TestCase):
                 server.kill()
                 server.wait()
 
+    def _run_server_version(self, version):
+        """Start s_server with -version and wait for it to exit or listen.
+
+        Returns (returncode, stderr). A server that starts listening is
+        killed and returncode is None.
+        """
+        readyfile = "readyfile-version-" + version
+        if os.path.exists(readyfile):
+            os.remove(readyfile)
+        self.addCleanup(
+            lambda: os.path.exists(readyfile) and os.remove(readyfile))
+
+        server = subprocess.Popen(
+            [WOLFSSL_BIN, "s_server", "-port", str(find_free_port()),
+             "-key", os.path.join(CERTS_DIR, "server-key.pem"),
+             "-cert", os.path.join(CERTS_DIR, "server-cert.pem"),
+             "-version", version, "-noVerify", "-readyFile", readyfile],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL, text=True,
+        )
+        try:
+            deadline = time.time() + 30
+            while True:
+                try:
+                    _, err = server.communicate(timeout=0.1)
+                    return server.returncode, err
+                except subprocess.TimeoutExpired:
+                    if os.path.exists(readyfile):
+                        server.kill()
+                        _, err = server.communicate()
+                        return None, err
+                    if time.time() > deadline:
+                        self.fail("s_server neither exited nor listened")
+        finally:
+            if server.poll() is None:
+                server.kill()
+                server.communicate()
+
+    def test_unsupported_version(self):
+        """s_server fails when the protocol version is not compiled in."""
+        # 0: SSLv3, 1: TLS 1.0, 2: TLS 1.1
+        for version in ("0", "1", "2"):
+            with self.subTest(version=version):
+                rc, err = self._run_server_version(version)
+                if rc is None:
+                    self.assertNotIn("unable to get method", err,
+                                     "s_server kept running without a "
+                                     "method: " + err)
+                    self.skipTest("version {} compiled in".format(version))
+                self.assertNotEqual(rc, 0, err)
+                self.assertIn("unable to get method", err)
+                self.assertNotIn("listening on port", err)
+
 
 if __name__ == "__main__":
     test_main()
