@@ -88,6 +88,20 @@ def run_wolfssl(*args, stdin_data=None, timeout=60):
     return subprocess.run(cmd, **kwargs)
 
 
+def skip_if_no_filesystem():
+    """Raise SkipTest when wolfCLU was built with --disable-filesystem.
+
+    WOLFCLU_NO_FILESYSTEM compiles out the front ends that need files (e.g.
+    wolfCLU_Client), so those commands only print "No filesystem support"
+    instead of doing any work.
+    """
+    config_log = os.path.join(".", "config.log")
+    if os.path.isfile(config_log):
+        with open(config_log, "r") as f:
+            if "disable-filesystem" in f.read():
+                raise unittest.SkipTest("filesystem support disabled")
+
+
 def is_fips():
     """True when linked against a FIPS wolfSSL build (per `wolfssl -v`)."""
     r = run_wolfssl("-v")
