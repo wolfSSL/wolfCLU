@@ -32,6 +32,14 @@ INDEX_REVOKED = (
     "/CN=www.wolfssl.com/emailAddress=info@wolfssl.com\n"
 )
 
+# 'E' (expired) is neither valid nor revoked: the wolfssl responder
+# answers unknown for it.
+INDEX_UNKNOWN = (
+    "E\t991231235959Z\t\t01\tunknown\t"
+    "/C=US/ST=Montana/L=Bozeman/O=wolfSSL/OU=Support"
+    "/CN=www.wolfssl.com/emailAddress=info@wolfssl.com\n"
+)
+
 
 def _ocsp_supported(binary):
     """Check if the given binary supports OCSP."""
@@ -171,27 +179,33 @@ class _OCSPInteropBase(unittest.TestCase):
             args.extend(extra_args)
         return _run_client(self.CLIENT_BIN, self.PORT, args)
 
+    def _assert_status(self, rc, out, status):
+        """Like openssl ocsp: exit 0 for any verified status, and print
+        '<cert>: <status>' followed by the update and revocation times."""
+        self.assertEqual(rc, 0, f"expected exit 0 for {status}: {out}")
+        self.assertIn(f": {status}", out, f"expected ': {status}': {out}")
+        self.assertIn("This Update:", out, out)
+        if status == "revoked":
+            self.assertIn("Revocation Time:", out, out)
+
     # -- Positive tests --
 
     def test_01_basic_check(self):
         self._start_responder(INDEX_VALID)
         rc, out = self._query("server-cert.pem")
-        self.assertEqual(rc, 0, f"basic OCSP check failed: {out}")
-        self.assertIn("good", out.lower())
+        self._assert_status(rc, out, "good")
 
     def test_02_no_nonce(self):
         self._start_responder(INDEX_VALID)
         rc, out = self._query("server-cert.pem", ["-no_nonce"])
-        self.assertEqual(rc, 0, f"no_nonce check failed: {out}")
-        self.assertIn("good", out.lower())
+        self._assert_status(rc, out, "good")
 
     # -- Revoked cert --
 
     def test_03_revoked_cert(self):
         self._start_responder(INDEX_VALID + INDEX_REVOKED)
         rc, out = self._query("server-revoked-cert.pem")
-        self.assertRegex(out, re.compile("revoked", re.IGNORECASE),
-                         "expected 'revoked' in output")
+        self._assert_status(rc, out, "revoked")
 
     # -- Missing parameters --
 
@@ -259,8 +273,7 @@ class _OCSPInteropBase(unittest.TestCase):
             rsigner=os.path.join(CERTS_DIR, "ocsp-responder-cert.pem"),
             rkey=os.path.join(CERTS_DIR, "ocsp-responder-key.pem"))
         rc, out = self._query("server-cert.pem")
-        self.assertEqual(rc, 0, f"delegated responder failed: {out}")
-        self.assertIn("good", out.lower())
+        self._assert_status(rc, out, "good")
 
     def test_09_delegated_no_nonce(self):
         self._start_responder(
@@ -268,8 +281,7 @@ class _OCSPInteropBase(unittest.TestCase):
             rsigner=os.path.join(CERTS_DIR, "ocsp-responder-cert.pem"),
             rkey=os.path.join(CERTS_DIR, "ocsp-responder-key.pem"))
         rc, out = self._query("server-cert.pem", ["-no_nonce"])
-        self.assertEqual(rc, 0, f"delegated no_nonce failed: {out}")
-        self.assertIn("good", out.lower())
+        self._assert_status(rc, out, "good")
 
     def test_10_delegated_revoked(self):
         self._start_responder(
@@ -277,7 +289,7 @@ class _OCSPInteropBase(unittest.TestCase):
             rsigner=os.path.join(CERTS_DIR, "ocsp-responder-cert.pem"),
             rkey=os.path.join(CERTS_DIR, "ocsp-responder-key.pem"))
         rc, out = self._query("server-revoked-cert.pem")
-        self.assertRegex(out, re.compile("revoked", re.IGNORECASE))
+        self._assert_status(rc, out, "revoked")
 
     # -- Unreachable responder --
 
@@ -305,6 +317,56 @@ class _OCSPInteropBase(unittest.TestCase):
         time.sleep(0.5)  # let responder shut down
         log = resp.read_log()
         self.assertIn("wolfssl exiting gracefully", log)
+
+    # -- Unknown status --
+
+    def test_13_unknown_status(self):
+        if self.RESPONDER_BIN == WOLFSSL_BIN:
+            index = INDEX_UNKNOWN
+        else:
+            # openssl answers unknown for a serial missing from the index
+            index = INDEX_REVOKED
+        self._start_responder(index)
+        rc, out = self._query("server-cert.pem")
+        self._assert_status(rc, out, "unknown")
+
+    # -- Responder error status --
+
+    def test_14_responder_error(self):
+        if self.RESPONDER_BIN != WOLFSSL_BIN:
+            self.skipTest("openssl answers unknown for an unknown issuer")
+        # ca-ecc is not served by the responder: it replies unauthorized
+        self._start_responder(INDEX_VALID)
+        cmd = [
+            self.CLIENT_BIN, "ocsp",
+            "-issuer", os.path.join(CERTS_DIR, "ca-ecc-cert.pem"),
+            "-CAfile", os.path.join(CERTS_DIR, "ca-cert.pem"),
+            "-url", f"http://127.0.0.1:{self.PORT}",
+            "-cert", os.path.join(CERTS_DIR, "server-ecc.pem"),
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL, timeout=30)
+        self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("Responder Error: unauthorized", r.stdout,
+                      r.stdout + r.stderr)
+
+    # -- Output streams --
+
+    def test_15_status_on_stdout(self):
+        self._start_responder(INDEX_VALID)
+        cmd = [
+            self.CLIENT_BIN, "ocsp",
+            "-issuer", os.path.join(CERTS_DIR, "ca-cert.pem"),
+            "-CAfile", os.path.join(CERTS_DIR, "ca-cert.pem"),
+            "-url", f"http://127.0.0.1:{self.PORT}",
+            "-cert", os.path.join(CERTS_DIR, "server-cert.pem"),
+        ]
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           stdin=subprocess.DEVNULL, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(": good", r.stdout, r.stdout)
+        self.assertIn("This Update:", r.stdout, r.stdout)
+        self.assertIn("Response verify OK", r.stderr, r.stderr)
 
 
 # Concrete test classes for each client/responder combination.

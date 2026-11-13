@@ -49,6 +49,13 @@ both \-cert and \-issuer to complete a check.
 -nrequest n           stop the responder after processing n requests (0 =
 .br
                       unlimited).
+.SH EXIT STATUS
+In client mode the exit status is 0 whenever a verified response was
+received, whatever status it reports, as with openssl ocsp. The status
+(good, revoked or unknown) and its update and revocation times are printed
+on standard output in the same format as openssl ocsp. An unreachable
+responder, a malformed or unverifiable response, or a responder error
+status exits non-zero.
 .SH EXAMPLES
 Check a certificate's status against the responder named in its AIA:
 .RS
