@@ -187,6 +187,8 @@
     <ClCompile Include="src\x509\clu_parse.c" />
     <ClCompile Include="src\x509\clu_request_setup.c" />
     <ClCompile Include="src\x509\clu_x509_sign.c" />
+    <ClCompile Include="src\asn1\clu_asn1_setup.c" />
+    <ClCompile Include="src\asn1\clu_asn1_parse.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\wolfssl\IDE\WIN\USER_SETTINGS.H" />
@@ -207,6 +209,8 @@
     <ClInclude Include="wolfclu\x509\clu_parse.h" />
     <ClInclude Include="wolfclu\x509\clu_request.h" />
     <ClInclude Include="wolfclu\x509\clu_x509_sign.h" />
+    <ClInclude Include="wolfclu\asn1\clu_asn1.h" />
+    <ClInclude Include="wolfclu\asn1\clu_oid_name_table.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

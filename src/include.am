@@ -48,6 +48,9 @@ wolfssl_SOURCES = src/clu_main.c \
                     src/tools/clu_http.c \
                     src/tools/clu_scgi.c \
                     src/tools/clu_pem_der.c \
-                    src/ocsp/clu_ocsp.c
+                    src/ocsp/clu_ocsp.c    \
+                    src/asn1/clu_asn1_setup.c \
+                    src/asn1/clu_asn1_parse.c
+
 
 
