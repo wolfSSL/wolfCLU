@@ -226,17 +226,37 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
                 useLookup = 1;
             }
         #else
-            struct zsock_addrinfo hints, *addrInfo;
+            struct zsock_addrinfo hints;
+            struct zsock_addrinfo* addrInfo = NULL;
+            struct zsock_addrinfo* cur;
             char portStr[6];
+            int found = 0;
+
             XSNPRINTF(portStr, sizeof(portStr), "%d", port);
             XMEMSET(&hints, 0, sizeof(hints));
-            hints.ai_family = AF_UNSPEC;
+            /* a sockaddr_in is being filled in here, so only IPv4 results
+             * can be used */
+            hints.ai_family = AF_INET_V;
             hints.ai_socktype = udp ? SOCK_DGRAM : SOCK_STREAM;
             hints.ai_protocol = udp ? IPPROTO_UDP : IPPROTO_TCP;
             if (getaddrinfo((char*)peer, portStr, &hints, &addrInfo) == 0) {
-                XMEMCPY(addr, addrInfo->ai_addr, sizeof(*addr));
-                useLookup = 1;
+                /* walk the results and take the first one that really is an
+                 * IPv4 address large enough to copy out, rather than trusting
+                 * the family of the first entry returned */
+                for (cur = addrInfo; cur != NULL; cur = cur->ai_next) {
+                    if (cur->ai_family == AF_INET_V && cur->ai_addr != NULL &&
+                            (size_t)cur->ai_addrlen >= sizeof(*addr)) {
+                        XMEMCPY(addr, cur->ai_addr, sizeof(*addr));
+                        found = 1;
+                        break;
+                    }
+                }
+                if (addrInfo != NULL)
+                    freeaddrinfo(addrInfo);
             }
+
+            if (found)
+                useLookup = 1;
         #endif
             else
                 err_sys("no entry for host");
@@ -270,7 +290,9 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
             #if defined(HAVE_GETADDRINFO)
                 struct addrinfo  hints;
                 struct addrinfo* answer = NULL;
+                struct addrinfo* cur;
                 int    ret;
+                int    found = 0;
                 char   strPort[80];
 
                 XMEMSET(&hints, 0, sizeof(hints));
@@ -295,11 +317,23 @@ static WC_INLINE void clu_build_addr(SOCKADDR_IN4_T* addr, SOCKADDR_IN6_T* ipv6,
                 strPort[79] = '\0';
 
                 ret = getaddrinfo(peer, strPort, &hints, &answer);
-                if (ret < 0 || answer == NULL)
+                if (ret != 0 || answer == NULL)
                     err_sys("getaddrinfo failed");
 
-                XMEMCPY(ipv6, answer->ai_addr, answer->ai_addrlen);
+                /* walk the results and take the first one that really is an
+                 * IPv6 address large enough to copy out, rather than trusting
+                 * the family of the first entry returned */
+                for (cur = answer; cur != NULL; cur = cur->ai_next) {
+                    if (cur->ai_family == AF_INET6_V && cur->ai_addr != NULL &&
+                            (size_t)cur->ai_addrlen >= sizeof(*ipv6)) {
+                        XMEMCPY(ipv6, cur->ai_addr, sizeof(*ipv6));
+                        found = 1;
+                        break;
+                    }
+                }
                 freeaddrinfo(answer);
+                if (!found)
+                    err_sys("no IPv6 entry for host");
             #else
                 printf("no ipv6 getaddrinfo, loopback only tests/examples\n");
                 ipv6->sin6_addr = in6addr_loopback;
